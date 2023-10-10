@@ -8,16 +8,18 @@ This package builds SVG code for Bliss (Blissymbolics) text using a specific Dom
 
 ## Installation
 
-To install this package, run the following command:
+This package is not yet published on npm. You can install it directly from GitHub using the following commands.
+
+### Using npm
 
 ```javascript
-npm install bliss-svg-builder
+npm install github:hlridge/bliss-svg-builder
 ```
 
-Or, if you're using Yarn:
+### Using npm
 
 ```javascript
-yarn add bliss-svg-builder
+yarn add hlridge/bliss-svg-builder
 ```
 
 # Usage
