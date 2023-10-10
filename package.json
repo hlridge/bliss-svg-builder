@@ -1,5 +1,5 @@
 {
-  "name": "@blissary/bliss-svg-builder",
+  "name": "bliss-svg-builder",
   "version": "0.1.0-alpha.1",
   "description": "Generates SVG code for Bliss (Blissymbolics) text using a Domain-Specific Language.",
   "main": "dist/bliss-svg-builder.umd.cjs",
