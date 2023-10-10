@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Example Usage</title>
+</head>
+
+<body>
+  <div id="bliss-container"></div>
+  <script type="module">
+    import { BlissSVGBuilder } from '../dist/bliss-svg-builder.js';
+
+    const builder = new BlissSVGBuilder("H:0,8");
+
+    document.getElementById('bliss-container').appendChild(builder.svgElement);
+  </script>
+</body>
+
+</html>

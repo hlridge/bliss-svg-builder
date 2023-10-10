@@ -1,0 +1,9 @@
+# Build artifacts
+dist/
+
+# Dependencies
+node_modules/
+
+# Temporarily ignoring test files until they reach a stable state
+tests/
+jest.config.cjs

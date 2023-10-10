@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Example Usage (UMD)</title>
+</head>
+
+<body>
+  <div id="bliss-container"></div>
+  <script src="../dist/bliss-svg-builder.umd.cjs"></script>
+  <script>
+    const { BlissSVGBuilder } = window.BlissSVGBuilder;
+    
+    const builder = new BlissSVGBuilder("H:0,8");
+    
+    document.getElementById('bliss-container').appendChild(builder.svgElement);
+  </script>
+</body>
+
+</html>
