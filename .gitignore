@@ -7,3 +7,6 @@ node_modules/
 # Temporarily ignoring test files until they reach a stable state
 tests/
 jest.config.cjs
+
+# Ignore temporary Vite files
+*.timestamp-*.mjs
