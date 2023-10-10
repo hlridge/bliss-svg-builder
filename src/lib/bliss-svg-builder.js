@@ -32,20 +32,46 @@ class BlissSVGBuilder {
     return this.composition.toJSON();
   }
 
+  /**
+   * Returns the main path element of the SVG as a string.
+   * This is useful when you need only the primary graphical content of the SVG for manipulation or for use in complex SVG compositions.
+   * 
+   * @returns {string} SVG path string
+   */
   get svgPath() {
     return `<path d="${this.composition.getPath()}"></path>`
   }
 
+  /**
+   * Returns the SVG as a DOM Element.
+   * This property is useful when you need to directly manipulate the SVG using the native DOM API.
+   * 
+   * @returns {HTMLElement} SVG DOM element
+   */
   get svgElement() {
-    const svgStr = this.#svgCode;
     const parser = new DOMParser();
-    const doc = parser.parseFromString(svgStr, 'image/svg+xml');
+    const doc = parser.parseFromString(this.#svgCode, 'image/svg+xml');
     return doc.documentElement;
   }
   
+  /**
+   * Returns the SVG code as a string, without the XML declaration.
+   * This is suitable for embedding the SVG within HTML documents or using it with virtual DOM libraries like React and Preact.
+   * 
+   * @returns {string} SVG string without XML declaration
+   */
   get svgCode() {
-    const svgStr = this.#svgCode;
-    return `<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n${svgStr}`;
+    return this.#svgCode;
+  }
+
+  /**
+   * Returns the SVG code as a string, including the XML declaration.
+   * This is suitable for creating standalone SVG files.
+   * 
+   * @returns {string} SVG string with XML declaration
+   */
+  get standaloneSvg() {
+    return `<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n${this.#svgCode}`;
   }
 
   set code(settingsAndCodesString) {
