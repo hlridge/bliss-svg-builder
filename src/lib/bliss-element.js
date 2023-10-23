@@ -41,8 +41,6 @@ export class BlissElement {
   //#endregion
   
   constructor(blissObj, { parentElement = null, previousElement = null, level = 0 } = {}) {
-    console.log("blissObj, level: " + level);
-    console.log(JSON.stringify(blissObj));
     this.#level = level;
 
     //this.#codeString = blissObj;
@@ -60,7 +58,6 @@ export class BlissElement {
 
     //this.#relativeToRootX = (level === 2) ? parentElement.x : previousElement ? previousElement.x + previousElement.width + 2 : parentElement ? parentElement.x : 0; //space would be added differently depending on level and type etc
     this.#relativeToRootX = (level === 2) ? parentElement.x : previousElement ? previousElement.x + previousElement.width + 2 : parentElement ? parentElement.x : 0; //space would be added differently depending on level and type etc
-    console.log("relativeToRootX: " + this.#relativeToRootX);
     //this.#relativeToRootX = (previousElement ? previousElement.x : parentElement ? parentElement.x : 0) + (blissObj ? blissObj.x || 0 : 0);
     this.parentElement = parentElement;
     this.previousElement = previousElement;
@@ -99,7 +96,6 @@ export class BlissElement {
       if (level === 2) {
         //detta funkar Inte, eller? nu ändrade jag så att x() returnerar relativeToParentX och inte (relativeToParentX+relativeToRootX)
         this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + this.#charSpacing : 0;
-        console.log("relativeToParentX is: " + this.#relativeToParentX)
       } else {
         this.#relativeToParentX = blissObj.x || 0;
         //this.#relativeToParentX = (blissObj.x || 0) + previousElement ? previousElement.x + previousElement.width : 0;
@@ -268,8 +264,6 @@ export class BlissElement {
 
   toStringDDD() {
     const obj = this.toJSON();
-console.log("toString obj:" );
-console.log(obj);
     return (obj.elements || [])
         .filter(e => e !== undefined && e !== null)
         .map(({ code, x = 0, y = 0, level }) => {  // use the level of the child element
@@ -292,8 +286,6 @@ console.log(obj);
   toStringO() {
     const obj = this.toJSON();
 
-    console.log("toString obj:" );
-    console.log(JSON.stringify(obj));
     const processElement = ({ code, x = 0, y = 0, level, elements = [] }) => {
         let joinWith = "";
         switch (level) {

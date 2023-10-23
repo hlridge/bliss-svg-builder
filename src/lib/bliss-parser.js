@@ -64,7 +64,7 @@ export class BlissParser {
     const part = {};
 
     let [_, optionsString, codeString] = str.match(/^(\[[^\}]*\])?(.*)/);
-    console.log(codeString);
+
     if (optionsString) {
       part.options = this.#parseOptions(optionsString);
     }
@@ -73,14 +73,11 @@ export class BlissParser {
       const matched = codeString.match(/^([\w\-.]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
 
       if (matched) {
-        console.log("codeString matched: " + codeString)
         let [, code, x, y] = matched;
-        console.log("code is : " + code)
         part.code = code;
         part.x = Number(x) || 0;
         part.y = Number(y) || 0;
       } else {
-        console.log("codeString not matched: " + codeString)
         part.error = `Invalid format: ${codeString}`;
       }
     }
