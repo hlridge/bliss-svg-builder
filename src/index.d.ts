@@ -53,4 +53,4 @@ declare module 'bliss-svg-builder' {
 }
 
 // If your library is an ES6 module
-export = BlissSVGBuilder;
+export = { BlissSVGBuilder };
