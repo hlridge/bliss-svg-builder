@@ -1,0 +1,9 @@
+# Ignore node modules
+node_modules/
+
+# Ignore Vite temporary files
+*.timestamp-*.mjs
+
+# Temporarily ignoring test files until they reach a stable state
+tests/
+jest.config.cjs
