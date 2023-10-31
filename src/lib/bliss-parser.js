@@ -197,8 +197,11 @@ export class BlissParser {
             if (definition.isIndicator) {
               part.isIndicator = true;
               part.width = definition.width || 2;
-              part.center = definition.center || 0;
+            } else {
+              part.top = definition.top;
             }
+
+            part.center = definition.center;
 
             parts.push(part);
           }

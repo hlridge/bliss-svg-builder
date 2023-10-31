@@ -28,6 +28,8 @@ export class BlissElement {
   #isExternalGlyph
   #width
   #height
+  #indicatorAnchorOffsetX
+  #indicatorAnchorOffsetY
   #children
   #relativeToRootX
   #relativeToParentX
@@ -101,6 +103,9 @@ export class BlissElement {
         //this.#relativeToParentX = (blissObj.x || 0) + previousElement ? previousElement.x + previousElement.width : 0;
       }
       this.#relativeToParentY = blissObj.y || 0;
+      this.#indicatorAnchorOffsetX = blissObj.center || 0;
+      this.#indicatorAnchorOffsetY = blissObj.top || 0;
+
       const definition = blissElementDefinitions[codeName];
 
       if (definition) {
@@ -127,17 +132,18 @@ export class BlissElement {
           this.#children.push(child);
         }
         if (blissObj?.isIndicator) {
-          const centerOfBaseCharacter = previousElement.width / 2; //should ask for center directly instead of calculating it.
-          const centerOfIndicator = blissObj.center;
+          const centerOfBaseCharacter = previousElement ? previousElement.width / 2 + previousElement.indicatorAnchorOffset.x : 0;
+
+          const centerOfIndicator = blissObj.center || 0;
           
-          const widthOfIndicator = blissObj.width;
-          const offsetX = centerOfBaseCharacter + centerOfIndicator - widthOfIndicator / 2;
-          //const offsetX = 2;
+          const widthOfIndicator = blissObj.width || 2;
+          const offsetX = previousElement ? centerOfBaseCharacter + centerOfIndicator - widthOfIndicator / 2 : centerOfIndicator - widthOfIndicator / 2;
+          const offsetY = previousElement ? previousElement.indicatorAnchorOffset.y : 0;
 
           this.getPath = (x = 0, y = 0, level = 0) => {
             // If level is 0, add the offsetX, else don't add it
             const appliedOffsetX = (level === 0) ? x + this.#relativeToParentX + offsetX : x + this.#relativeToParentX;
-            const appliedOffsetY = y + this.#relativeToParentY;
+            const appliedOffsetY = y + this.#relativeToParentY + offsetY;
           
             return this.#children.map(child => child.getPath(appliedOffsetX, appliedOffsetY, level + 1)).join(' ');
           }
@@ -160,6 +166,13 @@ export class BlissElement {
 
   get codeName() {
     return this.#codeName || "";
+  }
+
+  get indicatorAnchorOffset() {
+    return {
+      x: this.#indicatorAnchorOffsetX || 0,
+      y: this.#indicatorAnchorOffsetY || 0
+    }
   }
 
   get width() {
