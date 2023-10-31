@@ -107,9 +107,9 @@ class BlissSVGBuilder {
    * Extends the blissElementDefinitions with custom data.
    *
    * @static
-   * @param {Object.<string, { codeString: string, isIndicator?: boolean, center?: number, width?: number }>} data 
+   * @param {Object.<string, { codeString: string, isIndicator?: boolean, center?: number, top?: number, width?: number }>} data 
    *     Character code in the format { B1: { codeString: "..." }, B2: { codeString: "..." } }
-   *     Optional properties: isIndicator, center, width.
+   *     Optional properties: isIndicator, center, top, width.
    *     Use this function before invoking new to extend Bliss-SVG-Builder with custom data.
    */
   static extendData(data) {
@@ -127,7 +127,11 @@ class BlissSVGBuilder {
           if (entry.hasOwnProperty('center') && typeof entry.center === 'number') {
             validEntry.center = entry.center;
           }
-          
+
+          if (entry.hasOwnProperty('top') && typeof entry.top === 'number') {
+            validEntry.top = entry.top;
+          }
+
           if (entry.hasOwnProperty('width') && typeof entry.width === 'number') {
             validEntry.width = entry.width;
           }
