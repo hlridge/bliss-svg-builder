@@ -389,7 +389,8 @@ const charData = {
     codeString: "Xa/Xb/Xc"
   },
   B119: {
-    codeString: "P4W:0,6;P4E:4,10;P4W:0,14"
+    codeString: "P4W:0,6;P4E:4,10;P4W:0,14",
+    top: -2
   },
   B120: {
     codeString: "SC4:0,10"
@@ -448,7 +449,8 @@ const charData = {
     codeString: "B257;B11:7,0;B500:8,0"
   },
   B138: {
-    codeString: "QC4NW:3,4;VQW4NW:1,8;VQW4NE:3,8;HW4W:0,12;HW4E:5,12;B528:2.5,0;HL4:1,16"
+    codeString: "QC4NW:3,4;VQW4NW:1,8;VQW4NE:3,8;HW4W:0,12;HW4E:5,12;B528:2.5,0;HL4:1,16",
+    top: -4
   },
   B139: {
     codeString: "VL4:0,10;P4E:8,10"
@@ -463,7 +465,8 @@ const charData = {
     codeString: "C4:0,12;AT4W:4,12"
   },
   B143: {
-    codeString: "P4E:0,6;B518:3,0"
+    codeString: "P4E:0,6;B518:3,0",
+    top: -2
   },
   B144: {
     codeString: "B335;B145:0,4"
@@ -481,10 +484,12 @@ const charData = {
     codeString: "C4:0,12;HL4:0,14"
   },
   B149: {
-    codeString: "C8:0,4;QC4SE:0,12"
+    codeString: "C8:0,4;QC4SE:0,12",
+    top: -4
   },
   B150: {
-    codeString: "QC4NW:0,4;HW8E:0,8;HC8E:0,8"
+    codeString: "QC4NW:0,4;HW8E:0,8;HC8E:0,8",
+    top: -4
   },
   B151: {
     codeString: "B612;B428:12,0"
@@ -565,7 +570,8 @@ const charData = {
     codeString: "C4:0,10;C4:4,10;RA4N:2,14"
   },
   B177: {
-    codeString: "S8:0,8;DL4N:0,4;HL8:4,4;DL4N:8,4;VL8:12,4;DL4N:8,12"
+    codeString: "S8:0,8;DL4N:0,4;HL8:4,4;DL4N:8,4;VL8:12,4;DL4N:8,12",
+    top: -4
   },
   B178: {
     codeString: "C4:0,8;B106"
@@ -633,7 +639,8 @@ const charData = {
     codeString: "B291;B424"
   },
   B199: {
-    codeString: "VL4:0,8;B688;RA8N:0,4;VL4:8,8"
+    codeString: "VL4:0,8;B688;RA8N:0,4;VL4:8,8",
+    top: -4
   },
   B200: {
     codeString: "C4:0,8;VL4:0,10;VL4:4,10;HC4S:0,14"
@@ -701,7 +708,8 @@ const charData = {
     codeString: "C4:0,8;B956"
   },
   B221: {
-    codeString: "B1132;P4W:9,6"
+    codeString: "B1132;P4W:9,6",
+    top: -2
   },
   B222: {
     codeString: "B306;P4N:2,17"
@@ -729,7 +737,8 @@ const charData = {
     codeString: "B228;B548"
   },
   B230: {
-    codeString: "B597;W8N:0,7"
+    codeString: "B597;W8N:0,7",
+    top: -1
   },
   B231: {
     codeString: "OR84N:0,12;VL4:4,12"
@@ -738,7 +747,8 @@ const charData = {
     codeString: "C4:0,10;C4:2,10"
   },
   B233: {
-    codeString: "C2:0,4;C2:1,4"
+    codeString: "C2:0,4;C2:1,4",
+    top: -4
   },
   B234: {
     codeString: "B622:0,4;B255:1,0"
@@ -754,7 +764,8 @@ const charData = {
     codeString: "RA8N:0,8;HC8S:0,12"
   },
   B238: {
-    codeString: "B447;B447:0,-4"
+    codeString: "B447;B447:0,-4",
+    top: -4
   },
   B239: {
     codeString: "HC8S:0,12"
@@ -843,7 +854,8 @@ const charData = {
     codeString: "DOT:4,10;HL8:0,12;DOT:4,14"
   },
   B267: {
-    codeString: "VL12:2,6;OC4SE:0,8;OC4NW:0,12"
+    codeString: "VL12:2,6;OC4SE:0,8;OC4NW:0,12",
+    top: -2
   },
   B268: {
     codeString: "HC4E:0,14;B851:2,0"
@@ -931,7 +943,8 @@ const charData = {
     codeString: "B518;DL2N:0,10"
   },
   B296: {
-    codeString: "VL2:2,6;HW8W:0,8;HW8E:2,8"
+    codeString: "VL2:2,6;HW8W:0,8;HW8E:2,8",
+    top: -2
   },
   B297: {
     codeString: "AA8S:0,8"
@@ -949,16 +962,19 @@ const charData = {
     codeString: "B447;B1042:2,0"
   },
   B302: {
-    codeString: "LARR4W:0,10;LARR4N:4,6;B651:4,0;LARR4E:8,10;LARR4S:4,14"
+    codeString: "LARR4W:0,10;LARR4N:4,6;B651:4,0;LARR4E:8,10;LARR4S:4,14",
+    top: -2
   },
   B303: {
     codeString: "C4:0,10;DOT:2,12"
   },
   B304: {
-    codeString: "B1138;P4W:5,6"
+    codeString: "B1138;P4W:5,6",
+    top: -2
   },
   B305: {
-    codeString: "B303;P4S:0,7"
+    codeString: "B303;P4S:0,7",
+    top: -1
   },
   B306: {
     codeString: "B376;DOT:2,10;DOT:6,10"
@@ -998,7 +1014,8 @@ const charData = {
   },
   B318: {
     codeString: "B374;P4W:5,6",
-    center: -1.5
+    center: -1.5,
+    top: -2
   },
   B319: {
     codeString: "W8E:0,8"
@@ -1044,7 +1061,8 @@ const charData = {
     codeString: "RA4E:0,10;RA4E:2,10"
   },
   B333: {
-    codeString: "B306;P4S:2,7"
+    codeString: "B306;P4S:2,7",
+    top: -1
   },
   B334: {
     codeString: "DL6N:0,10;DL4S:2,10;DL2N:2,8;DL2N:6,12"
@@ -1084,7 +1102,8 @@ const charData = {
     codeString: "B678;C4:0,10"
   },
   B346: {
-    codeString: "LARR4E:0,10;LARR4S:4,6;LARR4N:4,14;LARR4W:8,10"
+    codeString: "LARR4E:0,10;LARR4S:4,6;LARR4N:4,14;LARR4W:8,10",
+    top: -2
   },
   B347: {
     codeString: "B106;B314:4,0"
@@ -1097,7 +1116,8 @@ const charData = {
   },
   B350: {
     codeString: "B122;VL8:8,4;HL4:8,4",
-    center: -2
+    center: -2,
+    top: -4
   },
   B351: {
     codeString: "C4:0,8;B314"
@@ -1112,7 +1132,8 @@ const charData = {
     codeString: "OS8S:0,8;B148:2,0"
   },
   B355: {
-    codeString: "AA8N:0,4;HL2:0,12;HL2:6,12;B247"
+    codeString: "AA8N:0,4;HL2:0,12;HL2:6,12;B247",
+    top: -4
   },
   B356: {
     codeString: "B239;B651:2,0"
@@ -1164,7 +1185,8 @@ const charData = {
   },
   B372: {
     codeString: "B1143;P4W:7,4",
-    center: -0.5
+    center: -0.5,
+    top: -4
   },
   B373: {
     codeString: "DL6N:0,10;DL4S:4,8"
@@ -1202,7 +1224,8 @@ const charData = {
     codeString: "RA4E:0,10;B270:4,0;B270:6,0"
   },
   B384: {
-    codeString: "B418;P4W:5,6"
+    codeString: "B418;P4W:5,6",
+    top: -2
   },
   B385: {
     codeString: "B127;DL4N:8,8;DL2S:12,8",
@@ -1280,7 +1303,8 @@ const charData = {
     codeString: "B457;B457:4,0"
   },
   B409: {
-    codeString: "DS8:0,4;QC4SE:0,12"
+    codeString: "DS8:0,4;QC4SE:0,12",
+    top: -4
   },
   B410: {
     codeString: "B514;P4W:5,14"
@@ -1311,7 +1335,8 @@ const charData = {
     center: -2
   },
   B419: {
-    codeString: "QC4NW:2,4;HW8W:0,8;HW8E:2,8"
+    codeString: "QC4NW:2,4;HW8W:0,8;HW8E:2,8",
+    top: -4
   },
   B420: {
     codeString: "VL4:0,10;HL8:0,12;VL4:8,10"
@@ -1341,7 +1366,8 @@ const charData = {
     codeString: "VL8:0,8"
   },
   B429: {
-    codeString: "P4S:0,7;B457;P4N:0,15"
+    codeString: "P4S:0,7;B457;P4N:0,15",
+    top: -1
   },
   B430: {
     codeString: "B818;HC4E:0,8;HC4W:6,8"
@@ -1380,13 +1406,16 @@ const charData = {
     codeString: "B420;VL4:4,10"
   },
   B442: {
-    codeString: "C8:0,8;C4:2,10;QC4NW:4,4"
+    codeString: "C8:0,8;C4:2,10;QC4NW:4,4",
+    top: -4
   },
   B443: {
-    codeString: "VL4:0,8;VL4:2,8;VL4:4,8;VL4:6,8;VL10:8,6;VL4:10,8;VL4:12,8;VL4:14,8;VL4:16,8;HL16:0,12;HL4:6,16"
+    codeString: "VL4:0,8;VL4:2,8;VL4:4,8;VL4:6,8;VL10:8,6;VL4:10,8;VL4:12,8;VL4:14,8;VL4:16,8;HL16:0,12;HL4:6,16",
+    top: -2
   },
   B444: {
-    codeString: "B457:0,-6;VL8:2,8;B1154"
+    codeString: "B457:0,-6;VL8:2,8;B1154",
+    top: -4
   },
   B445: {
     codeString: "B289;B291:4,0"
@@ -1452,7 +1481,8 @@ const charData = {
     codeString: "B1142;P4W:6,16"
   },
   B466: {
-    codeString: "B171;P4S:4,5"
+    codeString: "B171;P4S:4,5",
+    top: -3
   },
   B467: {
     codeString: "HL4:0,16;DL4-8N:2,8",
@@ -1579,7 +1609,8 @@ const charData = {
     codeString: "QC4NW:4,8;HC4N:0,10;HC4N:4,10;HC8S:0,12;B528:3.5,0"
   },
   B507: {
-    codeString: "QC4NW:3,4;VQW4NW:1,8;VQW4NE:3,8;HW4W:0,12;HW4E:5,12;HL4:1,16"
+    codeString: "QC4NW:3,4;VQW4NW:1,8;VQW4NE:3,8;HW4W:0,12;HW4E:5,12;HL4:1,16",
+    top: -4
   },
   B508: {
     codeString: "B801;C2:2,9;C2:2,13"
@@ -1591,7 +1622,8 @@ const charData = {
     codeString: "B434;P4W:3,12"
   },
   B511: {
-    codeString: "QC4NW:2,4;VL2:2,8;HC2N:0,9;HC2N:2,9;VL4:0,10;VL4:4,10;HC4S:0,14"
+    codeString: "QC4NW:2,4;VL2:2,8;HC2N:0,9;HC2N:2,9;VL4:0,10;VL4:4,10;HC4S:0,14",
+    top: -4
   },
   B512: {
     codeString: "HL8:0,16;VL8:4,8"
@@ -1625,7 +1657,8 @@ const charData = {
     center: 2
   },
   B522: {
-    codeString: "B156;P4S:6,5"
+    codeString: "B156;P4S:6,5",
+    top: -3
   },
   B523: {
     codeString: "B1140;P4W:9,10"
@@ -1634,7 +1667,8 @@ const charData = {
     codeString: "HL4:0,12;VL4:2,12"
   },
   B525: {
-    codeString: "QC4NE:0,4;VL4:4,4;QC4NW:4,4;HC4N:2,8;VL4:2,10;VL4:6,10;HC4S:2,14"
+    codeString: "QC4NE:0,4;VL4:4,4;QC4NW:4,4;HC4N:2,8;VL4:2,10;VL4:6,10;HC4S:2,14",
+    top: -4
   },
   B526: {
     codeString: "B1086;P4W:13,12"
@@ -1674,7 +1708,8 @@ const charData = {
   },
   B538: {
     codeString: "B411;P4W:9,6",
-    center: -1.5
+    center: -1.5,
+    top: -2
   },
   B539: {
     codeString: "B878;B695"
@@ -1831,7 +1866,8 @@ const charData = {
     codeString: "B1006;P4W:9,10"
   },
   B589: {
-    codeString: "B171;P4S:8,5"
+    codeString: "B171;P4S:8,5",
+    top: -3
   },
   B590: {
     codeString: "HL4:0,8;VL6:2,8;HL4:0,14;HC4S:0,14"
@@ -1969,7 +2005,8 @@ const charData = {
     codeString: "HL8:0,12"
   },
   B635: {
-    codeString: "B1063;B335:4,0"
+    codeString: "B1063;B335:4,0",
+    top: -2
   },
   B636: {
     codeString: "C8:0,8"
@@ -1988,7 +2025,8 @@ const charData = {
     center: 2.5
   },
   B641: {
-    codeString: "B201:0,-4;HL15:0,12;B700:3,0;B700:7,0;B700:11,0;DL2N:12,9;DL2S:13,10"
+    codeString: "B201:0,-4;HL15:0,12;B700:3,0;B700:7,0;B700:11,0;DL2N:12,9;DL2S:13,10",
+    top: -4
   },
   B642: {
     codeString: "B473;B457"
@@ -2053,13 +2091,15 @@ const charData = {
     center: 1
   },
   B661: {
-    codeString: "B291;P4S:2,5"
+    codeString: "B291;P4S:2,5",
+    top: -3
   },
   B662: {
     codeString: "AT4S:0,12;VL2:2,10"
   },
   B663: {
-    codeString: "VL2:2,6;VL2:6,6;S8:0,8;VL2:2,16;VL2:6,16"
+    codeString: "VL2:2,6;VL2:6,6;S8:0,8;VL2:2,16;VL2:6,16",
+    top: -2
   },
   B664: {
     codeString: "B827;HL4:8,12;B700:8,0;DL2N:9,9;DL2S:10,10"
@@ -2199,7 +2239,8 @@ const charData = {
     codeString: "QC4NE:0,8;QC4NW:4,8"
   },
   B709: {
-    codeString: "B120:0,-4"
+    codeString: "B120:0,-4",
+    top: -2
   },
   B710: {
     codeString: "VL4:2,8;B314"
@@ -2214,7 +2255,8 @@ const charData = {
     codeString: "HL12:0,16;B602:0,4"
   },
   B714: {
-    codeString: "B132;P4W:1,6"
+    codeString: "B132;P4W:1,6",
+    top: -2
   },
   B715: {
     codeString: "B1135;P4S:10,13"
@@ -2245,19 +2287,23 @@ const charData = {
     codeString: "B678;B271:4,0"
   },
   B724: {
-    codeString: "VL8:0,8;HW4N:0,7;HW4S:0,8;HW4S:0,16;VL8:4,8"
+    codeString: "VL8:0,8;HW4N:0,7;HW4S:0,8;HW4S:0,16;VL8:4,8",
+    top: -1
   },
   B725: {
-    codeString: "B313;B355"
+    codeString: "B313;B355",
+    top: -4
   },
   B726: {
     codeString: "B313;B247"
   },
   B727: {
-    codeString: "B313;B733"
+    codeString: "B313;B733",
+    top: -4
   },
   B728: {
-    codeString: "B513;B737:0,-2"
+    codeString: "B513;B737:0,-2",
+    top: -2
   },
   B729: {
     codeString: "B708;B513:2,0"
@@ -2275,7 +2321,8 @@ const charData = {
     codeString: "B447:0,-4;B247"
   },
   B734: {
-    codeString: "P4W:0,10;B355:3,0;P4E:12,10"
+    codeString: "P4W:0,10;B355:3,0;P4E:12,10",
+    top: -4
   },
   B735: {
     codeString: "B313;B894:2,0"
@@ -2386,16 +2433,19 @@ const charData = {
     codeString: "B695:0,4;DL4N:1,12;DL4N:3,14;DL2S:1,16;DL2S:5,12;DL5N:6,8"
   },
   B771: {
-    codeString: "B695:0,4;DL4N:1,12;DL4N:3,14;DL2S:1,16;DL2S:5,12;DL2N:6,11;DL4N:7,6;DL4N:9,8;DL2S:7,10;DL2S:11,6"
+    codeString: "B695:0,4;DL4N:1,12;DL4N:3,14;DL2S:1,16;DL2S:5,12;DL2N:6,11;DL4N:7,6;DL4N:9,8;DL2S:7,10;DL2S:11,6",
+    top: -2
   },
   B772: {
     codeString: "B170;RA4NW:0,8"
   },
   B773: {
-    codeString: "HC8N:0,4;B1040"
+    codeString: "HC8N:0,4;B1040",
+    top: -4
   },
   B774: {
-    codeString: "C8:0,4;OR42N:2,12"
+    codeString: "C8:0,4;OR42N:2,12",
+    top: -4
   },
   B775: {
     codeString: "B392;B270:4,0"
@@ -2438,7 +2488,8 @@ const charData = {
     codeString: "DL4S:0,8;DL4N:5,8;VL4:4,12;VL4:5,12"
   },
   B788: {
-    codeString: "B630;P4S:2,5"
+    codeString: "B630;P4S:2,5",
+    top: -3
   },
   B789: {
     codeString: "OS4N:0,12;HC4E:4,12",
@@ -2457,13 +2508,15 @@ const charData = {
     codeString: "HL2:0,14;R84:2,12;HL2:10,14"
   },
   B794: {
-    codeString: "B280;P4W:8,7"
+    codeString: "B280;P4W:8,7",
+    top: -1
   },
   B795: {
     codeString: "B280;P4W:9,14"
   },
   B796: {
-    codeString: "B280:3,0;P4E:0,6"
+    codeString: "B280:3,0;P4E:0,6",
+    top: -2
   },
   B797: {
     codeString: "B695:0,4;B456:8,0"
@@ -2541,7 +2594,8 @@ const charData = {
     codeString: "B803;B451:2,0"
   },
   B821: {
-    codeString: "OR48N:0,8;RA4N:0,6"
+    codeString: "OR48N:0,8;RA4N:0,6",
+    top: -2
   },
   B822: {
     codeString: "B566:3,0;P4E:0,10",
@@ -2554,7 +2608,8 @@ const charData = {
     codeString: "R84:0,10"
   },
   B825: {
-    codeString: "RA4N:0,6;VL8:0,8;HL16:0,16;VL4:4,8;RA8N:4,8;VL4:12,8;RA4N:12,6;VL8:16,8"
+    codeString: "RA4N:0,6;VL8:0,8;HL16:0,16;VL4:4,8;RA8N:4,8;VL4:12,8;RA4N:12,6;VL8:16,8",
+    top: -2
   },
   B826: {
     codeString: "B447;B206:4,0"
@@ -2592,13 +2647,16 @@ const charData = {
     center: -1
   },
   B837: {
-    codeString: "B945;B433:2,0"
+    codeString: "B945;B433:2,0",
+    top: -4
   },
   B838: {
-    codeString: "B945;B513:2,0"
+    codeString: "B945;B513:2,0",
+    top: -4
   },
   B839: {
-    codeString: "B945;B710:2,0"
+    codeString: "B945;B710:2,0",
+    top: -4
   },
   B840: {
     codeString: "RT8N:0,12"
@@ -2632,7 +2690,8 @@ const charData = {
   },
   B850: {
     codeString: "B391;DL2N:13,7",
-    center: -3.5
+    center: -3.5,
+    top: -1
   },
   B851: {
     codeString: "HC8N:0,12;B695:0,4"
@@ -2693,7 +2752,8 @@ const charData = {
     codeString: "QC4NW:0,12;HL2:4,12;QC4NW:2,12;HL2:0,16"
   },
   B870: {
-    codeString: "B871;P4W:5,6"
+    codeString: "B871;P4W:5,6",
+    top: -2
   },
   B871: {
     codeString: "HL4:0,8;HL4:0,10;HL4:0,12;HL4:0,14;HL4:0,16"
@@ -2743,7 +2803,8 @@ const charData = {
     codeString: "B803;B457:2,0"
   },
   B886: {
-    codeString: "B238;B2115:4,0"
+    codeString: "B238;B2115:4,0",
+    top: -4
   },
   B887: {
     codeString: "LARROC8NWC:0,8",
@@ -2771,7 +2832,8 @@ const charData = {
     codeString: "C4:0,10;VL4:2,10"
   },
   B895: {
-    codeString: "B635;VL8:12,8"
+    codeString: "B635;VL8:12,8",
+    top: -2
   },
   B896: {
     codeString: "C8:0,8;B622:3,0"
@@ -2933,7 +2995,8 @@ const charData = {
     codeString: "B335;VL2:8,8;VL2:8,14"
   },
   B941: {
-    codeString: "LARR4W:0,10;LARR4N:4,6;LARR4S:4,14;LARR4E:8,10"
+    codeString: "LARR4W:0,10;LARR4N:4,6;LARR4S:4,14;LARR4E:8,10",
+    top: -2
   },
   B942: {
     codeString: "C4:0,12;HC8N:2,8;C4:8,12"
@@ -2946,7 +3009,8 @@ const charData = {
     center: -3
   },
   B945: {
-    codeString: "B597;B894:2,-6"
+    codeString: "B597;B894:2,-6",
+    top: -4
   },
   B946: {
     codeString: "VL4:0,10;VL4:8,10"
@@ -3041,7 +3105,8 @@ const charData = {
     codeString: "B145;B291:4,0"
   },
   B977: {
-    codeString: "B291;B678:2,-4"
+    codeString: "B291;B678:2,-4",
+    top: -4
   },
   B978: {
     codeString: "B163;HC2N:1,13;HC2N:5,13"
@@ -3053,10 +3118,12 @@ const charData = {
     codeString: "B651;P4W:5,10"
   },
   B981: {
-    codeString: "P4W:0,10;B982:3,0;P4E:12,10"
+    codeString: "P4W:0,10;B982:3,0;P4E:12,10",
+    top: -1
   },
   B982: {
-    codeString: "B814;HW2N:3,8.5;HW4N:2,7;HW2S:3,15;HW4S:2,16"
+    codeString: "B814;HW2N:3,8.5;HW4N:2,7;HW2S:3,15;HW4S:2,16",
+    top: -1
   },
   B983: {
     codeString: "DL8-4N:0,8;DL8-4S:0,8;VL2:4,10"
@@ -3068,7 +3135,8 @@ const charData = {
     codeString: "B447;B894:2,0"
   },
   B986: {
-    codeString: "P4S:0,7;B651"
+    codeString: "P4S:0,7;B651",
+    top: -1
   },
   B987: {
     codeString: "B428;B288:2,0;B428:8,0"
@@ -3098,13 +3166,15 @@ const charData = {
   },
   B995: {
     codeString: "W8E:0,4;B122:1,0",
-    center: 0.5
+    center: 0.5,
+    top: -4
   },
   B996: {
     codeString: "VL4:0,10;DOT:2,16;DOT:4,16;DOT:6,16;P4E:8,10"
   },
   B997: {
-    codeString: "B238;B449:2,0"
+    codeString: "B238;B449:2,0",
+    top: -4
   },
   B998: {
     codeString: "B148:2,0;B281"
@@ -3123,7 +3193,8 @@ const charData = {
     codeString: "B172;HL4:2,16;DOT:8,16"
   },
   B1003: {
-    codeString: "B174;P4W:3,6"
+    codeString: "B174;P4W:3,6",
+    top: -2
   },
   B1004: {
     codeString: "P4S:3,9;B180;P4N:3,17"
@@ -3171,7 +3242,8 @@ const charData = {
     codeString: "B153;B145:4,0"
   },
   B1019: {
-    codeString: "B335;B1063:8,0"
+    codeString: "B335;B1063:8,0",
+    top: -2
   },
   B1020: {
     codeString: "VL8:0,8;P4S:0,14;VL8:4,8"
@@ -3207,7 +3279,8 @@ const charData = {
     codeString: "B319:3,0;B939"
   },
   B1031: {
-    codeString: "P4S:0,7;B303;P4N:0,15"
+    codeString: "P4S:0,7;B303;P4N:0,15",
+    top: -1
   },
   B1032: {
     codeString: "B303;P4N:0,15"
@@ -3243,14 +3316,16 @@ const charData = {
     codeString: "B341;B699:2,0"
   },
   B1043: {
-    codeString: "B238;B120:2,0"
+    codeString: "B238;B120:2,0",
+    top: -4
   },
   B1044: {
     codeString: "B281;B651:2,4"
   },
   B1045: {
     codeString: "B391;P4E:7,7",
-    center: -3
+    center: -3,
+    top: -1
   },
   B1046: {
     codeString: "P4E:0,10;B391:3,0",
@@ -3280,7 +3355,8 @@ const charData = {
     codeString: "B428;DOT:2,16;DOT:4,16;DOT:6,16;B428:8,0"
   },
   B1054: {
-    codeString: "B1127;P4W:9,4"
+    codeString: "B1127;P4W:9,4",
+    top: -4
   },
   B1055: {
     codeString: "B335;B329:8,0;B145:12,0"
@@ -3295,7 +3371,8 @@ const charData = {
     codeString: "B1057:0,-2;B1066:0,2"
   },
   B1059: {
-    codeString: "B444:2,0;B708"
+    codeString: "B444:2,0;B708",
+    top: -4
   },
   B1060: {
     codeString: "VL4:0,10;VL4:4,10"
@@ -3308,10 +3385,12 @@ const charData = {
     codeString: "B457:2,0;B939"
   },
   B1063: {
-    codeString: "B145:0,-4;B145:0,4"
+    codeString: "B145:0,-4;B145:0,4",
+    top: -2
   },
   B1064: {
-    codeString: "B171;B678:4,-4"
+    codeString: "B171;B678:4,-4",
+    top: -4
   },
   B1065: {
     codeString: "B392;B270:10,0",
@@ -3411,10 +3490,12 @@ const charData = {
     codeString: "P4E:0,10;B428:2,0;B428:6,0;P4W:6,10"
   },
   B1097: {
-    codeString: "B695:0,-4;B695;B695:0,4"
+    codeString: "B695:0,-4;B695;B695:0,4",
+    top: -1
   },
   B1098: {
-    codeString: "B291:0,-4;B700;B700:4,0"
+    codeString: "B291:0,-4;B700;B700:4,0",
+    top: -4
   },
   B1099: {
     codeString: "B651:0,-2;B700"
@@ -3495,7 +3576,8 @@ const charData = {
     center: -2
   },
   B1124: {
-    codeString: "B291;B271:2,-4"
+    codeString: "B291;B271:2,-4",
+    top: -4
   },
   B1125: {
     codeString: "B291;B678:2,4"
@@ -3504,7 +3586,8 @@ const charData = {
     codeString: "DL2S:0,8;DL2N:0,10;DL2S:0,12;DL2N:0,14"
   },
   B1127: {
-    codeString: "B171;B371:3.5,-4"
+    codeString: "B171;B371:3.5,-4",
+    top: -2
   },
   B1128: {
     codeString: "B171;DOT:6,12"
@@ -3552,7 +3635,8 @@ const charData = {
     codeString: "B376;VL2:3,16;VL2:5,16"
   },
   B1143: {
-    codeString: "B376;B371:1.5,-4"
+    codeString: "B376;B371:1.5,-4",
+    top: -2
   },
   B1144: {
     codeString: "RT8SW:0,8;B281:8,0;B456:16,0"
@@ -3571,7 +3655,8 @@ const charData = {
   },
   B1149: {
     codeString: "B202;P4W:8,7",
-    center: -1
+    center: -1,
+    top: -1
   },
   B1150: {
     codeString: "B281;B392:8,0"
@@ -3604,7 +3689,8 @@ const charData = {
     codeString: "B636;P3SW:2,11"
   },
   B1160: {
-    codeString: "B376;P4S:2,5"
+    codeString: "B376;P4S:2,5",
+    top: -3
   },
   B1161: {
     codeString: "B303;B1154"
@@ -3628,7 +3714,8 @@ const charData = {
     center: 1
   },
   B1999: {
-    codeString: "VL2:2,6;R48:0,8;VL2:2,16"
+    codeString: "VL2:2,6;R48:0,8;VL2:2,16",
+    top: -2
   },
   B2115: {
     codeString: "VL8:0,8;B11:2,0"
@@ -3670,7 +3757,8 @@ const charData = {
     codeString: "B106;B314:2,0"
   },
   B5995: {
-    codeString: "B457;P4S:0,7"
+    codeString: "B457;P4S:0,7",
+    top: -1
   },
   B5996: {
     codeString: "B99;B904:3,0",
