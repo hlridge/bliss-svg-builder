@@ -3400,7 +3400,8 @@ const charData = {
     codeString: "B145;B335:10,0"
   },
   B1067: {
-    codeString: "HC8N:0,4;B960"
+    codeString: "HC8N:0,4;B960",
+    top: -4
   },
   B1068: {
     codeString: "C8:0,8;DLIC8N:0,8;DLIC8S:0,8;VL8:4,8"
