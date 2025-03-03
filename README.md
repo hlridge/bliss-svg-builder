@@ -14,7 +14,7 @@ This package builds SVG code for Bliss (Blissymbolics) text using a specific Dom
 npm install bliss-svg-builder@alpha
 ```
 
-### Using npm
+### Using yarn
 
 ```javascript
 yarn add bliss-svg-builder@alpha
