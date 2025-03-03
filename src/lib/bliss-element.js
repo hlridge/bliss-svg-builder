@@ -73,7 +73,7 @@ export class BlissElement {
         //child.type = "word";
         this.#children.push(child);
       }
-      this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToRootX + x, this.#relativeToParentY + y)).join(' ');
+      this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToRootX + x, this.#relativeToParentY + y)).join('');
     } else if (blissObj.characters) {
       if (this.#level < 1) this.#level = 1;
       let relativeToLocalX = 0;
@@ -91,7 +91,7 @@ export class BlissElement {
         //child.type = "character";
         this.#children.push(child);        
       }
-      this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x , this.#relativeToParentY + y)).join(' ');
+      this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x , this.#relativeToParentY + y)).join('');
     } else {
       if (this.#level < 2) this.#level = 2;
       const codeName = blissObj.code;
@@ -145,13 +145,13 @@ export class BlissElement {
             const appliedOffsetX = (level === 0) ? x + this.#relativeToParentX + offsetX : x + this.#relativeToParentX;
             const appliedOffsetY = y + this.#relativeToParentY + offsetY;
           
-            return this.#children.map(child => child.getPath(appliedOffsetX, appliedOffsetY, level + 1)).join(' ');
+            return this.#children.map(child => child.getPath(appliedOffsetX, appliedOffsetY, level + 1)).join('');
           }
 
-          //this.getPath = (x = 0, y = 0, level = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join(' ');
-          //this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join(' ');
+          //this.getPath = (x = 0, y = 0, level = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
+          //this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
         } else {
-          this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join(' ');
+          this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
         }
       } 
       if (!definition?.getPath && !blissObj.parts) {
@@ -417,7 +417,7 @@ export class BlissElement {
       const child = new BlissElement(part, this.#relativeToParentX);
       this.#children.push(child);
     }
-    this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(x + this.#relativeToParentX, y + this.#relativeToParentY)).join(' ');  
+    this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(x + this.#relativeToParentX, y + this.#relativeToParentY)).join('');  
   }
 }
 
