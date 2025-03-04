@@ -52,5 +52,11 @@
     "jsdom": "^26.0.0",
     "vite": "^6.2.0",
     "vitest": "^3.0.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "canvas",
+      "esbuild"
+    ]
   }
 }
