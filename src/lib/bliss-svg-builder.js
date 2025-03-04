@@ -146,7 +146,7 @@ class BlissSVGBuilder {
 
   get #svgCode() {
     //temp hard coded values
-    const color = "black";
+    const color = "#000000";
     const strokeWidth = 0.5;
     const cropTop = 0;
     const cropBottom = 0;
