@@ -1836,7 +1836,7 @@ const charData = {
     codeString: "HL4:0,10;HL4:0,14"
   },
   B579: {
-    codeString: "DL1-2N:0,8;RA4SE:4,12;RA4SE:8,8"
+    codeString: "DL12N:0,8;RA4SE:4,12;RA4SE:8,8"
   },
   B580: {
     codeString: "B447;B247"
