@@ -7,6 +7,11 @@ node_modules/
 # Temporarily ignoring test files until they reach a stable state
 tests/
 jest.config.cjs
+vitest.config
 
 # Ignore temporary Vite files
 *.timestamp-*.mjs
+
+# Ignore temporary testing files but keep directory structure
+/temp/*
+!/temp/.gitkeep
