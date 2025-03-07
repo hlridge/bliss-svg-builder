@@ -196,7 +196,7 @@ export class BlissParser {
 
             if (definition.isIndicator) {
               part.isIndicator = true;
-              part.width = definition.width || 2;
+              part.width = definition.width ?? 2;
             } else {
               part.top = definition.top;
             }

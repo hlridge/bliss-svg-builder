@@ -136,7 +136,7 @@ export class BlissElement {
 
           const centerOfIndicator = blissObj.center || 0;
           
-          const widthOfIndicator = blissObj.width || 2;
+          const widthOfIndicator = blissObj.width ?? 2;
           const offsetX = previousElement ? centerOfBaseCharacter + centerOfIndicator - widthOfIndicator / 2 : centerOfIndicator - widthOfIndicator / 2;
           const offsetY = previousElement ? previousElement.indicatorAnchorOffset.y : 0;
 
