@@ -2855,7 +2855,8 @@ const charData = {
   },
   B902: {
     codeString: "B86;B81:2,0",
-    isIndicator: true
+    isIndicator: true,
+    width: 4
   },
   B903: {
     codeString: "HL2:0,5",
@@ -2876,7 +2877,8 @@ const charData = {
   },
   B907: {
     codeString: "VL1.25:0,4;DOT:0,6",
-    isIndicator: true
+    isIndicator: true,
+    width: 0
   },
   B908: {
     codeString: "DL2S:0,4",
@@ -2884,21 +2886,22 @@ const charData = {
   },
   B909: {
     codeString: "VL2:0,4",
-    isIndicator: true
+    isIndicator: true,
+    width: 0
   },
   B910: {
     codeString: "P2E:0,4;VL2:2,4",
     isIndicator: true
   },
   B911: {
-    codeString: "B92;B86:1,0",
+    codeString: "B92;B86:1.5,0",
     isIndicator: true,
-    width: 3
+    width: 3.5
   },
   B912: {
-    codeString: "B92;B270:1,-8",
+    codeString: "B92;B270:1.5,-8",
     isIndicator: true,
-    width: 1
+    width: 1.5
   },
   B913: {
     codeString: "SC2:0,4",
@@ -2911,11 +2914,13 @@ const charData = {
   },
   B915: {
     codeString: "HC1N:0,4;DL1-1.5N:0,4.5;HL1:0,6",
-    isIndicator: true
+    isIndicator: true,
+    width: 1
   },
   B916: {
     codeString: "OC1SW:0,4;OC1NW:0,5",
-    isIndicator: true
+    isIndicator: true,
+    width: 1
   },
   B917: {
     codeString: "B239;LARR4E:8,10",
@@ -3763,15 +3768,18 @@ const charData = {
   },
   B5996: {
     codeString: "B99;B904:3,0",
-    isIndicator: true
+    isIndicator: true,
+    width: 5
   },
   B5997: {
     codeString: "B97;B904:3,0",
-    isIndicator: true
+    isIndicator: true,
+    width: 5
   },
   B5998: {
     codeString: "B97;B5996:3,0",
-    isIndicator: true
+    isIndicator: true,
+    width: 8
   },
   B5999: {
     codeString: "B956:0,2"
