@@ -19,6 +19,7 @@
     "prepublishOnly": "npm run build",
     "example": "vite --open example.html",
     "example-umd": "vite --open example-legacy-browsers.html",
+    "dev:temp": "vite --open temp/test.html",
     "test": "jest --config=jest.config.cjs",
     "test:visual": "vitest run tests/visual-comparison.test.js",
     "test:visual:watch": "vitest tests/visual-comparison.test.js",
