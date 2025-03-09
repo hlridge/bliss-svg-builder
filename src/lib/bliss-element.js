@@ -63,6 +63,7 @@ export class BlissElement {
     //this.#relativeToRootX = (previousElement ? previousElement.x : parentElement ? parentElement.x : 0) + (blissObj ? blissObj.x || 0 : 0);
     this.parentElement = parentElement;
     this.previousElement = previousElement;
+    this.#isIndicator = !!blissObj.isIndicator;
 
     if (blissObj.words) {
       //let relativeToRootX = this.#relativeToRootX + this.#relativeToParentX;
@@ -126,18 +127,23 @@ export class BlissElement {
       }
       if (blissObj.parts) {
         for (const part of blissObj.parts) {
+          //console.log("part: ");
+          //console.log(part);
           //const child = new BlissElement(part, this.#relativeToParentX);
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
           //child.type = "part";
           this.#children.push(child);
         }
-        if (blissObj?.isIndicator) {
+        if (this.#isIndicator) {
           const centerOfBaseCharacter = previousElement ? previousElement.width / 2 + previousElement.indicatorAnchorOffset.x : 0;
 
           const centerOfIndicator = blissObj.center || 0;
-          
+
           const widthOfIndicator = blissObj.width ?? 2;
-          const offsetX = previousElement ? centerOfBaseCharacter + centerOfIndicator - widthOfIndicator / 2 : centerOfIndicator - widthOfIndicator / 2;
+          let offsetX = 0;
+          if (previousElement) {  
+            offsetX = previousElement ? centerOfBaseCharacter + centerOfIndicator - widthOfIndicator / 2 : centerOfIndicator - widthOfIndicator / 2;
+          }
           const offsetY = previousElement ? previousElement.indicatorAnchorOffset.y : 0;
 
           this.getPath = (x = 0, y = 0, level = 0) => {
@@ -218,6 +224,10 @@ export class BlissElement {
 
   get isCharacter() {
     return this.#isCharacter; //this.#theOnlyChild.#isCharacter;
+  }
+
+  get isIndicator() {
+    return this.#isIndicator;
   }
 
   get isAtomic() {

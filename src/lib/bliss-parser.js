@@ -139,37 +139,41 @@ export class BlissParser {
       }
       
       function replaceWithDefinition(str, definitions) {
-        let parts = str.split('/');
-        let resultParts = [];  // Accumulate resulting parts here
-    
-        for (let part of parts) {
+        function expand(part, definitions) {
             if (definitions[part]?.codeString) {
-                resultParts.push(...definitions[part].codeString.split('/'));
+                const subParts = definitions[part].codeString.split('/');
+                let result = [];
+                for (let sp of subParts) {
+                    // recursively expand nested parts
+                    result.push(...expand(sp, definitions));
+                }
+                return result.map(r => ({ 
+                    part: r.part, 
+                    isIndicator: definitions[part].isIndicator || r.isIndicator 
+                }));
             } else {
-                resultParts.push(part);
+                return [{ part, isIndicator: definitions[part]?.isIndicator || false }];
             }
         }
     
-        let newStr = resultParts.join('/');
-    
-        // If string has changed, recursively process it, otherwise return it
-        if (newStr !== str) {
-            return replaceWithDefinition(newStr, definitions);
-        } else {
-            return newStr;
-        }
+        const parts = str.split('/');
+        const expandedParts = parts.flatMap(part => expand(part, definitions));
+        return expandedParts;
       }
-    
-      let twoPartCharacterStrings = replaceWithDefinition(twoPartWordString, blissElementDefinitions).split('/');
-    
-      for (let tpcs of twoPartCharacterStrings) {
-        if (tpcs === "") continue;
-        const character = { parts: [] };
 
+      const expandedCharacterParts = replaceWithDefinition(twoPartWordString, blissElementDefinitions);
+    
+      for (let tpcs of expandedCharacterParts) {
+        if (tpcs.part === "") continue;
+        const character = { 
+          parts: [], 
+          isIndicator: tpcs.isIndicator 
+        };
+        
         // Extract text
         //let [_, twoPartCharacterString, textKey] = tpcs.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/); //TODO: adjust this to not include {text}
 
-        const [characterOptionsString, characterCodeString] = tpcs.includes('|') ? tpcs.split("|", 2) : [undefined, tpcs];
+        const [characterOptionsString, characterCodeString] = tpcs.part.includes('|') ? tpcs.part.split("|", 2) : [undefined, tpcs.part];
 
         if (characterOptionsString) {
           character.options = this.#parseOptions(characterOptionsString);
