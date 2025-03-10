@@ -2,7 +2,8 @@
 
 This package builds SVG code for Bliss (Blissymbolics) text using a specific Domain-Specific Language referencing typical Bliss building blocks and their positions.
 
-[![npm version](https://img.shields.io/npm/v/@blissary/bliss-svg-builder.svg)](https://www.npmjs.com/package/@blissary/bliss-svg-builder)
+[![npm version](https://img.shields.io/npm/v/bliss-svg-builder)](https://www.npmjs.com/package/bliss-svg-builder)
+
 
 ## Table of Contents
 
@@ -22,13 +23,13 @@ This package builds SVG code for Bliss (Blissymbolics) text using a specific Dom
 ### Using npm
 
 ```javascript
-npm install @blissary/bliss-svg-builder@alpha
+npm install bliss-svg-builder@alpha
 ```
 
 ### Using yarn
 
 ```javascript
-yarn add @blissary/bliss-svg-builder@alpha
+yarn add bliss-svg-builder@alpha
 ```
 
 # Usage
@@ -40,7 +41,7 @@ This package supports both ES Module and CommonJS syntax and is targeting Node 1
 ### Using ES Modules
 
 ```javascript
-import { BlissSVGBuilder } from '@blissary/bliss-svg-builder';
+import { BlissSVGBuilder } from 'bliss-svg-builder';
 const builder = new BlissSVGBuilder("H:0,8");
 
 // Get the SVG code as a string
@@ -55,7 +56,7 @@ To use ES Modules, the `type` field in your `package.json` should be set to `"mo
 ### Using CommonJS
 
 ```javascript
-const { BlissSVGBuilder } = require('@blissary/bliss-svg-builder');
+const { BlissSVGBuilder } = require('bliss-svg-builder');
 const builder = new BlissSVGBuilder("H:0,8");
 
 const svgCode = builder.svgCode;
@@ -68,7 +69,7 @@ const svgCode = builder.svgCode;
 ```html
 <div id="bliss-container" style="height: 68px;"></div>
 <script type="module">
-  import { BlissSVGBuilder } from '@blissary/bliss-svg-builder';
+  import { BlissSVGBuilder } from 'bliss-svg-builder';
   const builder = new BlissSVGBuilder("H:0,8");
   
   document.getElementById('bliss-container').appendChild(builder.svgElement);
@@ -80,7 +81,7 @@ const svgCode = builder.svgCode;
 ```html
 <div id="bliss-container" style="height: 68px;"></div>
 <script type="module">
-  import { BlissSVGBuilder } from './node_modules/@blissary/bliss-svg-builder/dist/bliss-svg-builder.esm.js';
+  import { BlissSVGBuilder } from './node_modules/bliss-svg-builder/dist/bliss-svg-builder.esm.js';
   const builder = new BlissSVGBuilder("H:0,8");
   
   document.getElementById('bliss-container').appendChild(builder.svgElement);
@@ -91,7 +92,7 @@ const svgCode = builder.svgCode;
 
 ```html
 <div id="bliss-container" style="height: 68px;"></div>
-<script src="./node_modules/@blissary/bliss-svg-builder/dist/bliss-svg-builder.umd.js"></script>
+<script src="./node_modules/bliss-svg-builder/dist/bliss-svg-builder.umd.js"></script>
 <script>
   const { BlissSVGBuilder } = window.BlissSVGBuilder;
   const builder = new BlissSVGBuilder("H:0,8");
