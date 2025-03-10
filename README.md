@@ -2,6 +2,17 @@
 
 This package builds SVG code for Bliss (Blissymbolics) text using a specific Domain-Specific Language referencing typical Bliss building blocks and their positions.
 
+[![npm version](https://img.shields.io/npm/v/@blissary/bliss-svg-builder.svg)](https://www.npmjs.com/package/@blissary/bliss-svg-builder)
+
+## Table of Contents
+
+- [Stability Notice](#stability-notice)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Server-side (Node.js)](#server-side-nodejs)
+  - [Client-side](#client-side)
+- [License](#license)
+
 ## Stability notice
 
 :warning: This package is currently in early stages of active development and considered unstable. Updates may introduce breaking changes without prior notice. Use at your own risk.
@@ -11,13 +22,13 @@ This package builds SVG code for Bliss (Blissymbolics) text using a specific Dom
 ### Using npm
 
 ```javascript
-npm install bliss-svg-builder@alpha
+npm install @blissary/bliss-svg-builder@alpha
 ```
 
 ### Using yarn
 
 ```javascript
-yarn add bliss-svg-builder@alpha
+yarn add @blissary/bliss-svg-builder@alpha
 ```
 
 # Usage
@@ -29,10 +40,14 @@ This package supports both ES Module and CommonJS syntax and is targeting Node 1
 ### Using ES Modules
 
 ```javascript
-import { BlissSVGBuilder } from 'bliss-svg-builder';
+import { BlissSVGBuilder } from '@blissary/bliss-svg-builder';
 const builder = new BlissSVGBuilder("H:0,8");
 
+// Get the SVG code as a string
 const svgCode = builder.svgCode;
+
+// Or get the SVG element directly
+const svgElement = builder.svgElement;
 ```
 
 To use ES Modules, the `type` field in your `package.json` should be set to `"module"`.
@@ -40,7 +55,7 @@ To use ES Modules, the `type` field in your `package.json` should be set to `"mo
 ### Using CommonJS
 
 ```javascript
-const { BlissSVGBuilder } = require('bliss-svg-builder');
+const { BlissSVGBuilder } = require('@blissary/bliss-svg-builder');
 const builder = new BlissSVGBuilder("H:0,8");
 
 const svgCode = builder.svgCode;
@@ -48,37 +63,35 @@ const svgCode = builder.svgCode;
 
 ## Client-side
 
-To use this package in a client-side project, first, include the following script tag in your HTML file:
+### Using ES Modules with Bundlers (Webpack, Vite, etc.)
 
-### Using ES Modules
-
-```javascript
+```html
 <div id="bliss-container" style="height: 68px;"></div>
 <script type="module">
-  import { BlissSVGBuilder } from './<path-to-bliss-text-package>/bliss-svg-builder.js';
+  import { BlissSVGBuilder } from '@blissary/bliss-svg-builder';
   const builder = new BlissSVGBuilder("H:0,8");
   
   document.getElementById('bliss-container').appendChild(builder.svgElement);
 </script>
 ```
 
-Replace `./<path-to-bliss-text-package>/` with the actual path to the package's `src` directory. If you're using a bundler like Webpack or Vite, you can simply import the package like this:
+### Using ES Modules Directly in Browser
 
 ```html
 <div id="bliss-container" style="height: 68px;"></div>
 <script type="module">
-  import { BlissSVGBuilder } from 'bliss-svg-builder';
+  import { BlissSVGBuilder } from './node_modules/@blissary/bliss-svg-builder/dist/bliss-svg-builder.esm.js';
   const builder = new BlissSVGBuilder("H:0,8");
   
   document.getElementById('bliss-container').appendChild(builder.svgElement);
 </script>
 ```
 
-### Using CommonJS
+### Using UMD
 
 ```html
 <div id="bliss-container" style="height: 68px;"></div>
-<script src="../dist/bliss-svg-builder.umd.cjs"></script>
+<script src="./node_modules/@blissary/bliss-svg-builder/dist/bliss-svg-builder.umd.js"></script>
 <script>
   const { BlissSVGBuilder } = window.BlissSVGBuilder;
   const builder = new BlissSVGBuilder("H:0,8");
@@ -86,10 +99,6 @@ Replace `./<path-to-bliss-text-package>/` with the actual path to the package's 
   document.getElementById('bliss-container').appendChild(builder.svgElement);
 </script>
 ```
-
-## Examples
-
-You can find example implementations in the `examples/` folder.
 
 ## License
 
