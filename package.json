@@ -2,12 +2,17 @@
   "name": "bliss-svg-builder",
   "version": "0.1.0-alpha.4",
   "description": "Generates SVG code for Bliss (Blissymbolics) text using a Domain-Specific Language.",
-  "main": "dist/bliss-svg-builder.umd.cjs",
-  "module": "dist/bliss-svg-builder.js",
+  "main": "dist/bliss-svg-builder.cjs",
+  "module": "dist/bliss-svg-builder.esm.js",
   "type": "module",
   "exports": {
-    "import": "./dist/bliss-svg-builder.js",
-    "require": "./dist/bliss-svg-builder.umd.cjs"
+    "browser": {
+      "import": "./dist/bliss-svg-builder.esm.js",
+      "require": "./dist/bliss-svg-builder.umd.js"
+    },
+    "require": "./dist/bliss-svg-builder.cjs",
+    "import": "./dist/bliss-svg-builder.esm.js",
+    "default": "./dist/bliss-svg-builder.umd.js"
   },
   "files": [
     "dist",
@@ -16,9 +21,12 @@
   ],
   "scripts": {
     "build": "vite build",
+    "test:consumption": "npm run build && node scripts/test-consumption.js",
     "prepublishOnly": "npm run build",
-    "example": "vite --open example.html",
-    "example-umd": "vite --open example-legacy-browsers.html",
+    "example:browser-umd": "vite --open examples/browser-umd.html",
+    "example:browser-esm": "vite --open examples/browser-esm.html",
+    "example:node-cjs": "node examples/node.cjs",
+    "example:node-esm": "node examples/node.esm.js",
     "dev:temp": "vite --open temp/test.html",
     "test": "jest --config=jest.config.cjs",
     "test:visual": "vitest run tests/visual-comparison.test.js",
