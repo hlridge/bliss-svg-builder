@@ -2,8 +2,7 @@
 
 This package builds SVG code for Bliss (Blissymbolics) text using a specific Domain-Specific Language referencing typical Bliss building blocks and their positions.
 
-[![npm version](https://img.shields.io/npm/v/bliss-svg-builder)](https://www.npmjs.com/package/bliss-svg-builder)
-
+[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/alpha)](https://www.npmjs.com/package/bliss-svg-builder) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@0.1.0-alpha.6,bliss-svg-builder@0.1.0-alpha.6&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
 
 ## Table of Contents
 
