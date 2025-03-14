@@ -117,7 +117,7 @@ export class BlissParser {
     inputString = inputString.replace(/\s/g, '');
 
     // Temorarily handle uses of kerning code K
-    inputString = inputString.replace(/(.*?)\/K(:-\d+)(\/[^\/]*)/g, '$1$3$2')
+    inputString = inputString.replace(/(.*?)\/K(:-?\d+)(\/[^\/]*)/g, '$1$3$2')
 
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
