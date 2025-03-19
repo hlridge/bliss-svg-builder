@@ -74,7 +74,45 @@ export class BlissElement {
         //child.type = "word";
         this.#children.push(child);
       }
-      this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToRootX + x, this.#relativeToParentY + y)).join('');
+      this.getPath = (x = 0, y = 0) => {
+        try {
+          if (this.#children && 
+              this.#children[0] && 
+              this.#children[0].#children && 
+              this.#children[0].#children[0] && 
+              this.#children[0].#children[0].#children) {
+            
+            const parentElement = this.#children[0].#children[0];
+            const nestedChildren = parentElement.#children;
+            
+            if (nestedChildren.length > 1) {
+              const firstChild = nestedChildren[0];
+              const secondChild = nestedChildren[1];
+              
+              console.log(firstChild);
+              console.log(secondChild);
+              
+              if (!parentElement.isIndicator && !firstChild.isIndicator && secondChild.isIndicator) {
+                let startOffset = (secondChild.width / 2 - (secondChild.indicatorAnchorOffset.x || 0)) - 
+                (firstChild.width / 2 + (firstChild.indicatorAnchorOffset.x || 0));
+
+                if (startOffset < 0) {
+                  startOffset = 0;
+                }
+                return this.#children.map(child => 
+                  child.getPath(this.#relativeToRootX + x + startOffset, this.#relativeToParentY + y)
+                ).join('');
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Error in indicator positioning:", e);
+        }
+        
+        return this.#children.map(child => 
+          child.getPath(this.#relativeToRootX + x, this.#relativeToParentY + y)
+        ).join('');
+      };
     } else if (blissObj.characters) {
       if (this.#level < 1) this.#level = 1;
       let relativeToLocalX = 0;
