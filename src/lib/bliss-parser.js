@@ -121,7 +121,7 @@ export class BlissParser {
 
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
-    result.options = this.#parseOptions(globalOptionsString);
+    result.options = this.#parseOptions(globalOptionsString) || {};
 
     // Iterate over each word part in the remaining string
     let threePartWordStrings = globalCodeString.split('//');
@@ -202,11 +202,15 @@ export class BlissParser {
               part.isIndicator = true;
               part.width = definition.width ?? 2;
             } else {
-              part.anchorOffsetY = definition.anchorOffsetY;
+              if (definition.anchorOffsetY !== undefined) {
+                part.anchorOffsetY = definition.anchorOffsetY;
+              }
             }
 
-            part.anchorOffsetX = definition.anchorOffsetX;
-
+            if (definition.anchorOffsetX !== undefined) {
+              part.anchorOffsetX = definition.anchorOffsetX 
+            }
+            
             parts.push(part);
           }
           return parts;
