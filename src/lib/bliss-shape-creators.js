@@ -525,13 +525,16 @@ export function createFiber(height) {
  */
 export function createExternalGlyph(glyph) {
   const aObj = alphabetData[`X${glyph}`];
+  const adjustX = -0.3;
+  const adjustY = -0.015;
+  aObj.width = aObj.width + adjustX;
   const closePath = `"></path>`;
   const glyphPath = aObj?.getPath() || "";
   const openPath = `<path d="`;
 
   return {
     getPath: (x, y) => {
-      const openGlyphPath = `<path stroke="none" fill="#000000" transform="translate(${x-0.3},${y-0.015})" d="`;
+      const openGlyphPath = `<path stroke="none" fill="#000000" transform="translate(${x+adjustX},${y+adjustY})" d="`;
       return `${closePath}${openGlyphPath}${glyphPath}${closePath}${openPath}`;
     },
     width: aObj.width || 0,
