@@ -202,10 +202,10 @@ export class BlissParser {
               part.isIndicator = true;
               part.width = definition.width ?? 2;
             } else {
-              part.top = definition.top;
+              part.anchorOffsetY = definition.anchorOffsetY;
             }
 
-            part.center = definition.center;
+            part.anchorOffsetX = definition.anchorOffsetX;
 
             parts.push(part);
           }

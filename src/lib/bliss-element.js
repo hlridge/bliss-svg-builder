@@ -93,7 +93,7 @@ export class BlissElement {
               console.log(secondChild);
               
               if (!parentElement.isIndicator && !firstChild.isIndicator && secondChild.isIndicator) {
-                let startOffset = (secondChild.width / 2 - (secondChild.indicatorAnchorOffset.x || 0)) - 
+                let startOffset = (secondChild.width / 2 + (secondChild.indicatorAnchorOffset.x || 0)) - 
                 (firstChild.width / 2 + (firstChild.indicatorAnchorOffset.x || 0));
 
                 if (startOffset < 0) {
@@ -142,8 +142,8 @@ export class BlissElement {
         //this.#relativeToParentX = (blissObj.x || 0) + previousElement ? previousElement.x + previousElement.width : 0;
       }
       this.#relativeToParentY = blissObj.y || 0;
-      this.#indicatorAnchorOffsetX = blissObj.center || 0;
-      this.#indicatorAnchorOffsetY = blissObj.top || 0;
+      this.#indicatorAnchorOffsetX = blissObj.anchorOffsetX || 0;
+      this.#indicatorAnchorOffsetY = blissObj.anchorOffsetY || 0;
 
       const definition = blissElementDefinitions[codeName];
 
@@ -175,12 +175,12 @@ export class BlissElement {
         if (this.#isIndicator) {
           const centerOfBaseCharacter = previousElement ? previousElement.width / 2 + previousElement.indicatorAnchorOffset.x : 0;
 
-          const centerOfIndicator = blissObj.center || 0;
+          let anchorOffsetX = blissObj.anchorOffsetX || 0;
 
           const widthOfIndicator = blissObj.width ?? 2;
           let offsetX = 0;
           if (previousElement) {  
-            offsetX = previousElement ? centerOfBaseCharacter + centerOfIndicator - widthOfIndicator / 2 : centerOfIndicator - widthOfIndicator / 2;
+            offsetX = previousElement ? centerOfBaseCharacter - anchorOffsetX - widthOfIndicator / 2 : anchorOffsetX - widthOfIndicator / 2;
           }
           const offsetY = previousElement ? previousElement.indicatorAnchorOffset.y : 0;
 
