@@ -139,41 +139,67 @@ export class BlissParser {
       }
       
       function replaceWithDefinition(str, definitions) {
-        function expand(part, definitions) {
-            if (definitions[part]?.codeString) {
-                const subParts = definitions[part].codeString.split('/');
-                let result = [];
-                for (let sp of subParts) {
-                    // recursively expand nested parts
-                    result.push(...expand(sp, definitions));
-                }
-                return result.map(r => ({ 
-                    part: r.part, 
-                    isIndicator: definitions[part].isIndicator || r.isIndicator 
-                }));
-            } else {
-                return [{ part, isIndicator: definitions[part]?.isIndicator || false }];
-            }
+        function expand(str, definitions) {
+          const definition = definitions[str] || {};
+
+          // If we have a codeString, recursively expand it
+          if (definition.codeString) {
+            return definition.codeString.split('/')
+              .flatMap(subStr => expand(subStr, definitions))
+              .map(expandedSubPart => {
+                // Apply properties from the definition, falling back to existing values
+                const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator; //To prevent confusing positioning  logic when a part of an indicator is not directly an indicator
+                const isExternalGlyph = expandedSubPart.isExternalGlyph;
+                const kerningRules = expandedSubPart.kerningRules;
+                const glyph = expandedSubPart.glyph;
+                return {
+                  part: expandedSubPart.part,
+                  ...(isIndicator === true && { isIndicator }),
+                  ...(isExternalGlyph === true && { 
+                    isExternalGlyph,
+                    ...(kerningRules && { kerningRules }),
+                    ...(glyph && { glyph })
+                  })
+                };
+              });
+          }
+
+          // Base case - create object with properties from definition
+          const isIndicator = definition.isIndicator;
+          const isExternalGlyph = definition.isExternalGlyph;
+          const kerningRules = definition.kerningRules;
+          const glyph = definition.glyph;
+          return [{
+            part: str,
+            ...(isIndicator === true && { isIndicator }),
+            ...(isExternalGlyph === true && {
+              isExternalGlyph,
+              ...(kerningRules && { kerningRules }),
+              ...(glyph && { glyph })
+            })
+          }];
         }
-    
-        const parts = str.split('/');
-        const expandedParts = parts.flatMap(part => expand(part, definitions));
-        return expandedParts;
+
+        return str.split('/').flatMap(strPart => expand(strPart, definitions));
       }
 
       const expandedCharacterParts = replaceWithDefinition(twoPartWordString, blissElementDefinitions);
-    
-      for (let tpcs of expandedCharacterParts) {
-        if (tpcs.part === "") continue;
+  
+      for (let { part, isIndicator, isExternalGlyph, glyph, kerningRules } of expandedCharacterParts) {
+        if (part === "") continue;
+
         const character = { 
-          parts: [], 
-          isIndicator: tpcs.isIndicator 
+          parts: [],
+          ...(typeof isIndicator === "boolean" && { isIndicator }),
+          ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
+          ...(typeof glyph === "string" && { glyph }),
+          ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules })
         };
         
         // Extract text
         //let [_, twoPartCharacterString, textKey] = tpcs.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/); //TODO: adjust this to not include {text}
 
-        const [characterOptionsString, characterCodeString] = tpcs.part.includes('|') ? tpcs.part.split("|", 2) : [undefined, tpcs.part];
+        const [characterOptionsString, characterCodeString] = part.includes('|') ? part.split("|", 2) : [undefined, part];
 
         if (characterOptionsString) {
           character.options = this.#parseOptions(characterOptionsString);
