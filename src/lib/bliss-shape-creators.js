@@ -525,9 +525,8 @@ export function createFiber(height) {
  */
 export function createExternalGlyph(glyph) {
   const aObj = alphabetData[`X${glyph}`];
-  const adjustX = -0.3;
-  const adjustY = -0.015;
-  aObj.width = aObj.width + adjustX;
+  const adjustX = -aObj.leftSideBearing;
+  const adjustY = -0.015; //revisit this
   const closePath = `"></path>`;
   const glyphPath = aObj?.getPath() || "";
   const openPath = `<path d="`;
