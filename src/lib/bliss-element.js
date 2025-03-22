@@ -11,6 +11,7 @@ const DEFAULT_STROKE_WIDTH = 0.5;
 const MAX_STROKE_WIDTH = 1.5;
 const MIN_STROKE_WIDTH = 0.1;
 const DEFAULT_CHAR_SPACING = 2;
+const DEFAULT_EXTERNAL_GLYPH_SPACING = 0.8;
 const DEFAULT_FULL_SPACE = 8;
 const DEFAULT_HALF_SPACE = 4;
 const DEFAULT_QUARTER_SPACE = 2;
@@ -21,11 +22,10 @@ const DEFAULT_PUNCTUATION_SPACING = DEFAULT_CHAR_SPACING + DEFAULT_QUARTER_SPACE
 export class BlissElement {
   //#region Private Properties
   #level
+  #blissObj
   #extraPathOptions
   #isCharacter
   #isAtomic
-  #isIndicator
-  #isExternalGlyph
   #width
   #height
   #anchorOffsetX
@@ -37,13 +37,15 @@ export class BlissElement {
   //#codeString
   #codeName
   #charSpacing
+  #externalGlyphSpacing
   #wordSpacing
   #sentenceSpacing
   #punctuationSpacing
   //#endregion
   
-  constructor(blissObj, { parentElement = null, previousElement = null, level = 0 } = {}) {
+  constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0 } = {}) {
     this.#level = level;
+    this.#blissObj = blissObj;
 
     //this.#codeString = blissObj;
     this.#codeName = "";
@@ -54,6 +56,7 @@ export class BlissElement {
     this.#relativeToParentY = 0;
     this.#children = [];
     this.#charSpacing = DEFAULT_CHAR_SPACING;
+    this.#externalGlyphSpacing = DEFAULT_EXTERNAL_GLYPH_SPACING - (this.kerningRules?.[previousElement?.glyph] ?? 0);
     this.#wordSpacing = DEFAULT_WORD_SPACING;
     this.#sentenceSpacing = DEFAULT_SENTENCE_SPACING;
     this.#punctuationSpacing = DEFAULT_PUNCTUATION_SPACING;
@@ -63,7 +66,6 @@ export class BlissElement {
     //this.#relativeToRootX = (previousElement ? previousElement.x : parentElement ? parentElement.x : 0) + (blissObj ? blissObj.x || 0 : 0);
     this.parentElement = parentElement;
     this.previousElement = previousElement;
-    this.#isIndicator = !!blissObj.isIndicator;
 
     if (blissObj.words) {
       //let relativeToRootX = this.#relativeToRootX + this.#relativeToParentX;
@@ -115,31 +117,22 @@ export class BlissElement {
       };
     } else if (blissObj.characters) {
       if (this.#level < 1) this.#level = 1;
-      let relativeToLocalX = 0;
       for (const character of blissObj.characters) {
-        //const child = new BlissElement(character, this.#relativeToParentX + relativeToLocalX);
         const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
-        /* handle this through querying previousElement instead.
-        if (child.isExternalGlyph) {
-          const defaultExternalGlyphSpacing = 0.1;
-          relativeToLocalX += child.width + defaultExternalGlyphSpacing;
-        } else {
-          relativeToLocalX += child.width + this.#charSpacing; //TODO take indicators into consideration
-        }*/
-
-        //child.type = "character";
-        this.#children.push(child);        
+        this.#children.push(child);
       }
       this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x , this.#relativeToParentY + y)).join('');
     } else {
       if (this.#level < 2) this.#level = 2;
       const codeName = blissObj.code;
       if (level === 2) {
-        //detta funkar Inte, eller? nu ändrade jag så att x() returnerar relativeToParentX och inte (relativeToParentX+relativeToRootX)
-        this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + this.#charSpacing : 0;
+        let charSpacing = this.#charSpacing;
+        if (this.isExternalGlyph && previousElement?.isExternalGlyph) {
+          charSpacing = this.#externalGlyphSpacing;
+        }
+        this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + charSpacing : 0;  
       } else {
         this.#relativeToParentX = blissObj.x || 0;
-        //this.#relativeToParentX = (blissObj.x || 0) + previousElement ? previousElement.x + previousElement.width : 0;
       }
       this.#relativeToParentY = blissObj.y || 0;
       this.#anchorOffsetX = blissObj.anchorOffsetX || 0;
@@ -152,11 +145,6 @@ export class BlissElement {
         this.#extraPathOptions = definition.extraPathOptions || {}; //default: empty object
         this.#isCharacter = !!definition.isCharacter;               //default: false
         this.#isAtomic = !!definition.isAtomic;                     //default: false
-        this.#isExternalGlyph = !!definition.isExternalGlyph;       //default: false
-        //hur ska jag göra så att isExternalGlyph hamnar på character, när den i själva verket läggs som en part?u
-        //if parent has only one child, och childen är isExternalGlyph, så är parenten ExternalGlyph?
-
-        //och isIndicator ligger ju på parenten, inte på definition
         this.#width = definition.width;
         this.#height = definition.height;
         if (definition.getPath) {
@@ -165,14 +153,10 @@ export class BlissElement {
       }
       if (blissObj.parts) {
         for (const part of blissObj.parts) {
-          //console.log("part: ");
-          //console.log(part);
-          //const child = new BlissElement(part, this.#relativeToParentX);
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
-          //child.type = "part";
           this.#children.push(child);
         }
-        if (this.#isIndicator) {
+        if (this.isIndicator) {
           const centerOfBaseCharacter = previousElement ? previousElement.width / 2 + previousElement.anchorOffset.x : 0;
 
           let anchorOffsetX = blissObj.anchorOffsetX || 0;
@@ -191,9 +175,6 @@ export class BlissElement {
           
             return this.#children.map(child => child.getPath(appliedOffsetX, appliedOffsetY, level + 1)).join('');
           }
-
-          //this.getPath = (x = 0, y = 0, level = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
-          //this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
         } else {
           this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
         }
@@ -256,16 +237,20 @@ export class BlissElement {
     return this.#relativeToParentY;
   }
 
-  //get #theOnlyChild() {
-  //  return (this.#children.length === 1 && this.#children[0]) || {};
-  //}
-
   get isCharacter() {
-    return this.#isCharacter; //this.#theOnlyChild.#isCharacter;
+    return this.#isCharacter;
+  }
+
+  get glyph() {
+    return this.#blissObj.glyph || "";
+  }
+
+  get kerningRules() {
+    return this.#blissObj.kerningRules || {};
   }
 
   get isIndicator() {
-    return this.#isIndicator;
+    return this.#blissObj.isIndicator || false;
   }
 
   get isAtomic() {
@@ -273,8 +258,7 @@ export class BlissElement {
   }
 
   get isExternalGlyph() {
-    const isCharacterLevel = (this.#level === 2);
-    return isCharacterLevel ? !!(this.#children[0]?.isExternalGlyph) : false;
+    return this.#blissObj.isExternalGlyph;
   }
 
   get includeGrid() {
