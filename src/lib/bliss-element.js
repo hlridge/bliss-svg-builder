@@ -156,7 +156,7 @@ export class BlissElement {
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
           this.#children.push(child);
         }
-        if (this.isIndicator) {
+        if (this.isIndicator && !previousElement?.isIndicator) {
           const centerOfBaseCharacter = previousElement ? previousElement.width / 2 + previousElement.anchorOffset.x : 0;
 
           let anchorOffsetX = blissObj.anchorOffsetX || 0;
