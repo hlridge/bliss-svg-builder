@@ -116,9 +116,6 @@ export class BlissParser {
     // Remove all spaces in input string
     inputString = inputString.replace(/\s/g, '');
 
-    // Temorarily handle uses of kerning code K
-    inputString = inputString.replace(/(.*?)\/K(:-?\d+)(\/[^\/]*)/g, '$1$3$2')
-
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
     result.options = this.#parseOptions(globalOptionsString) || {};
@@ -128,6 +125,7 @@ export class BlissParser {
 
     for (let tpws of threePartWordStrings) {
       if (tpws === "") continue;
+
       let word = { options: {}, characters: [] };
 
       let [_, twoPartWordString, textKey] = tpws.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/);
@@ -137,7 +135,7 @@ export class BlissParser {
         word.text = placeholderMap[textKey];
         //character.text = text.replace(/\\(.)/g, (_, char) => unescapeMap[escapeMap[char]] ? unescapeMap[escapeMap[char]] : char);
       }
-      
+
       function replaceWithDefinition(str, definitions) {
         function expand(str, definitions) {
           const definition = definitions[str] || {};
@@ -185,6 +183,9 @@ export class BlissParser {
 
       const expandedCharacterParts = replaceWithDefinition(twoPartWordString, blissElementDefinitions);
   
+      let pendingRelativeKerning;
+      let pendingAbsoluteKerning;
+
       for (let { part, isIndicator, isExternalGlyph, glyph, kerningRules } of expandedCharacterParts) {
         if (part === "") continue;
 
@@ -195,7 +196,25 @@ export class BlissParser {
           ...(typeof glyph === "string" && { glyph }),
           ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules })
         };
-        
+
+        const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);
+        if (kerningMatch) {
+          const [_, kerningType, kerningValue = 0] = kerningMatch;
+          if (kerningType === "RK") pendingRelativeKerning = Number(kerningValue);
+          if (kerningType === "AK") pendingAbsoluteKerning = Number(kerningValue);
+          continue;
+        }
+  
+        if (pendingRelativeKerning) {
+          (character.options ??= {}).relativeKerning = pendingRelativeKerning;
+          pendingRelativeKerning = undefined;
+        }
+
+        if (pendingAbsoluteKerning) {
+          (character.options ??= {}).absoluteKerning = pendingAbsoluteKerning;
+          pendingAbsoluteKerning = undefined;
+        }
+
         // Extract text
         //let [_, twoPartCharacterString, textKey] = tpcs.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/); //TODO: adjust this to not include {text}
 
@@ -211,7 +230,7 @@ export class BlissParser {
           for (const twoPartPartString of twoPartPartStrings) {
             const part = this.parsePartString(twoPartPartString);
 
-            const definition = blissElementDefinitions[part.code];
+            const definition = blissElementDefinitions[part.code] || {};
             const codeString = definition.codeString;
 
             if (codeString) {
@@ -246,7 +265,6 @@ export class BlissParser {
 
         word.characters.push(character);
       }
-
       result.words.push(word);      
     }
 

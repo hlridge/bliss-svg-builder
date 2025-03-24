@@ -66,7 +66,6 @@ export class BlissElement {
     //this.#relativeToRootX = (previousElement ? previousElement.x : parentElement ? parentElement.x : 0) + (blissObj ? blissObj.x || 0 : 0);
     this.parentElement = parentElement;
     this.previousElement = previousElement;
-
     if (blissObj.words) {
       //let relativeToRootX = this.#relativeToRootX + this.#relativeToParentX;
       for (const word of blissObj.words) {
@@ -90,9 +89,6 @@ export class BlissElement {
             if (nestedChildren.length > 1) {
               const firstChild = nestedChildren[0];
               const secondChild = nestedChildren[1];
-              
-              console.log(firstChild);
-              console.log(secondChild);
               
               if (!parentElement.isIndicator && !firstChild.isIndicator && secondChild.isIndicator) {
                 let startOffset = (secondChild.width / 2 + (secondChild.anchorOffset.x || 0)) - 
@@ -130,7 +126,12 @@ export class BlissElement {
         if (this.isExternalGlyph && previousElement?.isExternalGlyph) {
           charSpacing = this.#externalGlyphSpacing;
         }
-        this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + charSpacing : 0;  
+        this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + charSpacing : 0;
+        if (typeof blissObj.options?.relativeKerning === "number") {
+          this.#relativeToParentX += blissObj.options.relativeKerning;
+        } else if (typeof blissObj.options?.absoluteKerning === "number") {
+          this.#relativeToParentX += blissObj.options.absoluteKerning - charSpacing;
+        }
       } else {
         this.#relativeToParentX = blissObj.x || 0;
       }
