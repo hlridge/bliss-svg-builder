@@ -12,12 +12,9 @@ const MAX_STROKE_WIDTH = 1.5;
 const MIN_STROKE_WIDTH = 0.1;
 const DEFAULT_CHAR_SPACING = 2;
 const DEFAULT_EXTERNAL_GLYPH_SPACING = 0.8;
-const DEFAULT_FULL_SPACE = 8;
-const DEFAULT_HALF_SPACE = 4;
-const DEFAULT_QUARTER_SPACE = 2;
-const DEFAULT_SENTENCE_SPACING = DEFAULT_CHAR_SPACING + DEFAULT_FULL_SPACE;
-const DEFAULT_WORD_SPACING = DEFAULT_CHAR_SPACING + DEFAULT_HALF_SPACE;
-const DEFAULT_PUNCTUATION_SPACING = DEFAULT_CHAR_SPACING + DEFAULT_QUARTER_SPACE;
+const DEFAULT_SENTENCE_SPACING = 8;
+const DEFAULT_WORD_SPACING = 8
+const DEFAULT_PUNCTUATION_SPACING = 4;
 
 export class BlissElement {
   //#region Private Properties
@@ -113,10 +110,15 @@ export class BlissElement {
       };
     } else if (blissObj.characters) {
       if (this.#level < 1) this.#level = 1;
+
+      const wordSpacing = this.#wordSpacing;
+      this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + wordSpacing : 0;
+
       for (const character of blissObj.characters) {
         const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
         this.#children.push(child);
       }
+
       this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x , this.#relativeToParentY + y)).join('');
     } else {
       if (this.#level < 2) this.#level = 2;
