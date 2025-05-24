@@ -531,9 +531,11 @@ export function createExternalGlyph(glyph) {
   const glyphPath = aObj?.getPath() || "";
   const openPath = `<path d="`;
 
+  const round = (num) => parseFloat(num.toFixed(4));
+
   return {
     getPath: (x, y) => {
-      const openGlyphPath = `<path stroke="none" fill="#000000" transform="translate(${x+adjustX},${y+adjustY})" d="`;
+      const openGlyphPath = `<path stroke="none" fill="#000000" transform="translate(${round(x+adjustX)},${round(y+adjustY)})" d="`;
       return `${closePath}${openGlyphPath}${glyphPath}${closePath}${openPath}`;
     },
     width: aObj.width || 0,

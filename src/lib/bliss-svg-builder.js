@@ -162,6 +162,7 @@ class BlissSVGBuilder {
     const svgAttributeMultiplier = 6;
     const svgWidth = svgAttributeMultiplier * viewBoxWidth;
     const svgHeight = svgAttributeMultiplier * viewBoxHeight;
+    const round = (num) => parseFloat(num.toFixed(4));
 
     let title = "";//this._svgTitle ? `<title>${this._svgTitle}</title>` : "";
     let desc = "";//this._svgDesc ? `<desc>${this._svgDesc}</desc>` : "";
@@ -170,7 +171,7 @@ class BlissSVGBuilder {
     let backgroundRect = "";//(this._background === "" ? "" : `<rect x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${this._background}"/>`)
 
     let svgStr =
-`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="tiny" width="${svgWidth}" height="${svgHeight}" viewBox="${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}" fill="none" stroke="${color}" stroke-linejoin="round" stroke-linecap="round" stroke-width="${strokeWidth}">
+`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="tiny" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}" fill="none" stroke="${color}" stroke-linejoin="round" stroke-linecap="round" stroke-width="${strokeWidth}">
   ${title}${desc}${backgroundRect}${gridPath}${path}${svgText}
 </svg>`;
     return svgStr;
