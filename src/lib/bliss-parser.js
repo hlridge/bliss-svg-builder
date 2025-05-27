@@ -75,8 +75,10 @@ export class BlissParser {
       if (matched) {
         let [, code, x, y] = matched;
         part.code = code;
-        part.x = Number(x) || 0;
+        x !== undefined && (part.x = Number(x));
         part.y = Number(y) || 0;
+        //TODO:
+        //y !== undefined && (part.y = Number(y));
       } else {
         part.error = `Invalid format: ${codeString}`;
       }
