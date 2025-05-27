@@ -25,10 +25,14 @@ export class BlissElement {
   #isAtomic
   #width
   #height
+  #leafX
+  #leafY
+  #leafWidth
+  #leafHeight
   #anchorOffsetX
   #anchorOffsetY
+  #advanceX
   #children
-  #relativeToRootX
   #relativeToParentX
   #relativeToParentY
   //#codeString
@@ -39,16 +43,17 @@ export class BlissElement {
   #sentenceSpacing
   #punctuationSpacing
   //#endregion
-  
+  #childStartOffset
+  #parentElement;
+  #previousElement;
+
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0 } = {}) {
-    this.#level = level;
     this.#blissObj = blissObj;
+    this.#parentElement = parentElement;
+    this.#previousElement = previousElement;
+    this.#level = level;
 
-    //this.#codeString = blissObj;
     this.#codeName = "";
-    //this.#relativeToRootX = relativeToRootX;
-
-    //måste ta reda på this.#relativeToParentX utifrån parts. för infon saknas på charactern
     this.#relativeToParentX = 0;
     this.#relativeToParentY = 0;
     this.#children = [];
@@ -57,140 +62,172 @@ export class BlissElement {
     this.#wordSpacing = DEFAULT_WORD_SPACING;
     this.#sentenceSpacing = DEFAULT_SENTENCE_SPACING;
     this.#punctuationSpacing = DEFAULT_PUNCTUATION_SPACING;
+    this.#childStartOffset = 0;
 
-    //this.#relativeToRootX = (level === 2) ? parentElement.x : previousElement ? previousElement.x + previousElement.width + 2 : parentElement ? parentElement.x : 0; //space would be added differently depending on level and type etc
-    this.#relativeToRootX = (level === 2) ? parentElement.x : previousElement ? previousElement.x + previousElement.width + 2 : parentElement ? parentElement.x : 0; //space would be added differently depending on level and type etc
-    //this.#relativeToRootX = (previousElement ? previousElement.x : parentElement ? parentElement.x : 0) + (blissObj ? blissObj.x || 0 : 0);
-    this.parentElement = parentElement;
-    this.previousElement = previousElement;
-    if (blissObj.words) {
-      //let relativeToRootX = this.#relativeToRootX + this.#relativeToParentX;
-      for (const word of blissObj.words) {
-        //const child = new BlissElement(word, relativeToRootX);
+    if (this.#level === 0) {
+      // Root level
+      if (!this.#blissObj.words) {
+        this.#blissObj = { words: [this.#blissObj] };
+      }
+
+      for (const word of this.#blissObj.words) {
         const child = new BlissElement(word, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
-        //relativeToRootX = this.#relativeToParentX + child.width + this.#wordSpacing;
-        //child.type = "word";
+        child.type = "word";
         this.#children.push(child);
       }
-      this.getPath = (x = 0, y = 0) => {
-        try {
-          if (this.#children && 
-              this.#children[0] && 
-              this.#children[0].#children && 
-              this.#children[0].#children[0] && 
-              this.#children[0].#children[0].#children) {
+      
+      try {
+        // Checks if the first character of the first word of the entire thing is a character with indicator.
+        // TODO: add option for if overhang is accepted?
+        if (level === 0 &&
+            this.#children && 
+            this.#children[0] && 
+            this.#children[0].#children && 
+            this.#children[0].#children[0] && 
+            this.#children[0].#children[0].#children) {
+          const parentElement = this.#children[0].#children[0];
+          const nestedChildren = parentElement.#children;
+          
+          if (nestedChildren.length === 2) {
+            const firstChild = nestedChildren[0];
+            const secondChild = nestedChildren[1];
             
-            const parentElement = this.#children[0].#children[0];
-            const nestedChildren = parentElement.#children;
-            
-            if (nestedChildren.length > 1) {
-              const firstChild = nestedChildren[0];
-              const secondChild = nestedChildren[1];
-              
-              if (!parentElement.isIndicator && !firstChild.isIndicator && secondChild.isIndicator) {
-                let startOffset = (secondChild.width / 2 + (secondChild.anchorOffset.x || 0)) - 
-                (firstChild.width / 2 + (firstChild.anchorOffset.x || 0));
-
-                if (startOffset < 0) {
-                  startOffset = 0;
-                }
-                return this.#children.map(child => 
-                  child.getPath(this.#relativeToRootX + x + startOffset, this.#relativeToParentY + y)
-                ).join('');
+            if (!parentElement.isIndicator && !firstChild.isIndicator && secondChild.isIndicator) {
+              if (secondChild.#blissObj.x !== undefined) {
+                this.#childStartOffset = -secondChild.#blissObj.x || 0;
+              } else {
+                this.#childStartOffset = (secondChild.width / 2 + (secondChild.anchorOffset.x || 0)) - 
+                  (firstChild.width / 2 + (firstChild.anchorOffset.x || 0));
+              }
+              if (this.#childStartOffset < 0) {
+                this.#childStartOffset = 0;
               }
             }
           }
-        } catch (e) {
-          console.warn("Error in indicator positioning:", e);
-        }
-        
+        }  
+      } catch (e) {
+        console.warn("Error calculating indicator position: ", e);
+      }
+      this.#relativeToParentX = this.#childStartOffset + (this.#blissObj.x ?? 0);
+
+      this.getPath = (x = 0, y = 0) => {
         return this.#children.map(child => 
-          child.getPath(this.#relativeToRootX + x, this.#relativeToParentY + y)
+          child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
         ).join('');
-      };
-    } else if (blissObj.characters) {
-      if (this.#level < 1) this.#level = 1;
+      };      
+    } else if (this.#level === 1) {
+      // Word level
+      if (!this.#blissObj.characters) {
+        this.#blissObj = { characters: [this.#blissObj] };
+      }
 
-      const wordSpacing = this.#wordSpacing;
-      this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + wordSpacing : 0;
-
-      for (const character of blissObj.characters) {
+      for (const character of this.#blissObj.characters) {
         const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
+        child.type = "character";
         this.#children.push(child);
       }
 
-      this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x , this.#relativeToParentY + y)).join('');
-    } else {
-      if (this.#level < 2) this.#level = 2;
-      const codeName = blissObj.code;
-      if (level === 2) {
-        let charSpacing = this.#charSpacing;
-        if (this.isExternalGlyph && previousElement?.isExternalGlyph) {
-          charSpacing = this.#externalGlyphSpacing;
+      if (this.#previousElement) {
+        if (this.#blissObj.x === undefined) {
+          this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
+        } else {
+          this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.width + this.#blissObj.x;
         }
-        this.#relativeToParentX = previousElement ? previousElement.x + previousElement.width + charSpacing : 0;
-        if (typeof blissObj.options?.relativeKerning === "number") {
-          this.#relativeToParentX += blissObj.options.relativeKerning;
-        } else if (typeof blissObj.options?.absoluteKerning === "number") {
-          this.#relativeToParentX += blissObj.options.absoluteKerning - charSpacing;
-        }
+      } else if (this.#parentElement) {
+        this.#relativeToParentX = this.#parentElement.#relativeToParentX + (this.#blissObj.x ?? 0);
       } else {
-        this.#relativeToParentX = blissObj.x || 0;
+        this.#relativeToParentX = this.#blissObj.x ?? 0;
       }
-      this.#relativeToParentY = blissObj.y || 0;
-      this.#anchorOffsetX = blissObj.anchorOffsetX || 0;
-      this.#anchorOffsetY = blissObj.anchorOffsetY || 0;
 
-      const definition = blissElementDefinitions[codeName];
+      this.#advanceX = this.baseWordWidth + this.#wordSpacing;
 
-      if (definition) {
-        this.#codeName = codeName;                                  //default: empty string
-        this.#extraPathOptions = definition.extraPathOptions || {}; //default: empty object
-        this.#isCharacter = !!definition.isCharacter;               //default: false
-        this.#isAtomic = !!definition.isAtomic;                     //default: false
-        this.#width = definition.width;
-        this.#height = definition.height;
-        if (definition.getPath) {
-          this.getPath = (x = 0, y = 0) => definition.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#extraPathOptions);          
+      this.getPath = (x = 0, y = 0) => this.#children.map(child => 
+        child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
+      ).join('');
+    } else {
+      if (this.#level === 2) {
+        // Character level
+        if (!this.#blissObj.parts) {
+          this.#blissObj = { parts: [this.#blissObj] };
         }
-      }
-      if (blissObj.parts) {
-        for (const part of blissObj.parts) {
+
+        for (const part of this.#blissObj.parts) {
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
+          child.type = "characterPart";
           this.#children.push(child);
         }
-        if (this.isIndicator && !previousElement?.isIndicator) {
-          const centerOfBaseCharacter = previousElement ? previousElement.width / 2 + previousElement.anchorOffset.x : 0;
-
-          let anchorOffsetX = blissObj.anchorOffsetX || 0;
-
-          const widthOfIndicator = blissObj.width ?? 2;
-          let offsetX = 0;
-          if (previousElement) {  
-            offsetX = previousElement ? centerOfBaseCharacter - anchorOffsetX - widthOfIndicator / 2 : anchorOffsetX - widthOfIndicator / 2;
-          }
-          const offsetY = previousElement ? previousElement.anchorOffset.y : 0;
-
-          this.getPath = (x = 0, y = 0, level = 0) => {
-            // If level is 0, add the offsetX, else don't add it
-            const appliedOffsetX = (level === 0) ? x + this.#relativeToParentX + offsetX : x + this.#relativeToParentX;
-            const appliedOffsetY = y + this.#relativeToParentY + offsetY;
-          
-            return this.#children.map(child => child.getPath(appliedOffsetX, appliedOffsetY, level + 1)).join('');
-          }
+        if (!this.#previousElement) {
+          this.#relativeToParentX = this.#parentElement.#relativeToParentX + (this.#blissObj.x ?? 0);
         } else {
-          this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)).join('');
+          if (this.isExternalGlyph && this.#previousElement.isExternalGlyph) {
+            this.#previousElement.#advanceX = this.#previousElement.width + this.#externalGlyphSpacing;
+          }
+
+          if (typeof this.#blissObj.options?.relativeKerning === "number") {
+            this.#previousElement.#advanceX += this.#blissObj.options.relativeKerning;
+          } else if (typeof this.#blissObj.options?.absoluteKerning === "number") {
+            this.#previousElement.#advanceX = this.#previousElement.width + this.#blissObj.options.absoluteKerning;
+          }
+  
+          if (this.#blissObj.x === undefined) {
+            this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
+          } else {
+            this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.width + this.#blissObj.x;
+          }
         }
-      } 
-      if (!definition?.getPath && !blissObj.parts) {
-        throw new Error(`Code ${blissObj.code} did not correspond to a definition with a getPath function.`);
+  
+        this.#advanceX = this.baseCharacterWidth + this.#charSpacing;
+        this.getPath = (x = 0, y = 0) => this.#children.map(child => 
+          child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
+        ).join('');
+      } else {
+        // Part level (level >= 3)
+        const elementDefinition = blissElementDefinitions[this.#blissObj.code];
+        const isPredefinedElement = !!elementDefinition && !!elementDefinition.getPath;
+        const isCompositeElement = !!this.#blissObj.parts && this.#blissObj.parts.length > 0;
+  
+        const isValidElement = isPredefinedElement || isCompositeElement;
+        if (!isValidElement) {
+          throw new Error(
+            `Unable to create Bliss element: "${this.#blissObj.code}" either lacks a `
+            `rendering function (getPath()) or could not be parsed into component parts. ` + 
+            `Check code or composition syntax.`
+          );
+        }
+
+        this.#relativeToParentX = this.#blissObj.x ?? 0;
+          
+        if (isPredefinedElement) {
+          this.#handlePredefinedElement(elementDefinition);
+        } else if (isCompositeElement) {
+          this.#handleCompositeElement(this.#blissObj.parts);
+        }
       }
+      this.#relativeToParentY = this.#blissObj.y || 0;
+      this.#anchorOffsetX = this.#blissObj.anchorOffsetX || 0;
+      this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
     }
   }
 
   //get codeString() {
   //  return this.#codeString;
  // }
+
+  get parentElement() {
+    return this.#parentElement;
+  }
+
+  get previousElement() {
+    return this.#previousElement;
+  }
+
+  get advanceX() {
+    return this.#advanceX || 0;
+  }
+
+  get children() {
+    return this.#children;
+  }
 
   get codeName() {
     return this.#codeName || "";
@@ -204,20 +241,105 @@ export class BlissElement {
   }
 
   get width() {
-    if (this.#width !== undefined) {
-      return this.#width;
-    }
-    if (this.#children) {
-      let minRelativeX = Number.POSITIVE_INFINITY;
-      let maxRelativeXPlusWidth = Number.NEGATIVE_INFINITY;
+    if (this.#leafWidth !== undefined) return this.#leafWidth;
+    if (!this.#children || this.#children.length === 0) return 0;
     
-      for(let child of this.#children) {
-        minRelativeX = Math.min(minRelativeX, child.x);
-        maxRelativeXPlusWidth = Math.max(maxRelativeXPlusWidth, child.x + child.width);
-      }
+    const minRelativeX = Math.min(...this.#children.map(child => child.#relativeToParentX));
   
-      return maxRelativeXPlusWidth - minRelativeX;
+    let maxRelativeXPlusWidth;
+    if (this.#level === 1) {
+      maxRelativeXPlusWidth = Math.max(...this.#children.map(child => 
+        child.#relativeToParentX + child.rightExtendedCharacterWidth));
+    } else {
+      maxRelativeXPlusWidth = Math.max(...this.#children.map(child => 
+        child.#relativeToParentX + child.width));
     }
+       
+    let width;
+    if (this.#level === 0) {
+      width = maxRelativeXPlusWidth - minRelativeX + this.#childStartOffset;
+    } else {
+      width = maxRelativeXPlusWidth - minRelativeX;
+    }
+    
+    return width;
+  }
+
+  get rightExtendedCharacterWidth() {
+    if (this.#level !== 2) throw new Error('rightExtendedCharacterWidth can only be called on character elements (level 2)');
+
+    const character = this;
+    const parts = character.#children;
+
+    if (parts.length === 0) return 0;
+    if (parts.length === 1) return parts[0].width;
+
+    const allPartsAreIndicators = parts.every(part => part.isIndicator);
+    const lastPartIsIndicator = parts[parts.length - 1].isIndicator;
+    
+    let spacingParts = parts;
+    if (lastPartIsIndicator && !allPartsAreIndicators) { 
+      spacingParts = parts.slice(0, -1); 
+    }
+
+    const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
+    const maxRelativeXPlusWidth = Math.max(...parts.map(part => part.#relativeToParentX + part.width));
+    const rightExtendedCharacterWidth = maxRelativeXPlusWidth - minRelativeX;
+  
+    return rightExtendedCharacterWidth;
+  }
+
+  get baseCharacterWidth() {
+    if (this.#level !== 2) throw new Error('baseCharacterWidth can only be called on character elements (level 2)');
+
+    const character = this;
+    const parts = character.#children;
+    
+    if (parts.length === 0) return 0;
+    if (parts.length === 1) return parts[0].width;
+
+    const allPartsAreIndicators = parts.every(part => part.isIndicator);
+    const lastPartIsIndicator = parts[parts.length - 1].isIndicator;
+ 
+    let spacingParts = parts;
+    if (lastPartIsIndicator && !allPartsAreIndicators) { 
+      spacingParts = parts.slice(0, -1); 
+    }
+
+    const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
+    const maxRelativeXPlusWidth = Math.max(...spacingParts.map(part => part.#relativeToParentX + part.width));
+    const baseCharacterWidth = maxRelativeXPlusWidth - minRelativeX;
+    
+    return baseCharacterWidth;
+  }
+
+  get baseWordWidth() {
+    if (this.#level !== 1) throw new Error('baseWordWidth can only be called on word elements (level 1)');
+
+    const word = this;
+    const characters = word.#children;
+    const firstCharacter = characters[0];
+    const lastCharacter = characters[characters.length - 1];
+    const lastCharacterBaseWidth = lastCharacter.baseCharacterWidth;
+    const baseWordWidth = lastCharacter.#relativeToParentX + lastCharacterBaseWidth - firstCharacter.#relativeToParentX;
+
+    return baseWordWidth;
+  }
+
+  get baseWidth() {    
+    if (this.#level === 0) {
+      const words = this.#children;
+      const firstWord = words[0];
+      const lastWord = words[words.length - 1];
+      const lastWordBaseWidth = lastWord.baseWordWidth;
+      const baseWidth = lastWord.#relativeToParentX + lastWordBaseWidth - firstWord.#relativeToParentX;
+      return baseWidth;
+    }
+
+    if (this.#level === 1) return this.baseWordWidth;
+    if (this.#level === 2) return this.baseCharacterWidth;
+
+    return this.width;
   }
 
   get height() {
@@ -232,12 +354,33 @@ export class BlissElement {
     }
   }
 
+  get baseX() {
+    if (this.#leafX !== undefined) return this.#leafX;
+    if (!this.#children || this.#children.length === 0) return 0;
+
+    return this.#relativeToParentX;
+  }
+
   get x() {
-    return this.#relativeToParentX;// + this.#relativeToRootX;
+    if (this.#leafX !== undefined) return this.#leafX;
+    if (!this.#children || this.#children.length === 0) return 0;
+
+    const x = Math.min(
+      this.#relativeToParentX,
+      ...this.#children.map(child => this.#relativeToParentX + child.x)
+    );
+
+    return x;
   }
 
   get y() {
-    return this.#relativeToParentY;
+    if (this.#leafY !== undefined) return this.#leafY;
+    if (!this.#children || this.#children.length === 0) return 0;
+
+    return Math.min(
+      this.#relativeToParentY,
+      ...this.#children.map(child => this.#relativeToParentY + child.y)
+    );
   }
 
   get isCharacter() {
@@ -365,13 +508,13 @@ export class BlissElement {
           return str;
       }
       
-      let delimiterMap = {
+      const delimiterMap = {
           1: '//',
           2: '/',
           3: ';',
       };
 
-      let results = obj.elements.map(subObj => traverse(subObj, level + 1)).join(delimiterMap[level]);
+      const results = obj.elements.map(subObj => traverse(subObj, level + 1)).join(delimiterMap[level]);
   
       return results;
     }
@@ -441,18 +584,61 @@ export class BlissElement {
     return obj;
   }
 
-  #initExplicitElement(definition) {
-    this.#width = definition.width;
-    this.#height = definition.height;
-    this.getPath = (x = 0, y = 0) => definition.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#extraPathOptions);
+  #handlePredefinedElement(definition) {
+    if (typeof definition?.getPath !== 'function') throw new Error('An element is only predefined if has a proper getPath function.');
+
+    this.#codeName = this.#blissObj.code;                       //default: empty string
+    this.#extraPathOptions = definition.extraPathOptions || {}; //default: empty object
+    this.#isCharacter = !!definition.isCharacter;               //default: false
+    this.#isAtomic = !!definition.isAtomic;                     //default: false
+    this.#leafWidth = definition.width;
+    this.#leafHeight = definition.height;
+    this.#leafX = definition.x;
+    this.#leafX = definition.y;
+    
+    this.getPath = (x = 0, y = 0) => definition.getPath(
+      this.#relativeToParentX + x, 
+      this.#relativeToParentY + y, 
+      this.#extraPathOptions
+    );
   }
-  
-  #initImplicitElement(parts) {
+
+  #handleCompositeElement(parts) {
+    this.#children = [];
+    
     for (const part of parts) {
-      const child = new BlissElement(part, this.#relativeToParentX);
+      const child = new BlissElement(part, { 
+        parentElement: this, 
+        previousElement: this.#children[this.#children.length - 1], 
+        level: this.#level + 1
+      });
       this.#children.push(child);
     }
-    this.getPath = (x = 0, y = 0) => this.#children.map(child => child.getPath(x + this.#relativeToParentX, y + this.#relativeToParentY)).join('');  
+
+    const isThisIndicator = this.isIndicator;
+    const isParentIndicator = this.#parentElement.isIndicator;
+    const isPreviousIndicator = this.#previousElement?.isIndicator;
+    const isPreviousBaseCharacter = this.#previousElement && !isPreviousIndicator; 
+    const parentHasTwoParts = this.#parentElement && this.#parentElement.#blissObj.parts?.length === 2;    
+    const isThisCombiningIndicator = this.#level === 3 && isThisIndicator && !isParentIndicator && isPreviousBaseCharacter && parentHasTwoParts;
+
+    if (isThisCombiningIndicator) {
+      if (this.#blissObj.x !== undefined) {
+        this.#relativeToParentX = this.#blissObj.x;
+      } else {
+        const baseCharacterCenterX = this.#previousElement.width / 2;
+        const baseCharacterAnchorX = baseCharacterCenterX + (this.#previousElement.anchorOffset.x || 0);
+        const indicatorWidth = this.#blissObj.width ?? 2;
+        const indicatorHalfWidth  = indicatorWidth / 2;
+        const indicatorAnchorOffsetX = this.#blissObj.anchorOffsetX || 0;
+        this.#relativeToParentX = baseCharacterAnchorX - indicatorHalfWidth - indicatorAnchorOffsetX;
+      }
+
+      //TODO: handle anchorOffset.y
+    }
+    this.getPath = (x = 0, y = 0) => this.#children.map(child => 
+      child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
+    ).join('');
   }
 }
 
