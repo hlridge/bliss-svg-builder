@@ -1,21 +1,27 @@
 const charData = {
   B1: {
-    codeString: "VL6:0,8;DOT:0,16"
+    codeString: "VL6:0,8;DOT:0,16",
+    shrinksPrecedingWordSpace: true
   },
   B2: {
-    codeString: "C2:0,8;DL4-8N:0,8;C2:2,14"
+    codeString: "C2:0,8;DL4-8N:0,8;C2:2,14",
+    shrinksPrecedingWordSpace: true
   },
   B3: {
-    codeString: "OC4SW:0,8;VL2:2,12;DOT:2,16"
+    codeString: "OC4SW:0,8;VL2:2,12;DOT:2,16",
+    shrinksPrecedingWordSpace: true
   },
   B4: {
-    codeString: "DOT:0,16"
+    codeString: "DOT:0,16",
+    shrinksPrecedingWordSpace: true
   },
   B5: {
-    codeString: "COMMA:0,16"
+    codeString: "COMMA:0,16",
+    shrinksPrecedingWordSpace: true
   },
   B6: {
-    codeString: "DOT:0,14;DOT:0,16"
+    codeString: "DOT:0,14;DOT:0,16",
+    shrinksPrecedingWordSpace: true
   },
   B7: {
     codeString: "COMMA:0,8"
