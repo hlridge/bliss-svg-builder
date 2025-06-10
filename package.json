@@ -21,19 +21,22 @@
   ],
   "scripts": {
     "build": "vite build",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:consumption": "npm run build && node scripts/test-consumption.js",
-    "prepublishOnly": "npm run build",
+    "test": "vitest run --project unit --project integration",
+    "test:ui": "vitest --ui --project unit --project integration",
+    "test:unit": "vitest run --project unit",
+    "test:unit:ui": "vitest --ui --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:integration:ui": "vitest --ui --project integration",
+    "dev:temp": "vite --open temp/test.html",
+    "test:e2e": "vitest run --project e2e",
+    "test:e2e:ui": "vitest --ui --project e2e",
+    "test:all": "vitest run",
+    "prepublishOnly": "npm run test && npm run build",
     "example:browser-umd": "vite --open examples/browser-umd.html",
     "example:browser-esm": "vite --open examples/browser-esm.html",
     "example:node-cjs": "node examples/node.cjs",
     "example:node-esm": "node examples/node.esm.js",
-    "dev:temp": "vite --open temp/test.html",
-    "test:visual": "vitest run tests/visual-comparison.test.js",
-    "test:visual:watch": "vitest tests/visual-comparison.test.js",
-    "test:visual:ui": "vitest --ui tests/visual-comparison.test.js",
-    "test:structure": "vitest run tests/structure-comparison.test.js"
+    "examples:all": "npm run build && node scripts/test-consumption.js"
   },
   "repository": {
     "type": "git",
@@ -56,11 +59,11 @@
   },
   "homepage": "https://github.com/hlridge/bliss-svg-builder#readme",
   "devDependencies": {
-    "@vitest/ui": "^3.0.7",
+    "@vitest/ui": "^3.2.3",
     "canvas": "^3.1.0",
-    "jsdom": "^26.0.0",
-    "vite": "^6.2.0",
-    "vitest": "^3.0.7"
+    "jsdom": "^26.1.0",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
