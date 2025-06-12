@@ -95,7 +95,7 @@ export class BlissParser {
 
   static fromString(inputString) {
     inputString = inputString.trim();
-    let result = { options: {}, words: [] };
+    let result = { words: [] };
 
     // Parse a Blissymbolics string and convert it to an internal representation (BlissComposition)
     //Ex. 
@@ -128,7 +128,7 @@ export class BlissParser {
     for (let tpws of threePartWordStrings) {
       if (tpws === "") continue;
 
-      let word = { options: {}, characters: [] };
+      let word = { characters: [] };
 
       let [_, twoPartWordString, textKey] = tpws.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/);
 
