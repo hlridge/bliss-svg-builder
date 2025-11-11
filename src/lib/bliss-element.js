@@ -109,6 +109,7 @@ export class BlissElement {
         console.warn("Error calculating indicator position: ", e);
       }
       this.#relativeToParentX = this.#childStartOffset + (this.#blissObj.x ?? 0);
+      this.#relativeToParentY = this.#blissObj.y ?? 0;
 
       this.getPath = (x = 0, y = 0) => {
         return this.#children.map(child => 
@@ -139,6 +140,12 @@ export class BlissElement {
         this.#relativeToParentX = this.#blissObj.x ?? 0;
       }
 
+      if (this.#parentElement) {
+        this.#relativeToParentY = this.#parentElement.#relativeToParentY + (this.#blissObj.y ?? 0);
+      } else {
+        this.#relativeToParentY = this.#blissObj.y ?? 0;
+      }
+
       this.#advanceX = this.baseWordWidth + this.#wordSpacing;
 
       this.getPath = (x = 0, y = 0) => this.#children.map(child => 
@@ -156,6 +163,7 @@ export class BlissElement {
           child.type = "characterPart";
           this.#children.push(child);
         }
+
         if (!this.#previousElement) {
           this.#relativeToParentX = this.#parentElement.#relativeToParentX + (this.#blissObj.x ?? 0);
         } else {
@@ -175,8 +183,10 @@ export class BlissElement {
             this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.width + this.#blissObj.x;
           }
         }
-  
+
+        this.#relativeToParentY = this.#blissObj.y ?? 0;
         this.#advanceX = this.baseCharacterWidth + this.#charSpacing;
+
         this.getPath = (x = 0, y = 0) => this.#children.map(child => 
           child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
         ).join('');
@@ -189,23 +199,26 @@ export class BlissElement {
         const isValidElement = isPredefinedElement || isCompositeElement;
         if (!isValidElement) {
           throw new Error(
-            `Unable to create Bliss element: "${this.#blissObj.code}" either lacks a `
+            `Unable to create Bliss element: "${this.#blissObj.code}" either lacks a ` +
             `rendering function (getPath()) or could not be parsed into component parts. ` + 
             `Check code or composition syntax.`
           );
         }
 
         this.#relativeToParentX = this.#blissObj.x ?? 0;
-          
+        this.#relativeToParentY = this.#blissObj.y ?? 0;
+
         if (isPredefinedElement) {
           this.#handlePredefinedElement(elementDefinition);
+
+          // For predefined (leaf) elements with explicit coordinates, use them directly
+          if (this.#blissObj.y !== undefined) {
+            this.#relativeToParentY = this.#blissObj.y;
+          }
         } else if (isCompositeElement) {
           this.#handleCompositeElement(this.#blissObj.parts);
         }
       }
-      this.#relativeToParentY = this.#blissObj.y || 0;
-      this.#anchorOffsetX = this.#blissObj.anchorOffsetX || 0;
-      this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
     }
   }
 
@@ -374,6 +387,7 @@ export class BlissElement {
   }
 
   get y() {
+    if (this.#level <= 1) return 0;
     if (this.#leafY !== undefined) return this.#leafY;
     if (!this.#children || this.#children.length === 0) return 0;
 
@@ -594,7 +608,7 @@ export class BlissElement {
     this.#leafWidth = definition.width;
     this.#leafHeight = definition.height;
     this.#leafX = definition.x;
-    this.#leafX = definition.y;
+    this.#leafY = definition.y;
     
     this.getPath = (x = 0, y = 0) => definition.getPath(
       this.#relativeToParentX + x, 
@@ -634,9 +648,24 @@ export class BlissElement {
         this.#relativeToParentX = baseCharacterAnchorX - indicatorHalfWidth - indicatorAnchorOffsetX;
       }
 
-      //TODO: handle anchorOffset.y
+      if (this.#blissObj.y !== undefined) {
+        // Explicit y coordinates are relative to the default position (0 for element, 4 for drawing)
+        // So we just use the value directly as the element's relativeToParentY
+        this.#relativeToParentY = this.#blissObj.y;
+      } else {
+        // Implicit positioning: calculate based on base character's anchor point
+        const defaultIndicatorRelativeToParentY = 4;
+        const baseCharacterDefaultAnchorY = 4;
+        const baseCharacterAnchorY = baseCharacterDefaultAnchorY + (this.#previousElement.anchorOffset.y || 0);
+        const indicatorAnchorOffsetY = this.#blissObj.anchorOffsetY || 0; //rare
+        this.#relativeToParentY = baseCharacterAnchorY - indicatorAnchorOffsetY - defaultIndicatorRelativeToParentY; //TODO: test continuous form.
+      }
     }
-    this.getPath = (x = 0, y = 0) => this.#children.map(child => 
+
+    this.#anchorOffsetX = this.#blissObj.anchorOffsetX || 0;
+    this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
+
+    this.getPath = (x = 0, y = 0) => this.#children.map(child =>
       child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
     ).join('');
   }
