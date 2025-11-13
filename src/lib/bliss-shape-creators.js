@@ -7,6 +7,19 @@
 import { alphabetData } from "../external-font-data/open-sans-svg-path-data.js";
 
 /**
+ * Create an invisible zero-sized anchor element with zero width and height.
+ * Used to prevent normalization when explicit positioning is needed.
+ * @returns {Object} - An object with a getPath method, width, and height properties.
+ */
+export function createZeroSizedAnchor() {
+  return {
+    getPath: () => '',
+    width: 0,
+    height: 0,
+  };
+}
+
+/**
  * Create a circle object with a specified radius.
  * @param {number} radius - The radius of the circle.
  * @returns {Object} - An object with a getPath method, width, and height properties.

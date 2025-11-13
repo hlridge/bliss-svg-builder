@@ -164,6 +164,21 @@ export class BlissElement {
           this.#children.push(child);
         }
 
+        // Normalize: shift all parts so the leftmost part starts at x=0
+        // Skip normalization if this character contains a combining indicator
+        const hasCombiningIndicator = this.#children.length === 2 &&
+          !this.#children[0].isIndicator &&
+          this.#children[1].isIndicator;
+
+        if (!hasCombiningIndicator && this.#children.length > 0) {
+          const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
+          if (minX !== 0) {
+            for (const child of this.#children) {
+              child.#relativeToParentX -= minX;
+            }
+          }
+        }
+
         if (!this.#previousElement) {
           this.#relativeToParentX = this.#parentElement.#relativeToParentX + (this.#blissObj.x ?? 0);
         } else {
@@ -256,25 +271,25 @@ export class BlissElement {
   get width() {
     if (this.#leafWidth !== undefined) return this.#leafWidth;
     if (!this.#children || this.#children.length === 0) return 0;
-    
+
     const minRelativeX = Math.min(...this.#children.map(child => child.#relativeToParentX));
-  
+
     let maxRelativeXPlusWidth;
     if (this.#level === 1) {
-      maxRelativeXPlusWidth = Math.max(...this.#children.map(child => 
+      maxRelativeXPlusWidth = Math.max(...this.#children.map(child =>
         child.#relativeToParentX + child.rightExtendedCharacterWidth));
     } else {
-      maxRelativeXPlusWidth = Math.max(...this.#children.map(child => 
+      maxRelativeXPlusWidth = Math.max(...this.#children.map(child =>
         child.#relativeToParentX + child.width));
     }
-       
+
     let width;
     if (this.#level === 0) {
       width = maxRelativeXPlusWidth - minRelativeX + this.#childStartOffset;
     } else {
       width = maxRelativeXPlusWidth - minRelativeX;
     }
-    
+
     return width;
   }
 
@@ -307,22 +322,24 @@ export class BlissElement {
 
     const character = this;
     const parts = character.#children;
-    
+
     if (parts.length === 0) return 0;
-    if (parts.length === 1) return parts[0].width;
+    if (parts.length === 1) {
+      return parts[0].width;
+    }
 
     const allPartsAreIndicators = parts.every(part => part.isIndicator);
     const lastPartIsIndicator = parts[parts.length - 1].isIndicator;
- 
+
     let spacingParts = parts;
-    if (lastPartIsIndicator && !allPartsAreIndicators) { 
-      spacingParts = parts.slice(0, -1); 
+    if (lastPartIsIndicator && !allPartsAreIndicators) {
+      spacingParts = parts.slice(0, -1);
     }
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...spacingParts.map(part => part.#relativeToParentX + part.width));
     const baseCharacterWidth = maxRelativeXPlusWidth - minRelativeX;
-    
+
     return baseCharacterWidth;
   }
 
@@ -619,11 +636,11 @@ export class BlissElement {
 
   #handleCompositeElement(parts) {
     this.#children = [];
-    
+
     for (const part of parts) {
-      const child = new BlissElement(part, { 
-        parentElement: this, 
-        previousElement: this.#children[this.#children.length - 1], 
+      const child = new BlissElement(part, {
+        parentElement: this,
+        previousElement: this.#children[this.#children.length - 1],
         level: this.#level + 1
       });
       this.#children.push(child);
@@ -632,9 +649,20 @@ export class BlissElement {
     const isThisIndicator = this.isIndicator;
     const isParentIndicator = this.#parentElement.isIndicator;
     const isPreviousIndicator = this.#previousElement?.isIndicator;
-    const isPreviousBaseCharacter = this.#previousElement && !isPreviousIndicator; 
-    const parentHasTwoParts = this.#parentElement && this.#parentElement.#blissObj.parts?.length === 2;    
+    const isPreviousBaseCharacter = this.#previousElement && !isPreviousIndicator;
+    const parentHasTwoParts = this.#parentElement && this.#parentElement.#blissObj.parts?.length === 2;
     const isThisCombiningIndicator = this.#level === 3 && isThisIndicator && !isParentIndicator && isPreviousBaseCharacter && parentHasTwoParts;
+
+    // Normalize: shift all child parts so the leftmost part starts at x=0
+    // Skip normalization for combining indicators (they have their own positioning logic)
+    if (!isThisCombiningIndicator && this.#children.length > 0) {
+      const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
+      if (minX !== 0) {
+        for (const child of this.#children) {
+          child.#relativeToParentX -= minX;
+        }
+      }
+    }
 
     if (isThisCombiningIndicator) {
       if (this.#blissObj.x !== undefined) {

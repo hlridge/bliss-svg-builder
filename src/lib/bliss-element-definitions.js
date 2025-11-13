@@ -8,6 +8,7 @@ import * as sc from "./bliss-shape-creators.js";
 import { charData } from "./bliss-character-data.js";
 
 const blissElementDefinitions = {
+  'ZSA': sc.createZeroSizedAnchor(),
   'H': sc.createHeart(8),
   'E': sc.createEar(8),
   'F': sc.createFiber(8),
