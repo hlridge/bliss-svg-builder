@@ -175,12 +175,12 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Returns the main path element of the SVG as a string.
+   * Returns the SVG content (path elements and groups) as a string.
    * This is useful when you need only the primary graphical content of the SVG for manipulation or for use in complex SVG compositions.
-   * 
-   * @returns {string} SVG path string
+   *
+   * @returns {string} SVG content string
    */
-  get svgPath() {
+  get svgContent() {
     return `<path d="${this.composition.getPath()}"></path>`
   }
 
@@ -299,7 +299,7 @@ class BlissSVGBuilder {
 
     const viewBoxX = -margin + cropLeft;
     const viewBoxY = -margin + cropTop;
-    const path = this.svgPath;
+    const content = this.svgContent;
     const viewBoxWidth = width + margin * 2 - cropLeft - cropRight;
     const viewBoxHeight = height - cropTop - cropBottom + margin * 2;
     const svgAttributeMultiplier = 6;
@@ -355,7 +355,7 @@ class BlissSVGBuilder {
 
     let svgStr =
 `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="tiny" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}" fill="none" stroke="${color}" stroke-linejoin="round" stroke-linecap="round" stroke-width="${strokeWidth}">
-  ${title}${desc}${backgroundRect}${gridPath}${path}${svgText}
+  ${title}${desc}${backgroundRect}${gridPath}${content}${svgText}
 </svg>`;
     return svgStr;
   }

@@ -9,9 +9,9 @@ declare class BlissSVGBuilder {
   constructor(input: any);
 
   /**
-   * Returns the main path element of the SVG as a string.
+   * Returns the SVG content (path elements and groups) as a string.
    */
-  readonly svgPath: string;
+  readonly svgContent: string;
 
   /**
    * Returns the SVG as a DOM Element.
