@@ -47,6 +47,35 @@ export class BlissElement {
   #parentElement;
   #previousElement;
 
+  static #optionsToAttributes(options) {
+    if (!options || typeof options !== 'object') return '';
+
+    // Map option keys to SVG attribute names
+    const attrMap = {
+      'color': 'stroke'
+      // All other keys pass through as-is (stroke-width, fill, opacity, class, id, etc.)
+    };
+
+    const escapeHtml = (str) => String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const attrs = [];
+    for (const [key, value] of Object.entries(options)) {
+      // Skip positioning options (x, y) and special options (relativeKerning, absoluteKerning)
+      if (key === 'x' || key === 'y' || key === 'relativeKerning' || key === 'absoluteKerning') continue;
+
+      const attrName = attrMap[key] || key;
+      const escapedValue = escapeHtml(value);
+      attrs.push(`${attrName}="${escapedValue}"`);
+    }
+
+    return attrs.join(' ');
+  }
+
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0 } = {}) {
     this.#blissObj = blissObj;
     this.#parentElement = parentElement;
@@ -111,10 +140,16 @@ export class BlissElement {
       this.#relativeToParentX = this.#childStartOffset + (this.#blissObj.x ?? 0);
       this.#relativeToParentY = this.#blissObj.y ?? 0;
 
-      this.getPath = (x = 0, y = 0) => {
-        return this.#children.map(child => 
-          child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
+      this.getSvgContent = (x = 0, y = 0) => {
+        const content = this.#children.map(child =>
+          child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
         ).join('');
+
+        const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
+        if (attrs) {
+          return `<g ${attrs}>${content}</g>`;
+        }
+        return content;
       };      
     } else if (this.#level === 1) {
       // Word level
@@ -148,9 +183,17 @@ export class BlissElement {
 
       this.#advanceX = this.baseWordWidth + this.#wordSpacing;
 
-      this.getPath = (x = 0, y = 0) => this.#children.map(child => 
-        child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
-      ).join('');
+      this.getSvgContent = (x = 0, y = 0) => {
+        const content = this.#children.map(child =>
+          child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
+        ).join('');
+
+        const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
+        if (attrs) {
+          return `<g ${attrs}>${content}</g>`;
+        }
+        return content;
+      };
     } else {
       if (this.#level === 2) {
         // Character level
@@ -202,9 +245,17 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
         this.#advanceX = this.baseCharacterWidth + this.#charSpacing;
 
-        this.getPath = (x = 0, y = 0) => this.#children.map(child => 
-          child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
-        ).join('');
+        this.getSvgContent = (x = 0, y = 0) => {
+          const content = this.#children.map(child =>
+            child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
+          ).join('');
+
+          const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
+          if (attrs) {
+            return `<g ${attrs}>${content}</g>`;
+          }
+          return content;
+        };
       } else {
         // Part level (level >= 3)
         const elementDefinition = blissElementDefinitions[this.#blissObj.code];
@@ -627,11 +678,25 @@ export class BlissElement {
     this.#leafX = definition.x;
     this.#leafY = definition.y;
     
-    this.getPath = (x = 0, y = 0) => definition.getPath(
-      this.#relativeToParentX + x, 
-      this.#relativeToParentY + y, 
-      this.#extraPathOptions
-    );
+    this.getSvgContent = (x = 0, y = 0) => {
+      const pathData = definition.getPath(
+        this.#relativeToParentX + x,
+        this.#relativeToParentY + y,
+        this.#extraPathOptions
+      );
+
+      // If the definition returns SVG tags (like DOT/COMMA with extraPathOptions),
+      // return as-is without wrapping
+      if (pathData.includes('<')) {
+        return pathData;
+      }
+
+      const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
+      if (attrs) {
+        return `<g ${attrs}><path d="${pathData}"/></g>`;
+      }
+      return pathData;
+    };
   }
 
   #handleCompositeElement(parts) {
@@ -693,9 +758,17 @@ export class BlissElement {
     this.#anchorOffsetX = this.#blissObj.anchorOffsetX || 0;
     this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
 
-    this.getPath = (x = 0, y = 0) => this.#children.map(child =>
-      child.getPath(this.#relativeToParentX + x, this.#relativeToParentY + y)
-    ).join('');
+    this.getSvgContent = (x = 0, y = 0) => {
+      const content = this.#children.map(child =>
+        child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
+      ).join('');
+
+      const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
+      if (attrs) {
+        return `<g ${attrs}>${content}</g>`;
+      }
+      return content;
+    };
   }
 }
 

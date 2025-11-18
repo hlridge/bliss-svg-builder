@@ -181,7 +181,17 @@ class BlissSVGBuilder {
    * @returns {string} SVG content string
    */
   get svgContent() {
-    return `<path d="${this.composition.getPath()}"></path>`
+    const content = this.composition.getSvgContent();
+
+    // If content already contains complete SVG tags (like <g> from hierarchical options), return as-is
+    if (content.includes('<g ')) {
+      return content;
+    }
+
+    // Otherwise, wrap raw path data in a <path> element
+    // Note: DOT/COMMA have extraPathOptions that embed </path><path.../><path d=" in the content
+    // which gets wrapped properly here
+    return `<path d="${content}"></path>`;
   }
 
   /**

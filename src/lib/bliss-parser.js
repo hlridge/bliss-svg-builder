@@ -17,40 +17,22 @@ export class BlissParser {
       return result;
   }
 
-  static #setupEscapeMaps() {
-    // Escaping map for special characters in text section
-    // Using characters from the Unicode Private Use Area (U+F000 to U+F005) to avoid conflicts with normal characters.
-    const escapeMap = {
-      "\\": "\uF000",
-      ";": "\uF001",
-      "{": "\uF002",
-      "}": "\uF003",
-      "n": "\uF004",
-      "r": "\uF005",
-    };
-
-    // Unescaping map
-    const unescapeMap = {};
-    for (let k in escapeMap) {
-      unescapeMap[escapeMap[k]] = k;
-    }
-
-    return { escapeMap, unescapeMap };
-  }
 
   static #parseOptions(optionsString) {
     if (!optionsString) return;
 
-    // ...[OPTIONSKEY1=OPTIONSVALUE1;OPTIONSKEY2=OPTIONSVALUE2]...
-    const extractedContent = optionsString.match(/\[([^\]]*)\]/)?.[1].replace(/\s/g, '');
-    const keyValuePairs = extractedContent ? extractedContent.split(';') : [];
+    // ...[OPTIONSKEY1=OPTIONSVALUE1,OPTIONSKEY2=OPTIONSVALUE2]...
+    // Note: comma (with optional whitespace) separates key-value pairs
+    const extractedContent = optionsString.match(/\[([^\]]*)\]/)?.[1];
+    const keyValuePairs = extractedContent ? extractedContent.split(',') : [];
     const parsedObject = {};
 
     for (const keyValuePair of keyValuePairs) {
       const [key, value] = keyValuePair.split('=');
-      parsedObject[key] = value;
+      // Trim whitespace around key and value, but preserve spaces within values
+      parsedObject[key.trim()] = value.trim();
     }
-  
+
     return parsedObject;
   }
 
@@ -100,21 +82,31 @@ export class BlissParser {
     //inputString = "[stroke-width=0.4;stroke-width=0.3]||[stroke-width=0.2]|H:3,4;E:2,4{hej}/C8:0,8;[color=green]E:0,11{hopp}/AA8N:0,2"
     //inputString = "[stroke-width=0.4;stroke-width=0.3]||[stroke-width=0.2]|H:3,4;E:2,4/C8:0,8;[color=green]E:0,11/AA8N:0,2{hej hopp}"
 
-    let { escapeMap, unescapeMap } = this.#setupEscapeMaps();
-
-    // Replace special characters inside square brackets with their escaped versions
-    
     let placeholderMap = {};
     let placeholderCount = 0;
 
-    inputString = inputString.replace(/\{(.*?)\}/g, (match, group1) => {
+    // Preserve content in both {...} and [...] to protect spaces
+    // {...} uses greedy match since it's always at the end and can contain any characters
+    // [...] uses non-greedy match since it can appear multiple times
+    inputString = inputString.replace(/\{(.*)\}|\[([^\]]*)\]/g, (match, textContent, optionContent) => {
       let placeholder = `PLACEHOLDER_${placeholderCount++}`;
-      placeholderMap[placeholder] = group1.trim();
-      return `{${placeholder}}`;
+      if (textContent !== undefined) {
+        placeholderMap[placeholder] = { content: textContent, openBracket: '{', closeBracket: '}' };
+        return '{' + placeholder + '}';
+      } else {
+        placeholderMap[placeholder] = { content: optionContent, openBracket: '[', closeBracket: ']' };
+        return '[' + placeholder + ']';
+      }
     });
 
-    // Remove all spaces in input string
+    // Remove all spaces in input string (but not in preserved content)
     inputString = inputString.replace(/\s/g, '');
+
+    // Restore preserved content
+    inputString = inputString.replace(/(\{|\[)PLACEHOLDER_(\d+)(\}|\])/g, (match, open, num, close) => {
+      const { content, openBracket, closeBracket } = placeholderMap[`PLACEHOLDER_${num}`];
+      return openBracket + content + closeBracket;
+    });
 
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
@@ -130,10 +122,9 @@ export class BlissParser {
 
       let [_, twoPartWordString, textKey] = tpws.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/);
 
-      // Escape characters in text
+      // Restore text from placeholder
       if (textKey) {
-        word.text = placeholderMap[textKey];
-        //character.text = text.replace(/\\(.)/g, (_, char) => unescapeMap[escapeMap[char]] ? unescapeMap[escapeMap[char]] : char);
+        word.text = placeholderMap[textKey]?.content ?? textKey;
       }
 
       function replaceWithDefinition(str, definitions) {
@@ -226,6 +217,8 @@ export class BlissParser {
 
         const parseParts = (partsString) => {
           const parts = [];
+
+          // Split on ; (brackets are already replaced with placeholders at this point)
           const twoPartPartStrings = partsString.split(';');
           for (const twoPartPartString of twoPartPartStrings) {
             const part = this.parsePartString(twoPartPartString);
