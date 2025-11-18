@@ -147,7 +147,8 @@ export class BlissElement {
 
         const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
         if (attrs) {
-          return `<g ${attrs}>${content}</g>`;
+          const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
+          return `<g ${attrs}>${wrappedContent}</g>`;
         }
         return content;
       };      
@@ -190,7 +191,9 @@ export class BlissElement {
 
         const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
         if (attrs) {
-          return `<g ${attrs}>${content}</g>`;
+          // If content is raw path data (doesn't start with <), wrap it in <path> element
+          const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
+          return `<g ${attrs}>${wrappedContent}</g>`;
         }
         return content;
       };
