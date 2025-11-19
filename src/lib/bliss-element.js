@@ -50,6 +50,15 @@ export class BlissElement {
   static #optionsToAttributes(options) {
     if (!options || typeof options !== 'object') return '';
 
+    // Internal options that should never become SVG attributes
+    const internalOptions = new Set([
+      'x',
+      'y',
+      'relativeKerning',
+      'absoluteKerning',
+      'grid'
+    ]);
+
     // Map option keys to SVG attribute names
     const attrMap = {
       'color': 'stroke'
@@ -65,8 +74,7 @@ export class BlissElement {
 
     const attrs = [];
     for (const [key, value] of Object.entries(options)) {
-      // Skip positioning options (x, y) and special options (relativeKerning, absoluteKerning)
-      if (key === 'x' || key === 'y' || key === 'relativeKerning' || key === 'absoluteKerning') continue;
+      if (internalOptions.has(key)) continue;
 
       const attrName = attrMap[key] || key;
       const escapedValue = escapeHtml(value);
@@ -141,15 +149,23 @@ export class BlissElement {
       this.#relativeToParentY = this.#blissObj.y ?? 0;
 
       this.getSvgContent = (x = 0, y = 0) => {
-        const content = this.#children.map(child =>
+        const childContents = this.#children.map(child =>
           child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-        ).join('');
+        );
+
+        const hasTaggedContent = childContents.some(c => c.startsWith('<'));
+        const hasRawContent = childContents.some(c => !c.startsWith('<'));
+
+        const content = hasTaggedContent && hasRawContent
+          ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+          : childContents.join('');
 
         const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
         if (attrs) {
           const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
           return `<g ${attrs}>${wrappedContent}</g>`;
         }
+
         return content;
       };      
     } else if (this.#level === 1) {
@@ -185,16 +201,23 @@ export class BlissElement {
       this.#advanceX = this.baseWordWidth + this.#wordSpacing;
 
       this.getSvgContent = (x = 0, y = 0) => {
-        const content = this.#children.map(child =>
+        const childContents = this.#children.map(child =>
           child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-        ).join('');
+        );
+
+        const hasTaggedContent = childContents.some(c => c.startsWith('<'));
+        const hasRawContent = childContents.some(c => !c.startsWith('<'));
+
+        const content = hasTaggedContent && hasRawContent
+          ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+          : childContents.join('');
 
         const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
         if (attrs) {
-          // If content is raw path data (doesn't start with <), wrap it in <path> element
           const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
           return `<g ${attrs}>${wrappedContent}</g>`;
         }
+
         return content;
       };
     } else {
@@ -249,13 +272,21 @@ export class BlissElement {
         this.#advanceX = this.baseCharacterWidth + this.#charSpacing;
 
         this.getSvgContent = (x = 0, y = 0) => {
-          const content = this.#children.map(child =>
+          const childContents = this.#children.map(child =>
             child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-          ).join('');
+          );
+
+          const hasTaggedContent = childContents.some(c => c.startsWith('<'));
+          const hasRawContent = childContents.some(c => !c.startsWith('<'));
+
+          const content = hasTaggedContent && hasRawContent
+            ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+            : childContents.join('');
 
           const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
           if (attrs) {
-            return `<g ${attrs}>${content}</g>`;
+            const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
+            return `<g ${attrs}>${wrappedContent}</g>`;
           }
           return content;
         };
@@ -762,13 +793,21 @@ export class BlissElement {
     this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
 
     this.getSvgContent = (x = 0, y = 0) => {
-      const content = this.#children.map(child =>
+      const childContents = this.#children.map(child =>
         child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-      ).join('');
+      );
+
+      const hasTaggedContent = childContents.some(c => c.startsWith('<'));
+      const hasRawContent = childContents.some(c => !c.startsWith('<'));
+
+      const content = hasTaggedContent && hasRawContent
+        ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+        : childContents.join('');
 
       const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
       if (attrs) {
-        return `<g ${attrs}>${content}</g>`;
+        const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
+        return `<g ${attrs}>${wrappedContent}</g>`;
       }
       return content;
     };

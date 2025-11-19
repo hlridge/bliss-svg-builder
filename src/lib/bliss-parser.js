@@ -21,16 +21,23 @@ export class BlissParser {
   static #parseOptions(optionsString) {
     if (!optionsString) return;
 
-    // ...[OPTIONSKEY1=OPTIONSVALUE1,OPTIONSKEY2=OPTIONSVALUE2]...
-    // Note: comma (with optional whitespace) separates key-value pairs
     const extractedContent = optionsString.match(/\[([^\]]*)\]/)?.[1];
-    const keyValuePairs = extractedContent ? extractedContent.split(',') : [];
+    if (!extractedContent) return;
+
     const parsedObject = {};
 
-    for (const keyValuePair of keyValuePairs) {
-      const [key, value] = keyValuePair.split('=');
-      // Trim whitespace around key and value, but preserve spaces within values
-      parsedObject[key.trim()] = value.trim();
+    const regex = /([\w-]+)\s*=\s*("(?:[^"\\]|\\.)*"|[^,]+)/g;
+    let match;
+
+    while ((match = regex.exec(extractedContent)) !== null) {
+      const key = match[1].trim();
+      let value = match[2].trim();
+
+      if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.slice(1, -1).replace(/\\"/g, '"');
+      }
+
+      parsedObject[key] = value;
     }
 
     return parsedObject;
@@ -45,10 +52,14 @@ export class BlissParser {
   static parsePartString(str) {
     const part = {};
 
-    let [_, optionsString, codeString] = str.match(/^(\[[^\}]*\])?(.*)/);
-
-    if (optionsString) {
+    let optionsString, codeString;
+    const match = str.match(/^(\[.*?\])>(.*)$/);
+    if (match) {
+      optionsString = match[1];
+      codeString = match[2];
       part.options = this.#parseOptions(optionsString);
+    } else {
+      codeString = str;
     }
 
     if (codeString) {
@@ -122,9 +133,24 @@ export class BlissParser {
 
       let [_, twoPartWordString, textKey] = tpws.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/);
 
-      // Restore text from placeholder
       if (textKey) {
         word.text = placeholderMap[textKey]?.content ?? textKey;
+      }
+
+      let wordCodeString;
+      if (twoPartWordString.includes('|')) {
+        const [beforePipe, afterPipe] = twoPartWordString.split("|", 2);
+        if (beforePipe.match(/^\[.*\]$/)) {
+          word.options = this.#parseOptions(beforePipe);
+          wordCodeString = afterPipe;
+        } else if (beforePipe.length > 0) {
+          console.warn(`Invalid word options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`);
+          wordCodeString = afterPipe;
+        } else {
+          wordCodeString = afterPipe;
+        }
+      } else {
+        wordCodeString = twoPartWordString;
       }
 
       function replaceWithDefinition(str, definitions) {
@@ -172,7 +198,7 @@ export class BlissParser {
         return str.split('/').flatMap(strPart => expand(strPart, definitions));
       }
 
-      const expandedCharacterParts = replaceWithDefinition(twoPartWordString, blissElementDefinitions);
+      const expandedCharacterParts = replaceWithDefinition(wordCodeString, blissElementDefinitions);
   
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
@@ -206,13 +232,11 @@ export class BlissParser {
           pendingAbsoluteKerning = undefined;
         }
 
-        // Extract text
-        //let [_, twoPartCharacterString, textKey] = tpcs.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/); //TODO: adjust this to not include {text}
-
-        const [characterOptionsString, characterCodeString] = part.includes('|') ? part.split("|", 2) : [undefined, part];
-
-        if (characterOptionsString) {
-          character.options = this.#parseOptions(characterOptionsString);
+        let characterCodeString = part;
+        const charMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
+        if (charMatch) {
+          character.options = this.#parseOptions(charMatch[1]);
+          characterCodeString = charMatch[2];
         }
 
         const parseParts = (partsString) => {
