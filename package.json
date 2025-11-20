@@ -5,6 +5,7 @@
   "main": "dist/bliss-svg-builder.cjs",
   "module": "dist/bliss-svg-builder.esm.js",
   "type": "module",
+  "types": "src/index.d.ts",
   "exports": {
     "browser": {
       "import": "./dist/bliss-svg-builder.esm.js",
@@ -16,6 +17,7 @@
   },
   "files": [
     "dist",
+    "src/index.d.ts",
     "README.md",
     "LICENSE"
   ],
