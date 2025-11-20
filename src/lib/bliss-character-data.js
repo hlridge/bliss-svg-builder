@@ -1044,7 +1044,7 @@ const charData = {
   B318: {
     codeString: "B374;P4W:5,6",
     anchorOffsetX: -1.5,
-    anchorOffsetY: -2
+    anchorOffsetY: -1
   },
   B319: {
     codeString: "W8E:0,8"
