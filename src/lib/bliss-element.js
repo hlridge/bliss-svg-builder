@@ -84,6 +84,102 @@ export class BlissElement {
     return attrs.join(' ');
   }
 
+  /**
+   * Wraps content with <a> and/or <g> tags based on options.
+   * Ensures consistent wrapping behavior across all element levels.
+   *
+   * @param {string} content - The content to wrap (raw path data or HTML string)
+   * @param {Object} options - The options containing anchor and group attributes
+   * @returns {string} The wrapped content
+   */
+  static #wrapWithAnchorAndGroup(content, options) {
+    const { anchorAttrs, groupAttrs, hasHref } = BlissElement.#separateAnchorAndGroupOptions(options);
+
+    // For content that's already tagged (starts with '<'), use as-is
+    // For raw path data, wrap in <path>
+    const needsPathWrapper = !content.startsWith('<');
+
+    if (hasHref) {
+      const wrappedContent = needsPathWrapper ? `<path d="${content}"></path>` : content;
+      if (groupAttrs) {
+        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${wrappedContent}</g></a>`;
+      }
+      return `<a ${anchorAttrs} style="cursor: pointer;">${wrappedContent}</a>`;
+    }
+
+    if (groupAttrs) {
+      const wrappedContent = needsPathWrapper ? `<path d="${content}"></path>` : content;
+      return `<g ${groupAttrs}>${wrappedContent}</g>`;
+    }
+
+    return content;
+  }
+
+  static #separateAnchorAndGroupOptions(options) {
+    if (!options || typeof options !== 'object') {
+      return { anchorAttrs: '', groupAttrs: '', hasHref: false };
+    }
+
+    const anchorAttrNames = new Set([
+      'href',
+      'target',
+      'rel',
+      'download',
+      'hreflang',
+      'type',
+      'referrerpolicy'
+    ]);
+
+    const internalOptions = new Set([
+      'x',
+      'y',
+      'relativeKerning',
+      'absoluteKerning',
+      'grid'
+    ]);
+
+    const attrMap = {
+      'color': 'stroke'
+    };
+
+    const escapeHtml = (str) => String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const anchorAttrs = [];
+    const groupAttrs = [];
+    let hasHref = false;
+    let hasPointerEvents = false;
+
+    for (const [key, value] of Object.entries(options)) {
+      if (internalOptions.has(key)) continue;
+
+      const escapedValue = escapeHtml(value);
+
+      if (anchorAttrNames.has(key)) {
+        if (key === 'href') hasHref = true;
+        anchorAttrs.push(`${key}="${escapedValue}"`);
+      } else {
+        const attrName = attrMap[key] || key;
+        if (key === 'pointer-events') hasPointerEvents = true;
+        groupAttrs.push(`${attrName}="${escapedValue}"`);
+      }
+    }
+
+    if (hasHref && !hasPointerEvents) {
+      groupAttrs.push('pointer-events="bounding-box"');
+    }
+
+    return {
+      anchorAttrs: anchorAttrs.join(' '),
+      groupAttrs: groupAttrs.join(' '),
+      hasHref
+    };
+  }
+
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0 } = {}) {
     this.#blissObj = blissObj;
     this.#parentElement = parentElement;
@@ -160,14 +256,8 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
           : childContents.join('');
 
-        const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
-        if (attrs) {
-          const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
-          return `<g ${attrs}>${wrappedContent}</g>`;
-        }
-
-        return content;
-      };      
+        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+      };
     } else if (this.#level === 1) {
       // Word level
       if (!this.#blissObj.characters) {
@@ -212,13 +302,7 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
           : childContents.join('');
 
-        const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
-        if (attrs) {
-          const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
-          return `<g ${attrs}>${wrappedContent}</g>`;
-        }
-
-        return content;
+        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
       };
     } else {
       if (this.#level === 2) {
@@ -283,12 +367,7 @@ export class BlissElement {
             ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
             : childContents.join('');
 
-          const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
-          if (attrs) {
-            const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
-            return `<g ${attrs}>${wrappedContent}</g>`;
-          }
-          return content;
+          return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
         };
       } else {
         // Part level (level >= 3)
@@ -725,11 +804,7 @@ export class BlissElement {
         return pathData;
       }
 
-      const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
-      if (attrs) {
-        return `<g ${attrs}><path d="${pathData}"/></g>`;
-      }
-      return pathData;
+      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options);
     };
   }
 
@@ -804,12 +879,7 @@ export class BlissElement {
         ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
         : childContents.join('');
 
-      const attrs = BlissElement.#optionsToAttributes(this.#blissObj.options);
-      if (attrs) {
-        const wrappedContent = content.startsWith('<') ? content : `<path d="${content}"></path>`;
-        return `<g ${attrs}>${wrappedContent}</g>`;
-      }
-      return content;
+      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
     };
   }
 }

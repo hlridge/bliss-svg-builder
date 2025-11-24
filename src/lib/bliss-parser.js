@@ -26,15 +26,18 @@ export class BlissParser {
 
     const parsedObject = {};
 
-    const regex = /([\w-]+)\s*=\s*("(?:[^"\\]|\\.)*"|[^,]+)/g;
+    const regex = /([\w-]+)\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,]+)/g;
     let match;
 
     while ((match = regex.exec(extractedContent)) !== null) {
       const key = match[1].trim();
       let value = match[2].trim();
 
+      // Remove quotes and handle escapes for both double and single quotes
       if (value.startsWith('"') && value.endsWith('"')) {
         value = value.slice(1, -1).replace(/\\"/g, '"');
+      } else if (value.startsWith("'") && value.endsWith("'")) {
+        value = value.slice(1, -1).replace(/\\'/g, "'");
       }
 
       parsedObject[key] = value;
@@ -49,7 +52,7 @@ export class BlissParser {
     return { encodedString, globalOptions };
   }
 
-  static parsePartString(str) {
+  static parsePartString(str, restoreFunction = (s) => s) {
     const part = {};
 
     let optionsString, codeString;
@@ -57,7 +60,7 @@ export class BlissParser {
     if (match) {
       optionsString = match[1];
       codeString = match[2];
-      part.options = this.#parseOptions(optionsString);
+      part.options = this.#parseOptions(restoreFunction(optionsString));
     } else {
       codeString = str;
     }
@@ -113,15 +116,22 @@ export class BlissParser {
     // Remove all spaces in input string (but not in preserved content)
     inputString = inputString.replace(/\s/g, '');
 
-    // Restore preserved content
-    inputString = inputString.replace(/(\{|\[)PLACEHOLDER_(\d+)(\}|\])/g, (match, open, num, close) => {
-      const { content, openBracket, closeBracket } = placeholderMap[`PLACEHOLDER_${num}`];
-      return openBracket + content + closeBracket;
-    });
+    // Helper function to restore placeholders in a string
+    const restorePlaceholders = (str) => {
+      if (!str) return str; // Handle undefined/null/empty (matches #parseOptions behavior)
+      return str.replace(/(\{|\[)PLACEHOLDER_(\d+)(\}|\])/g, (match, open, num, close) => {
+        const placeholder = placeholderMap[`PLACEHOLDER_${num}`];
+        if (placeholder) {
+          const { content, openBracket, closeBracket } = placeholder;
+          return openBracket + content + closeBracket;
+        }
+        return match;
+      });
+    };
 
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
-    result.options = this.#parseOptions(globalOptionsString) || {};
+    result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
 
     // Iterate over each word part in the remaining string
     let threePartWordStrings = globalCodeString.split('//');
@@ -141,7 +151,7 @@ export class BlissParser {
       if (twoPartWordString.includes('|')) {
         const [beforePipe, afterPipe] = twoPartWordString.split("|", 2);
         if (beforePipe.match(/^\[.*\]$/)) {
-          word.options = this.#parseOptions(beforePipe);
+          word.options = this.#parseOptions(restorePlaceholders(beforePipe));
           wordCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
           console.warn(`Invalid word options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`);
@@ -235,7 +245,7 @@ export class BlissParser {
         let characterCodeString = part;
         const charMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
         if (charMatch) {
-          character.options = this.#parseOptions(charMatch[1]);
+          character.options = this.#parseOptions(restorePlaceholders(charMatch[1]));
           characterCodeString = charMatch[2];
         }
 
@@ -245,7 +255,7 @@ export class BlissParser {
           // Split on ; (brackets are already replaced with placeholders at this point)
           const twoPartPartStrings = partsString.split(';');
           for (const twoPartPartString of twoPartPartStrings) {
-            const part = this.parsePartString(twoPartPartString);
+            const part = this.parsePartString(twoPartPartString, restorePlaceholders);
 
             const definition = blissElementDefinitions[part.code] || {};
             const codeString = definition.codeString;
