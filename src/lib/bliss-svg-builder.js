@@ -45,9 +45,27 @@ class BlissSVGBuilder {
       options.space = space;
     }
 
-    // margin: Explicit number (calculated default happens in constructor)
+    // margin: Sets ALL 4 margins
     if ('margin' in rawOptions && !isNaN(rawOptions['margin'])) {
-      options.margin = Number(rawOptions['margin']);
+      const m = Number(rawOptions['margin']);
+      options.marginTop = m;
+      options.marginBottom = m;
+      options.marginLeft = m;
+      options.marginRight = m;
+    }
+
+    // Individual margins (override the above if present)
+    if ('margin-top' in rawOptions && !isNaN(rawOptions['margin-top'])) {
+      options.marginTop = Number(rawOptions['margin-top']);
+    }
+    if ('margin-bottom' in rawOptions && !isNaN(rawOptions['margin-bottom'])) {
+      options.marginBottom = Number(rawOptions['margin-bottom']);
+    }
+    if ('margin-left' in rawOptions && !isNaN(rawOptions['margin-left'])) {
+      options.marginLeft = Number(rawOptions['margin-left']);
+    }
+    if ('margin-right' in rawOptions && !isNaN(rawOptions['margin-right'])) {
+      options.marginRight = Number(rawOptions['margin-right']);
     }
 
     // grid: Boolean ("1" -> true, "0" -> false)
@@ -82,6 +100,29 @@ class BlissSVGBuilder {
       options.grid4StrokeWidth = Number(rawOptions['grid4-stroke-width']);
     }
 
+    // grid-color: Sets ALL 4 grid colors
+    if ('grid-color' in rawOptions) {
+      const gc = rawOptions['grid-color'];
+      options.grid1Color = gc;
+      options.grid2Color = gc;
+      options.grid3Color = gc;
+      options.grid4Color = gc;
+    }
+
+    // Individual grid colors (override the above if present)
+    if ('grid1-color' in rawOptions) {
+      options.grid1Color = rawOptions['grid1-color'];
+    }
+    if ('grid2-color' in rawOptions) {
+      options.grid2Color = rawOptions['grid2-color'];
+    }
+    if ('grid3-color' in rawOptions) {
+      options.grid3Color = rawOptions['grid3-color'];
+    }
+    if ('grid4-color' in rawOptions) {
+      options.grid4Color = rawOptions['grid4-color'];
+    }
+
     // Crop values: Simple numbers
     if ('crop-top' in rawOptions) {
       options.cropTop = Number(rawOptions['crop-top']);
@@ -94,20 +135,6 @@ class BlissSVGBuilder {
     }
     if ('crop-right' in rawOptions) {
       options.cropRight = Number(rawOptions['crop-right']);
-    }
-
-    // Grid colors: Strings
-    if ('grid1' in rawOptions) {
-      options.grid1Color = rawOptions.grid1;
-    }
-    if ('grid2' in rawOptions) {
-      options.grid2Color = rawOptions.grid2;
-    }
-    if ('grid3' in rawOptions) {
-      options.grid3Color = rawOptions.grid3;
-    }
-    if ('grid4' in rawOptions) {
-      options.grid4Color = rawOptions.grid4;
     }
 
     // Other string options
@@ -125,6 +152,11 @@ class BlissSVGBuilder {
     }
     if ('svg-title' in rawOptions) {
       options.svgTitle = rawOptions['svg-title'];
+    }
+
+    // SVG element height (presentation size, not viewBox)
+    if ('svg-height' in rawOptions && !isNaN(rawOptions['svg-height'])) {
+      options.svgHeight = Number(rawOptions['svg-height']);
     }
 
     return options;
@@ -148,7 +180,10 @@ class BlissSVGBuilder {
       svgTitle: processedOptions.svgTitle ?? "",
       svgDesc: processedOptions.svgDesc ?? "",
       grid: processedOptions.grid ?? false,
-      margin: processedOptions.margin ?? 0.75,
+      marginTop: processedOptions.marginTop ?? 0.75,
+      marginBottom: processedOptions.marginBottom ?? 0.75,
+      marginLeft: processedOptions.marginLeft ?? 0.75,
+      marginRight: processedOptions.marginRight ?? 0.75,
       color: processedOptions.color ?? "#000000",
       grid1Color: processedOptions.grid1Color ?? "#858585", // sky and earth line color
       grid2Color: processedOptions.grid2Color ?? "#c7c7c7", // sparse line color
@@ -162,7 +197,8 @@ class BlissSVGBuilder {
       cropTop: processedOptions.cropTop ?? 0,
       cropBottom: processedOptions.cropBottom ?? 0,
       cropLeft: processedOptions.cropLeft ?? 0,
-      cropRight: processedOptions.cropRight ?? 0
+      cropRight: processedOptions.cropRight ?? 0,
+      svgHeight: processedOptions.svgHeight // optional: SVG element height attribute
     }
   }
 
@@ -303,18 +339,32 @@ class BlissSVGBuilder {
     const cropBottom = this.options.cropBottom;
     const cropLeft = this.options.cropLeft;
     const cropRight = this.options.cropRight;
-    const margin = this.options.margin;
+    const marginTop = this.options.marginTop;
+    const marginBottom = this.options.marginBottom;
+    const marginLeft = this.options.marginLeft;
+    const marginRight = this.options.marginRight;
     const width = this.options.width;
     const height = this.options.height;
 
-    const viewBoxX = -margin + cropLeft;
-    const viewBoxY = -margin + cropTop;
+    const viewBoxX = -marginLeft + cropLeft;
+    const viewBoxY = -marginTop + cropTop;
     const content = this.svgContent;
-    const viewBoxWidth = width + margin * 2 - cropLeft - cropRight;
-    const viewBoxHeight = height - cropTop - cropBottom + margin * 2;
+    const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight;
+    const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom;
     const svgAttributeMultiplier = 6;
-    const svgWidth = svgAttributeMultiplier * viewBoxWidth;
-    const svgHeight = svgAttributeMultiplier * viewBoxHeight;
+
+    // Calculate SVG element dimensions (maintaining aspect ratio)
+    let svgWidth, svgHeight;
+    if (this.options.svgHeight !== undefined) {
+      // Height specified: calculate width to maintain aspect ratio
+      svgHeight = this.options.svgHeight;
+      svgWidth = (viewBoxWidth / viewBoxHeight) * svgHeight;
+    } else {
+      // Auto-calculate both dimensions
+      svgWidth = svgAttributeMultiplier * viewBoxWidth;
+      svgHeight = svgAttributeMultiplier * viewBoxHeight;
+    }
+
     const round = (num) => parseFloat(num.toFixed(4));
 
     let title = this.options.svgTitle ? `<title>${this.options.svgTitle}</title>` : "";

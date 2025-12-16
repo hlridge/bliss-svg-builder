@@ -47,43 +47,6 @@ export class BlissElement {
   #parentElement;
   #previousElement;
 
-  static #optionsToAttributes(options) {
-    if (!options || typeof options !== 'object') return '';
-
-    // Internal options that should never become SVG attributes
-    const internalOptions = new Set([
-      'x',
-      'y',
-      'relativeKerning',
-      'absoluteKerning',
-      'grid'
-    ]);
-
-    // Map option keys to SVG attribute names
-    const attrMap = {
-      'color': 'stroke'
-      // All other keys pass through as-is (stroke-width, fill, opacity, class, id, etc.)
-    };
-
-    const escapeHtml = (str) => String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-    const attrs = [];
-    for (const [key, value] of Object.entries(options)) {
-      if (internalOptions.has(key)) continue;
-
-      const attrName = attrMap[key] || key;
-      const escapedValue = escapeHtml(value);
-      attrs.push(`${attrName}="${escapedValue}"`);
-    }
-
-    return attrs.join(' ');
-  }
-
   /**
    * Wraps content with <a> and/or <g> tags based on options.
    * Ensures consistent wrapping behavior across all element levels.
@@ -131,11 +94,48 @@ export class BlissElement {
     ]);
 
     const internalOptions = new Set([
+      // Position/layout
       'x',
       'y',
       'relativeKerning',
       'absoluteKerning',
-      'grid'
+
+      // Grid display and styling
+      'grid',
+      'grid-color',
+      'grid1-color',
+      'grid2-color',
+      'grid3-color',
+      'grid4-color',
+      'grid-stroke-width',
+      'grid1-stroke-width',
+      'grid2-stroke-width',
+      'grid3-stroke-width',
+      'grid4-stroke-width',
+
+      // Cropping
+      'crop-top',
+      'crop-bottom',
+      'crop-left',
+      'crop-right',
+      'crop',
+
+      // Builder-level settings (not SVG attributes)
+      'dot-extra-width',
+      'background',
+      'space',
+      'margin',
+      'margin-top',
+      'margin-bottom',
+      'margin-left',
+      'margin-right',
+      'min-width',
+
+      // SVG metadata and overlays
+      'text',
+      'svg-desc',
+      'svg-title',
+      'svg-height'
     ]);
 
     const attrMap = {
@@ -600,10 +600,6 @@ export class BlissElement {
 
   get isExternalGlyph() {
     return this.#blissObj.isExternalGlyph;
-  }
-
-  get includeGrid() {
-    return this.optio
   }
 
   toStringOldNotWorking() {
