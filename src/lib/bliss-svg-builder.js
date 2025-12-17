@@ -34,11 +34,11 @@ class BlissSVGBuilder {
       options.dotExtraWidth = dotExtraWidth;
     }
 
-    // space: Number, clamped 1-10
+    // space: Number, clamped 0-10
     if ('space' in rawOptions && !isNaN(rawOptions['space'])) {
       let space = Number(rawOptions['space']);
-      if (space < 1) {
-        space = 1;
+      if (space < 0) {
+        space = 0;
       } else if (space > 10) {
         space = 10;
       }
@@ -219,43 +219,46 @@ class BlissSVGBuilder {
 
   constructor(input) {
     const blissObj = BlissParser.parse(input);
+
+    // Process options (apply clamping, defaults, bulk expansion) and store back in blissObj
+    blissObj.options = this.#processOptions(blissObj.options);
+
+    // Create composition - it will read from blissObj.options
     this.composition = new BlissElement(blissObj);
 
-    const processedOptions = this.#processOptions(blissObj.options);
-
     this.options = {
-      strokeWidth: processedOptions.strokeWidth ?? 0.5,
-      dotExtraWidth: processedOptions.dotExtraWidth ?? 0.333,
+      strokeWidth: blissObj.options?.strokeWidth ?? 0.5,
+      dotExtraWidth: blissObj.options?.dotExtraWidth ?? 0.333,
       width: this.composition.width,
       height: 20, // fixed value
       x: this.composition.x,
       y: this.composition.y,
-      space: processedOptions.space ?? 2,
-      text: processedOptions.text ?? "",
-      svgTitle: processedOptions.svgTitle ?? "",
-      svgDesc: processedOptions.svgDesc ?? "",
-      grid: processedOptions.grid ?? false,
-      marginTop: processedOptions.marginTop ?? 0.75,
-      marginBottom: processedOptions.marginBottom ?? 0.75,
-      marginLeft: processedOptions.marginLeft ?? 0.75,
-      marginRight: processedOptions.marginRight ?? 0.75,
-      color: processedOptions.color ?? "#000000",
-      gridSkyColor: processedOptions.gridSkyColor ?? "#858585", // sky line color (major semantic grid line at y=8)
-      gridEarthColor: processedOptions.gridEarthColor ?? "#858585", // earth line color (major semantic grid line at y=16)
-      gridMajorColor: processedOptions.gridMajorColor ?? "#c7c7c7", // major grid color (structural lines)
-      gridMediumColor: processedOptions.gridMediumColor ?? "#ebebeb", // medium grid color (intermediate precision)
-      gridMinorColor: processedOptions.gridMinorColor ?? "#ebebeb", // minor grid color (fine detail alignment)
-      gridSkyStrokeWidth: processedOptions.gridSkyStrokeWidth ?? 0.166, // sky line stroke-width
-      gridEarthStrokeWidth: processedOptions.gridEarthStrokeWidth ?? 0.166, // earth line stroke-width
-      gridMajorStrokeWidth: processedOptions.gridMajorStrokeWidth ?? 0.166, // major grid stroke-width
-      gridMediumStrokeWidth: processedOptions.gridMediumStrokeWidth ?? 0.166, // medium grid stroke-width
-      gridMinorStrokeWidth: processedOptions.gridMinorStrokeWidth ?? 0.166, // minor grid stroke-width
-      background: processedOptions.background ?? "", // empty string => transparent background
-      cropTop: processedOptions.cropTop ?? 0,
-      cropBottom: processedOptions.cropBottom ?? 0,
-      cropLeft: processedOptions.cropLeft ?? 0,
-      cropRight: processedOptions.cropRight ?? 0,
-      svgHeight: processedOptions.svgHeight // optional: SVG element height attribute
+      space: blissObj.options?.space ?? 2,
+      text: blissObj.options?.text ?? "",
+      svgTitle: blissObj.options?.svgTitle ?? "",
+      svgDesc: blissObj.options?.svgDesc ?? "",
+      grid: blissObj.options?.grid ?? false,
+      marginTop: blissObj.options?.marginTop ?? 0.75,
+      marginBottom: blissObj.options?.marginBottom ?? 0.75,
+      marginLeft: blissObj.options?.marginLeft ?? 0.75,
+      marginRight: blissObj.options?.marginRight ?? 0.75,
+      color: blissObj.options?.color ?? "#000000",
+      gridSkyColor: blissObj.options?.gridSkyColor ?? "#858585", // sky line color (major semantic grid line at y=8)
+      gridEarthColor: blissObj.options?.gridEarthColor ?? "#858585", // earth line color (major semantic grid line at y=16)
+      gridMajorColor: blissObj.options?.gridMajorColor ?? "#c7c7c7", // major grid color (structural lines)
+      gridMediumColor: blissObj.options?.gridMediumColor ?? "#ebebeb", // medium grid color (intermediate precision)
+      gridMinorColor: blissObj.options?.gridMinorColor ?? "#ebebeb", // minor grid color (fine detail alignment)
+      gridSkyStrokeWidth: blissObj.options?.gridSkyStrokeWidth ?? 0.166, // sky line stroke-width
+      gridEarthStrokeWidth: blissObj.options?.gridEarthStrokeWidth ?? 0.166, // earth line stroke-width
+      gridMajorStrokeWidth: blissObj.options?.gridMajorStrokeWidth ?? 0.166, // major grid stroke-width
+      gridMediumStrokeWidth: blissObj.options?.gridMediumStrokeWidth ?? 0.166, // medium grid stroke-width
+      gridMinorStrokeWidth: blissObj.options?.gridMinorStrokeWidth ?? 0.166, // minor grid stroke-width
+      background: blissObj.options?.background ?? "", // empty string => transparent background
+      cropTop: blissObj.options?.cropTop ?? 0,
+      cropBottom: blissObj.options?.cropBottom ?? 0,
+      cropLeft: blissObj.options?.cropLeft ?? 0,
+      cropRight: blissObj.options?.cropRight ?? 0,
+      svgHeight: blissObj.options?.svgHeight // optional: SVG element height attribute
     }
   }
 

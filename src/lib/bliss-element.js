@@ -192,7 +192,8 @@ export class BlissElement {
     this.#relativeToParentX = 0;
     this.#relativeToParentY = 0;
     this.#children = [];
-    this.#charSpacing = DEFAULT_CHAR_SPACING;
+    // Use space option from blissObj if available, otherwise use default
+    this.#charSpacing = this.#blissObj.options?.space ?? DEFAULT_CHAR_SPACING;
     this.#externalGlyphSpacing = DEFAULT_EXTERNAL_GLYPH_SPACING - (this.kerningRules?.[previousElement?.glyph] ?? 0);
     this.#wordSpacing = DEFAULT_WORD_SPACING;
     this.#sentenceSpacing = DEFAULT_SENTENCE_SPACING;
@@ -206,6 +207,10 @@ export class BlissElement {
       }
 
       for (const word of this.#blissObj.words) {
+        // Propagate options to child blissObj
+        if (!word.options && this.#blissObj.options) {
+          word.options = this.#blissObj.options;
+        }
         const child = new BlissElement(word, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
         child.type = "word";
         this.#children.push(child);
@@ -279,6 +284,10 @@ export class BlissElement {
       }
 
       for (const character of this.#blissObj.characters) {
+        // Propagate options to child blissObj
+        if (!character.options && this.#blissObj.options) {
+          character.options = this.#blissObj.options;
+        }
         const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
         child.type = "character";
         this.#children.push(child);
@@ -326,6 +335,10 @@ export class BlissElement {
         }
 
         for (const part of this.#blissObj.parts) {
+          // Propagate options to child blissObj
+          if (!part.options && this.#blissObj.options) {
+            part.options = this.#blissObj.options;
+          }
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
           child.type = "characterPart";
           this.#children.push(child);
@@ -822,6 +835,10 @@ export class BlissElement {
     this.#children = [];
 
     for (const part of parts) {
+      // Propagate options to child blissObj
+      if (!part.options && this.#blissObj.options) {
+        part.options = this.#blissObj.options;
+      }
       const child = new BlissElement(part, {
         parentElement: this,
         previousElement: this.#children[this.#children.length - 1],
