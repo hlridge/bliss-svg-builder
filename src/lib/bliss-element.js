@@ -258,7 +258,19 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
           : childContents.join('');
 
-        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+        // At level 0 (sentence/global), only pass anchor attributes to #wrapWithAnchorAndGroup
+        // SVG-level attributes (stroke-width, color, etc.) are handled by the SVG builder
+        const anchorAttrNames = new Set(['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy']);
+        const filteredOptions = {};
+        if (this.#blissObj.options) {
+          for (const [key, value] of Object.entries(this.#blissObj.options)) {
+            if (anchorAttrNames.has(key)) {
+              filteredOptions[key] = value;
+            }
+          }
+        }
+
+        return BlissElement.#wrapWithAnchorAndGroup(content, filteredOptions);
       };
     } else if (this.#level === 1) {
       // Word level
