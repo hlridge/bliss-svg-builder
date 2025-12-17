@@ -34,15 +34,37 @@ class BlissSVGBuilder {
       options.dotExtraWidth = dotExtraWidth;
     }
 
-    // space: Number, clamped 0-10
-    if ('space' in rawOptions && !isNaN(rawOptions['space'])) {
-      let space = Number(rawOptions['space']);
-      if (space < 0) {
-        space = 0;
-      } else if (space > 10) {
-        space = 10;
+    // char-space: Number, clamped 0-10
+    if ('char-space' in rawOptions && !isNaN(rawOptions['char-space'])) {
+      let charSpace = Number(rawOptions['char-space']);
+      if (charSpace < 0) {
+        charSpace = 0;
+      } else if (charSpace > 10) {
+        charSpace = 10;
       }
-      options.space = space;
+      options['char-space'] = charSpace;
+    }
+
+    // word-space: Number, clamped 0-20
+    if ('word-space' in rawOptions && !isNaN(rawOptions['word-space'])) {
+      let wordSpace = Number(rawOptions['word-space']);
+      if (wordSpace < 0) {
+        wordSpace = 0;
+      } else if (wordSpace > 20) {
+        wordSpace = 20;
+      }
+      options['word-space'] = wordSpace;
+    }
+
+    // punctuation-space: Number, clamped 0-20
+    if ('punctuation-space' in rawOptions && !isNaN(rawOptions['punctuation-space'])) {
+      let punctuationSpace = Number(rawOptions['punctuation-space']);
+      if (punctuationSpace < 0) {
+        punctuationSpace = 0;
+      } else if (punctuationSpace > 20) {
+        punctuationSpace = 20;
+      }
+      options['punctuation-space'] = punctuationSpace;
     }
 
     // margin: Sets ALL 4 margins

@@ -126,7 +126,9 @@ export class BlissElement {
       // Builder-level settings (not SVG attributes)
       'dot-extra-width',
       'background',
-      'space',
+      'char-space',
+      'word-space',
+      'punctuation-space',
       'margin',
       'margin-top',
       'margin-bottom',
@@ -193,12 +195,12 @@ export class BlissElement {
     this.#relativeToParentX = 0;
     this.#relativeToParentY = 0;
     this.#children = [];
-    // Use space option from blissObj if available, otherwise use default
-    this.#charSpacing = this.#blissObj.options?.space ?? DEFAULT_CHAR_SPACING;
+    // Use spacing options from blissObj if available, otherwise use defaults
+    this.#charSpacing = this.#blissObj.options?.['char-space'] ?? DEFAULT_CHAR_SPACING;
     this.#externalGlyphSpacing = DEFAULT_EXTERNAL_GLYPH_SPACING - (this.kerningRules?.[previousElement?.glyph] ?? 0);
-    this.#wordSpacing = DEFAULT_WORD_SPACING;
+    this.#wordSpacing = this.#blissObj.options?.['word-space'] ?? DEFAULT_WORD_SPACING;
     this.#sentenceSpacing = DEFAULT_SENTENCE_SPACING;
-    this.#punctuationSpacing = DEFAULT_PUNCTUATION_SPACING;
+    this.#punctuationSpacing = this.#blissObj.options?.['punctuation-space'] ?? DEFAULT_PUNCTUATION_SPACING;
     this.#childStartOffset = 0;
 
     if (this.#level === 0) {
