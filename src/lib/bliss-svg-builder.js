@@ -169,7 +169,16 @@ class BlissSVGBuilder {
     options.gridMediumStrokeWidth = mediumWidth;
     options.gridMinorStrokeWidth = minorWidth;
 
-    // Crop values: Simple numbers
+    // crop: Sets ALL 4 crop values
+    if ('crop' in rawOptions && !isNaN(rawOptions['crop'])) {
+      const c = Number(rawOptions['crop']);
+      options.cropTop = c;
+      options.cropBottom = c;
+      options.cropLeft = c;
+      options.cropRight = c;
+    }
+
+    // Individual crop values (override the above if present)
     if ('crop-top' in rawOptions) {
       options.cropTop = Number(rawOptions['crop-top']);
     }
