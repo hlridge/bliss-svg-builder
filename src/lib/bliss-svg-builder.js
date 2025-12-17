@@ -77,51 +77,97 @@ class BlissSVGBuilder {
       }
     }
 
-    // grid-stroke-width: Sets ALL 4 grid stroke widths
-    if ('grid-stroke-width' in rawOptions) {
-      const gsw = Number(rawOptions['grid-stroke-width']);
-      options.grid1StrokeWidth = gsw;
-      options.grid2StrokeWidth = gsw;
-      options.grid3StrokeWidth = gsw;
-      options.grid4StrokeWidth = gsw;
-    }
+    // Grid colors - hierarchy: bulk → category → specific
+    // Start with defaults
+    let skyColor = "#858585";
+    let earthColor = "#858585";
+    let majorColor = "#c7c7c7";  // major grid (non-semantic)
+    let mediumColor = "#ebebeb";
+    let minorColor = "#ebebeb";
 
-    // Individual grid stroke widths (override the above if present)
-    if ('grid1-stroke-width' in rawOptions) {
-      options.grid1StrokeWidth = Number(rawOptions['grid1-stroke-width']);
-    }
-    if ('grid2-stroke-width' in rawOptions) {
-      options.grid2StrokeWidth = Number(rawOptions['grid2-stroke-width']);
-    }
-    if ('grid3-stroke-width' in rawOptions) {
-      options.grid3StrokeWidth = Number(rawOptions['grid3-stroke-width']);
-    }
-    if ('grid4-stroke-width' in rawOptions) {
-      options.grid4StrokeWidth = Number(rawOptions['grid4-stroke-width']);
-    }
-
-    // grid-color: Sets ALL 4 grid colors
+    // Apply bulk option (sets all grid colors)
     if ('grid-color' in rawOptions) {
       const gc = rawOptions['grid-color'];
-      options.grid1Color = gc;
-      options.grid2Color = gc;
-      options.grid3Color = gc;
-      options.grid4Color = gc;
+      skyColor = earthColor = majorColor = mediumColor = minorColor = gc;
     }
 
-    // Individual grid colors (override the above if present)
-    if ('grid1-color' in rawOptions) {
-      options.grid1Color = rawOptions['grid1-color'];
+    // Apply category option for major grids (overrides bulk for major lines)
+    if ('grid-major-color' in rawOptions) {
+      const gmc = rawOptions['grid-major-color'];
+      skyColor = earthColor = majorColor = gmc;
     }
-    if ('grid2-color' in rawOptions) {
-      options.grid2Color = rawOptions['grid2-color'];
+
+    // Apply category option for medium grid (overrides bulk)
+    if ('grid-medium-color' in rawOptions) {
+      mediumColor = rawOptions['grid-medium-color'];
     }
-    if ('grid3-color' in rawOptions) {
-      options.grid3Color = rawOptions['grid3-color'];
+
+    // Apply category option for minor grid (overrides bulk)
+    if ('grid-minor-color' in rawOptions) {
+      minorColor = rawOptions['grid-minor-color'];
     }
-    if ('grid4-color' in rawOptions) {
-      options.grid4Color = rawOptions['grid4-color'];
+
+    // Apply specific options (most specific, override everything)
+    if ('grid-sky-color' in rawOptions) {
+      skyColor = rawOptions['grid-sky-color'];
     }
+
+    if ('grid-earth-color' in rawOptions) {
+      earthColor = rawOptions['grid-earth-color'];
+    }
+
+    // Assign to options object
+    options.gridSkyColor = skyColor;
+    options.gridEarthColor = earthColor;
+    options.gridMajorColor = majorColor;
+    options.gridMediumColor = mediumColor;
+    options.gridMinorColor = minorColor;
+
+    // Grid stroke widths - same hierarchy pattern
+    // Start with defaults
+    let skyWidth = 0.166;
+    let earthWidth = 0.166;
+    let majorWidth = 0.166;  // major grid (non-semantic)
+    let mediumWidth = 0.166;
+    let minorWidth = 0.166;
+
+    // Apply bulk option (sets all grid widths)
+    if ('grid-stroke-width' in rawOptions) {
+      const gsw = Number(rawOptions['grid-stroke-width']);
+      skyWidth = earthWidth = majorWidth = mediumWidth = minorWidth = gsw;
+    }
+
+    // Apply category option for major grids (overrides bulk for major lines)
+    if ('grid-major-stroke-width' in rawOptions) {
+      const gmsw = Number(rawOptions['grid-major-stroke-width']);
+      skyWidth = earthWidth = majorWidth = gmsw;
+    }
+
+    // Apply category option for medium grid (overrides bulk)
+    if ('grid-medium-stroke-width' in rawOptions) {
+      mediumWidth = Number(rawOptions['grid-medium-stroke-width']);
+    }
+
+    // Apply category option for minor grid (overrides bulk)
+    if ('grid-minor-stroke-width' in rawOptions) {
+      minorWidth = Number(rawOptions['grid-minor-stroke-width']);
+    }
+
+    // Apply specific options (most specific, override everything)
+    if ('grid-sky-stroke-width' in rawOptions) {
+      skyWidth = Number(rawOptions['grid-sky-stroke-width']);
+    }
+
+    if ('grid-earth-stroke-width' in rawOptions) {
+      earthWidth = Number(rawOptions['grid-earth-stroke-width']);
+    }
+
+    // Assign to options object
+    options.gridSkyStrokeWidth = skyWidth;
+    options.gridEarthStrokeWidth = earthWidth;
+    options.gridMajorStrokeWidth = majorWidth;
+    options.gridMediumStrokeWidth = mediumWidth;
+    options.gridMinorStrokeWidth = minorWidth;
 
     // Crop values: Simple numbers
     if ('crop-top' in rawOptions) {
@@ -185,14 +231,16 @@ class BlissSVGBuilder {
       marginLeft: processedOptions.marginLeft ?? 0.75,
       marginRight: processedOptions.marginRight ?? 0.75,
       color: processedOptions.color ?? "#000000",
-      grid1Color: processedOptions.grid1Color ?? "#858585", // sky and earth line color
-      grid2Color: processedOptions.grid2Color ?? "#c7c7c7", // sparse line color
-      grid3Color: processedOptions.grid3Color ?? "#ebebeb", // semi-dense line color
-      grid4Color: processedOptions.grid4Color ?? "#ebebeb", // dense line color
-      grid1StrokeWidth: processedOptions.grid1StrokeWidth ?? 0.166, // sky and earth line stroke-width
-      grid2StrokeWidth: processedOptions.grid2StrokeWidth ?? 0.166, // sparse line stroke-width
-      grid3StrokeWidth: processedOptions.grid3StrokeWidth ?? 0.166, // semi-dense line stroke-width
-      grid4StrokeWidth: processedOptions.grid4StrokeWidth ?? 0.166, // dense line stroke-width
+      gridSkyColor: processedOptions.gridSkyColor ?? "#858585", // sky line color (major semantic grid line at y=8)
+      gridEarthColor: processedOptions.gridEarthColor ?? "#858585", // earth line color (major semantic grid line at y=16)
+      gridMajorColor: processedOptions.gridMajorColor ?? "#c7c7c7", // major grid color (structural lines)
+      gridMediumColor: processedOptions.gridMediumColor ?? "#ebebeb", // medium grid color (intermediate precision)
+      gridMinorColor: processedOptions.gridMinorColor ?? "#ebebeb", // minor grid color (fine detail alignment)
+      gridSkyStrokeWidth: processedOptions.gridSkyStrokeWidth ?? 0.166, // sky line stroke-width
+      gridEarthStrokeWidth: processedOptions.gridEarthStrokeWidth ?? 0.166, // earth line stroke-width
+      gridMajorStrokeWidth: processedOptions.gridMajorStrokeWidth ?? 0.166, // major grid stroke-width
+      gridMediumStrokeWidth: processedOptions.gridMediumStrokeWidth ?? 0.166, // medium grid stroke-width
+      gridMinorStrokeWidth: processedOptions.gridMinorStrokeWidth ?? 0.166, // minor grid stroke-width
       background: processedOptions.background ?? "", // empty string => transparent background
       cropTop: processedOptions.cropTop ?? 0,
       cropBottom: processedOptions.cropBottom ?? 0,
@@ -406,10 +454,11 @@ class BlissSVGBuilder {
     }
     if (this.options.grid) {
       gridPath =
-  `<path class="denseGrid" stroke-width="${this.options.grid4StrokeWidth}" stroke="${this.options.grid4Color}" stroke-linecap="square" stroke-linejoin="miter" d="M0,1H${width}M0,3H${width}M0,5H${width}M0,7H${width}M0,9H${width}M0,11H${width}M0,13H${width}M0,15H${width}M0,17H${width}M0,19H${width}${getVerticalLines("dense")}"/>
-  <path class="semiDenseGrid" stroke-width="${this.options.grid3StrokeWidth}" stroke="${this.options.grid3Color}" stroke-linecap="square" stroke-linejoin="miter" d="M0,2H${width}M0,6H${width}M0,10H${width}M0,14H${width}M0,18H${width}${getVerticalLines("semiDense")}"/>
-  <path class="sparseGrid" stroke-width="${this.options.grid2StrokeWidth}" stroke="${this.options.grid2Color}" stroke-linecap="square" stroke-linejoin="miter" d="M0,0H${width}M0,4H${width}M0,12H${width}M0,20H${width}${getVerticalLines("sparse")}"/>
-  <path class="skyEarthGrid" stroke-width="${this.options.grid1StrokeWidth}" stroke="${this.options.grid1Color}" stroke-linecap="square" stroke-linejoin="miter" d="M0,8H${width}M0,16H${width}"/>
+  `<path class="grid-line grid-line--minor" stroke-width="${this.options.gridMinorStrokeWidth}" stroke="${this.options.gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,1H${width}M0,3H${width}M0,5H${width}M0,7H${width}M0,9H${width}M0,11H${width}M0,13H${width}M0,15H${width}M0,17H${width}M0,19H${width}${getVerticalLines("dense")}"/>
+  <path class="grid-line grid-line--medium" stroke-width="${this.options.gridMediumStrokeWidth}" stroke="${this.options.gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,2H${width}M0,6H${width}M0,10H${width}M0,14H${width}M0,18H${width}${getVerticalLines("semiDense")}"/>
+  <path class="grid-line grid-line--major" stroke-width="${this.options.gridMajorStrokeWidth}" stroke="${this.options.gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,0H${width}M0,4H${width}M0,12H${width}M0,20H${width}${getVerticalLines("sparse")}"/>
+  <path class="grid-line grid-line--major grid-line--sky" stroke-width="${this.options.gridSkyStrokeWidth}" stroke="${this.options.gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,8H${width}"/>
+  <path class="grid-line grid-line--major grid-line--earth" stroke-width="${this.options.gridEarthStrokeWidth}" stroke="${this.options.gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,16H${width}"/>
   `;
     }
 
