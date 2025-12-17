@@ -6,6 +6,7 @@
 
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissParser } from "./bliss-parser.js";
+import { charData } from "./bliss-character-data.js";
 
 const DEFAULT_STROKE_WIDTH = 0.5;
 const MAX_STROKE_WIDTH = 1.5;
@@ -293,9 +294,22 @@ export class BlissElement {
         this.#children.push(child);
       }
 
+      // Check if this word is punctuation (has a character with shrinksPrecedingWordSpace)
+      const isPunctuation = this.#blissObj.characters?.some(char => {
+        const charCode = char.charCode;
+        return charCode && charData[charCode]?.shrinksPrecedingWordSpace === true;
+      }) ?? false;
+
       if (this.#previousElement) {
         if (this.#blissObj.x === undefined) {
-          this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
+          // If this word is punctuation, use reduced spacing before it
+          let spacing;
+          if (isPunctuation) {
+            spacing = this.#previousElement.baseWordWidth + this.#punctuationSpacing;
+          } else {
+            spacing = this.#previousElement.#advanceX; // baseWordWidth + wordSpacing
+          }
+          this.#relativeToParentX = this.#previousElement.#relativeToParentX + spacing;
         } else {
           this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.width + this.#blissObj.x;
         }
@@ -311,6 +325,7 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
       }
 
+      // advanceX is always word width + word spacing (punctuation spacing is handled in position calculation)
       this.#advanceX = this.baseWordWidth + this.#wordSpacing;
 
       this.getSvgContent = (x = 0, y = 0) => {
