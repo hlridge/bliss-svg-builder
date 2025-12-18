@@ -9,6 +9,8 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 
 class BlissSVGBuilder {
+  // Processes raw options (kebab-case) into internal options (camelCase).
+  // Bulk options expanded here (not in output): 'margin', 'crop', 'grid-color', 'grid-stroke-width'.
   #processOptions(rawOptions = {}) {
     const options = {};
 
@@ -42,7 +44,7 @@ class BlissSVGBuilder {
       } else if (charSpace > 10) {
         charSpace = 10;
       }
-      options['char-space'] = charSpace;
+      options.charSpace = charSpace;
     }
 
     // word-space: Number, clamped 0-20
@@ -53,7 +55,7 @@ class BlissSVGBuilder {
       } else if (wordSpace > 20) {
         wordSpace = 20;
       }
-      options['word-space'] = wordSpace;
+      options.wordSpace = wordSpace;
     }
 
     // punctuation-space: Number, clamped 0-20
@@ -64,7 +66,18 @@ class BlissSVGBuilder {
       } else if (punctuationSpace > 20) {
         punctuationSpace = 20;
       }
-      options['punctuation-space'] = punctuationSpace;
+      options.punctuationSpace = punctuationSpace;
+    }
+
+    // external-glyph-space: Number, clamped 0-3
+    if ('external-glyph-space' in rawOptions && !isNaN(rawOptions['external-glyph-space'])) {
+      let externalGlyphSpace = Number(rawOptions['external-glyph-space']);
+      if (externalGlyphSpace < 0) {
+        externalGlyphSpace = 0;
+      } else if (externalGlyphSpace > 3) {
+        externalGlyphSpace = 3;
+      }
+      options.externalGlyphSpace = externalGlyphSpace;
     }
 
     // margin: Sets ALL 4 margins
@@ -88,6 +101,21 @@ class BlissSVGBuilder {
     }
     if ('margin-right' in rawOptions && !isNaN(rawOptions['margin-right'])) {
       options.marginRight = Number(rawOptions['margin-right']);
+    }
+
+    // min-width: Number, clamped to 0 minimum (negative values become 0)
+    if ('min-width' in rawOptions && !isNaN(rawOptions['min-width'])) {
+      let minWidth = Number(rawOptions['min-width']);
+      if (minWidth < 0) {
+        minWidth = 0;
+      }
+      options.minWidth = minWidth;
+    }
+
+    // centered: Number, 0 (left-aligned) or 1 (centered, default)
+    if ('centered' in rawOptions && !isNaN(rawOptions['centered'])) {
+      const centered = Number(rawOptions['centered']);
+      options.centered = (centered === 0) ? 0 : 1;
     }
 
     // grid: Boolean ("1" -> true, "0" -> false)
@@ -245,17 +273,35 @@ class BlissSVGBuilder {
     // Process options (apply clamping, defaults, bulk expansion) and store back in blissObj
     blissObj.options = this.#processOptions(blissObj.options);
 
-    // Create composition - it will read from blissObj.options
-    this.composition = new BlissElement(blissObj);
+    const {
+      charSpace,
+      wordSpace,
+      punctuationSpace,
+      externalGlyphSpace,
+      ...remainingOptions
+    } = blissObj.options ?? {};
+
+    this.sharedOptions = {
+      charSpace: charSpace ?? 2,
+      wordSpace: wordSpace ?? 8,
+      punctuationSpace: punctuationSpace ?? 4,
+      externalGlyphSpace: externalGlyphSpace ?? 0.8
+    };
+
+    blissObj.options = remainingOptions;
+
+    this.composition = new BlissElement(blissObj, { sharedOptions: this.sharedOptions });
 
     this.options = {
       strokeWidth: blissObj.options?.strokeWidth ?? 0.5,
       dotExtraWidth: blissObj.options?.dotExtraWidth ?? 0.333,
-      width: this.composition.width,
-      height: 20, // fixed value
+      width: Math.max(this.composition.width, blissObj.options?.minWidth ?? 0),
+      height: 20,
       x: this.composition.x,
       y: this.composition.y,
-      space: blissObj.options?.space ?? 2,
+      charSpace: blissObj.options?.charSpace ?? 2,
+      wordSpace: blissObj.options?.wordSpace ?? 8,
+      punctuationSpace: blissObj.options?.punctuationSpace ?? 4,
       text: blissObj.options?.text ?? "",
       svgTitle: blissObj.options?.svgTitle ?? "",
       svgDesc: blissObj.options?.svgDesc ?? "",
@@ -280,7 +326,8 @@ class BlissSVGBuilder {
       cropBottom: blissObj.options?.cropBottom ?? 0,
       cropLeft: blissObj.options?.cropLeft ?? 0,
       cropRight: blissObj.options?.cropRight ?? 0,
-      svgHeight: blissObj.options?.svgHeight // optional: SVG element height attribute
+      centered: blissObj.options?.centered ?? 1,
+      svgHeight: blissObj.options?.svgHeight
     }
   }
 
@@ -428,8 +475,17 @@ class BlissSVGBuilder {
     const width = this.options.width;
     const height = this.options.height;
 
-    const viewBoxX = -marginLeft + cropLeft;
+    let viewBoxX = -marginLeft + cropLeft;
     const viewBoxY = -marginTop + cropTop;
+
+    if (this.options.centered === 1 && this.options.width > this.composition.width) {
+      const leftOverhang = -this.composition.x;
+      const rightOverhang = (this.composition.x + this.composition.width) - this.composition.baseWidth;
+      const maxOverhang = Math.max(leftOverhang, rightOverhang);
+      const symmetricWidth = this.composition.baseWidth + 2 * maxOverhang;
+      const extraSpace = this.options.width - symmetricWidth;
+      viewBoxX -= extraSpace / 2;
+    }
     const content = this.svgContent;
     const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight;
     const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom;

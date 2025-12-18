@@ -8,14 +8,7 @@ import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissParser } from "./bliss-parser.js";
 import { charData } from "./bliss-character-data.js";
 
-const DEFAULT_STROKE_WIDTH = 0.5;
-const MAX_STROKE_WIDTH = 1.5;
-const MIN_STROKE_WIDTH = 0.1;
-const DEFAULT_CHAR_SPACING = 2;
 const DEFAULT_EXTERNAL_GLYPH_SPACING = 0.8;
-const DEFAULT_SENTENCE_SPACING = 8;
-const DEFAULT_WORD_SPACING = 8
-const DEFAULT_PUNCTUATION_SPACING = 4;
 
 export class BlissElement {
   //#region Private Properties
@@ -36,13 +29,8 @@ export class BlissElement {
   #children
   #relativeToParentX
   #relativeToParentY
-  //#codeString
   #codeName
-  #charSpacing
   #externalGlyphSpacing
-  #wordSpacing
-  #sentenceSpacing
-  #punctuationSpacing
   //#endregion
   #childStartOffset
   #parentElement;
@@ -94,6 +82,9 @@ export class BlissElement {
       'referrerpolicy'
     ]);
 
+    // Options that should NOT be rendered as SVG attributes (processed camelCase names only).
+    // NOTE: Bulk options ('margin', 'crop', 'grid-color', 'grid-stroke-width') are expanded in #processOptions and not listed here.
+    // Multi-level options (strokeWidth, color) are NOT listed (can appear at global or element level).
     const internalOptions = new Set([
       // Position/layout
       'x',
@@ -101,46 +92,46 @@ export class BlissElement {
       'relativeKerning',
       'absoluteKerning',
 
-      // Grid display and styling
+      // Grid display and styling (processed, camelCase)
       'grid',
-      'grid-color',
-      'grid-major-color',
-      'grid-medium-color',
-      'grid-minor-color',
-      'grid-sky-color',
-      'grid-earth-color',
-      'grid-stroke-width',
-      'grid-major-stroke-width',
-      'grid-medium-stroke-width',
-      'grid-minor-stroke-width',
-      'grid-sky-stroke-width',
-      'grid-earth-stroke-width',
+      'gridSkyColor',
+      'gridEarthColor',
+      'gridMajorColor',
+      'gridMediumColor',
+      'gridMinorColor',
+      'gridSkyStrokeWidth',
+      'gridEarthStrokeWidth',
+      'gridMajorStrokeWidth',
+      'gridMediumStrokeWidth',
+      'gridMinorStrokeWidth',
 
-      // Cropping
-      'crop-top',
-      'crop-bottom',
-      'crop-left',
-      'crop-right',
-      'crop',
+      // Cropping (processed, camelCase)
+      'cropTop',
+      'cropBottom',
+      'cropLeft',
+      'cropRight',
+
+      // Margins (processed, camelCase)
+      'marginTop',
+      'marginBottom',
+      'marginLeft',
+      'marginRight',
 
       // Builder-level settings (not SVG attributes)
-      'dot-extra-width',
+      'dotExtraWidth',
       'background',
-      'char-space',
-      'word-space',
-      'punctuation-space',
-      'margin',
-      'margin-top',
-      'margin-bottom',
-      'margin-left',
-      'margin-right',
-      'min-width',
+      'charSpace',
+      'wordSpace',
+      'punctuationSpace',
+      'externalGlyphSpace',
+      'minWidth',
+      'centered',
 
       // SVG metadata and overlays
       'text',
-      'svg-desc',
-      'svg-title',
-      'svg-height'
+      'svgDesc',
+      'svgTitle',
+      'svgHeight'
     ]);
 
     const attrMap = {
@@ -185,22 +176,20 @@ export class BlissElement {
     };
   }
 
-  constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0 } = {}) {
+  #sharedOptions;
+
+  constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0, sharedOptions = null } = {}) {
     this.#blissObj = blissObj;
     this.#parentElement = parentElement;
     this.#previousElement = previousElement;
     this.#level = level;
+    this.#sharedOptions = sharedOptions || { charSpace: 2, wordSpace: 8, punctuationSpace: 4, externalGlyphSpace: 0.8 };
 
     this.#codeName = "";
     this.#relativeToParentX = 0;
     this.#relativeToParentY = 0;
     this.#children = [];
-    // Use spacing options from blissObj if available, otherwise use defaults
-    this.#charSpacing = this.#blissObj.options?.['char-space'] ?? DEFAULT_CHAR_SPACING;
-    this.#externalGlyphSpacing = DEFAULT_EXTERNAL_GLYPH_SPACING - (this.kerningRules?.[previousElement?.glyph] ?? 0);
-    this.#wordSpacing = this.#blissObj.options?.['word-space'] ?? DEFAULT_WORD_SPACING;
-    this.#sentenceSpacing = DEFAULT_SENTENCE_SPACING;
-    this.#punctuationSpacing = this.#blissObj.options?.['punctuation-space'] ?? DEFAULT_PUNCTUATION_SPACING;
+    this.#externalGlyphSpacing = this.#sharedOptions.externalGlyphSpace - (this.kerningRules?.[previousElement?.glyph] ?? 0);
     this.#childStartOffset = 0;
 
     if (this.#level === 0) {
@@ -210,11 +199,7 @@ export class BlissElement {
       }
 
       for (const word of this.#blissObj.words) {
-        // Propagate options to child blissObj
-        if (!word.options && this.#blissObj.options) {
-          word.options = this.#blissObj.options;
-        }
-        const child = new BlissElement(word, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
+        const child = new BlissElement(word, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
         child.type = "word";
         this.#children.push(child);
       }
@@ -287,11 +272,7 @@ export class BlissElement {
       }
 
       for (const character of this.#blissObj.characters) {
-        // Propagate options to child blissObj
-        if (!character.options && this.#blissObj.options) {
-          character.options = this.#blissObj.options;
-        }
-        const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
+        const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
         child.type = "character";
         this.#children.push(child);
       }
@@ -307,7 +288,7 @@ export class BlissElement {
           // If this word is punctuation, use reduced spacing before it
           let spacing;
           if (isPunctuation) {
-            spacing = this.#previousElement.baseWordWidth + this.#punctuationSpacing;
+            spacing = this.#previousElement.baseWordWidth + this.#sharedOptions.punctuationSpace;
           } else {
             spacing = this.#previousElement.#advanceX; // baseWordWidth + wordSpacing
           }
@@ -328,7 +309,7 @@ export class BlissElement {
       }
 
       // advanceX is always word width + word spacing (punctuation spacing is handled in position calculation)
-      this.#advanceX = this.baseWordWidth + this.#wordSpacing;
+      this.#advanceX = this.baseWordWidth + this.#sharedOptions.wordSpace;
 
       this.getSvgContent = (x = 0, y = 0) => {
         const childContents = this.#children.map(child =>
@@ -352,11 +333,7 @@ export class BlissElement {
         }
 
         for (const part of this.#blissObj.parts) {
-          // Propagate options to child blissObj
-          if (!part.options && this.#blissObj.options) {
-            part.options = this.#blissObj.options;
-          }
-          const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1 });
+          const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
           child.type = "characterPart";
           this.#children.push(child);
         }
@@ -397,7 +374,7 @@ export class BlissElement {
         }
 
         this.#relativeToParentY = this.#blissObj.y ?? 0;
-        this.#advanceX = this.baseCharacterWidth + this.#charSpacing;
+        this.#advanceX = this.baseCharacterWidth + this.#sharedOptions.charSpace;
 
         this.getSvgContent = (x = 0, y = 0) => {
           const childContents = this.#children.map(child =>
@@ -859,7 +836,8 @@ export class BlissElement {
       const child = new BlissElement(part, {
         parentElement: this,
         previousElement: this.#children[this.#children.length - 1],
-        level: this.#level + 1
+        level: this.#level + 1,
+        sharedOptions: this.#sharedOptions
       });
       this.#children.push(child);
     }

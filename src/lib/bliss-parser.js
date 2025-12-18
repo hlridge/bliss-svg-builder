@@ -40,13 +40,7 @@ export class BlissParser {
         value = value.slice(1, -1).replace(/\\'/g, "'");
       }
 
-      // Convert numeric strings to numbers
-      const numValue = Number(value);
-      if (!isNaN(numValue) && value !== '') {
-        parsedObject[key] = numValue;
-      } else {
-        parsedObject[key] = value;
-      }
+      parsedObject[key] = value;
     }
 
     return parsedObject;
