@@ -8,8 +8,6 @@ import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissParser } from "./bliss-parser.js";
 import { charData } from "./bliss-character-data.js";
 
-const DEFAULT_EXTERNAL_GLYPH_SPACING = 0.8;
-
 export class BlissElement {
   //#region Private Properties
   #level
@@ -558,6 +556,7 @@ export class BlissElement {
   }
 
   get height() {
+    if (this.#leafHeight !== undefined) return this.#leafHeight;
     if (this.#height !== undefined) {
       return this.#height;
     }
@@ -621,6 +620,46 @@ export class BlissElement {
 
   get isExternalGlyph() {
     return this.#blissObj.isExternalGlyph;
+  }
+
+  get effectiveBounds() {
+    return this.#calculateBounds(0, 0);
+  }
+
+  #calculateBounds(offsetX, offsetY) {
+    const absX = offsetX + this.#relativeToParentX;
+    const absY = offsetY + this.#relativeToParentY;
+
+    if (this.#leafHeight !== undefined && this.#leafWidth !== undefined) {
+      const leafY = this.#leafY || 0;
+      const leafX = this.#leafX || 0;
+      return {
+        minX: absX + leafX,
+        maxX: absX + leafX + this.#leafWidth,
+        minY: absY + leafY,
+        maxY: absY + leafY + this.#leafHeight
+      };
+    }
+
+    if (!this.#children || this.#children.length === 0) {
+      return {
+        minX: absX,
+        maxX: absX,
+        minY: absY,
+        maxY: absY
+      };
+    }
+
+    const childBounds = this.#children.map(child =>
+      child.#calculateBounds(absX, absY)
+    );
+
+    return {
+      minX: Math.min(...childBounds.map(b => b.minX)),
+      maxX: Math.max(...childBounds.map(b => b.maxX)),
+      minY: Math.min(...childBounds.map(b => b.minY)),
+      maxY: Math.max(...childBounds.map(b => b.maxY))
+    };
   }
 
   toStringOldNotWorking() {

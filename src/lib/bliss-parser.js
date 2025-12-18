@@ -17,6 +17,16 @@ export class BlissParser {
       return result;
   }
 
+  static #extractPositionFromOptions(obj) {
+    if (obj.options) {
+      if (obj.options.x !== undefined && obj.x === undefined) {
+        obj.x = Number(obj.options.x);
+      }
+      if (obj.options.y !== undefined && obj.y === undefined) {
+        obj.y = Number(obj.options.y);
+      }
+    }
+  }
 
   static #parseOptions(optionsString) {
     if (!optionsString) return;
@@ -285,21 +295,26 @@ export class BlissParser {
             }
 
             if (definition.anchorOffsetX !== undefined) {
-              part.anchorOffsetX = definition.anchorOffsetX 
+              part.anchorOffsetX = definition.anchorOffsetX
             }
-            
+
+            this.#extractPositionFromOptions(part);
             parts.push(part);
           }
           return parts;
         };
-        
+
         character.parts = parseParts(characterCodeString);
 
+        this.#extractPositionFromOptions(character);
         word.characters.push(character);
       }
-      result.words.push(word);      
+
+      this.#extractPositionFromOptions(word);
+      result.words.push(word);
     }
 
+    this.#extractPositionFromOptions(result);
     return result;
   }
 
