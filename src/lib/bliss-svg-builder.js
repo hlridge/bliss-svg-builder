@@ -298,15 +298,17 @@ class BlissSVGBuilder {
 
     blissObj.options = remainingOptions;
 
-    // Builder-level options that should NOT be rendered as SVG attributes.
-    // These are handled by SVG construction logic (margins, grid, cropping, etc.)
-    const builderInternalOptions = new Set([
+    // Internal options that should NOT be rendered as SVG attributes.
+    // Builder-level: handled by SVG construction logic (margins, grid, cropping, etc.)
+    // Element-level: handled by element positioning logic (x, y, kerning)
+    const internalOptions = new Set([
       'grid', 'gridSkyColor', 'gridEarthColor', 'gridMajorColor', 'gridMediumColor', 'gridMinorColor',
       'gridSkyStrokeWidth', 'gridEarthStrokeWidth', 'gridMajorStrokeWidth', 'gridMediumStrokeWidth', 'gridMinorStrokeWidth',
       'cropTop', 'cropBottom', 'cropLeft', 'cropRight',
       'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
       'dotExtraWidth', 'background', 'charSpace', 'wordSpace', 'punctuationSpace', 'externalGlyphSpace',
-      'minWidth', 'centered', 'text', 'svgDesc', 'svgTitle', 'svgHeight'
+      'minWidth', 'centered', 'text', 'svgDesc', 'svgTitle', 'svgHeight',
+      'x', 'y', 'relativeKerning', 'absoluteKerning'
     ]);
 
     const attrMap = { 'color': 'stroke' };
@@ -320,7 +322,7 @@ class BlissSVGBuilder {
     // Store global options that should become SVG attributes
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
-      if (!builderInternalOptions.has(key)) {
+      if (!internalOptions.has(key)) {
         const attrName = attrMap[key] || key;
         this.globalSvgAttributes[attrName] = escapeHtml(value);
       }

@@ -579,7 +579,16 @@ export class BlissElement {
   }
 
   get effectiveBounds() {
-    return this.#calculateBounds(0, 0);
+    // Accumulate offsets from all ancestors
+    let offsetX = 0;
+    let offsetY = 0;
+    let current = this.#parentElement;
+    while (current) {
+      offsetX += current.#relativeToParentX;
+      offsetY += current.#relativeToParentY;
+      current = current.#parentElement;
+    }
+    return this.#calculateBounds(offsetX, offsetY);
   }
 
   #calculateBounds(offsetX, offsetY) {
@@ -824,10 +833,6 @@ export class BlissElement {
     this.#children = [];
 
     for (const part of parts) {
-      // Propagate options to child blissObj
-      if (!part.options && this.#blissObj.options) {
-        part.options = this.#blissObj.options;
-      }
       const child = new BlissElement(part, {
         parentElement: this,
         previousElement: this.#children[this.#children.length - 1],
