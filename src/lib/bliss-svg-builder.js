@@ -118,6 +118,26 @@ class BlissSVGBuilder {
       options.centered = (centered === 0) ? 0 : 1;
     }
 
+    // freestyle: Boolean ("1" -> true, "0" -> false)
+    // When true, uses actual composition height instead of fixed 20 units
+    if ('freestyle' in rawOptions) {
+      if (rawOptions.freestyle === "1") {
+        options.freestyle = true;
+      } else if (rawOptions.freestyle === "0") {
+        options.freestyle = false;
+      }
+    }
+
+    // auto-crop: Boolean ("1" -> true, "0" -> false)
+    // When true, crops to effectiveBounds removing dead space
+    if ('auto-crop' in rawOptions) {
+      if (rawOptions['auto-crop'] === "1") {
+        options.autoCrop = true;
+      } else if (rawOptions['auto-crop'] === "0") {
+        options.autoCrop = false;
+      }
+    }
+
     // grid: Boolean ("1" -> true, "0" -> false)
     if ('grid' in rawOptions) {
       if (rawOptions.grid === "1") {
@@ -334,7 +354,7 @@ class BlissSVGBuilder {
       strokeWidth: blissObj.options?.strokeWidth ?? 0.5,
       dotExtraWidth: blissObj.options?.dotExtraWidth ?? 0.333,
       width: Math.max(this.composition.width, blissObj.options?.minWidth ?? 0),
-      height: 20,
+      height: blissObj.options?.freestyle ? this.composition.height : 20,
       x: this.composition.x,
       y: this.composition.y,
       charSpace: blissObj.options?.charSpace ?? 2,
@@ -365,6 +385,8 @@ class BlissSVGBuilder {
       cropLeft: blissObj.options?.cropLeft ?? 0,
       cropRight: blissObj.options?.cropRight ?? 0,
       centered: blissObj.options?.centered ?? 1,
+      freestyle: blissObj.options?.freestyle ?? false,
+      autoCrop: blissObj.options?.autoCrop ?? false,
       svgHeight: blissObj.options?.svgHeight
     }
   }
@@ -513,8 +535,30 @@ class BlissSVGBuilder {
     const width = this.options.width;
     const height = this.options.height;
 
-    let viewBoxX = -marginLeft + cropLeft;
-    const viewBoxY = -marginTop + cropTop;
+    // Apply auto-crop using effectiveBounds if enabled
+    let autoCropTop = 0;
+    let autoCropBottom = 0;
+    let autoCropLeft = 0;
+    let autoCropRight = 0;
+
+    if (this.options.autoCrop) {
+      const bounds = this.composition.effectiveBounds;
+
+      if (this.options.freestyle) {
+        // Freestyle mode: crop all sides
+        autoCropLeft = bounds.minX;
+        autoCropRight = width - bounds.maxX;
+        autoCropTop = bounds.minY;
+        autoCropBottom = height - bounds.maxY;
+      } else {
+        // Writing mode: crop vertically only (preserve horizontal spacing)
+        autoCropTop = bounds.minY;
+        autoCropBottom = height - bounds.maxY;
+      }
+    }
+
+    let viewBoxX = -marginLeft + cropLeft + autoCropLeft;
+    const viewBoxY = -marginTop + cropTop + autoCropTop;
 
     if (this.options.centered === 1 && this.options.width > this.composition.width) {
       const leftOverhang = -this.composition.x;
@@ -525,8 +569,8 @@ class BlissSVGBuilder {
       viewBoxX -= extraSpace / 2;
     }
     const content = this.svgContent;
-    const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight;
-    const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom;
+    const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight - autoCropLeft - autoCropRight;
+    const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom - autoCropTop - autoCropBottom;
     const svgAttributeMultiplier = 6;
 
     // Calculate SVG element dimensions (maintaining aspect ratio)
