@@ -25,7 +25,7 @@ class BlissSVGBuilder {
       options.strokeWidth = strokeWidth;
     }
 
-    // stroke-width: Number, clamped 0.1-1.5
+    // dot-extra-width: Number, clamped 0-1
     if ('dot-extra-width' in rawOptions && !isNaN(rawOptions['dot-extra-width'])) {
       let dotExtraWidth = Number(rawOptions['dot-extra-width']);
       if (dotExtraWidth < 0) {
@@ -264,6 +264,14 @@ class BlissSVGBuilder {
       options.svgHeight = Number(rawOptions['svg-height']);
     }
 
+    // Preserve any options that weren't explicitly processed (like fill, opacity, id, etc.)
+    // Skip kebab-case keys since those are transformed to camelCase above
+    for (const [key, value] of Object.entries(rawOptions)) {
+      if (!(key in options) && !key.includes('-')) {
+        options[key] = value;
+      }
+    }
+
     return options;
   }
 
@@ -289,6 +297,34 @@ class BlissSVGBuilder {
     };
 
     blissObj.options = remainingOptions;
+
+    // Builder-level options that should NOT be rendered as SVG attributes.
+    // These are handled by SVG construction logic (margins, grid, cropping, etc.)
+    const builderInternalOptions = new Set([
+      'grid', 'gridSkyColor', 'gridEarthColor', 'gridMajorColor', 'gridMediumColor', 'gridMinorColor',
+      'gridSkyStrokeWidth', 'gridEarthStrokeWidth', 'gridMajorStrokeWidth', 'gridMediumStrokeWidth', 'gridMinorStrokeWidth',
+      'cropTop', 'cropBottom', 'cropLeft', 'cropRight',
+      'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
+      'dotExtraWidth', 'background', 'charSpace', 'wordSpace', 'punctuationSpace', 'externalGlyphSpace',
+      'minWidth', 'centered', 'text', 'svgDesc', 'svgTitle', 'svgHeight'
+    ]);
+
+    const attrMap = { 'color': 'stroke' };
+    const escapeHtml = (str) => String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    // Store global options that should become SVG attributes
+    this.globalSvgAttributes = {};
+    for (const [key, value] of Object.entries(blissObj.options ?? {})) {
+      if (!builderInternalOptions.has(key)) {
+        const attrName = attrMap[key] || key;
+        this.globalSvgAttributes[attrName] = escapeHtml(value);
+      }
+    }
 
     this.composition = new BlissElement(blissObj, { sharedOptions: this.sharedOptions });
 
@@ -552,8 +588,22 @@ class BlissSVGBuilder {
   `;
     }
 
+    // Build additional SVG attributes from global options (excluding explicitly handled ones)
+    const explicitlyHandled = ['fill', 'stroke', 'stroke-linejoin', 'stroke-linecap', 'stroke-width', 'strokeWidth', 'color', 'width', 'height', 'viewBox'];
+    const additionalAttrs = Object.entries(this.globalSvgAttributes)
+      .filter(([key]) => !explicitlyHandled.includes(key))
+      .map(([key, value]) => `${key}="${value}"`)
+      .join(' ');
+    const attrsStr = additionalAttrs ? ' ' + additionalAttrs : '';
+
+    const fill = this.globalSvgAttributes.fill || 'none';
+    const stroke = this.globalSvgAttributes.stroke || color;
+    const strokeLinejoin = this.globalSvgAttributes['stroke-linejoin'] || 'round';
+    const strokeLinecap = this.globalSvgAttributes['stroke-linecap'] || 'round';
+    const strokeWidthAttr = this.globalSvgAttributes['stroke-width'] || strokeWidth;
+
     let svgStr =
-`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="tiny" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}" fill="none" stroke="${color}" stroke-linejoin="round" stroke-linecap="round" stroke-width="${strokeWidth}">
+`<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="tiny" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}" fill="${fill}" stroke="${stroke}" stroke-linejoin="${strokeLinejoin}" stroke-linecap="${strokeLinecap}" stroke-width="${strokeWidthAttr}"${attrsStr}>
   ${title}${desc}${backgroundRect}${gridPath}${content}${svgText}
 </svg>`;
     return svgStr;

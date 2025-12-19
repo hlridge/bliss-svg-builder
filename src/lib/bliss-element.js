@@ -6,7 +6,6 @@
 
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissParser } from "./bliss-parser.js";
-import { charData } from "./bliss-character-data.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -80,56 +79,14 @@ export class BlissElement {
       'referrerpolicy'
     ]);
 
-    // Options that should NOT be rendered as SVG attributes (processed camelCase names only).
-    // NOTE: Bulk options ('margin', 'crop', 'grid-color', 'grid-stroke-width') are expanded in #processOptions and not listed here.
-    // Multi-level options (strokeWidth, color) are NOT listed (can appear at global or element level).
+    // Element-level options that should NOT be rendered as SVG attributes.
+    // These are handled by element positioning/layout logic, not SVG attributes.
+    // Multi-level options (strokeWidth, color, fill, opacity, etc.) are NOT listed - they should render as attributes.
     const internalOptions = new Set([
-      // Position/layout
       'x',
       'y',
       'relativeKerning',
-      'absoluteKerning',
-
-      // Grid display and styling (processed, camelCase)
-      'grid',
-      'gridSkyColor',
-      'gridEarthColor',
-      'gridMajorColor',
-      'gridMediumColor',
-      'gridMinorColor',
-      'gridSkyStrokeWidth',
-      'gridEarthStrokeWidth',
-      'gridMajorStrokeWidth',
-      'gridMediumStrokeWidth',
-      'gridMinorStrokeWidth',
-
-      // Cropping (processed, camelCase)
-      'cropTop',
-      'cropBottom',
-      'cropLeft',
-      'cropRight',
-
-      // Margins (processed, camelCase)
-      'marginTop',
-      'marginBottom',
-      'marginLeft',
-      'marginRight',
-
-      // Builder-level settings (not SVG attributes)
-      'dotExtraWidth',
-      'background',
-      'charSpace',
-      'wordSpace',
-      'punctuationSpace',
-      'externalGlyphSpace',
-      'minWidth',
-      'centered',
-
-      // SVG metadata and overlays
-      'text',
-      'svgDesc',
-      'svgTitle',
-      'svgHeight'
+      'absoluteKerning'
     ]);
 
     const attrMap = {
@@ -275,11 +232,10 @@ export class BlissElement {
         this.#children.push(child);
       }
 
-      // Check if this word is punctuation (has a character with shrinksPrecedingWordSpace)
-      const isPunctuation = this.#blissObj.characters?.some(char => {
-        const charCode = char.charCode;
-        return charCode && charData[charCode]?.shrinksPrecedingWordSpace === true;
-      }) ?? false;
+      // Check if this word is punctuation (all characters have shrinksPrecedingWordSpace)
+      const isPunctuation = this.#blissObj.characters?.every(char =>
+        char.shrinksPrecedingWordSpace === true
+      ) ?? false;
 
       if (this.#previousElement) {
         if (this.#blissObj.x === undefined) {
