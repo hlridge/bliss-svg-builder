@@ -174,24 +174,23 @@ export class BlissParser {
       }
 
       function replaceWithDefinition(str, definitions) {
-        function expand(str, definitions, originalCharCode = null) {
+        function expand(str, definitions) {
           const definition = definitions[str] || {};
 
           // If we have a codeString, recursively expand it
           if (definition.codeString) {
-            // Preserve the original character code (the first level of expansion)
-            const charCodeToPreserve = originalCharCode || str;
             return definition.codeString.split('/')
-              .flatMap(subStr => expand(subStr, definitions, charCodeToPreserve))
+              .flatMap(subStr => expand(subStr, definitions))
               .map(expandedSubPart => {
                 // Apply properties from the definition, falling back to existing values
-                const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator; //To prevent confusing positioning  logic when a part of an indicator is not directly an indicator
+                const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
                 const isExternalGlyph = expandedSubPart.isExternalGlyph;
                 const kerningRules = expandedSubPart.kerningRules;
                 const glyph = expandedSubPart.glyph;
+                const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
                 return {
                   part: expandedSubPart.part,
-                  ...(originalCharCode === null && { charCode: charCodeToPreserve }), // Only preserve at top level
+                  ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
                   ...(isIndicator === true && { isIndicator }),
                   ...(isExternalGlyph === true && {
                     isExternalGlyph,
@@ -209,7 +208,6 @@ export class BlissParser {
           const glyph = definition.glyph;
           return [{
             part: str,
-            ...(originalCharCode !== null && { charCode: originalCharCode }), // Preserve the original char code if set
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph === true && {
               isExternalGlyph,
@@ -227,12 +225,12 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, charCode, isIndicator, isExternalGlyph, glyph, kerningRules } of expandedCharacterParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules } of expandedCharacterParts) {
         if (part === "") continue;
 
         const character = {
           parts: [],
-          ...(charCode && { charCode }), // Preserve the original character code
+          ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
           ...(typeof isIndicator === "boolean" && { isIndicator }),
           ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
           ...(typeof glyph === "string" && { glyph }),
