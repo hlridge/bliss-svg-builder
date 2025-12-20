@@ -519,9 +519,10 @@ export class BlissElement {
     if (this.#isCharacter) {
       return 20;
     }
-    if (this.#children) {
-      return Math.max(...this.#children.map(child => this.y + child.y + child.height));
+    if (this.#children && this.#children.length > 0) {
+      return Math.max(...this.#children.map(child => child.#relativeToParentY + child.height));
     }
+    return 0;
   }
 
   get baseX() {
@@ -598,11 +599,17 @@ export class BlissElement {
     if (this.#leafHeight !== undefined && this.#leafWidth !== undefined) {
       const leafY = this.#leafY || 0;
       const leafX = this.#leafX || 0;
+      const minX = absX + leafX;
+      const maxX = absX + leafX + this.#leafWidth;
+      const minY = absY + leafY;
+      const maxY = absY + leafY + this.#leafHeight;
       return {
-        minX: absX + leafX,
-        maxX: absX + leafX + this.#leafWidth,
-        minY: absY + leafY,
-        maxY: absY + leafY + this.#leafHeight
+        minX,
+        maxX,
+        minY,
+        maxY,
+        width: maxX - minX,
+        height: maxY - minY
       };
     }
 
@@ -611,7 +618,9 @@ export class BlissElement {
         minX: absX,
         maxX: absX,
         minY: absY,
-        maxY: absY
+        maxY: absY,
+        width: 0,
+        height: 0
       };
     }
 
@@ -619,11 +628,18 @@ export class BlissElement {
       child.#calculateBounds(absX, absY)
     );
 
+    const minX = Math.min(...childBounds.map(b => b.minX));
+    const maxX = Math.max(...childBounds.map(b => b.maxX));
+    const minY = Math.min(...childBounds.map(b => b.minY));
+    const maxY = Math.max(...childBounds.map(b => b.maxY));
+
     return {
-      minX: Math.min(...childBounds.map(b => b.minX)),
-      maxX: Math.max(...childBounds.map(b => b.maxX)),
-      minY: Math.min(...childBounds.map(b => b.minY)),
-      maxY: Math.max(...childBounds.map(b => b.maxY))
+      minX,
+      maxX,
+      minY,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY
     };
   }
 
