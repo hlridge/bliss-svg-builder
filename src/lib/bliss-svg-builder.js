@@ -9,6 +9,8 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 
 class BlissSVGBuilder {
+  #processedOptions;
+
   // Processes raw options (kebab-case) into internal options (camelCase).
   // Bulk options expanded here (not in output): 'margin', 'crop', 'grid-color', 'grid-stroke-width'.
   #processOptions(rawOptions = {}) {
@@ -267,7 +269,7 @@ class BlissSVGBuilder {
       options.color = rawOptions.color;
     }
     if ('background' in rawOptions) {
-      options.background = rawOptions.background;
+      options.background = rawOptions.background; // empty string => transparent background
     }
     if ('text' in rawOptions) {
       options.text = rawOptions.text;
@@ -309,7 +311,7 @@ class BlissSVGBuilder {
       ...remainingOptions
     } = blissObj.options ?? {};
 
-    this.sharedOptions = {
+    const sharedOptions = {
       charSpace: charSpace ?? 2,
       wordSpace: wordSpace ?? 8,
       punctuationSpace: punctuationSpace ?? 4,
@@ -317,6 +319,9 @@ class BlissSVGBuilder {
     };
 
     blissObj.options = remainingOptions;
+
+    // Store processed options privately for svgCode getter
+    this.#processedOptions = blissObj.options;
 
     // Internal options that should NOT be rendered as SVG attributes.
     // Builder-level: handled by SVG construction logic (margins, grid, cropping, etc.)
@@ -348,47 +353,7 @@ class BlissSVGBuilder {
       }
     }
 
-    this.composition = new BlissElement(blissObj, { sharedOptions: this.sharedOptions });
-
-    this.options = {
-      strokeWidth: blissObj.options?.strokeWidth ?? 0.5,
-      dotExtraWidth: blissObj.options?.dotExtraWidth ?? 0.333,
-      width: Math.max(this.composition.width, blissObj.options?.minWidth ?? 0),
-      height: blissObj.options?.freestyle ? this.composition.height : 20,
-      x: this.composition.x,
-      y: this.composition.y,
-      charSpace: blissObj.options?.charSpace ?? 2,
-      wordSpace: blissObj.options?.wordSpace ?? 8,
-      punctuationSpace: blissObj.options?.punctuationSpace ?? 4,
-      text: blissObj.options?.text ?? "",
-      svgTitle: blissObj.options?.svgTitle ?? "",
-      svgDesc: blissObj.options?.svgDesc ?? "",
-      grid: blissObj.options?.grid ?? false,
-      marginTop: blissObj.options?.marginTop ?? 0.75,
-      marginBottom: blissObj.options?.marginBottom ?? 0.75,
-      marginLeft: blissObj.options?.marginLeft ?? 0.75,
-      marginRight: blissObj.options?.marginRight ?? 0.75,
-      color: blissObj.options?.color ?? "#000000",
-      gridSkyColor: blissObj.options?.gridSkyColor ?? "#858585", // sky line color (major semantic grid line at y=8)
-      gridEarthColor: blissObj.options?.gridEarthColor ?? "#858585", // earth line color (major semantic grid line at y=16)
-      gridMajorColor: blissObj.options?.gridMajorColor ?? "#c7c7c7", // major grid color (structural lines)
-      gridMediumColor: blissObj.options?.gridMediumColor ?? "#ebebeb", // medium grid color (intermediate precision)
-      gridMinorColor: blissObj.options?.gridMinorColor ?? "#ebebeb", // minor grid color (fine detail alignment)
-      gridSkyStrokeWidth: blissObj.options?.gridSkyStrokeWidth ?? 0.166, // sky line stroke-width
-      gridEarthStrokeWidth: blissObj.options?.gridEarthStrokeWidth ?? 0.166, // earth line stroke-width
-      gridMajorStrokeWidth: blissObj.options?.gridMajorStrokeWidth ?? 0.166, // major grid stroke-width
-      gridMediumStrokeWidth: blissObj.options?.gridMediumStrokeWidth ?? 0.166, // medium grid stroke-width
-      gridMinorStrokeWidth: blissObj.options?.gridMinorStrokeWidth ?? 0.166, // minor grid stroke-width
-      background: blissObj.options?.background ?? "", // empty string => transparent background
-      cropTop: blissObj.options?.cropTop ?? 0,
-      cropBottom: blissObj.options?.cropBottom ?? 0,
-      cropLeft: blissObj.options?.cropLeft ?? 0,
-      cropRight: blissObj.options?.cropRight ?? 0,
-      centered: blissObj.options?.centered ?? 1,
-      freestyle: blissObj.options?.freestyle ?? false,
-      autoCrop: blissObj.options?.autoCrop ?? false,
-      svgHeight: blissObj.options?.svgHeight
-    }
+    this.composition = new BlissElement(blissObj, { sharedOptions });
   }
 
   toString() {
@@ -522,18 +487,21 @@ class BlissSVGBuilder {
   }
 
   get #svgCode() {
-    const color = this.options.color;
-    const strokeWidth = this.options.strokeWidth;
-    const cropTop = this.options.cropTop;
-    const cropBottom = this.options.cropBottom;
-    const cropLeft = this.options.cropLeft;
-    const cropRight = this.options.cropRight;
-    const marginTop = this.options.marginTop;
-    const marginBottom = this.options.marginBottom;
-    const marginLeft = this.options.marginLeft;
-    const marginRight = this.options.marginRight;
-    const width = this.options.width;
-    const height = this.options.height;
+    // Computed rendering dimensions
+    const width = Math.max(this.composition.width, this.#processedOptions.minWidth ?? 0);
+    const height = this.#processedOptions.freestyle ? this.composition.height : 20;
+
+    // User-provided options with defaults
+    const color = this.#processedOptions.color ?? "#000000";
+    const strokeWidth = this.#processedOptions.strokeWidth ?? 0.5;
+    const cropTop = this.#processedOptions.cropTop ?? 0;
+    const cropBottom = this.#processedOptions.cropBottom ?? 0;
+    const cropLeft = this.#processedOptions.cropLeft ?? 0;
+    const cropRight = this.#processedOptions.cropRight ?? 0;
+    const marginTop = this.#processedOptions.marginTop ?? 0.75;
+    const marginBottom = this.#processedOptions.marginBottom ?? 0.75;
+    const marginLeft = this.#processedOptions.marginLeft ?? 0.75;
+    const marginRight = this.#processedOptions.marginRight ?? 0.75;
 
     // Apply auto-crop using effectiveBounds if enabled
     let autoCropTop = 0;
@@ -541,10 +509,10 @@ class BlissSVGBuilder {
     let autoCropLeft = 0;
     let autoCropRight = 0;
 
-    if (this.options.autoCrop) {
+    if (this.#processedOptions.autoCrop) {
       const bounds = this.composition.effectiveBounds;
 
-      if (this.options.freestyle) {
+      if (this.#processedOptions.freestyle) {
         // Freestyle mode: crop all sides
         autoCropLeft = bounds.minX;
         autoCropRight = width - bounds.maxX;
@@ -560,12 +528,12 @@ class BlissSVGBuilder {
     let viewBoxX = -marginLeft + cropLeft + autoCropLeft;
     const viewBoxY = -marginTop + cropTop + autoCropTop;
 
-    if (this.options.centered === 1 && this.options.width > this.composition.width) {
+    if ((this.#processedOptions.centered ?? 1) === 1 && width > this.composition.width) {
       const leftOverhang = -this.composition.x;
       const rightOverhang = (this.composition.x + this.composition.width) - this.composition.baseWidth;
       const maxOverhang = Math.max(leftOverhang, rightOverhang);
       const symmetricWidth = this.composition.baseWidth + 2 * maxOverhang;
-      const extraSpace = this.options.width - symmetricWidth;
+      const extraSpace = width - symmetricWidth;
       viewBoxX -= extraSpace / 2;
     }
     const content = this.svgContent;
@@ -575,9 +543,9 @@ class BlissSVGBuilder {
 
     // Calculate SVG element dimensions (maintaining aspect ratio)
     let svgWidth, svgHeight;
-    if (this.options.svgHeight !== undefined) {
+    if (this.#processedOptions.svgHeight !== undefined) {
       // Height specified: calculate width to maintain aspect ratio
-      svgHeight = this.options.svgHeight;
+      svgHeight = this.#processedOptions.svgHeight;
       svgWidth = (viewBoxWidth / viewBoxHeight) * svgHeight;
     } else {
       // Auto-calculate both dimensions
@@ -587,11 +555,15 @@ class BlissSVGBuilder {
 
     const round = (num) => parseFloat(num.toFixed(4));
 
-    let title = this.options.svgTitle ? `<title>${this.options.svgTitle}</title>` : "";
-    let desc = this.options.svgDesc ? `<desc>${this.options.svgDesc}</desc>` : "";
+    const svgTitle = this.#processedOptions.svgTitle ?? "";
+    const svgDesc = this.#processedOptions.svgDesc ?? "";
+    const background = this.#processedOptions.background ?? "";
+
+    let title = svgTitle ? `<title>${svgTitle}</title>` : "";
+    let desc = svgDesc ? `<desc>${svgDesc}</desc>` : "";
     let gridPath = "";
     let svgText = "";//this._getSvgText();
-    let backgroundRect = (this.options.background === "" ? "" : `<rect x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${this.options.background}"/>`);
+    let backgroundRect = (background === "" ? "" : `<rect x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`);
 
     let getVerticalLines = (type) => {
       let pathData = "";
@@ -624,13 +596,24 @@ class BlissSVGBuilder {
       }
       return pathData;
     }
-    if (this.options.grid) {
+    if (this.#processedOptions.grid) {
+      const gridMinorStrokeWidth = this.#processedOptions.gridMinorStrokeWidth ?? 0.166;
+      const gridMinorColor = this.#processedOptions.gridMinorColor ?? "#ebebeb";
+      const gridMediumStrokeWidth = this.#processedOptions.gridMediumStrokeWidth ?? 0.166;
+      const gridMediumColor = this.#processedOptions.gridMediumColor ?? "#ebebeb";
+      const gridMajorStrokeWidth = this.#processedOptions.gridMajorStrokeWidth ?? 0.166;
+      const gridMajorColor = this.#processedOptions.gridMajorColor ?? "#c7c7c7";
+      const gridSkyStrokeWidth = this.#processedOptions.gridSkyStrokeWidth ?? 0.166;
+      const gridSkyColor = this.#processedOptions.gridSkyColor ?? "#858585";
+      const gridEarthStrokeWidth = this.#processedOptions.gridEarthStrokeWidth ?? 0.166;
+      const gridEarthColor = this.#processedOptions.gridEarthColor ?? "#858585";
+
       gridPath =
-  `<path class="grid-line grid-line--minor" stroke-width="${this.options.gridMinorStrokeWidth}" stroke="${this.options.gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,1H${width}M0,3H${width}M0,5H${width}M0,7H${width}M0,9H${width}M0,11H${width}M0,13H${width}M0,15H${width}M0,17H${width}M0,19H${width}${getVerticalLines("dense")}"/>
-  <path class="grid-line grid-line--medium" stroke-width="${this.options.gridMediumStrokeWidth}" stroke="${this.options.gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,2H${width}M0,6H${width}M0,10H${width}M0,14H${width}M0,18H${width}${getVerticalLines("semiDense")}"/>
-  <path class="grid-line grid-line--major" stroke-width="${this.options.gridMajorStrokeWidth}" stroke="${this.options.gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,0H${width}M0,4H${width}M0,12H${width}M0,20H${width}${getVerticalLines("sparse")}"/>
-  <path class="grid-line grid-line--major grid-line--sky" stroke-width="${this.options.gridSkyStrokeWidth}" stroke="${this.options.gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,8H${width}"/>
-  <path class="grid-line grid-line--major grid-line--earth" stroke-width="${this.options.gridEarthStrokeWidth}" stroke="${this.options.gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,16H${width}"/>
+  `<path class="grid-line grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,1H${width}M0,3H${width}M0,5H${width}M0,7H${width}M0,9H${width}M0,11H${width}M0,13H${width}M0,15H${width}M0,17H${width}M0,19H${width}${getVerticalLines("dense")}"/>
+  <path class="grid-line grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,2H${width}M0,6H${width}M0,10H${width}M0,14H${width}M0,18H${width}${getVerticalLines("semiDense")}"/>
+  <path class="grid-line grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,0H${width}M0,4H${width}M0,12H${width}M0,20H${width}${getVerticalLines("sparse")}"/>
+  <path class="grid-line grid-line--major grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,8H${width}"/>
+  <path class="grid-line grid-line--major grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,16H${width}"/>
   `;
     }
 
