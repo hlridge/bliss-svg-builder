@@ -33,12 +33,12 @@
     "test:e2e": "vitest run --project e2e",
     "test:e2e:ui": "vitest --ui --project e2e",
     "test:all": "vitest run",
-    "prepublishOnly": "npm run test && npm run build",
+    "prepublishOnly": "pnpm run test && pnpm run build",
     "example:browser-umd": "vite --open examples/browser-umd.html",
     "example:browser-esm": "vite --open examples/browser-esm.html",
     "example:node-cjs": "node examples/node.cjs",
     "example:node-esm": "node examples/node.esm.js",
-    "examples:all": "npm run build && node scripts/test-consumption.js"
+    "examples:all": "pnpm run build && node scripts/test-consumption.js"
   },
   "repository": {
     "type": "git",
@@ -61,11 +61,11 @@
   },
   "homepage": "https://github.com/hlridge/bliss-svg-builder#readme",
   "devDependencies": {
-    "@vitest/ui": "^3.2.4",
-    "canvas": "^3.1.0",
-    "jsdom": "^26.1.0",
-    "vite": "^6.4.1",
-    "vitest": "^3.2.4"
+    "@vitest/ui": "^4.0.16",
+    "canvas": "^3.2.0",
+    "jsdom": "^27.3.0",
+    "vite": "^7.3.0",
+    "vitest": "^4.0.16"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
