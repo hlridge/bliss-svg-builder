@@ -527,6 +527,7 @@ class BlissSVGBuilder {
 
     let viewBoxX = -marginLeft + cropLeft + autoCropLeft;
     const viewBoxY = -marginTop + cropTop + autoCropTop;
+    let gridOffsetX = 0;
 
     if ((this.#processedOptions.centered ?? 1) === 1 && width > this.composition.width) {
       const leftOverhang = -this.composition.x;
@@ -534,7 +535,9 @@ class BlissSVGBuilder {
       const maxOverhang = Math.max(leftOverhang, rightOverhang);
       const symmetricWidth = this.composition.baseWidth + 2 * maxOverhang;
       const extraSpace = width - symmetricWidth;
-      viewBoxX -= extraSpace / 2;
+      const offset = extraSpace / 2;
+      viewBoxX -= offset;
+      gridOffsetX = viewBoxX + marginLeft;
     }
     const content = this.svgContent;
     const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight - autoCropLeft - autoCropRight;
@@ -570,25 +573,25 @@ class BlissSVGBuilder {
       let count = 0;
 
       switch(type) {
-        case "dense":
+        case "minor":
           //odd numbers
           count = Math.floor((width + 1) / 2)
           for (let i = 0; i < count; i++) {
-              pathData += `M${i*2+1},0V${height}`;
+              pathData += `M${gridOffsetX + i*2+1},0V${height}`;
           }
           break;
-        case "semiDense":
+        case "medium":
           //even numbers not divisible with 4
           count = Math.floor((width + 2) / 4)
           for (let i = 0; i < count; i++) {
-              pathData += `M${i*4+2},0V${height}`;
+              pathData += `M${gridOffsetX + i*4+2},0V${height}`;
           }
           break;
-        case "sparse":
+        case "major":
           //even numbers divisible with 4
           count = Math.floor((width + 4) / 4)
           for (let i = 0; i < count; i++) {
-              pathData += `M${i*4},0V${height}`;
+              pathData += `M${gridOffsetX + i*4},0V${height}`;
           }
           break;
         default:
@@ -609,11 +612,11 @@ class BlissSVGBuilder {
       const gridEarthColor = this.#processedOptions.gridEarthColor ?? "#858585";
 
       gridPath =
-  `<path class="grid-line grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,1H${width}M0,3H${width}M0,5H${width}M0,7H${width}M0,9H${width}M0,11H${width}M0,13H${width}M0,15H${width}M0,17H${width}M0,19H${width}${getVerticalLines("dense")}"/>
-  <path class="grid-line grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,2H${width}M0,6H${width}M0,10H${width}M0,14H${width}M0,18H${width}${getVerticalLines("semiDense")}"/>
-  <path class="grid-line grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,0H${width}M0,4H${width}M0,12H${width}M0,20H${width}${getVerticalLines("sparse")}"/>
-  <path class="grid-line grid-line--major grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,8H${width}"/>
-  <path class="grid-line grid-line--major grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M0,16H${width}"/>
+  `<path class="grid-line grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},1h${width}M${gridOffsetX},3h${width}M${gridOffsetX},5h${width}M${gridOffsetX},7h${width}M${gridOffsetX},9h${width}M${gridOffsetX},11h${width}M${gridOffsetX},13h${width}M${gridOffsetX},15h${width}M${gridOffsetX},17h${width}M${gridOffsetX},19h${width}${getVerticalLines("minor")}"/>
+  <path class="grid-line grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},2h${width}M${gridOffsetX},6h${width}M${gridOffsetX},10h${width}M${gridOffsetX},14h${width}M${gridOffsetX},18h${width}${getVerticalLines("medium")}"/>
+  <path class="grid-line grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},0h${width}M${gridOffsetX},4h${width}M${gridOffsetX},12h${width}M${gridOffsetX},20h${width}${getVerticalLines("major")}"/>
+  <path class="grid-line grid-line--major grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},8h${width}"/>
+  <path class="grid-line grid-line--major grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},16h${width}"/>
   `;
     }
 
