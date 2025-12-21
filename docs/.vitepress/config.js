@@ -19,6 +19,7 @@ export default defineConfig({
           items: [
             { text: 'Installation', link: '/guide/installation' },
             { text: 'Quick Start', link: '/guide/quick-start' },
+            { text: 'Writing with Bliss', link: '/guide/writing' },
             { text: 'DSL Syntax', link: '/guide/dsl-syntax' }
           ]
         },
