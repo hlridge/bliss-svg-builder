@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   title: 'Bliss SVG Builder',
   description: 'Generate SVG code for Blissymbolics using a Domain-Specific Language',
+  base: '/bliss-svg-builder/',
 
   themeConfig: {
     nav: [
