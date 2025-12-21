@@ -12,7 +12,7 @@ For example, the character **"FEELING"** (code: `B313`) is defined as a heart po
 
 Compare this to manually building the same shape:
 
-<Demo code="[grid=1;freestyle=1]||H:0,8" title="Manual: H:0,8 with freestyle" />
+<Demo code="[grid=1]||H:0,8" title="Manual: H:0,8" />
 
 **The difference:**
 - Predefined characters like `B313` already have proper height (20 units)
