@@ -8,32 +8,6 @@ A JavaScript library for generating SVG representations of Blissymbolics (Bliss)
 
 Bliss SVG Builder enables you to **programmatically generate Bliss characters** in your JavaScript applications. It's designed as a library to power AAC applications, educational tools, communication boards, and any system that needs to create or display Bliss dynamically.
 
-## Examples
-
-**Simple shape** - Heart with freestyle mode
-
-![Heart shape](assets/heart-shape.svg)
-
-```javascript
-const heart = new BlissSVGBuilder('[grid=1;freestyle=1;background=#fafafa]||H');
-```
-
-**Bliss character** - B313 (FEELING)
-
-![B313 FEELING](assets/b313-feeling.svg)
-
-```javascript
-const feeling = new BlissSVGBuilder('[grid=1;background=#fafafa]||B313');
-```
-
-**Complex composition** - "I love Blissymbolics!"
-
-![I love Blissymbolics](assets/i-love-blissymbolics.svg)
-
-```javascript
-const sentence = new BlissSVGBuilder('[grid=1;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1');
-```
-
 ## Installation
 
 ```bash
@@ -54,6 +28,32 @@ const svgCode = builder.svgCode;
 // Or get DOM element (browser)
 const svgElement = builder.svgElement;
 document.getElementById('container').appendChild(svgElement);
+```
+
+## Examples
+
+**Simple shape** - Heart with freestyle mode
+
+![Heart shape](assets/heart-shape.svg)
+
+```
+INPUT: [freestyle=1;background=#fafafa]||H
+```
+
+**Bliss character** - B313 (FEELING)
+
+![B313 FEELING](assets/b313-feeling.svg)
+
+```
+INPUT: [grid=1;background=#fafafa]||B313
+```
+
+**Complex composition** - "I love Blissymbolics!"
+
+![I love Blissymbolics](assets/i-love-blissymbolics.svg)
+
+```
+INPUT: [grid=1;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1
 ```
 
 ## Module Format Support
