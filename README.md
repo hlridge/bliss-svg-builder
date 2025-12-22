@@ -34,27 +34,27 @@ document.getElementById('container').appendChild(svgElement);
 
 **Simple shape** - Heart with freestyle mode
 
-![Heart shape](assets/heart-shape.svg)
+```
+[freestyle=1;background=#fafafa]||H
+```
 
-```
-INPUT: [freestyle=1;background=#fafafa]||H
-```
+![Heart shape](assets/heart-shape.svg)
 
 **Bliss character** - B313 (FEELING)
 
-![B313 FEELING](assets/b313-feeling.svg)
+```
+[grid=1;background=#fafafa]||B313
+```
 
-```
-INPUT: [grid=1;background=#fafafa]||B313
-```
+![B313 FEELING](assets/b313-feeling.svg)
 
 **Complex composition** - "I love Blissymbolics!"
 
-![I love Blissymbolics](assets/i-love-blissymbolics.svg)
+```
+[grid=1;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1
+```
 
-```
-INPUT: [grid=1;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1
-```
+![I love Blissymbolics](assets/i-love-blissymbolics.svg)
 
 ## Module Format Support
 
