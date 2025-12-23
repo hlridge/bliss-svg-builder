@@ -489,6 +489,9 @@ for (const definition of Object.values(blissElementDefinitions)) {
 } 
 
 //character definitions
+for (const [code, definition] of Object.entries(charData)) {
+  definition.characterCode = code;
+}
 Object.assign(blissElementDefinitions, charData);
 
 export { blissElementDefinitions };
