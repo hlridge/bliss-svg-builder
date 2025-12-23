@@ -511,13 +511,13 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
  * @returns {Object} - An object with a getPath method, width, and height properties.
  */
 export function createFiber(height) {
-  const radius = height * 5 / 4;
-  const initialX = height;
-  const initialY = 0;
+  const radius = height * 3 / 4;
+  const initialX = 0;
+  const initialY = height;
   const midX = height / 4;
-  const midY = height / 2;
-  const endX = height / 2;
-  const endY = 0;
+  const midY = -height / 2;
+  const endX = height / 4;
+  const endY = -height / 2;
 
   return {
     getPath: (x, y) => {
