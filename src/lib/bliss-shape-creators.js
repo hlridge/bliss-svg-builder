@@ -484,7 +484,7 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
       };
     },
     width: 0,
-    height: 0,
+    height: (defaultBaseStrokeWidth + defaultExtraDotWidth) * 4 / 3,
   };
 
   /**
