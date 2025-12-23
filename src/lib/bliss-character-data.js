@@ -1,3 +1,13 @@
+const digitKerning = {
+  B9: -1, B10: -1, B11: -1, B12: -1, B13: -1,
+  B14: -1, B15: -1, B16: -1, B17: -1, B18: -1
+};
+
+const smallDigitKerning = {
+  B19: -1, B20: -1, B21: -1, B22: -1, B23: -1,
+  B24: -1, B25: -1, B26: -1, B27: -1, B28: -1
+};
+
 const charData = {
   B1: {
     codeString: "VL6:0,8;DOT:0,16",
@@ -24,70 +34,91 @@ const charData = {
     shrinksPrecedingWordSpace: true
   },
   B7: {
-    codeString: "COMMA:0,8"
+    codeString: "COMMA:0,8",
+    shrinksPrecedingWordSpace: true
   },
   B8: {
     codeString: "C2:0,8"
   },
   B9: {
-    codeString: "HC2N:0,12;VL2:0,13;HC2S:0,15;VL2:2,13"
+    codeString: "HC2N:0,12;VL2:0,13;HC2S:0,15;VL2:2,13",
+    kerningRules: digitKerning
   },
   B10: {
-    codeString: "DL1N:0,12;VL4:1,12;HL2:0,16"
+    codeString: "DL1N:0,12;VL4:1,12;HL2:0,16",
+    kerningRules: digitKerning
   },
   B11: {
-    codeString: "HC2N:0,12;DL2-3N:0,13;HL2:0,16"
+    codeString: "HC2N:0,12;DL2-3N:0,13;HL2:0,16",
+    kerningRules: digitKerning
   },
   B12: {
-    codeString: "OC2SW:0,12;OC2NW:0,14"
+    codeString: "OC2SW:0,12;OC2NW:0,14",
+    kerningRules: digitKerning
   },
   B13: {
-    codeString: "VL2:0,12;HL2:0,14;VL4:2,12"
+    codeString: "VL2:0,12;HL2:0,14;VL4:2,12",
+    kerningRules: digitKerning
   },
   B14: {
-    codeString: "HL2:0,12;VL2:0,12;HL1:0,14;HL1:0,16;HC2E:1,14"
+    codeString: "HL2:0,12;VL2:0,12;HL1:0,14;HL1:0,16;HC2E:1,14",
+    kerningRules: digitKerning
   },
   B15: {
-    codeString: "HC2N:0,12;VL2:0,13;C2:0,14"
+    codeString: "HC2N:0,12;VL2:0,13;C2:0,14",
+    kerningRules: digitKerning
   },
   B16: {
-    codeString: "HL2:0,12;DL1-4N:1,12"
+    codeString: "HL2:0,12;DL1-4N:1,12",
+    kerningRules: digitKerning
   },
   B17: {
-    codeString: "C2:0,12;C2:0,14"
+    codeString: "C2:0,12;C2:0,14",
+    kerningRules: digitKerning
   },
   B18: {
-    codeString: "C2:0,12;HC2S:0,15;VL2:2,13"
+    codeString: "C2:0,12;HC2S:0,15;VL2:2,13",
+    kerningRules: digitKerning
   },
   B19: {
-    codeString: "HC1N:0,14;VL1:0,14.5;HC1S:0,15.5;VL1:1,14.5"
+    codeString: "HC1N:0,14;VL1:0,14.5;HC1S:0,15.5;VL1:1,14.5",
+    kerningRules: smallDigitKerning
   },
   B20: {
-    codeString: "DL.5N:0,14;VL2:0.5,14;HL1:0,16"
+    codeString: "DL.5N:0,14;VL2:0.5,14;HL1:0,16",
+    kerningRules: smallDigitKerning
   },
   B21: {
-    codeString: "HC1N:0,14;DL1-1.5N:0,14.5;HL1:0,16"
+    codeString: "HC1N:0,14;DL1-1.5N:0,14.5;HL1:0,16",
+    kerningRules: smallDigitKerning
   },
   B22: {
-    codeString: "OC1SW:0,14;OC1NW:0,15"
+    codeString: "OC1SW:0,14;OC1NW:0,15",
+    kerningRules: smallDigitKerning
   },
   B23: {
-    codeString: "VL1:0,14;HL1:0,15;VL2:1,14"
+    codeString: "VL1:0,14;HL1:0,15;VL2:1,14",
+    kerningRules: smallDigitKerning
   },
   B24: {
-    codeString: "HL1:0,14;VL1:0,14;HL.5:0,15;HL.5:0,16;HC1E:0.5,15"
+    codeString: "HL1:0,14;VL1:0,14;HL.5:0,15;HL.5:0,16;HC1E:0.5,15",
+    kerningRules: smallDigitKerning
   },
   B25: {
-    codeString: "HC1N:0,14;VL1:0,14.5;C1:0,15"
+    codeString: "HC1N:0,14;VL1:0,14.5;C1:0,15",
+    kerningRules: smallDigitKerning
   },
   B26: {
-    codeString: "HL1:0,14;DL.5-2N:0.5,14"
+    codeString: "HL1:0,14;DL.5-2N:0.5,14",
+    kerningRules: smallDigitKerning
   },
   B27: {
-    codeString: "C1:0,14;C1:0,15"
+    codeString: "C1:0,14;C1:0,15",
+    kerningRules: smallDigitKerning
   },
   B28: {
-    codeString: "C1:0,14;HC1S:0,15.5;VL1:1,14.5"
+    codeString: "C1:0,14;HC1S:0,15.5;VL1:1,14.5",
+    kerningRules: smallDigitKerning
   },
   B29: {
     codeString: "Xa"
