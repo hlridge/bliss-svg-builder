@@ -1,9 +1,22 @@
 import { defineConfig } from 'vitepress';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   title: 'Bliss SVG Builder',
   description: 'Generate SVG code for Blissymbolics using a Domain-Specific Language',
   base: '/bliss-svg-builder/',
+
+  vite: {
+    server: {
+      fs: {
+        // Allow serving files from the project root (for src/ imports)
+        allow: [resolve(__dirname, '../..')]
+      }
+    }
+  },
 
   themeConfig: {
     nav: [
