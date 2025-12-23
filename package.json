@@ -56,6 +56,9 @@
     "url": "https://blissary.com"
   },
   "license": "MPL-2.0",
+  "engines": {
+    "node": ">=16"
+  },
   "bugs": {
     "url": "https://github.com/hlridge/bliss-svg-builder/issues"
   },
