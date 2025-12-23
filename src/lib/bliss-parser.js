@@ -185,18 +185,18 @@ export class BlissParser {
                 // Apply properties from the definition, falling back to existing values
                 const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
                 const isExternalGlyph = expandedSubPart.isExternalGlyph;
-                const kerningRules = expandedSubPart.kerningRules;
+                const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
                 const glyph = expandedSubPart.glyph;
                 const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
+                const characterCode = definition.characterCode;
                 return {
                   part: expandedSubPart.part,
                   ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
                   ...(isIndicator === true && { isIndicator }),
-                  ...(isExternalGlyph === true && {
-                    isExternalGlyph,
-                    ...(kerningRules && { kerningRules }),
-                    ...(glyph && { glyph })
-                  })
+                  ...(isExternalGlyph && { isExternalGlyph }),
+                  ...(glyph && { glyph }),
+                  ...(kerningRules && { kerningRules }),
+                  ...(characterCode && { characterCode })
                 };
               });
           }
@@ -206,14 +206,14 @@ export class BlissParser {
           const isExternalGlyph = definition.isExternalGlyph;
           const kerningRules = definition.kerningRules;
           const glyph = definition.glyph;
+          const characterCode = definition.characterCode;
           return [{
             part: str,
             ...(isIndicator === true && { isIndicator }),
-            ...(isExternalGlyph === true && {
-              isExternalGlyph,
-              ...(kerningRules && { kerningRules }),
-              ...(glyph && { glyph })
-            })
+            ...(isExternalGlyph && { isExternalGlyph }),
+            ...(glyph && { glyph }),
+            ...(kerningRules && { kerningRules }),
+            ...(characterCode && { characterCode })
           }];
         }
 
@@ -225,7 +225,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules } of expandedCharacterParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode } of expandedCharacterParts) {
         if (part === "") continue;
 
         const character = {
@@ -234,7 +234,8 @@ export class BlissParser {
           ...(typeof isIndicator === "boolean" && { isIndicator }),
           ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
           ...(typeof glyph === "string" && { glyph }),
-          ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules })
+          ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules }),
+          ...(typeof characterCode === "string" && { characterCode })
         };
 
         const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);
