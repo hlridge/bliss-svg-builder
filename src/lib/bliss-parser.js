@@ -76,7 +76,7 @@ export class BlissParser {
     }
 
     if (codeString) {
-      const matched = codeString.match(/^([\w\-.]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
+      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\-.]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
 
       if (matched) {
         let [, code, x, y] = matched;
