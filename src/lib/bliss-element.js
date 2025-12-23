@@ -282,6 +282,8 @@ export class BlissElement {
     } else {
       if (this.#level === 2) {
         // Character level
+        this.#codeName = this.#blissObj.characterCode || this.#blissObj.code || "";
+
         if (!this.#blissObj.parts) {
           this.#blissObj = { parts: [this.#blissObj] };
         }
@@ -314,12 +316,20 @@ export class BlissElement {
             this.#previousElement.#advanceX = this.#previousElement.width + this.#externalGlyphSpacing;
           }
 
+          if (!this.isExternalGlyph && !this.#previousElement.isExternalGlyph &&
+              this.#previousElement.kerningRules && this.codeName) {
+            const kerningAdjustment = this.#previousElement.kerningRules[this.codeName] ?? 0;
+            if (kerningAdjustment !== 0) {
+              this.#previousElement.#advanceX = this.#previousElement.width + this.#sharedOptions.charSpace + kerningAdjustment;
+            }
+          }
+
           if (typeof this.#blissObj.options?.relativeKerning === "number") {
             this.#previousElement.#advanceX += this.#blissObj.options.relativeKerning;
           } else if (typeof this.#blissObj.options?.absoluteKerning === "number") {
             this.#previousElement.#advanceX = this.#previousElement.width + this.#blissObj.options.absoluteKerning;
           }
-  
+
           if (this.#blissObj.x === undefined) {
             this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
           } else {
