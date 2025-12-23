@@ -173,7 +173,7 @@ const blissElementDefinitions = {
   'DL1.5S': sc.createDescendingDiagonalLine(1.5, 1.5),
   'DL1S': sc.createDescendingDiagonalLine(1, 1),
   'DL.5S': sc.createDescendingDiagonalLine(0.5, 0.5),
-  'DL2,3S': sc.createDescendingDiagonalLine(2, 3),
+  'DL2-3S': sc.createDescendingDiagonalLine(2, 3),
   'DL1-1.5S': sc.createDescendingDiagonalLine(1, 1.5),
   'DL3-2S': sc.createDescendingDiagonalLine(3, 2),
   'DL1.5-1S': sc.createDescendingDiagonalLine(1.5, 1),
