@@ -1,10 +1,8 @@
 # Bliss SVG Builder
 
-A JavaScript library for generating SVG representations of Blissymbolics (Bliss) using a Domain-Specific Language.
+A JavaScript library for generating SVG representations of Blissymbolics (Bliss) using a Domain-Specific Language (DSL).
 
-[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/alpha)](https://www.npmjs.com/package/bliss-svg-builder)
-
-## What is Bliss SVG Builder?
+[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/alpha)](https://www.npmjs.com/package/bliss-svg-builder) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@0.1.0-alpha.6,bliss-svg-builder@0.1.0-alpha.6&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
 
 Bliss SVG Builder enables you to **programmatically generate Bliss characters** in your JavaScript applications. It's designed as a library to power AAC applications, educational tools, communication boards, and any system that needs to create or display Bliss dynamically.
 
@@ -48,7 +46,7 @@ document.getElementById('container').appendChild(svgElement);
 
 ![B313 FEELING](assets/b313-feeling.svg)
 
-**Complex composition** - "I love Blissymbolics!"
+**Bliss sentence** - "I love Blissymbolics!"
 
 ```
 [grid=1;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1
@@ -56,21 +54,21 @@ document.getElementById('container').appendChild(svgElement);
 
 ![I love Blissymbolics](assets/i-love-blissymbolics.svg)
 
-## Module Format Support
+## Compatibility
 
-Bliss SVG Builder works everywhere JavaScript runs:
+This package supports the three major JavaScript module systems:
+**ES Modules (ESM), CommonJS (CJS), and UMD**.
 
-- **ES Modules (ESM)** - Modern bundlers (Vite, Webpack), Node.js, and browsers with `<script type="module">`
-- **CommonJS (CJS)** - Traditional Node.js environments
-- **UMD** - Direct browser usage via `<script>` tag
+As a result, it works in:
 
-Both **browser** and **Node.js** environments are fully supported.
+- Modern browsers (ESM or UMD)
+- Node.js (ESM or CJS)
+- Bundlers (Vite, Webpack, Rollup, Parcel, etc.)
+- Script tags and legacy setups (UMD)
 
 ## Documentation
 
-For complete documentation including DSL syntax, shapes reference, options, and examples, visit:
-
-**[https://hlridge.github.io/bliss-svg-builder/](https://hlridge.github.io/bliss-svg-builder/)**
+For complete documentation including DSL syntax, shapes reference, options, and examples, visit the **[Full Documentation](https://hlridge.github.io/bliss-svg-builder/)**.
 
 - [Quick Start Guide](https://hlridge.github.io/bliss-svg-builder/guide/quick-start)
 - [Writing with Bliss](https://hlridge.github.io/bliss-svg-builder/guide/writing)
