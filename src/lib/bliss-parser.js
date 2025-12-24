@@ -246,12 +246,12 @@ export class BlissParser {
           continue;
         }
   
-        if (pendingRelativeKerning) {
+        if (pendingRelativeKerning !== undefined) {
           (character.options ??= {}).relativeKerning = pendingRelativeKerning;
           pendingRelativeKerning = undefined;
         }
 
-        if (pendingAbsoluteKerning) {
+        if (pendingAbsoluteKerning !== undefined) {
           (character.options ??= {}).absoluteKerning = pendingAbsoluteKerning;
           pendingAbsoluteKerning = undefined;
         }
