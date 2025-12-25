@@ -63,7 +63,7 @@ Apply options just like with shapes:
 
 <Demo code="[color=#2563eb]||B313/B102" title="Blue word" />
 
-<Demo code="[color=red]||B313//[color=blue]||B102" title="Different colored words" />
+<Demo code="[color=red]||B313//[color=blue]|B102" title="Different colored words" />
 
 Remember the option cascade:
 - Global options (`||`) apply to everything
