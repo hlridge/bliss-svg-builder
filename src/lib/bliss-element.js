@@ -497,6 +497,8 @@ export class BlissElement {
 
     const word = this;
     const characters = word.#children;
+    if (characters.length === 0) return 0;
+
     const firstCharacter = characters[0];
     const lastCharacter = characters[characters.length - 1];
     const lastCharacterBaseWidth = lastCharacter.baseCharacterWidth;
@@ -505,9 +507,11 @@ export class BlissElement {
     return baseWordWidth;
   }
 
-  get baseWidth() {    
+  get baseWidth() {
     if (this.#level === 0) {
       const words = this.#children;
+      if (words.length === 0) return 0;
+
       const firstWord = words[0];
       const lastWord = words[words.length - 1];
       const lastWordBaseWidth = lastWord.baseWordWidth;
