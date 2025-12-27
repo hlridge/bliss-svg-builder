@@ -99,7 +99,7 @@ export class BlissParser {
 
   static fromString(inputString) {
     inputString = inputString.trim();
-    let result = { words: [] };
+    let result = { groups: [] };
 
     // Parse a Blissymbolics string and convert it to an internal representation (BlissComposition)
     //Ex. 
@@ -149,37 +149,52 @@ export class BlissParser {
     blissElementDefinitions['TSP'].advanceWidth = wordSpace - charSpace;
     blissElementDefinitions['QSP'].advanceWidth = wordSpace / 2 - charSpace;
 
-    // Iterate over each word part in the remaining string
-    let threePartWordStrings = globalCodeString.split('//');
+    // Split on //+ patterns to identify word boundaries and track space counts
+    // Example: "word1//word2///word3" → ["word1", "word2", "word3"] with spaceCounts [1, 2]
+    const wordSegments = [];
+    const spaceCounts = []; // Number of space glyphs between each word
 
-    // First, parse all words into a temporary array
-    const parsedWords = [];
+    let currentPos = 0;
+    const slashPattern = /\/{2,}/g;
+    let match;
 
-    for (let tpws of threePartWordStrings) {
-      if (tpws === "") continue;
+    while ((match = slashPattern.exec(globalCodeString)) !== null) {
+      wordSegments.push(globalCodeString.substring(currentPos, match.index));
+      // Each // is one space, /// is two spaces, etc.
+      spaceCounts.push(match[0].length - 1);
+      currentPos = match.index + match[0].length;
+    }
+    wordSegments.push(globalCodeString.substring(currentPos));
 
-      let word = { characters: [] };
+    // Parse all word segments
+    const parsedGroups = [];
 
-      let [_, twoPartWordString, textKey] = tpws.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/);
+    for (let i = 0; i < wordSegments.length; i++) {
+      const tpgs = wordSegments[i];
+      if (tpgs === "") continue;
+
+      let group = { glyphs: [] };
+
+      let [_, twoPartGroupString, textKey] = tpgs.match(/(.*?)(?:\{(.*?(?<!\\))\})?$/);
 
       if (textKey) {
-        word.text = placeholderMap[textKey]?.content ?? textKey;
+        group.text = placeholderMap[textKey]?.content ?? textKey;
       }
 
-      let wordCodeString;
-      if (twoPartWordString.includes('|')) {
-        const [beforePipe, afterPipe] = twoPartWordString.split("|", 2);
+      let groupCodeString;
+      if (twoPartGroupString.includes('|')) {
+        const [beforePipe, afterPipe] = twoPartGroupString.split("|", 2);
         if (beforePipe.match(/^\[.*\]$/)) {
-          word.options = this.#parseOptions(restorePlaceholders(beforePipe));
-          wordCodeString = afterPipe;
+          group.options = this.#parseOptions(restorePlaceholders(beforePipe));
+          groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
-          console.warn(`Invalid word options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`);
-          wordCodeString = afterPipe;
+          console.warn(`Invalid group options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`);
+          groupCodeString = afterPipe;
         } else {
-          wordCodeString = afterPipe;
+          groupCodeString = afterPipe;
         }
       } else {
-        wordCodeString = twoPartWordString;
+        groupCodeString = twoPartGroupString;
       }
 
       function replaceWithDefinition(str, definitions) {
@@ -233,15 +248,15 @@ export class BlissParser {
         return str.split('/').flatMap(strPart => expand(strPart, definitions));
       }
 
-      const expandedCharacterParts = replaceWithDefinition(wordCodeString, blissElementDefinitions);
+      const expandedGlyphParts = replaceWithDefinition(groupCodeString, blissElementDefinitions);
 
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode, advanceWidth } of expandedCharacterParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode, advanceWidth } of expandedGlyphParts) {
         if (part === "") continue;
 
-        const character = {
+        const glyphObj = {
           parts: [],
           ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
           ...(typeof isIndicator === "boolean" && { isIndicator }),
@@ -259,22 +274,22 @@ export class BlissParser {
           if (kerningType === "AK") pendingAbsoluteKerning = Number(kerningValue);
           continue;
         }
-  
+
         if (pendingRelativeKerning !== undefined) {
-          (character.options ??= {}).relativeKerning = pendingRelativeKerning;
+          (glyphObj.options ??= {}).relativeKerning = pendingRelativeKerning;
           pendingRelativeKerning = undefined;
         }
 
         if (pendingAbsoluteKerning !== undefined) {
-          (character.options ??= {}).absoluteKerning = pendingAbsoluteKerning;
+          (glyphObj.options ??= {}).absoluteKerning = pendingAbsoluteKerning;
           pendingAbsoluteKerning = undefined;
         }
 
-        let characterCodeString = part;
-        const charMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
-        if (charMatch) {
-          character.options = this.#parseOptions(restorePlaceholders(charMatch[1]));
-          characterCodeString = charMatch[2];
+        let glyphCodeString = part;
+        const glyphMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
+        if (glyphMatch) {
+          glyphObj.options = this.#parseOptions(restorePlaceholders(glyphMatch[1]));
+          glyphCodeString = glyphMatch[2];
         }
 
         const parseParts = (partsString) => {
@@ -317,40 +332,45 @@ export class BlissParser {
           return parts;
         };
 
-        character.parts = parseParts(characterCodeString);
+        glyphObj.parts = parseParts(glyphCodeString);
 
-        this.#extractPositionFromOptions(character);
-        word.characters.push(character);
+        this.#extractPositionFromOptions(glyphObj);
+        group.glyphs.push(glyphObj);
       }
 
-      this.#extractPositionFromOptions(word);
-      parsedWords.push(word);
+      this.#extractPositionFromOptions(group);
+      parsedGroups.push(group);
     }
 
-    // Interleave words with space groups (TSP or QSP)
-    for (let i = 0; i < parsedWords.length; i++) {
-      const word = parsedWords[i];
+    // Interleave groups with space groups (multiple space glyphs if ///)
+    for (let i = 0; i < parsedGroups.length; i++) {
+      const group = parsedGroups[i];
 
-      // Insert space group before this word (except for the first word)
+      // Insert space group(s) before this group (except for the first group)
       if (i > 0) {
-        // Check if this word is punctuation (all characters have shrinksPrecedingWordSpace)
-        const isPunctuation = word.characters?.every(char =>
-          char.shrinksPrecedingWordSpace === true
+        const spaceCount = spaceCounts[i - 1]; // Number of space glyphs to insert
+
+        // Check if this group is punctuation (all glyphs have shrinksPrecedingWordSpace)
+        const isPunctuation = group.glyphs?.every(g =>
+          g.shrinksPrecedingWordSpace === true
         ) ?? false;
 
-        const spaceGlyph = isPunctuation ? 'QSP' : 'TSP';
+        // Single space before punctuation uses QSP, otherwise TSP
+        const spaceGlyph = (spaceCount === 1 && isPunctuation) ? 'QSP' : 'TSP';
 
-        // Create space group with the appropriate space glyph
+        // Create space group with the appropriate number of space glyphs
+        const spaceGlyphs = Array(spaceCount).fill(null).map(() => ({
+          parts: [{ code: spaceGlyph }],
+          advanceWidth: blissElementDefinitions[spaceGlyph].advanceWidth
+        }));
+
         const spaceGroup = {
-          characters: [{
-            parts: [{ code: spaceGlyph }],
-            advanceWidth: blissElementDefinitions[spaceGlyph].advanceWidth
-          }]
+          glyphs: spaceGlyphs
         };
-        result.words.push(spaceGroup);
+        result.groups.push(spaceGroup);
       }
 
-      result.words.push(word);
+      result.groups.push(group);
     }
 
     this.#extractPositionFromOptions(result);

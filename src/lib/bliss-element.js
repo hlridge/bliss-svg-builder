@@ -148,19 +148,19 @@ export class BlissElement {
     this.#childStartOffset = 0;
 
     if (this.#level === 0) {
-      // Root level
-      if (!this.#blissObj.words) {
-        this.#blissObj = { words: [this.#blissObj] };
+      // Root level (sequence)
+      if (!this.#blissObj.groups) {
+        this.#blissObj = { groups: [this.#blissObj] };
       }
 
-      for (const word of this.#blissObj.words) {
-        const child = new BlissElement(word, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
-        child.type = "word";
+      for (const group of this.#blissObj.groups) {
+        const child = new BlissElement(group, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
+        child.type = "group";
         this.#children.push(child);
       }
       
       try {
-        // Checks if the first character of the first word of the entire thing is a character with indicator.
+        // Checks if the first glyph of the first group of the entire sequence is a glyph with indicator.
         // TODO: add option for if overhang is accepted?
         if (level === 0 &&
             this.#children && 
@@ -221,20 +221,20 @@ export class BlissElement {
         return BlissElement.#wrapWithAnchorAndGroup(content, filteredOptions);
       };
     } else if (this.#level === 1) {
-      // Word level
-      if (!this.#blissObj.characters) {
-        this.#blissObj = { characters: [this.#blissObj] };
+      // Group level
+      if (!this.#blissObj.glyphs) {
+        this.#blissObj = { glyphs: [this.#blissObj] };
       }
 
-      for (const character of this.#blissObj.characters) {
-        const child = new BlissElement(character, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
-        child.type = "character";
+      for (const glyph of this.#blissObj.glyphs) {
+        const child = new BlissElement(glyph, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
+        child.type = "glyph";
         this.#children.push(child);
       }
 
-      // Check if this is a space group (all characters have advanceWidth - only space glyphs have this)
-      const isSpaceGroup = this.#blissObj.characters?.every(char =>
-        typeof char.advanceWidth === 'number'
+      // Check if this is a space group (all glyphs have advanceWidth - only space glyphs have this)
+      const isSpaceGroup = this.#blissObj.glyphs?.every(g =>
+        typeof g.advanceWidth === 'number'
       ) ?? false;
 
       if (this.#previousElement) {
@@ -256,15 +256,15 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
       }
 
-      // Space groups: advanceX is the sum of their character advanceWidths (TSP=6, QSP=2)
-      // Regular words: advanceX is baseWordWidth + charSpace (the charSpace pairs with TSP to make full wordSpace)
+      // Space groups: advanceX is the sum of their glyph advanceWidths (TSP=6, QSP=2)
+      // Regular groups: advanceX is baseGroupWidth + charSpace (the charSpace pairs with TSP to make full wordSpace)
       if (isSpaceGroup) {
-        // Sum of all character advanceWidths in this space group
-        this.#advanceX = this.#blissObj.characters.reduce(
-          (sum, char) => sum + (char.advanceWidth || 0), 0
+        // Sum of all glyph advanceWidths in this space group
+        this.#advanceX = this.#blissObj.glyphs.reduce(
+          (sum, g) => sum + (g.advanceWidth || 0), 0
         );
       } else {
-        this.#advanceX = this.baseWordWidth + this.#sharedOptions.charSpace;
+        this.#advanceX = this.baseGroupWidth + this.#sharedOptions.charSpace;
       }
 
       this.getSvgContent = (x = 0, y = 0) => {
@@ -343,7 +343,7 @@ export class BlissElement {
         if (typeof this.#blissObj.advanceWidth === "number") {
           this.#advanceX = this.#blissObj.advanceWidth;
         } else {
-          this.#advanceX = this.baseCharacterWidth + this.#sharedOptions.charSpace;
+          this.#advanceX = this.baseGlyphWidth + this.#sharedOptions.charSpace;
         }
 
         this.getSvgContent = (x = 0, y = 0) => {
@@ -448,35 +448,35 @@ export class BlissElement {
     return width;
   }
 
-  get rightExtendedCharacterWidth() {
-    if (this.#level !== 2) throw new Error('rightExtendedCharacterWidth can only be called on character elements (level 2)');
+  get rightExtendedGlyphWidth() {
+    if (this.#level !== 2) throw new Error('rightExtendedGlyphWidth can only be called on glyph elements (level 2)');
 
-    const character = this;
-    const parts = character.#children;
+    const glyph = this;
+    const parts = glyph.#children;
 
     if (parts.length === 0) return 0;
     if (parts.length === 1) return parts[0].width;
 
     const allPartsAreIndicators = parts.every(part => part.isIndicator);
     const lastPartIsIndicator = parts[parts.length - 1].isIndicator;
-    
+
     let spacingParts = parts;
-    if (lastPartIsIndicator && !allPartsAreIndicators) { 
-      spacingParts = parts.slice(0, -1); 
+    if (lastPartIsIndicator && !allPartsAreIndicators) {
+      spacingParts = parts.slice(0, -1);
     }
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...parts.map(part => part.#relativeToParentX + part.width));
-    const rightExtendedCharacterWidth = maxRelativeXPlusWidth - minRelativeX;
-  
-    return rightExtendedCharacterWidth;
+    const rightExtendedGlyphWidth = maxRelativeXPlusWidth - minRelativeX;
+
+    return rightExtendedGlyphWidth;
   }
 
-  get baseCharacterWidth() {
-    if (this.#level !== 2) throw new Error('baseCharacterWidth can only be called on character elements (level 2)');
+  get baseGlyphWidth() {
+    if (this.#level !== 2) throw new Error('baseGlyphWidth can only be called on glyph elements (level 2)');
 
-    const character = this;
-    const parts = character.#children;
+    const glyph = this;
+    const parts = glyph.#children;
 
     if (parts.length === 0) return 0;
     if (parts.length === 1) {
@@ -493,40 +493,40 @@ export class BlissElement {
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...spacingParts.map(part => part.#relativeToParentX + part.width));
-    const baseCharacterWidth = maxRelativeXPlusWidth - minRelativeX;
+    const baseGlyphWidth = maxRelativeXPlusWidth - minRelativeX;
 
-    return baseCharacterWidth;
+    return baseGlyphWidth;
   }
 
-  get baseWordWidth() {
-    if (this.#level !== 1) throw new Error('baseWordWidth can only be called on word elements (level 1)');
+  get baseGroupWidth() {
+    if (this.#level !== 1) throw new Error('baseGroupWidth can only be called on group elements (level 1)');
 
-    const word = this;
-    const characters = word.#children;
-    if (characters.length === 0) return 0;
+    const group = this;
+    const glyphs = group.#children;
+    if (glyphs.length === 0) return 0;
 
-    const firstCharacter = characters[0];
-    const lastCharacter = characters[characters.length - 1];
-    const lastCharacterBaseWidth = lastCharacter.baseCharacterWidth;
-    const baseWordWidth = lastCharacter.#relativeToParentX + lastCharacterBaseWidth - firstCharacter.#relativeToParentX;
+    const firstGlyph = glyphs[0];
+    const lastGlyph = glyphs[glyphs.length - 1];
+    const lastGlyphBaseWidth = lastGlyph.baseGlyphWidth;
+    const baseGroupWidth = lastGlyph.#relativeToParentX + lastGlyphBaseWidth - firstGlyph.#relativeToParentX;
 
-    return baseWordWidth;
+    return baseGroupWidth;
   }
 
   get baseWidth() {
     if (this.#level === 0) {
-      const words = this.#children;
-      if (words.length === 0) return 0;
+      const groups = this.#children;
+      if (groups.length === 0) return 0;
 
-      const firstWord = words[0];
-      const lastWord = words[words.length - 1];
-      const lastWordBaseWidth = lastWord.baseWordWidth;
-      const baseWidth = lastWord.#relativeToParentX + lastWordBaseWidth - firstWord.#relativeToParentX;
+      const firstGroup = groups[0];
+      const lastGroup = groups[groups.length - 1];
+      const lastGroupBaseWidth = lastGroup.baseGroupWidth;
+      const baseWidth = lastGroup.#relativeToParentX + lastGroupBaseWidth - firstGroup.#relativeToParentX;
       return baseWidth;
     }
 
-    if (this.#level === 1) return this.baseWordWidth;
-    if (this.#level === 2) return this.baseCharacterWidth;
+    if (this.#level === 1) return this.baseGroupWidth;
+    if (this.#level === 2) return this.baseGlyphWidth;
 
     return this.width;
   }
