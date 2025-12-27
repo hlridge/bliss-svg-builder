@@ -143,12 +143,6 @@ export class BlissParser {
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
     result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
 
-    // Update space glyph advanceWidth based on global options
-    const wordSpace = Number(result.options['word-space']) || 8;
-    const charSpace = Number(result.options['char-space']) || 2;
-    blissElementDefinitions['TSP'].advanceWidth = wordSpace - charSpace;
-    blissElementDefinitions['QSP'].advanceWidth = wordSpace / 2 - charSpace;
-
     // Split on //+ patterns to identify word boundaries and track space counts
     // Example: "word1//word2///word3" → ["word1", "word2", "word3"] with spaceCounts [1, 2]
     const wordSegments = [];
@@ -231,7 +225,6 @@ export class BlissParser {
           const kerningRules = definition.kerningRules;
           const glyph = definition.glyph;
           const characterCode = definition.characterCode;
-          const advanceWidth = definition.advanceWidth;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
           return [{
             part: str,
@@ -240,8 +233,7 @@ export class BlissParser {
             ...(isExternalGlyph && { isExternalGlyph }),
             ...(glyph && { glyph }),
             ...(kerningRules && { kerningRules }),
-            ...(characterCode && { characterCode }),
-            ...(typeof advanceWidth === "number" && { advanceWidth })
+            ...(characterCode && { characterCode })
           }];
         }
 
@@ -253,7 +245,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode, advanceWidth } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode } of expandedGlyphParts) {
         if (part === "") continue;
 
         const glyphObj = {
@@ -263,8 +255,7 @@ export class BlissParser {
           ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
           ...(typeof glyph === "string" && { glyph }),
           ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules }),
-          ...(typeof characterCode === "string" && { characterCode }),
-          ...(typeof advanceWidth === "number" && { advanceWidth })
+          ...(typeof characterCode === "string" && { characterCode })
         };
 
         const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);
@@ -360,8 +351,7 @@ export class BlissParser {
 
         // Create space group with the appropriate number of space glyphs
         const spaceGlyphs = Array(spaceCount).fill(null).map(() => ({
-          parts: [{ code: spaceGlyph }],
-          advanceWidth: blissElementDefinitions[spaceGlyph].advanceWidth
+          parts: [{ code: spaceGlyph }]
         }));
 
         const spaceGroup = {

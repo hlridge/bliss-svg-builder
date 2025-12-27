@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { BlissParser } from "./bliss-parser.js";
 
 export class BlissElement {
@@ -232,10 +232,11 @@ export class BlissElement {
         this.#children.push(child);
       }
 
-      // Check if this is a space group (all glyphs have advanceWidth - only space glyphs have this)
-      const isSpaceGroup = this.#blissObj.glyphs?.every(g =>
-        typeof g.advanceWidth === 'number'
-      ) ?? false;
+      // Check if this is a space group (all glyphs are space glyphs: TSP or QSP)
+      const isSpaceGroup = this.#blissObj.glyphs?.every(g => {
+        const code = g.parts?.[0]?.code;
+        return code && isSpaceGlyph(code);
+      }) ?? false;
 
       if (this.#previousElement) {
         if (this.#blissObj.x === undefined) {
@@ -256,13 +257,19 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
       }
 
-      // Space groups: advanceX is the sum of their glyph advanceWidths (TSP=6, QSP=2)
+      // Space groups: advanceX is the sum of their dynamically-calculated glyph widths
       // Regular groups: advanceX is baseGroupWidth + charSpace (the charSpace pairs with TSP to make full wordSpace)
       if (isSpaceGroup) {
-        // Sum of all glyph advanceWidths in this space group
-        this.#advanceX = this.#blissObj.glyphs.reduce(
-          (sum, g) => sum + (g.advanceWidth || 0), 0
-        );
+        // Sum dynamically-calculated widths for all space glyphs
+        this.#advanceX = this.#blissObj.glyphs.reduce((sum, g) => {
+          const code = g.parts?.[0]?.code;
+          if (code === 'TSP') {
+            return sum + (this.#sharedOptions.wordSpace - this.#sharedOptions.charSpace);
+          } else if (code === 'QSP') {
+            return sum + (this.#sharedOptions.wordSpace / 2 - this.#sharedOptions.charSpace);
+          }
+          return sum;
+        }, 0);
       } else {
         this.#advanceX = this.baseGroupWidth + this.#sharedOptions.charSpace;
       }
@@ -340,9 +347,18 @@ export class BlissElement {
         }
 
         this.#relativeToParentY = this.#blissObj.y ?? 0;
-        if (typeof this.#blissObj.advanceWidth === "number") {
-          this.#advanceX = this.#blissObj.advanceWidth;
+
+        // Dynamic advanceX calculation for space glyphs (TSP, QSP)
+        const code = this.#blissObj.parts?.[0]?.code;
+        if (code && isSpaceGlyph(code)) {
+          // Space glyphs have dynamic width based on word-space and char-space options
+          if (code === 'TSP') {
+            this.#advanceX = this.#sharedOptions.wordSpace - this.#sharedOptions.charSpace;
+          } else if (code === 'QSP') {
+            this.#advanceX = this.#sharedOptions.wordSpace / 2 - this.#sharedOptions.charSpace;
+          }
         } else {
+          // Regular glyphs use baseWidth + charSpace
           this.#advanceX = this.baseGlyphWidth + this.#sharedOptions.charSpace;
         }
 

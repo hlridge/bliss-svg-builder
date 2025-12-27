@@ -7,6 +7,17 @@
 import * as sc from "./bliss-shape-creators.js";
 import { charData } from "./bliss-character-data.js";
 
+/**
+ * Special space glyph codes: TSP and QSP
+ * These codes have dynamic width calculated by BlissElement.
+ * DO NOT rename or remove these without updating BlissElement.
+ */
+export const SPACE_GLYPH_CODES = Object.freeze(new Set(['TSP', 'QSP']));
+
+export function isSpaceGlyph(code) {
+  return SPACE_GLYPH_CODES.has(code);
+}
+
 const blissElementDefinitions = {
   'ZSA': sc.createZeroSizedAnchor(),
   'H': sc.createHeart(8),
