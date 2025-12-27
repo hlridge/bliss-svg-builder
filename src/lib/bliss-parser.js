@@ -152,6 +152,9 @@ export class BlissParser {
     // Iterate over each word part in the remaining string
     let threePartWordStrings = globalCodeString.split('//');
 
+    // First, parse all words into a temporary array
+    const parsedWords = [];
+
     for (let tpws of threePartWordStrings) {
       if (tpws === "") continue;
 
@@ -321,6 +324,32 @@ export class BlissParser {
       }
 
       this.#extractPositionFromOptions(word);
+      parsedWords.push(word);
+    }
+
+    // Interleave words with space groups (TSP or QSP)
+    for (let i = 0; i < parsedWords.length; i++) {
+      const word = parsedWords[i];
+
+      // Insert space group before this word (except for the first word)
+      if (i > 0) {
+        // Check if this word is punctuation (all characters have shrinksPrecedingWordSpace)
+        const isPunctuation = word.characters?.every(char =>
+          char.shrinksPrecedingWordSpace === true
+        ) ?? false;
+
+        const spaceGlyph = isPunctuation ? 'QSP' : 'TSP';
+
+        // Create space group with the appropriate space glyph
+        const spaceGroup = {
+          characters: [{
+            parts: [{ code: spaceGlyph }],
+            advanceWidth: blissElementDefinitions[spaceGlyph].advanceWidth
+          }]
+        };
+        result.words.push(spaceGroup);
+      }
+
       result.words.push(word);
     }
 

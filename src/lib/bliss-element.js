@@ -232,21 +232,15 @@ export class BlissElement {
         this.#children.push(child);
       }
 
-      // Check if this word is punctuation (all characters have shrinksPrecedingWordSpace)
-      const isPunctuation = this.#blissObj.characters?.every(char =>
-        char.shrinksPrecedingWordSpace === true
+      // Check if this is a space group (all characters have advanceWidth - only space glyphs have this)
+      const isSpaceGroup = this.#blissObj.characters?.every(char =>
+        typeof char.advanceWidth === 'number'
       ) ?? false;
 
       if (this.#previousElement) {
         if (this.#blissObj.x === undefined) {
-          // If this word is punctuation, use reduced spacing before it
-          let spacing;
-          if (isPunctuation) {
-            spacing = this.#previousElement.baseWordWidth + this.#sharedOptions.punctuationSpace;
-          } else {
-            spacing = this.#previousElement.#advanceX; // baseWordWidth + wordSpacing
-          }
-          this.#relativeToParentX = this.#previousElement.#relativeToParentX + spacing;
+          // Position based on previous element's advanceX
+          this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
         } else {
           this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.width + this.#blissObj.x;
         }
@@ -262,8 +256,16 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
       }
 
-      // advanceX is always word width + word spacing (punctuation spacing is handled in position calculation)
-      this.#advanceX = this.baseWordWidth + this.#sharedOptions.wordSpace;
+      // Space groups: advanceX is the sum of their character advanceWidths (TSP=6, QSP=2)
+      // Regular words: advanceX is baseWordWidth + charSpace (the charSpace pairs with TSP to make full wordSpace)
+      if (isSpaceGroup) {
+        // Sum of all character advanceWidths in this space group
+        this.#advanceX = this.#blissObj.characters.reduce(
+          (sum, char) => sum + (char.advanceWidth || 0), 0
+        );
+      } else {
+        this.#advanceX = this.baseWordWidth + this.#sharedOptions.charSpace;
+      }
 
       this.getSvgContent = (x = 0, y = 0) => {
         const childContents = this.#children.map(child =>
