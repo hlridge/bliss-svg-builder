@@ -60,17 +60,6 @@ class BlissSVGBuilder {
       options.wordSpace = wordSpace;
     }
 
-    // punctuation-space: Number, clamped 0-20
-    if ('punctuation-space' in rawOptions && !isNaN(rawOptions['punctuation-space'])) {
-      let punctuationSpace = Number(rawOptions['punctuation-space']);
-      if (punctuationSpace < 0) {
-        punctuationSpace = 0;
-      } else if (punctuationSpace > 20) {
-        punctuationSpace = 20;
-      }
-      options.punctuationSpace = punctuationSpace;
-    }
-
     // external-glyph-space: Number, clamped 0-3
     if ('external-glyph-space' in rawOptions && !isNaN(rawOptions['external-glyph-space'])) {
       let externalGlyphSpace = Number(rawOptions['external-glyph-space']);
@@ -306,7 +295,6 @@ class BlissSVGBuilder {
     const {
       charSpace,
       wordSpace,
-      punctuationSpace,
       externalGlyphSpace,
       ...remainingOptions
     } = blissObj.options ?? {};
@@ -314,7 +302,7 @@ class BlissSVGBuilder {
     const sharedOptions = {
       charSpace: charSpace ?? 2,
       wordSpace: wordSpace ?? 8,
-      punctuationSpace: punctuationSpace ?? 4,
+      punctuationSpace: (wordSpace ?? 8) / 2,
       externalGlyphSpace: externalGlyphSpace ?? 0.8
     };
 
