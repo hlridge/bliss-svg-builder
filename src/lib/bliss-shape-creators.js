@@ -20,6 +20,21 @@ export function createZeroSizedAnchor() {
 }
 
 /**
+ * Create an invisible space glyph.
+ * Width is 0 (invisible). advanceWidth controls cursor movement.
+ * @param {number} advanceWidth - Default advance width (may be overridden by BlissSVGBuilder based on options)
+ * @returns {Object} - An object with getPath, width, height, and advanceWidth.
+ */
+export function createSpace(advanceWidth) {
+  return {
+    getPath: () => '',
+    width: 0,
+    height: 0,
+    advanceWidth,
+  };
+}
+
+/**
  * Create a circle object with a specified radius.
  * @param {number} radius - The radius of the circle.
  * @returns {Object} - An object with a getPath method, width, and height properties.

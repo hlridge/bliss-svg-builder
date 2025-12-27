@@ -143,6 +143,12 @@ export class BlissParser {
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
     result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
 
+    // Update space glyph advanceWidth based on global options
+    const wordSpace = Number(result.options['word-space']) || 8;
+    const charSpace = Number(result.options['char-space']) || 2;
+    blissElementDefinitions['TSP'].advanceWidth = wordSpace - charSpace;
+    blissElementDefinitions['QSP'].advanceWidth = wordSpace / 2 - charSpace;
+
     // Iterate over each word part in the remaining string
     let threePartWordStrings = globalCodeString.split('//');
 
@@ -207,13 +213,17 @@ export class BlissParser {
           const kerningRules = definition.kerningRules;
           const glyph = definition.glyph;
           const characterCode = definition.characterCode;
+          const advanceWidth = definition.advanceWidth;
+          const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
           return [{
             part: str,
+            ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph && { isExternalGlyph }),
             ...(glyph && { glyph }),
             ...(kerningRules && { kerningRules }),
-            ...(characterCode && { characterCode })
+            ...(characterCode && { characterCode }),
+            ...(typeof advanceWidth === "number" && { advanceWidth })
           }];
         }
 
@@ -225,7 +235,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode } of expandedCharacterParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode, advanceWidth } of expandedCharacterParts) {
         if (part === "") continue;
 
         const character = {
@@ -235,7 +245,8 @@ export class BlissParser {
           ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
           ...(typeof glyph === "string" && { glyph }),
           ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules }),
-          ...(typeof characterCode === "string" && { characterCode })
+          ...(typeof characterCode === "string" && { characterCode }),
+          ...(typeof advanceWidth === "number" && { advanceWidth })
         };
 
         const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);

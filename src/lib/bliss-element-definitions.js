@@ -15,6 +15,8 @@ const blissElementDefinitions = {
   'DOT': sc.createDot(0.5, 0.333),
   'SDOT': sc.createDot(0.5, 0),
   'COMMA': sc.createComma(0.5, 0.333),
+  'TSP': sc.createSpace(6),
+  'QSP': sc.createSpace(2),
   'C8': sc.createCircle(4),
   'C4': sc.createCircle(2),
   'C2': sc.createCircle(1),

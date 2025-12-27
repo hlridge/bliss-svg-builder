@@ -338,7 +338,11 @@ export class BlissElement {
         }
 
         this.#relativeToParentY = this.#blissObj.y ?? 0;
-        this.#advanceX = this.baseCharacterWidth + this.#sharedOptions.charSpace;
+        if (typeof this.#blissObj.advanceWidth === "number") {
+          this.#advanceX = this.#blissObj.advanceWidth;
+        } else {
+          this.#advanceX = this.baseCharacterWidth + this.#sharedOptions.charSpace;
+        }
 
         this.getSvgContent = (x = 0, y = 0) => {
           const childContents = this.#children.map(child =>
