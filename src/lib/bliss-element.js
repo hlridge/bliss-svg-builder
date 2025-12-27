@@ -432,7 +432,7 @@ export class BlissElement {
     let maxRelativeXPlusWidth;
     if (this.#level === 1) {
       maxRelativeXPlusWidth = Math.max(...this.#children.map(child =>
-        child.#relativeToParentX + child.rightExtendedCharacterWidth));
+        child.#relativeToParentX + child.rightExtendedGlyphWidth));
     } else {
       maxRelativeXPlusWidth = Math.max(...this.#children.map(child =>
         child.#relativeToParentX + child.width));

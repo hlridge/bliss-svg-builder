@@ -300,6 +300,10 @@ class BlissSVGBuilder {
   constructor(input) {
     const blissObj = BlissParser.parse(input);
 
+    // Check if word-space was provided (to detect if clamping might be needed)
+    const rawWordSpace = blissObj.options?.['word-space'];
+    const hasWordSpaceOption = rawWordSpace !== undefined;
+
     // Process options (apply clamping, defaults, bulk expansion) and store back in blissObj
     blissObj.options = this.#processOptions(blissObj.options);
 
@@ -317,6 +321,31 @@ class BlissSVGBuilder {
       punctuationSpace: punctuationSpace ?? 4,
       externalGlyphSpace: externalGlyphSpace ?? 0.8
     };
+
+    // Update TSP/QSP advanceWidth with clamped values from processOptions
+    const tspAdvanceWidth = sharedOptions.wordSpace - sharedOptions.charSpace;
+    const qspAdvanceWidth = sharedOptions.wordSpace / 2 - sharedOptions.charSpace;
+    blissElementDefinitions['TSP'].advanceWidth = tspAdvanceWidth;
+    blissElementDefinitions['QSP'].advanceWidth = qspAdvanceWidth;
+
+    // If word-space was provided, update advanceWidth in space groups created by parser
+    // (Parser used unclamped value; we need to apply clamped value)
+    if (hasWordSpaceOption && blissObj.groups) {
+      for (const group of blissObj.groups) {
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (glyph.advanceWidth !== undefined && glyph.parts?.[0]) {
+              const code = glyph.parts[0].code;
+              if (code === 'TSP') {
+                glyph.advanceWidth = tspAdvanceWidth;
+              } else if (code === 'QSP') {
+                glyph.advanceWidth = qspAdvanceWidth;
+              }
+            }
+          }
+        }
+      }
+    }
 
     blissObj.options = remainingOptions;
 
