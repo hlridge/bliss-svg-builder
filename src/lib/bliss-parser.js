@@ -301,7 +301,8 @@ export class BlissParser {
         let glyphCodeString = part;
         const glyphMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
         if (glyphMatch) {
-          glyphObj.options = this.#parseOptions(restorePlaceholders(glyphMatch[1]));
+          const parsedOptions = this.#parseOptions(restorePlaceholders(glyphMatch[1]));
+          glyphObj.options = { ...glyphObj.options, ...parsedOptions };
           glyphCodeString = glyphMatch[2];
         }
 
