@@ -143,29 +143,51 @@ export class BlissParser {
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
     result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
 
-    // Split on //+ patterns to identify word boundaries and track space counts
-    // Example: "word1//word2///word3" → ["word1", "word2", "word3"] with spaceCounts [1, 2]
-    const wordSegments = [];
-    const spaceCounts = []; // Number of space glyphs between each word
+    // Step 1: Replace // patterns with /SP/ (space placeholder)
+    // Each // adds one SP, /// adds two SPs, etc.
+    const normalized = globalCodeString.replace(/\/{2,}/g, match =>
+      '/' + 'SP/'.repeat(match.length - 1)
+    );
 
-    let currentPos = 0;
-    const slashPattern = /\/{2,}/g;
-    let match;
+    // Step 2: Split on / and group consecutive items by type (space vs non-space)
+    const glyphCodes = normalized.split('/').filter(s => s !== '');
+    const isSpaceCode = code => code === 'SP' || code === 'TSP' || code === 'QSP';
 
-    while ((match = slashPattern.exec(globalCodeString)) !== null) {
-      wordSegments.push(globalCodeString.substring(currentPos, match.index));
-      // Each // is one space, /// is two spaces, etc.
-      spaceCounts.push(match[0].length - 1);
-      currentPos = match.index + match[0].length;
+    const groupedCodes = []; // Array of { codes: [...], isSpace: boolean }
+    for (const code of glyphCodes) {
+      const isSpace = isSpaceCode(code);
+      const lastGroup = groupedCodes[groupedCodes.length - 1];
+      if (lastGroup && lastGroup.isSpace === isSpace) {
+        lastGroup.codes.push(code);
+      } else {
+        groupedCodes.push({ codes: [code], isSpace });
+      }
     }
-    wordSegments.push(globalCodeString.substring(currentPos));
 
-    // Parse all word segments
+    // Step 3: Build parsed groups, converting SP to TSP/QSP
     const parsedGroups = [];
+    for (let gi = 0; gi < groupedCodes.length; gi++) {
+      const { codes, isSpace } = groupedCodes[gi];
 
-    for (let i = 0; i < wordSegments.length; i++) {
-      const tpgs = wordSegments[i];
-      if (tpgs === "") continue;
+      if (isSpace) {
+        // Space group: convert SP to TSP or QSP
+        // Use QSP only if: single space AND next group is punctuation-only
+        const nextGroup = groupedCodes[gi + 1];
+        let useQSP = false;
+        if (codes.length === 1 && codes[0] === 'SP' && nextGroup && !nextGroup.isSpace) {
+          // Check if next group is punctuation-only (will be determined after parsing)
+          // For now, mark it and we'll resolve after parsing all groups
+        }
+        // Convert codes: SP→TSP (or QSP), keep TSP/QSP as-is
+        const spaceGlyphs = codes.map(code => ({
+          parts: [{ code: code === 'SP' ? 'TSP' : code }]
+        }));
+        parsedGroups.push({ glyphs: spaceGlyphs, _isSpaceGroup: true, _spaceIndex: gi });
+        continue;
+      }
+
+      // Non-space group: parse normally
+      const tpgs = codes.join('/');
 
       let group = { glyphs: [] };
 
@@ -333,35 +355,27 @@ export class BlissParser {
       parsedGroups.push(group);
     }
 
-    // Interleave groups with space groups (multiple space glyphs if ///)
+    // Step 4: Resolve SP→QSP for single-space groups before punctuation
     for (let i = 0; i < parsedGroups.length; i++) {
       const group = parsedGroups[i];
-
-      // Insert space group(s) before this group (except for the first group)
-      if (i > 0) {
-        const spaceCount = spaceCounts[i - 1]; // Number of space glyphs to insert
-
-        // Check if this group is punctuation (all glyphs have shrinksPrecedingWordSpace)
-        const isPunctuation = group.glyphs?.every(g =>
-          g.shrinksPrecedingWordSpace === true
-        ) ?? false;
-
-        // Single space before punctuation uses QSP, otherwise TSP
-        const spaceGlyph = (spaceCount === 1 && isPunctuation) ? 'QSP' : 'TSP';
-
-        // Create space group with the appropriate number of space glyphs
-        const spaceGlyphs = Array(spaceCount).fill(null).map(() => ({
-          parts: [{ code: spaceGlyph }]
-        }));
-
-        const spaceGroup = {
-          glyphs: spaceGlyphs
-        };
-        result.groups.push(spaceGroup);
+      if (group._isSpaceGroup && group.glyphs.length === 1) {
+        const nextGroup = parsedGroups[i + 1];
+        if (nextGroup && !nextGroup._isSpaceGroup) {
+          // Check if next group is punctuation-only
+          const isPunctuation = nextGroup.glyphs?.every(g =>
+            g.shrinksPrecedingWordSpace === true
+          ) ?? false;
+          if (isPunctuation) {
+            group.glyphs[0].parts[0].code = 'QSP';
+          }
+        }
       }
-
-      result.groups.push(group);
+      // Clean up internal markers
+      delete group._isSpaceGroup;
+      delete group._spaceIndex;
     }
+
+    result.groups = parsedGroups;
 
     this.#extractPositionFromOptions(result);
     return result;
