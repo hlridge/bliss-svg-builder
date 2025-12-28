@@ -8,7 +8,7 @@ const smallDigitKerning = {
   B24: -1, B25: -1, B26: -1, B27: -1, B28: -1
 };
 
-const charData = {
+const glyphData = {
   B1: {
     codeString: "VL6:0,8;DOT:0,16",
     shrinksPrecedingWordSpace: true
@@ -3966,4 +3966,4 @@ const charData = {
   }
 }
 
-export { charData };
+export { glyphData };

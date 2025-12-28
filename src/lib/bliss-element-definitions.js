@@ -5,7 +5,7 @@
  */
 
 import * as sc from "./bliss-shape-creators.js";
-import { charData } from "./bliss-character-data.js";
+import { glyphData } from "./bliss-glyph-data.js";
 
 /**
  * Special space glyph codes: TSP and QSP
@@ -501,10 +501,10 @@ for (const definition of Object.values(blissElementDefinitions)) {
   definition.isAtomic = true;
 } 
 
-//character definitions
-for (const [code, definition] of Object.entries(charData)) {
+//glyph definitions
+for (const [code, definition] of Object.entries(glyphData)) {
   definition.characterCode = code;
 }
-Object.assign(blissElementDefinitions, charData);
+Object.assign(blissElementDefinitions, glyphData);
 
 export { blissElementDefinitions };
