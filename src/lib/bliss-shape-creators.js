@@ -573,6 +573,7 @@ export function createExternalGlyph(glyph) {
       return `${closePath}${openGlyphPath}${transformedPath}${closePath}${openPath}`;
     },
     width: aObj.width || 0,
+    height: aObj.height || 0,
     // Indicates that this "shape" is an external, non-Bliss glyph.
     isExternalGlyph: true,
     // The glyph represented.
