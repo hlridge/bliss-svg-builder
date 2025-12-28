@@ -5,6 +5,7 @@
  */
 
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
+import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -76,7 +77,7 @@ export class BlissParser {
     }
 
     if (codeString) {
-      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\-.]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
+      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\-._]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
 
       if (matched) {
         let [, code, x, y] = matched;
@@ -213,6 +214,76 @@ export class BlissParser {
         groupCodeString = twoPartGroupString;
       }
 
+      function processXCodes(codeString, definitions) {
+        // First, expand multi-char X-codes (like Xhello -> Xh/Xe/Xl/Xl/Xo or XTXT_héllo)
+        let expanded = codeString.replace(/X([a-zA-Z\u00C0-\u017F]{2,})/g, (match, chars) => {
+          const allHavePath = [...chars].every(char => hasPathData(char));
+          if (allHavePath) {
+            return [...chars].map(char => `X${char}`).join('/');
+          } else {
+            const fallbackCode = `XTXT_${chars}`;
+            if (!definitions[fallbackCode]) {
+              const glyph = createTextFallbackGlyph(chars);
+              glyph.isAtomic = true;
+              definitions[fallbackCode] = glyph;
+            }
+            return fallbackCode;
+          }
+        });
+
+        // Then, process sequences of single-char X-codes (like Xh/Xé/Xl -> XTXT_hél if any needs fallback)
+        const parts = expanded.split('/');
+        const result = [];
+        let currentXSequence = [];
+
+        const flushXSequence = () => {
+          if (currentXSequence.length === 0) return;
+
+          if (currentXSequence.length === 1) {
+            const char = currentXSequence[0].slice(1);
+            if (hasPathData(char)) {
+              result.push(currentXSequence[0]);
+            } else {
+              const fallbackCode = `XTXT_${char}`;
+              if (!definitions[fallbackCode]) {
+                const glyph = createTextFallbackGlyph(char);
+                glyph.isAtomic = true;
+                definitions[fallbackCode] = glyph;
+              }
+              result.push(fallbackCode);
+            }
+          } else {
+            const chars = currentXSequence.map(code => code.slice(1)).join('');
+            const allHavePath = [...chars].every(char => hasPathData(char));
+
+            if (allHavePath) {
+              currentXSequence.forEach(code => result.push(code));
+            } else {
+              const fallbackCode = `XTXT_${chars}`;
+              if (!definitions[fallbackCode]) {
+                const glyph = createTextFallbackGlyph(chars);
+                glyph.isAtomic = true;
+                definitions[fallbackCode] = glyph;
+              }
+              result.push(fallbackCode);
+            }
+          }
+          currentXSequence = [];
+        };
+
+        for (const part of parts) {
+          if (/^X[a-zA-Z\u00C0-\u017F]$/.test(part)) {
+            currentXSequence.push(part);
+          } else {
+            flushXSequence();
+            result.push(part);
+          }
+        }
+        flushXSequence();
+
+        return result.join('/');
+      }
+
       function replaceWithDefinition(str, definitions) {
         function expand(str, definitions) {
           const definition = definitions[str] || {};
@@ -262,7 +333,8 @@ export class BlissParser {
         return str.split('/').flatMap(strPart => expand(strPart, definitions));
       }
 
-      const expandedGlyphParts = replaceWithDefinition(groupCodeString, blissElementDefinitions);
+      const processedGroupCodeString = processXCodes(groupCodeString, blissElementDefinitions);
+      const expandedGlyphParts = replaceWithDefinition(processedGroupCodeString, blissElementDefinitions);
 
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;

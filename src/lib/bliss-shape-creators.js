@@ -7,6 +7,55 @@
 import { alphabetData } from "../external-font-data/open-sans-svg-path-data.js";
 
 /**
+ * Checks if a character has hardcoded path data available.
+ *
+ * @param {string} char - The character to check.
+ * @return {boolean} True if path data exists, false if text fallback would be used.
+ */
+export function hasPathData(char) {
+  return !!alphabetData[`X${char}`];
+}
+
+/**
+ * Creates a text fallback glyph for characters without hardcoded path data.
+ * Uses SVG <text> element which relies on system fonts.
+ *
+ * @param {string} str - The character or string to render.
+ * @return {object} A glyph object compatible with createExternalGlyph.
+ */
+export function createTextFallbackGlyph(str) {
+  // Use known character widths where available, generous fallback for unknown.
+  // Users may need manual kerning/cropping for precise layouts with unknown chars.
+  const unknownCharWidth = 2.5;
+  const defaultCharSpace = 272 / 356; // ~0.764
+  const charWidths = [...str].reduce((sum, char) => {
+    const glyphData = alphabetData[`X${char}`];
+    return sum + (glyphData ? glyphData.width : unknownCharWidth);
+  }, 0);
+  const charSpacing = (str.length - 1) * defaultCharSpace;
+  const width = charWidths + charSpacing;
+  const height = 16; // Match external glyph maxY values
+
+  return {
+    getPath: (x, y, options = {}) => {
+      const fill = options.color || '#000000';
+      const closePath = `"></path>`;
+      const openPath = `<path d="`;
+      // External glyphs have baseline at y≈16, font-size 5.7 gives x-height of ~4
+      const baseline = 16;
+      const textX = x - 0.3;
+      const textY = y + baseline;
+      return `${closePath}<text x="${textX}" y="${textY}" font-family="Open Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${str}</text>${openPath}`;
+    },
+    width,
+    height,
+    isExternalGlyph: true,
+    isTextFallback: true,
+    glyph: str,
+  };
+}
+
+/**
  * Create an invisible zero-sized anchor element with zero width and height.
  * Used to prevent normalization when explicit positioning is needed.
  * @returns {Object} - An object with a getPath method, width, and height properties.
