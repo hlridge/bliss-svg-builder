@@ -5,7 +5,6 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { BlissParser } from "./bliss-parser.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -132,6 +131,28 @@ export class BlissElement {
   }
 
   #sharedOptions;
+
+  /**
+   * Gets inherited options by walking up the parent chain.
+   * Child options take precedence over parent options.
+   * @param {string} optionName - The option name to look for
+   * @returns {*} The option value, or undefined if not found
+   */
+  #getInheritedOption(optionName) {
+    // Check this element's options first
+    if (this.#blissObj.options?.[optionName] !== undefined) {
+      return this.#blissObj.options[optionName];
+    }
+    // Walk up parent chain
+    let current = this.#parentElement;
+    while (current) {
+      if (current.#blissObj.options?.[optionName] !== undefined) {
+        return current.#blissObj.options[optionName];
+      }
+      current = current.#parentElement;
+    }
+    return undefined;
+  }
 
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0, sharedOptions = null } = {}) {
     this.#blissObj = blissObj;
@@ -865,10 +886,17 @@ export class BlissElement {
     this.#leafY = definition.y;
     
     this.getSvgContent = (x = 0, y = 0) => {
+      // Build path options with inheritance: extraPathOptions < inherited < element-level
+      // Use #getInheritedOption for color which already handles the inheritance chain
+      const inheritedColor = this.#getInheritedOption('color');
+      const pathOptions = {
+        ...this.#extraPathOptions,
+        ...(inheritedColor !== undefined && { color: inheritedColor })
+      };
       const pathData = definition.getPath(
         this.#relativeToParentX + x,
         this.#relativeToParentY + y,
-        this.#extraPathOptions
+        pathOptions
       );
 
       // If the definition returns SVG tags (like DOT/COMMA with extraPathOptions),

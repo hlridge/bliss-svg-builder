@@ -562,9 +562,15 @@ export function createExternalGlyph(glyph) {
   const round = (num) => parseFloat(num.toFixed(4));
 
   return {
-    getPath: (x, y) => {
-      const openGlyphPath = `<path stroke="none" fill="#000000" transform="translate(${round(x+adjustX)},${round(y+adjustY)})" d="`;
-      return `${closePath}${openGlyphPath}${glyphPath}${closePath}${openPath}`;
+    getPath: (x, y, options = {}) => {
+      // Transform all M coordinates directly (paths use relative commands after M)
+      const transformedPath = glyphPath.replace(
+        /M(-?\d+\.?\d*),(-?\d+\.?\d*)/g,
+        (_, mx, my) => `M${round(parseFloat(mx) + x + adjustX)},${round(parseFloat(my) + y + adjustY)}`
+      );
+      const fill = options.color || "#000000";
+      const openGlyphPath = `<path stroke="none" fill="${fill}" d="`;
+      return `${closePath}${openGlyphPath}${transformedPath}${closePath}${openPath}`;
     },
     width: aObj.width || 0,
     // Indicates that this "shape" is an external, non-Bliss glyph.
