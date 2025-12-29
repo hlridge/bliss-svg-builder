@@ -77,7 +77,7 @@ export class BlissParser {
     }
 
     if (codeString) {
-      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\-._]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
+      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\-._]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
 
       if (matched) {
         let [, code, x, y] = matched;
@@ -216,7 +216,8 @@ export class BlissParser {
 
       function processXCodes(codeString, definitions) {
         // First, expand multi-char X-codes (like Xhello -> Xh/Xe/Xl/Xl/Xo or XTXT_héllo)
-        let expanded = codeString.replace(/X([a-zA-Z\u00C0-\u017F]{2,})/g, (match, chars) => {
+        // Match Latin, Latin Extended, and Cyrillic letters
+        let expanded = codeString.replace(/X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, chars) => {
           const allHavePath = [...chars].every(char => hasPathData(char));
           if (allHavePath) {
             return [...chars].map(char => `X${char}`).join('/');
@@ -272,7 +273,8 @@ export class BlissParser {
         };
 
         for (const part of parts) {
-          if (/^X[a-zA-Z\u00C0-\u017F]$/.test(part)) {
+          // Match single-char X-codes: Latin, Latin Extended, and Cyrillic letters
+          if (/^X[a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]$/.test(part)) {
             currentXSequence.push(part);
           } else {
             flushXSequence();
@@ -286,11 +288,31 @@ export class BlissParser {
 
       function replaceWithDefinition(str, definitions) {
         function expand(str, definitions) {
-          const definition = definitions[str] || {};
+          // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
+          // Don't expand codeString, but DO get kerning rules for external glyphs
+          const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
+          if (partLevelMatch) {
+            const codeForKerning = partLevelMatch[2].split(':')[0]; // Strip any :x,y positioning
+            const definition = definitions[codeForKerning] || {};
+            // Return original string unchanged, but include kerning-related properties
+            return [{
+              part: str,
+              ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
+              ...(definition.glyph && { glyph: definition.glyph }),
+              ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
+            }];
+          }
+
+          // Strip leading glyph-level bracket options to get the actual code for lookup
+          // Only matches [options]code (NOT [options]>code, which are part-level options)
+          const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
+          const optionsPrefix = optionsMatch ? optionsMatch[1] : '';
+          const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
+          const definition = definitions[codeForLookup] || {};
 
           // If we have a codeString, recursively expand it
           if (definition.codeString) {
-            return definition.codeString.split('/')
+            const expandedParts = definition.codeString.split('/')
               .flatMap(subStr => expand(subStr, definitions))
               .map(expandedSubPart => {
                 // Apply properties from the definition, falling back to existing values
@@ -310,6 +332,11 @@ export class BlissParser {
                   ...(characterCode && { characterCode })
                 };
               });
+            // Prepend options to the first expanded part
+            if (optionsPrefix && expandedParts.length > 0) {
+              expandedParts[0].part = optionsPrefix + expandedParts[0].part;
+            }
+            return expandedParts;
           }
 
           // Base case - create object with properties from definition

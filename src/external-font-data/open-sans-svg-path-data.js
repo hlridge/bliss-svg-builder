@@ -351,18 +351,74 @@ const alphabetData = {
       "y": getGridUnitKerningRule(113),
       "w": getGridUnitKerningRule(113),
       "u": getGridUnitKerningRule(76),
+      "ù": getGridUnitKerningRule(76),
+      "ú": getGridUnitKerningRule(76),
+      "û": getGridUnitKerningRule(76),
+      "ü": getGridUnitKerningRule(76),
+      "ū": getGridUnitKerningRule(76),
+      "ű": getGridUnitKerningRule(76),
+      "ų": getGridUnitKerningRule(76),
       "s": getGridUnitKerningRule(227),
+      "š": getGridUnitKerningRule(227),
+      "ś": getGridUnitKerningRule(227),
       "r": getGridUnitKerningRule(76),
       "o": getGridUnitKerningRule(227),
+      "ò": getGridUnitKerningRule(227),
+      "ó": getGridUnitKerningRule(227),
+      "ô": getGridUnitKerningRule(227),
+      "õ": getGridUnitKerningRule(227),
+      "ö": getGridUnitKerningRule(227),
+      "ø": getGridUnitKerningRule(227),
+      "ō": getGridUnitKerningRule(227),
+      "ő": getGridUnitKerningRule(227),
       "i": getGridUnitKerningRule(76),
+      "ì": getGridUnitKerningRule(76),
+      "í": getGridUnitKerningRule(76),
+      "î": getGridUnitKerningRule(76),
+      "ï": getGridUnitKerningRule(76),
+      "ī": getGridUnitKerningRule(76),
+      "į": getGridUnitKerningRule(76),
       "e": getGridUnitKerningRule(227),
+      "è": getGridUnitKerningRule(227),
+      "é": getGridUnitKerningRule(227),
+      "ê": getGridUnitKerningRule(227),
+      "ë": getGridUnitKerningRule(227),
+      "ē": getGridUnitKerningRule(227),
+      "ė": getGridUnitKerningRule(227),
+      "ę": getGridUnitKerningRule(227),
       "c": getGridUnitKerningRule(227),
+      "ć": getGridUnitKerningRule(227),
+      "č": getGridUnitKerningRule(227),
+      "ç": getGridUnitKerningRule(227),
       "a": getGridUnitKerningRule(227),
+      "à": getGridUnitKerningRule(227),
+      "á": getGridUnitKerningRule(227),
+      "â": getGridUnitKerningRule(227),
+      "ã": getGridUnitKerningRule(227),
+      "ä": getGridUnitKerningRule(227),
+      "å": getGridUnitKerningRule(227),
+      "ā": getGridUnitKerningRule(227),
+      "ą": getGridUnitKerningRule(227),
+      "æ": getGridUnitKerningRule(227),
       "O": getGridUnitKerningRule(37),
+      "Ò": getGridUnitKerningRule(37),
+      "Ó": getGridUnitKerningRule(37),
+      "Ô": getGridUnitKerningRule(37),
+      "Õ": getGridUnitKerningRule(37),
       "Ö": getGridUnitKerningRule(37),
+      "Ø": getGridUnitKerningRule(37),
+      "Ō": getGridUnitKerningRule(37),
+      "Ő": getGridUnitKerningRule(37),
       "A": getGridUnitKerningRule(152),
+      "À": getGridUnitKerningRule(152),
+      "Á": getGridUnitKerningRule(152),
+      "Â": getGridUnitKerningRule(152),
+      "Ã": getGridUnitKerningRule(152),
+      "Ä": getGridUnitKerningRule(152),
       "Å": getGridUnitKerningRule(152),
-      "Ä": getGridUnitKerningRule(152)
+      "Ā": getGridUnitKerningRule(152),
+      "Ą": getGridUnitKerningRule(152),
+      "Æ": getGridUnitKerningRule(152)
     }
   },
   'XU': {
@@ -378,15 +434,61 @@ const alphabetData = {
     glyph: "V",
     kerningRules: {
       "y": getGridUnitKerningRule(76),
+      "ý": getGridUnitKerningRule(76),
+      "ÿ": getGridUnitKerningRule(76),
       "u": getGridUnitKerningRule(76),
+      "ù": getGridUnitKerningRule(76),
+      "ú": getGridUnitKerningRule(76),
+      "û": getGridUnitKerningRule(76),
+      "ü": getGridUnitKerningRule(76),
+      "ū": getGridUnitKerningRule(76),
+      "ű": getGridUnitKerningRule(76),
+      "ų": getGridUnitKerningRule(76),
       "r": getGridUnitKerningRule(76),
       "o": getGridUnitKerningRule(113),
+      "ò": getGridUnitKerningRule(113),
+      "ó": getGridUnitKerningRule(113),
+      "ô": getGridUnitKerningRule(113),
+      "õ": getGridUnitKerningRule(113),
+      "ö": getGridUnitKerningRule(113),
+      "ø": getGridUnitKerningRule(113),
+      "ō": getGridUnitKerningRule(113),
+      "ő": getGridUnitKerningRule(113),
       "i": getGridUnitKerningRule(37),
+      "ì": getGridUnitKerningRule(37),
+      "í": getGridUnitKerningRule(37),
+      "î": getGridUnitKerningRule(37),
+      "ï": getGridUnitKerningRule(37),
+      "ī": getGridUnitKerningRule(37),
+      "į": getGridUnitKerningRule(37),
       "e": getGridUnitKerningRule(113),
+      "è": getGridUnitKerningRule(113),
+      "é": getGridUnitKerningRule(113),
+      "ê": getGridUnitKerningRule(113),
+      "ë": getGridUnitKerningRule(113),
+      "ē": getGridUnitKerningRule(113),
+      "ė": getGridUnitKerningRule(113),
+      "ę": getGridUnitKerningRule(113),
       "a": getGridUnitKerningRule(227),
+      "à": getGridUnitKerningRule(227),
+      "á": getGridUnitKerningRule(227),
+      "â": getGridUnitKerningRule(227),
+      "ã": getGridUnitKerningRule(227),
+      "ä": getGridUnitKerningRule(227),
+      "å": getGridUnitKerningRule(227),
+      "ā": getGridUnitKerningRule(227),
+      "ą": getGridUnitKerningRule(227),
+      "æ": getGridUnitKerningRule(227),
       "A": getGridUnitKerningRule(152),
+      "À": getGridUnitKerningRule(152),
+      "Á": getGridUnitKerningRule(152),
+      "Â": getGridUnitKerningRule(152),
+      "Ã": getGridUnitKerningRule(152),
+      "Ä": getGridUnitKerningRule(152),
       "Å": getGridUnitKerningRule(152),
-      "Ä": getGridUnitKerningRule(152)
+      "Ā": getGridUnitKerningRule(152),
+      "Ą": getGridUnitKerningRule(152),
+      "Æ": getGridUnitKerningRule(152)
     }
   },
   'XW': {
@@ -396,14 +498,54 @@ const alphabetData = {
     glyph: "W",
     kerningRules: {
       "y": getGridUnitKerningRule(18),
+      "ý": getGridUnitKerningRule(18),
+      "ÿ": getGridUnitKerningRule(18),
       "u": getGridUnitKerningRule(37),
+      "ù": getGridUnitKerningRule(37),
+      "ú": getGridUnitKerningRule(37),
+      "û": getGridUnitKerningRule(37),
+      "ü": getGridUnitKerningRule(37),
+      "ū": getGridUnitKerningRule(37),
+      "ű": getGridUnitKerningRule(37),
+      "ų": getGridUnitKerningRule(37),
       "r": getGridUnitKerningRule(37),
       "o": getGridUnitKerningRule(37),
+      "ò": getGridUnitKerningRule(37),
+      "ó": getGridUnitKerningRule(37),
+      "ô": getGridUnitKerningRule(37),
+      "õ": getGridUnitKerningRule(37),
+      "ö": getGridUnitKerningRule(37),
+      "ø": getGridUnitKerningRule(37),
+      "ō": getGridUnitKerningRule(37),
+      "ő": getGridUnitKerningRule(37),
       "e": getGridUnitKerningRule(37),
+      "è": getGridUnitKerningRule(37),
+      "é": getGridUnitKerningRule(37),
+      "ê": getGridUnitKerningRule(37),
+      "ë": getGridUnitKerningRule(37),
+      "ē": getGridUnitKerningRule(37),
+      "ė": getGridUnitKerningRule(37),
+      "ę": getGridUnitKerningRule(37),
       "a": getGridUnitKerningRule(76),
+      "à": getGridUnitKerningRule(76),
+      "á": getGridUnitKerningRule(76),
+      "â": getGridUnitKerningRule(76),
+      "ã": getGridUnitKerningRule(76),
+      "ä": getGridUnitKerningRule(76),
+      "å": getGridUnitKerningRule(76),
+      "ā": getGridUnitKerningRule(76),
+      "ą": getGridUnitKerningRule(76),
+      "æ": getGridUnitKerningRule(76),
       "A": getGridUnitKerningRule(76),
+      "À": getGridUnitKerningRule(76),
+      "Á": getGridUnitKerningRule(76),
+      "Â": getGridUnitKerningRule(76),
+      "Ã": getGridUnitKerningRule(76),
+      "Ä": getGridUnitKerningRule(76),
       "Å": getGridUnitKerningRule(76),
-      "Ä": getGridUnitKerningRule(76)
+      "Ā": getGridUnitKerningRule(76),
+      "Ą": getGridUnitKerningRule(76),
+      "Æ": getGridUnitKerningRule(76)
     }
   },
   'XX': {
@@ -420,15 +562,59 @@ const alphabetData = {
     kerningRules: {
       "v": getGridUnitKerningRule(113),
       "u": getGridUnitKerningRule(113),
+      "ù": getGridUnitKerningRule(113),
+      "ú": getGridUnitKerningRule(113),
+      "û": getGridUnitKerningRule(113),
+      "ü": getGridUnitKerningRule(113),
+      "ū": getGridUnitKerningRule(113),
+      "ű": getGridUnitKerningRule(113),
+      "ų": getGridUnitKerningRule(113),
       "q": getGridUnitKerningRule(188),
       "p": getGridUnitKerningRule(152),
       "o": getGridUnitKerningRule(188),
+      "ò": getGridUnitKerningRule(188),
+      "ó": getGridUnitKerningRule(188),
+      "ô": getGridUnitKerningRule(188),
+      "õ": getGridUnitKerningRule(188),
+      "ö": getGridUnitKerningRule(188),
+      "ø": getGridUnitKerningRule(188),
+      "ō": getGridUnitKerningRule(188),
+      "ő": getGridUnitKerningRule(188),
       "i": getGridUnitKerningRule(76),
+      "ì": getGridUnitKerningRule(76),
+      "í": getGridUnitKerningRule(76),
+      "î": getGridUnitKerningRule(76),
+      "ï": getGridUnitKerningRule(76),
+      "ī": getGridUnitKerningRule(76),
+      "į": getGridUnitKerningRule(76),
       "e": getGridUnitKerningRule(188),
+      "è": getGridUnitKerningRule(188),
+      "é": getGridUnitKerningRule(188),
+      "ê": getGridUnitKerningRule(188),
+      "ë": getGridUnitKerningRule(188),
+      "ē": getGridUnitKerningRule(188),
+      "ė": getGridUnitKerningRule(188),
+      "ę": getGridUnitKerningRule(188),
       "a": getGridUnitKerningRule(152),
+      "à": getGridUnitKerningRule(152),
+      "á": getGridUnitKerningRule(152),
+      "â": getGridUnitKerningRule(152),
+      "ã": getGridUnitKerningRule(152),
+      "ä": getGridUnitKerningRule(152),
+      "å": getGridUnitKerningRule(152),
+      "ā": getGridUnitKerningRule(152),
+      "ą": getGridUnitKerningRule(152),
+      "æ": getGridUnitKerningRule(152),
       "A": getGridUnitKerningRule(152),
+      "À": getGridUnitKerningRule(152),
+      "Á": getGridUnitKerningRule(152),
+      "Â": getGridUnitKerningRule(152),
+      "Ã": getGridUnitKerningRule(152),
+      "Ä": getGridUnitKerningRule(152),
       "Å": getGridUnitKerningRule(152),
-      "Ä": getGridUnitKerningRule(152)
+      "Ā": getGridUnitKerningRule(152),
+      "Ą": getGridUnitKerningRule(152),
+      "Æ": getGridUnitKerningRule(152)
     }
   },
   'XZ': {
@@ -472,6 +658,1169 @@ const alphabetData = {
     get width() { return getGridUnitWidth(1593); },
     height: 16.05,
     glyph: "Ö"
+  },
+  // Kerning inherited from 'A'
+  'XÀ': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382zM2.1067,11.7022l-0.8708,-0.6096v-0.0815h0.5815l0.6096,0.6348v0.0562h-0.3202z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "À",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  // Kerning inherited from 'A'
+  'XÁ': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382zM1.5365,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Á",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  // Kerning inherited from 'A'
+  'XÂ': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382zM2.8483,11.6461v0.0562h-0.2949l-0.6152,-0.3904h-0.0056l-0.6517,0.3904h-0.2921v-0.0562l0.6573,-0.6742h0.573z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Â",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  // Kerning inherited from 'A'
+  'XÃ': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382zM2.3652,11.7022q-0.118,0,-0.236,-0.052t-0.2275,-0.1152t-0.2093,-0.1152t-0.1868,-0.052q-0.1545,0,-0.2303,0.0871t-0.1011,0.2472h-0.2556q0.0309,-0.2865,0.0983,-0.434t0.1812,-0.2331t0.2907,-0.0857q0.1236,0,0.2416,0.052t0.2275,0.1152t0.2065,0.1152t0.1812,0.052q0.2809,0,0.3287,-0.3343h0.2584q-0.0478,0.4157,-0.1882,0.5843t-0.3792,0.1685z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ã",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  // Kerning inherited from 'A'
+  'XÆ': {
+    getPath: () => `M2.7219,16v-1.1573h-1.5393l-0.5562,1.1573h-0.559l1.927,-3.9579h3.3961v0.4382h-2.132v1.2697h1.9635v0.4326h-1.9635v1.3792h2.2472v0.4382h-2.7837zM2.7219,12.4551h-0.4242l-0.0787,0.177l-0.8399,1.7921h1.3427v-1.9691z`,
+    get width() { return getGridUnitWidth(2048); },
+    height: 16,
+    glyph: "Æ",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  'XÇ': {
+    getPath: () => `M2.2247,12.4213q-0.6573,0,-1.0225,0.4228t-0.3652,1.1587q0,0.7275,0.3806,1.1699t1.0295,0.4424q0.8315,0,1.25,-0.823l0.4382,0.2191q-0.2444,0.5112,-0.6868,0.7781t-1.0267,0.2669q-0.5983,0,-1.0351,-0.2486t-0.6657,-0.7107t-0.2289,-1.0941q0,-0.9466,0.5112,-1.4831t1.4157,-0.5365q0.632,0,1.0562,0.2472t0.6236,0.7331l-0.5084,0.1685q-0.1376,-0.3455,-0.4424,-0.5281t-0.7233,-0.1826zM2.7893,16.7107q0,0.5084,-0.7697,0.5084q-0.1601,0,-0.2528,-0.0112v-0.2753q0.1376,0.0169,0.2416,0.0169q0.4129,0,0.4129,-0.2275q0,-0.2163,-0.3736,-0.2163q-0.1208,0,-0.1601,0.0056l0.1826,-0.5112h0.3006l-0.1096,0.2809q0.264,0.0084,0.3961,0.1222t0.132,0.3076z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ç"
+  },
+  'XÈ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM2.0646,11.7022l-0.8708,-0.6096v-0.0815h0.5815l0.6096,0.6348v0.0562h-0.3202z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "È"
+  },
+  'XÉ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM1.5478,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "É"
+  },
+  'XÊ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM2.9129,11.6461v0.0562h-0.2949l-0.6152,-0.3904h-0.0056l-0.6517,0.3904h-0.2921v-0.0562l0.6573,-0.6742h0.573z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ê"
+  },
+  'XË': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM2.2921,11.7022v-0.5169h0.4579v0.5169h-0.4579zM1.1854,11.7022v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ë"
+  },
+  'XÌ': {
+    getPath: () => `M0.5309,16v-3.9579h0.5365v3.9579h-0.5365zM0.8961,11.7022l-0.8708,-0.6096v-0.0815h0.5815l0.6096,0.6348v0.0562h-0.3202z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "Ì"
+  },
+  'XÍ': {
+    getPath: () => `M0.5309,16v-3.9579h0.5365v3.9579h-0.5365zM0.3989,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "Í"
+  },
+  'XÎ': {
+    getPath: () => `M0.5309,16v-3.9579h0.5365v3.9579h-0.5365zM1.7303,11.6461v0.0562h-0.2949l-0.6152,-0.3904h-0.0056l-0.6517,0.3904h-0.2921v-0.0562l0.6573,-0.6742h0.573z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "Î"
+  },
+  'XÏ': {
+    getPath: () => `M0.5309,16v-3.9579h0.5365v3.9579h-0.5365zM1.1264,11.7022v-0.5169h0.4579v0.5169h-0.4579zM0.0197,11.7022v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "Ï"
+  },
+  'XÐ': {
+    getPath: () => `M0.0393,13.75h0.4326v-1.7079h1.309q1.0056,0,1.552,0.5042t0.5463,1.434q0,0.6124,-0.2388,1.0716t-0.677,0.7037t-1.0112,0.2444h-1.4803v-1.8174h-0.4326v-0.4326zM3.3399,13.9803q0,-0.736,-0.4031,-1.1222t-1.1671,-0.3862h-0.7612v1.2781h1.1404v0.4326h-1.1404v1.3876h0.882q0.4354,0,0.7654,-0.191t0.507,-0.5506t0.177,-0.8483z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ð"
+  },
+  'XÑ': {
+    getPath: () => `M3.0393,16l-2.118,-3.3708l0.014,0.2725l0.014,0.4691v2.6292h-0.4775v-3.9579h0.6236l2.1404,3.3933q-0.0337,-0.5506,-0.0337,-0.7978v-2.5955h0.4831v3.9579h-0.6461zM2.5534,11.7022q-0.118,0,-0.236,-0.052t-0.2275,-0.1152t-0.2093,-0.1152t-0.1868,-0.052q-0.1545,0,-0.2303,0.0871t-0.1011,0.2472h-0.2556q0.0309,-0.2865,0.0983,-0.434t0.1812,-0.2331t0.2907,-0.0857q0.1236,0,0.2416,0.052t0.2275,0.1152t0.2065,0.1152t0.1812,0.052q0.2809,0,0.3287,-0.3343h0.2584q-0.0478,0.4157,-0.1882,0.5843t-0.3792,0.1685z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ñ"
+  },
+  'XÒ': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.6096,0,-1.052,-0.2472t-0.6756,-0.7149t-0.2331,-1.0913q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6039,0,1.0478,0.2402t0.6784,0.698t0.2346,1.0815zM3.6517,14.0028q0,-0.7388,-0.3694,-1.1601t-1.0435,-0.4213q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657q0,0.7444,0.375,1.1812t1.0407,0.4368q0.6854,0,1.052,-0.4228t0.3666,-1.1952zM2.3989,11.7022l-0.8708,-0.6096v-0.0815h0.5815l0.6096,0.6348v0.0562h-0.3202z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Ò"
+  },
+  'XÓ': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.6096,0,-1.052,-0.2472t-0.6756,-0.7149t-0.2331,-1.0913q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6039,0,1.0478,0.2402t0.6784,0.698t0.2346,1.0815zM3.6517,14.0028q0,-0.7388,-0.3694,-1.1601t-1.0435,-0.4213q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657q0,0.7444,0.375,1.1812t1.0407,0.4368q0.6854,0,1.052,-0.4228t0.3666,-1.1952zM1.7444,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Ó"
+  },
+  'XÔ': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.6096,0,-1.052,-0.2472t-0.6756,-0.7149t-0.2331,-1.0913q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6039,0,1.0478,0.2402t0.6784,0.698t0.2346,1.0815zM3.6517,14.0028q0,-0.7388,-0.3694,-1.1601t-1.0435,-0.4213q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657q0,0.7444,0.375,1.1812t1.0407,0.4368q0.6854,0,1.052,-0.4228t0.3666,-1.1952zM3.177,11.6461v0.0562h-0.2949l-0.6152,-0.3904h-0.0056l-0.6517,0.3904h-0.2921v-0.0562l0.6573,-0.6742h0.573z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Ô"
+  },
+  'XÕ': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.6096,0,-1.052,-0.2472t-0.6756,-0.7149t-0.2331,-1.0913q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6039,0,1.0478,0.2402t0.6784,0.698t0.2346,1.0815zM3.6517,14.0028q0,-0.7388,-0.3694,-1.1601t-1.0435,-0.4213q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657q0,0.7444,0.375,1.1812t1.0407,0.4368q0.6854,0,1.052,-0.4228t0.3666,-1.1952zM2.6433,11.7022q-0.118,0,-0.236,-0.052t-0.2275,-0.1152t-0.2093,-0.1152t-0.1868,-0.052q-0.1545,0,-0.2303,0.0871t-0.1011,0.2472h-0.2556q0.0309,-0.2865,0.0983,-0.434t0.1812,-0.2331t0.2907,-0.0857q0.1236,0,0.2416,0.052t0.2275,0.1152t0.2065,0.1152t0.1812,0.052q0.2809,0,0.3287,-0.3343h0.2584q-0.0478,0.4157,-0.1882,0.5843t-0.3792,0.1685z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Õ"
+  },
+  'XØ': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.691,0,-1.1629,-0.3146l-0.3371,0.4073h-0.5337l0.5618,-0.677q-0.4888,-0.5393,-0.4888,-1.4691q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6938,0,1.1629,0.309l0.3399,-0.4101h0.5393l-0.5646,0.6798q0.4831,0.5337,0.4831,1.441zM3.6517,14.0028q0,-0.6292,-0.2753,-1.0337l-1.9916,2.3961q0.3427,0.2556,0.8483,0.2556q0.6854,0,1.052,-0.4228t0.3666,-1.1952zM0.8174,14.0028q0,0.6433,0.2837,1.0618l1.986,-2.3961q-0.3483,-0.2472,-0.8483,-0.2472q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Ø"
+  },
+  'XÙ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM2.2837,11.7022l-0.8708,-0.6096v-0.0815h0.5815l0.6096,0.6348v0.0562h-0.3202z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ù"
+  },
+  'XÚ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM1.5871,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ú"
+  },
+  'XÛ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM3.0056,11.6461v0.0562h-0.2949l-0.6152,-0.3904h-0.0056l-0.6517,0.3904h-0.2921v-0.0562l0.6573,-0.6742h0.573z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Û"
+  },
+  'XÜ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM2.3961,11.7022v-0.5169h0.4579v0.5169h-0.4579zM1.2893,11.7022v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ü"
+  },
+  // Kerning inherited from 'Y'
+  'XÝ': {
+    getPath: () => `M2.1826,14.3596v1.6404h-0.5337v-1.6404l-1.5225,-2.3174h0.5899l1.2051,1.8848l1.1994,-1.8848h0.5899zM1.5056,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ý",
+    kerningRules: {
+      "a": getGridUnitKerningRule(152),
+      "A": getGridUnitKerningRule(152),
+      "e": getGridUnitKerningRule(188),
+      "i": getGridUnitKerningRule(76),
+      "o": getGridUnitKerningRule(188),
+      "p": getGridUnitKerningRule(152),
+      "q": getGridUnitKerningRule(188),
+      "u": getGridUnitKerningRule(113),
+      "v": getGridUnitKerningRule(113)
+    }
+  },
+  // Kerning inherited from 'T'
+  'XÞ': {
+    getPath: () => `M3.5337,13.9354q0,0.3596,-0.1629,0.639t-0.4705,0.4354t-0.7289,0.1559h-1.1629v0.8343h-0.5365v-3.9579h0.5365v0.7079h1.1292q0.6713,0,1.0337,0.3118t0.3624,0.8736zM2.9944,13.9466q0,-0.3764,-0.2303,-0.5857t-0.691,-0.2093h-1.0646v1.618h1.0871q0.4298,0,0.6643,-0.2177t0.2346,-0.6053z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Þ",
+    kerningRules: {
+      "a": getGridUnitKerningRule(227),
+      "A": getGridUnitKerningRule(152),
+      "c": getGridUnitKerningRule(227),
+      "e": getGridUnitKerningRule(227),
+      "i": getGridUnitKerningRule(76),
+      "o": getGridUnitKerningRule(227),
+      "O": getGridUnitKerningRule(37),
+      "r": getGridUnitKerningRule(76),
+      "s": getGridUnitKerningRule(227),
+      "u": getGridUnitKerningRule(76),
+      "w": getGridUnitKerningRule(113),
+      "y": getGridUnitKerningRule(113)
+    }
+  },
+  'Xß': {
+    getPath: () => `M3.2781,15.1713q0,0.4213,-0.264,0.6531t-0.7416,0.2317q-0.4803,0,-0.7949,-0.1376l-0.0056,-0.4607q0.1461,0.0815,0.3708,0.1376t0.4185,0.0562q0.2584,0,0.3961,-0.1208t0.1376,-0.3427q0,-0.1798,-0.1194,-0.323t-0.3919,-0.3062q-0.2584,-0.1517,-0.3862,-0.3371t-0.1278,-0.427q0,-0.1713,0.0801,-0.3118t0.2317,-0.2669q0.1629,-0.1348,0.2374,-0.2528t0.0744,-0.2584q0,-0.2163,-0.1882,-0.3469t-0.4944,-0.1306q-0.4157,0,-0.611,0.2247t-0.1952,0.6798v2.868h-0.5056v-2.8848q0,-0.6376,0.3301,-0.9607t0.9817,-0.323q0.5337,0,0.8497,0.2261t0.316,0.6081q0,0.4017,-0.3174,0.691q-0.2219,0.2022,-0.2697,0.2711t-0.0478,0.1503q0,0.1067,0.0772,0.1896t0.1924,0.1629t0.25,0.1699q0.5169,0.3483,0.5169,0.8708z`,
+    get width() { return getGridUnitWidth(1251); },
+    height: 16,
+    glyph: "ß"
+  },
+  'Xà': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348zM1.7528,12.6264l-0.927,-0.7809v-0.0815h0.5815l0.6096,0.8062v0.0562h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "à"
+  },
+  'Xá': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348zM1.1573,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "á"
+  },
+  'Xâ': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348zM2.4719,12.5702v0.0562h-0.2949l-0.6152,-0.4747h-0.0056l-0.6517,0.4747h-0.2921v-0.0562l0.6573,-0.7584h0.573z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "â"
+  },
+  'Xã': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348zM2.0702,12.6264q-0.118,0,-0.236,-0.052t-0.2275,-0.1152t-0.2093,-0.1152t-0.1868,-0.052q-0.1545,0,-0.2303,0.0871t-0.1011,0.2472h-0.2556q0.0309,-0.2865,0.0983,-0.434t0.1812,-0.2331t0.2907,-0.0857q0.1236,0,0.2416,0.052t0.2275,0.1152t0.2065,0.1152t0.1812,0.052q0.2809,0,0.3287,-0.3343h0.2584q-0.0478,0.4157,-0.1882,0.5843t-0.3792,0.1685z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ã"
+  },
+  'Xæ': {
+    getPath: () => `M2.7191,14.5871v0.0478q0.0056,0.5084,0.2163,0.7753t0.6039,0.2669q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.9017,0,-1.1882,-0.7219q-0.2219,0.3933,-0.5169,0.5576t-0.7051,0.1643q-0.4691,0,-0.7065,-0.2416t-0.2374,-0.6629q0,-0.4888,0.3343,-0.736t1.014,-0.2584l0.6742,-0.0112v-0.1657q0,-0.3792,-0.1559,-0.5351t-0.4958,-0.1559q-0.3539,0,-0.5126,0.1124t-0.1952,0.3708l-0.5281,-0.0478q0.1292,-0.8202,1.2472,-0.8202q0.7022,0,0.9803,0.3904q0.3315,-0.3904,0.9719,-0.3904q1.3399,0,1.3399,1.6152v0.0674h-2.1404zM2.2079,14.5l-0.5478,0.0112q-0.3736,0.0084,-0.5716,0.0829t-0.2907,0.2163t-0.0927,0.3497q0,0.2444,0.1404,0.3806t0.4017,0.1362q0.2865,0,0.5014,-0.125t0.3371,-0.3427t0.1222,-0.4593v-0.25zM4.3371,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.3567,0,-0.5632,0.2402t-0.2233,0.6812h1.6124z`,
+    get width() { return getGridUnitWidth(1821); },
+    height: 16,
+    glyph: "æ"
+  },
+  'Xç': {
+    getPath: () => `M0.7725,14.4663q0,0.6067,0.191,0.8989t0.5758,0.2921q0.2697,0,0.4508,-0.1461t0.2233,-0.4494l0.5112,0.0337q-0.059,0.4382,-0.3736,0.6994t-0.7978,0.2612q-0.6376,0,-0.9733,-0.4031t-0.3357,-1.1756q0,-0.7669,0.3371,-1.1699t0.9663,-0.4031q0.4663,0,0.7739,0.2416t0.3862,0.6657l-0.5197,0.0393q-0.0393,-0.2528,-0.1994,-0.4017t-0.4551,-0.1489q-0.4017,0,-0.5815,0.2669t-0.1798,0.8989zM2.1096,16.7107q0,0.5084,-0.7697,0.5084q-0.1601,0,-0.2528,-0.0112v-0.2753q0.1376,0.0169,0.2416,0.0169q0.4129,0,0.4129,-0.2275q0,-0.2163,-0.3736,-0.2163q-0.1208,0,-0.1601,0.0056l0.1826,-0.5112h0.3006l-0.1096,0.2809q0.264,0.0084,0.3961,0.1222t0.132,0.3076z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ç"
+  },
+  'Xè': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM1.8455,12.6264l-0.927,-0.7809v-0.0815h0.5815l0.6096,0.8062v0.0562h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "è"
+  },
+  'Xé': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM1.236,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "é"
+  },
+  'Xê': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM2.5478,12.5702v0.0562h-0.2949l-0.6152,-0.4747h-0.0056l-0.6517,0.4747h-0.2921v-0.0562l0.6573,-0.7584h0.573z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ê"
+  },
+  'Xë': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM1.9298,12.5758v-0.5169h0.4579v0.5169h-0.4579zM0.823,12.5758v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ë"
+  },
+  'Xì': {
+    getPath: () => `M0.5449,16v-3.0393h0.5056v3.0393h-0.5056zM0.9551,12.6264l-0.927,-0.7809v-0.0815h0.5815l0.6096,0.8062v0.0562h-0.264z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "ì"
+  },
+  'Xí': {
+    getPath: () => `M0.5449,16v-3.0393h0.5056v3.0393h-0.5056zM0.3792,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "í"
+  },
+  'Xî': {
+    getPath: () => `M0.5449,16v-3.0393h0.5056v3.0393h-0.5056zM1.7331,12.5702v0.0562h-0.2949l-0.6152,-0.4747h-0.0056l-0.6517,0.4747h-0.2921v-0.0562l0.6573,-0.7584h0.573z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "î"
+  },
+  'Xï': {
+    getPath: () => `M0.5449,16v-3.0393h0.5056v3.0393h-0.5056zM1.1292,12.5758v-0.5169h0.4579v0.5169h-0.4579zM0.0225,12.5758v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "ï"
+  },
+  'Xð': {
+    getPath: () => `M1.5899,16.0562q-0.6517,0,-1,-0.3624t-0.3483,-1.0449q0,-0.6854,0.3483,-1.0421t1.0197,-0.3567q0.3848,0,0.6489,0.1657q-0.3062,-0.6096,-0.6573,-0.9298l-0.8455,0.3736v-0.3202l0.6124,-0.264q-0.3062,-0.2444,-0.6798,-0.4438h0.5871q0.2247,0.1011,0.4775,0.2865l0.8596,-0.3708l-0.0028,0.3146l-0.5927,0.2584q0.4803,0.4382,0.7247,1.0084t0.2444,1.2219v0.0169q0,0.7331,-0.3497,1.111t-1.0463,0.3778zM2.4551,14.6489q0,-0.5393,-0.198,-0.7823t-0.6362,-0.243q-0.441,0,-0.6447,0.2444t-0.2037,0.7809q0,0.5337,0.2022,0.7837t0.6096,0.25q0.4522,0,0.6615,-0.2458t0.2093,-0.7879z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ð"
+  },
+  'Xñ': {
+    getPath: () => `M2.3287,16v-1.927q0,-0.3006,-0.059,-0.4663t-0.1882,-0.2388t-0.3792,-0.073q-0.3652,0,-0.5758,0.25t-0.2107,0.6938v1.7612h-0.5056v-2.3904q0,-0.5309,-0.0169,-0.6489h0.4775q0.0028,0.014,0.0056,0.0758t0.007,0.1419t0.0098,0.302h0.0084q0.1742,-0.3146,0.4031,-0.4452t0.5688,-0.1306q0.5,0,0.7317,0.2486t0.2317,0.8216v2.0253h-0.5084zM2.0702,12.6264q-0.118,0,-0.236,-0.052t-0.2275,-0.1152t-0.2093,-0.1152t-0.1868,-0.052q-0.1545,0,-0.2303,0.0871t-0.1011,0.2472h-0.2556q0.0309,-0.2865,0.0983,-0.434t0.1812,-0.2331t0.2907,-0.0857q0.1236,0,0.2416,0.052t0.2275,0.1152t0.2065,0.1152t0.1812,0.052q0.2809,0,0.3287,-0.3343h0.2584q-0.0478,0.4157,-0.1882,0.5843t-0.3792,0.1685z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ñ"
+  },
+  'Xò': {
+    getPath: () => `M2.9579,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.6657,0,-1.0056,-0.4059t-0.3399,-1.1728q0,-1.573,1.3624,-1.573q0.6966,0,1.0253,0.3834t0.3287,1.1896zM2.427,14.4775q0,-0.6292,-0.1868,-0.9143t-0.6278,-0.2851q-0.4438,0,-0.6419,0.2907t-0.198,0.9087q0,0.6011,0.1952,0.9031t0.6138,0.302q0.4551,0,0.6503,-0.2921t0.1952,-0.9129zM1.8511,12.6264l-0.927,-0.7809v-0.0815h0.5815l0.6096,0.8062v0.0562h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ò"
+  },
+  'Xó': {
+    getPath: () => `M2.9579,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.6657,0,-1.0056,-0.4059t-0.3399,-1.1728q0,-1.573,1.3624,-1.573q0.6966,0,1.0253,0.3834t0.3287,1.1896zM2.427,14.4775q0,-0.6292,-0.1868,-0.9143t-0.6278,-0.2851q-0.4438,0,-0.6419,0.2907t-0.198,0.9087q0,0.6011,0.1952,0.9031t0.6138,0.302q0.4551,0,0.6503,-0.2921t0.1952,-0.9129zM1.2107,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ó"
+  },
+  'Xô': {
+    getPath: () => `M2.9579,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.6657,0,-1.0056,-0.4059t-0.3399,-1.1728q0,-1.573,1.3624,-1.573q0.6966,0,1.0253,0.3834t0.3287,1.1896zM2.427,14.4775q0,-0.6292,-0.1868,-0.9143t-0.6278,-0.2851q-0.4438,0,-0.6419,0.2907t-0.198,0.9087q0,0.6011,0.1952,0.9031t0.6138,0.302q0.4551,0,0.6503,-0.2921t0.1952,-0.9129zM2.5337,12.5702v0.0562h-0.2949l-0.6152,-0.4747h-0.0056l-0.6517,0.4747h-0.2921v-0.0562l0.6573,-0.7584h0.573z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ô"
+  },
+  'Xõ': {
+    getPath: () => `M2.9579,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.6657,0,-1.0056,-0.4059t-0.3399,-1.1728q0,-1.573,1.3624,-1.573q0.6966,0,1.0253,0.3834t0.3287,1.1896zM2.427,14.4775q0,-0.6292,-0.1868,-0.9143t-0.6278,-0.2851q-0.4438,0,-0.6419,0.2907t-0.198,0.9087q0,0.6011,0.1952,0.9031t0.6138,0.302q0.4551,0,0.6503,-0.2921t0.1952,-0.9129zM2.0758,12.6264q-0.118,0,-0.236,-0.052t-0.2275,-0.1152t-0.2093,-0.1152t-0.1868,-0.052q-0.1545,0,-0.2303,0.0871t-0.1011,0.2472h-0.2556q0.0309,-0.2865,0.0983,-0.434t0.1812,-0.2331t0.2907,-0.0857q0.1236,0,0.2416,0.052t0.2275,0.1152t0.2065,0.1152t0.1812,0.052q0.2809,0,0.3287,-0.3343h0.2584q-0.0478,0.4157,-0.1882,0.5843t-0.3792,0.1685z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "õ"
+  },
+  'Xø': {
+    getPath: () => `M3.1236,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.5478,0,-0.8792,-0.2753l-0.2809,0.3258h-0.4691l0.5169,-0.6011q-0.2331,-0.3876,-0.2331,-1.0281q0,-1.573,1.3624,-1.573q0.5646,0,0.8876,0.2556l0.2556,-0.2949h0.4691l-0.486,0.5646q0.2275,0.3736,0.2275,1.0478zM2.5927,14.4775q0,-0.3624,-0.0646,-0.6208l-1.3567,1.5787q0.191,0.2472,0.5758,0.2472q0.4551,0,0.6503,-0.2921t0.1952,-0.9129zM0.9382,14.4775q0,0.3652,0.0674,0.6039l1.3539,-1.5758q-0.1882,-0.2275,-0.5815,-0.2275q-0.4438,0,-0.6419,0.2907t-0.198,0.9087z`,
+    get width() { return getGridUnitWidth(1251); },
+    height: 16,
+    glyph: "ø"
+  },
+  'Xù': {
+    getPath: () => `M0.8989,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM1.8876,12.6264l-0.927,-0.7809v-0.0815h0.5815l0.6096,0.8062v0.0562h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ù"
+  },
+  'Xú': {
+    getPath: () => `M0.8989,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM1.1657,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ú"
+  },
+  'Xû': {
+    getPath: () => `M0.8989,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM2.5309,12.5702v0.0562h-0.2949l-0.6152,-0.4747h-0.0056l-0.6517,0.4747h-0.2921v-0.0562l0.6573,-0.7584h0.573z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "û"
+  },
+  'Xü': {
+    getPath: () => `M0.8989,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM1.8989,12.5758v-0.5169h0.4579v0.5169h-0.4579zM0.7921,12.5758v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ü"
+  },
+  'Xý': {
+    getPath: () => `M0.5365,17.1938q-0.2079,0,-0.3483,-0.0309v-0.3792q0.1067,0.0169,0.236,0.0169q0.4719,0,0.7472,-0.6938l0.0478,-0.1208l-1.2051,-3.0253h0.5393l0.6404,1.6798q0.014,0.0393,0.0337,0.0941t0.1264,0.3666t0.1152,0.3483l0.1966,-0.5534l0.6657,-1.9354h0.5337l-1.1685,3.0393q-0.1882,0.486,-0.3511,0.7233t-0.361,0.3539t-0.448,0.1166zM0.9972,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ý"
+  },
+  'Xþ': {
+    getPath: () => `M0.3876,11.8315h0.5056v1.1882q0,0.1826,-0.0112,0.4298h0.0169q0.1348,-0.2809,0.3567,-0.4115t0.5843,-0.1306q0.5618,0,0.8399,0.3764t0.2781,1.1826q0,1.5899,-1.118,1.5899q-0.7022,0,-0.9438,-0.5281h-0.014q0.0112,0.0225,0.0112,0.4775v1.1882h-0.5056v-5.3624zM2.427,14.4775q0,-0.6348,-0.1713,-0.9073t-0.5449,-0.2725q-0.3006,0,-0.4705,0.1264t-0.2584,0.3947t-0.0885,0.698q0,0.5983,0.191,0.882t0.6208,0.2837q0.3764,0,0.5492,-0.2767t0.1728,-0.9284z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "þ"
+  },
+  'Xÿ': {
+    getPath: () => `M0.5365,17.1938q-0.2079,0,-0.3483,-0.0309v-0.3792q0.1067,0.0169,0.236,0.0169q0.4719,0,0.7472,-0.6938l0.0478,-0.1208l-1.2051,-3.0253h0.5393l0.6404,1.6798q0.014,0.0393,0.0337,0.0941t0.1264,0.3666t0.1152,0.3483l0.1966,-0.5534l0.6657,-1.9354h0.5337l-1.1685,3.0393q-0.1882,0.486,-0.3511,0.7233t-0.361,0.3539t-0.448,0.1166zM1.7584,12.5758v-0.5169h0.4579v0.5169h-0.4579zM0.6517,12.5758v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ÿ"
+  },
+  // Kerning inherited from 'A'
+  'XĀ': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382zM2.6966,11.6039h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ā",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  'Xā': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348zM2.3399,12.5281h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ā"
+  },
+  // Kerning inherited from 'A'
+  'XĄ': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382zM3.8736,17.0927q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ą",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "v": getGridUnitKerningRule(37),
+      "V": getGridUnitKerningRule(152),
+      "w": getGridUnitKerningRule(37),
+      "W": getGridUnitKerningRule(76),
+      "y": getGridUnitKerningRule(37),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  'Xą': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348zM3.1994,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ą"
+  },
+  'XĆ': {
+    getPath: () => `M2.2247,12.4213q-0.6573,0,-1.0225,0.4228t-0.3652,1.1587q0,0.7275,0.3806,1.1699t1.0295,0.4424q0.8315,0,1.25,-0.823l0.4382,0.2191q-0.2444,0.5112,-0.6868,0.7781t-1.0267,0.2669q-0.5983,0,-1.0351,-0.2486t-0.6657,-0.7107t-0.2289,-1.0941q0,-0.9466,0.5112,-1.4831t1.4157,-0.5365q0.632,0,1.0562,0.2472t0.6236,0.7331l-0.5084,0.1685q-0.1376,-0.3455,-0.4424,-0.5281t-0.7233,-0.1826zM1.8736,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ć"
+  },
+  'Xć': {
+    getPath: () => `M0.7725,14.4663q0,0.6067,0.191,0.8989t0.5758,0.2921q0.2697,0,0.4508,-0.1461t0.2233,-0.4494l0.5112,0.0337q-0.059,0.4382,-0.3736,0.6994t-0.7978,0.2612q-0.6376,0,-0.9733,-0.4031t-0.3357,-1.1756q0,-0.7669,0.3371,-1.1699t0.9663,-0.4031q0.4663,0,0.7739,0.2416t0.3862,0.6657l-0.5197,0.0393q-0.0393,-0.2528,-0.1994,-0.4017t-0.4551,-0.1489q-0.4017,0,-0.5815,0.2669t-0.1798,0.8989zM1.2107,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ć"
+  },
+  'XČ': {
+    getPath: () => `M2.2247,12.4213q-0.6573,0,-1.0225,0.4228t-0.3652,1.1587q0,0.7275,0.3806,1.1699t1.0295,0.4424q0.8315,0,1.25,-0.823l0.4382,0.2191q-0.2444,0.5112,-0.6868,0.7781t-1.0267,0.2669q-0.5983,0,-1.0351,-0.2486t-0.6657,-0.7107t-0.2289,-1.0941q0,-0.9466,0.5112,-1.4831t1.4157,-0.5365q0.632,0,1.0562,0.2472t0.6236,0.7331l-0.5084,0.1685q-0.1376,-0.3455,-0.4424,-0.5281t-0.7233,-0.1826zM2.5225,11.7022h-0.573l-0.6573,-0.6713v-0.059h0.2921l0.6517,0.3904h0.0056l0.6152,-0.3904h0.2949v0.059z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Č"
+  },
+  'Xč': {
+    getPath: () => `M0.7725,14.4663q0,0.6067,0.191,0.8989t0.5758,0.2921q0.2697,0,0.4508,-0.1461t0.2233,-0.4494l0.5112,0.0337q-0.059,0.4382,-0.3736,0.6994t-0.7978,0.2612q-0.6376,0,-0.9733,-0.4031t-0.3357,-1.1756q0,-0.7669,0.3371,-1.1699t0.9663,-0.4031q0.4663,0,0.7739,0.2416t0.3862,0.6657l-0.5197,0.0393q-0.0393,-0.2528,-0.1994,-0.4017t-0.4551,-0.1489q-0.4017,0,-0.5815,0.2669t-0.1798,0.8989zM1.8315,12.6264h-0.573l-0.6573,-0.7584v-0.0562h0.2921l0.6517,0.4747h0.0056l0.6152,-0.4747h0.2949v0.0562z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "č"
+  },
+  'XĒ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM2.7472,11.6039h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ē"
+  },
+  'Xē': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM2.3736,12.5281h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ē"
+  },
+  'XĖ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM1.7219,11.4916v-0.4831h0.5056v0.4831h-0.5056z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ė"
+  },
+  'Xė': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM1.3483,12.3146v-0.4831h0.5056v0.4831h-0.5056z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ė"
+  },
+  'XĘ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM3.5899,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ę"
+  },
+  'Xę': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM2.2781,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ę"
+  },
+  'XĢ': {
+    getPath: () => `M0.2893,14.0028q0,-0.9635,0.5169,-1.4916t1.4522,-0.5281q0.6573,0,1.0674,0.2219t0.632,0.7107l-0.5112,0.1517q-0.1685,-0.3371,-0.4649,-0.4916t-0.7374,-0.1545q-0.6854,0,-1.0478,0.4143t-0.3624,1.1671q0,0.75,0.3848,1.184t1.0646,0.434q0.3876,0,0.7233,-0.118t0.5435,-0.3202v-0.7135h-1.1826v-0.4494h1.677v1.3652q-0.3146,0.3202,-0.7711,0.4958t-0.9902,0.1756q-0.6208,0,-1.0702,-0.2472t-0.6868,-0.7121t-0.2374,-1.0941zM2.5787,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Ģ"
+  },
+  'Xģ': {
+    getPath: () => `M1.5393,17.1938q-0.4972,0,-0.7921,-0.1952t-0.3792,-0.5548l0.5084,-0.073q0.0506,0.2107,0.2233,0.3244t0.4537,0.1138q0.7556,0,0.7556,-0.8848v-0.4888h-0.0056q-0.1433,0.2921,-0.3933,0.4396t-0.5843,0.1475q-0.559,0,-0.8216,-0.3708t-0.2626,-1.1657q0,-0.8062,0.2823,-1.1896t0.8581,-0.3834q0.323,0,0.5604,0.1475t0.3666,0.4199h0.0056q0,-0.0843,0.0112,-0.2921t0.0225,-0.2275h0.4803q-0.0169,0.1517,-0.0169,0.6292v2.323q0,1.2809,-1.2725,1.2809zM2.309,14.4803q0,-0.3708,-0.1011,-0.639t-0.2851,-0.4101t-0.4171,-0.1419q-0.3876,0,-0.5646,0.2809t-0.177,0.9101q0,0.6236,0.1657,0.8961t0.5674,0.2725q0.2388,0,0.4242,-0.1404t0.2865,-0.4031t0.1011,-0.625zM1.2416,12.3006q0,-0.2444,0.0618,-0.4087t0.1742,-0.2963h0.3287q-0.264,0.2809,-0.264,0.5337h0.2472v0.4691h-0.5478v-0.2978z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ģ"
+  },
+  'XĪ': {
+    getPath: () => `M0.5309,16v-3.9579h0.5365v3.9579h-0.5365zM1.5758,11.6039h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "Ī"
+  },
+  'Xī': {
+    getPath: () => `M0.5449,16v-3.0393h0.5056v3.0393h-0.5056zM1.5758,12.5281h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "ī"
+  },
+  'XĮ': {
+    getPath: () => `M0.5309,16v-3.9579h0.5365v3.9579h-0.5365zM1.2416,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(569); },
+    height: 16,
+    glyph: "Į"
+  },
+  'Xį': {
+    getPath: () => `M0.3848,12.3146v-0.4831h0.5056v0.4831h-0.5056zM0.3848,16v-3.0393h0.5056v3.0393h-0.5056zM1.0702,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(455); },
+    height: 16,
+    glyph: "į"
+  },
+  'XĶ': {
+    getPath: () => `M3.1067,16l-1.5815,-1.9101l-0.5169,0.3933v1.5169h-0.5365v-3.9579h0.5365v1.9831l1.9073,-1.9831h0.632l-1.6854,1.7191l1.9101,2.2388h-0.6657zM2.2612,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ķ"
+  },
+  'Xķ': {
+    getPath: () => `M2.2921,16l-1.0281,-1.3876l-0.3708,0.3062v1.0815h-0.5056v-4.1685h0.5056v2.6039l1.3343,-1.4747h0.5927l-1.2331,1.3062l1.2978,1.7331h-0.5927zM1.8596,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ķ"
+  },
+  // Kerning inherited from 'L'
+  'XĻ': {
+    getPath: () => `M0.4719,16v-3.9579h0.5365v3.5197h2v0.4382h-2.5365zM2.014,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "Ļ",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "V": getGridUnitKerningRule(152),
+      "W": getGridUnitKerningRule(152),
+      "y": getGridUnitKerningRule(76),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  'Xļ': {
+    getPath: () => `M0.3876,16v-4.1685h0.5056v4.1685h-0.5056zM0.9185,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(455); },
+    height: 16,
+    glyph: "ļ"
+  },
+  // Kerning inherited from 'L'
+  'XŁ': {
+    getPath: () => `M1.7303,13.7612l-0.7219,0.4185v1.382h2v0.4382h-2.5365v-1.5112l-0.4157,0.2388v-0.4438l0.4157,-0.2388v-2.0028h0.5365v1.6938l0.7219,-0.4157v0.441z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "Ł",
+    kerningRules: {
+      "T": getGridUnitKerningRule(152),
+      "V": getGridUnitKerningRule(152),
+      "W": getGridUnitKerningRule(152),
+      "y": getGridUnitKerningRule(76),
+      "Y": getGridUnitKerningRule(152)
+    }
+  },
+  'Xł': {
+    getPath: () => `M0.3876,16v-1.5225l-0.3427,0.191v-0.4438l0.3427,-0.191v-2.2022h0.5056v1.9101l0.3483,-0.2022v0.4466l-0.3483,0.1994v1.8146h-0.5056z`,
+    get width() { return getGridUnitWidth(455); },
+    height: 16,
+    glyph: "ł"
+  },
+  'XŃ': {
+    getPath: () => `M3.0393,16l-2.118,-3.3708l0.014,0.2725l0.014,0.4691v2.6292h-0.4775v-3.9579h0.6236l2.1404,3.3933q-0.0337,-0.5506,-0.0337,-0.7978v-2.5955h0.4831v3.9579h-0.6461zM1.6882,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ń"
+  },
+  'Xń': {
+    getPath: () => `M2.3287,16v-1.927q0,-0.3006,-0.059,-0.4663t-0.1882,-0.2388t-0.3792,-0.073q-0.3652,0,-0.5758,0.25t-0.2107,0.6938v1.7612h-0.5056v-2.3904q0,-0.5309,-0.0169,-0.6489h0.4775q0.0028,0.014,0.0056,0.0758t0.007,0.1419t0.0098,0.302h0.0084q0.1742,-0.3146,0.4031,-0.4452t0.5688,-0.1306q0.5,0,0.7317,0.2486t0.2317,0.8216v2.0253h-0.5084zM1.2921,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ń"
+  },
+  'XŅ': {
+    getPath: () => `M3.0393,16l-2.118,-3.3708l0.014,0.2725l0.014,0.4691v2.6292h-0.4775v-3.9579h0.6236l2.1404,3.3933q-0.0337,-0.5506,-0.0337,-0.7978v-2.5955h0.4831v3.9579h-0.6461zM2.3483,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ņ"
+  },
+  'Xņ': {
+    getPath: () => `M2.3287,16v-1.927q0,-0.3006,-0.059,-0.4663t-0.1882,-0.2388t-0.3792,-0.073q-0.3652,0,-0.5758,0.25t-0.2107,0.6938v1.7612h-0.5056v-2.3904q0,-0.5309,-0.0169,-0.6489h0.4775q0.0028,0.014,0.0056,0.0758t0.007,0.1419t0.0098,0.302h0.0084q0.1742,-0.3146,0.4031,-0.4452t0.5688,-0.1306q0.5,0,0.7317,0.2486t0.2317,0.8216v2.0253h-0.5084zM1.8961,16.5421q0,0.2444,-0.0618,0.3947t-0.1742,0.2823h-0.3287q0.1264,-0.1348,0.1952,-0.2556t0.0688,-0.25h-0.2472v-0.4382h0.5478v0.2669z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ņ"
+  },
+  'XŐ': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.6096,0,-1.052,-0.2472t-0.6756,-0.7149t-0.2331,-1.0913q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6039,0,1.0478,0.2402t0.6784,0.698t0.2346,1.0815zM3.6517,14.0028q0,-0.7388,-0.3694,-1.1601t-1.0435,-0.4213q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657q0,0.7444,0.375,1.1812t1.0407,0.4368q0.6854,0,1.052,-0.4228t0.3666,-1.1952zM1.4438,11.7022v-0.0562l0.5534,-0.6376h0.5815v0.0815l-0.8708,0.6124h-0.264zM2.4185,11.7022v-0.0562l0.5534,-0.6376h0.5815v0.0815l-0.8708,0.6124h-0.264z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "Ő"
+  },
+  'Xő': {
+    getPath: () => `M2.9579,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.6657,0,-1.0056,-0.4059t-0.3399,-1.1728q0,-1.573,1.3624,-1.573q0.6966,0,1.0253,0.3834t0.3287,1.1896zM2.427,14.4775q0,-0.6292,-0.1868,-0.9143t-0.6278,-0.2851q-0.4438,0,-0.6419,0.2907t-0.198,0.9087q0,0.6011,0.1952,0.9031t0.6138,0.302q0.4551,0,0.6503,-0.2921t0.1952,-0.9129zM0.8062,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264zM1.7809,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ő"
+  },
+  'XŒ': {
+    getPath: () => `M2.8062,16q-0.1882,0.0281,-0.5899,0.0281q-0.9073,0,-1.4256,-0.5421t-0.5183,-1.4831q0,-0.9326,0.5169,-1.4621t1.4326,-0.5295q0.3006,0,0.5955,0.0309h2.5674v0.4382h-2.2556v1.2697h2.0871v0.4326h-2.0871v1.3792h2.3708v0.4382h-2.6938zM2.2163,15.5927q0.2303,0,0.3764,-0.0112v-3.1208q-0.1236,-0.0112,-0.2261,-0.0112h-0.1447q-0.6882,0,-1.0463,0.4017t-0.3581,1.1517q0,0.7528,0.3694,1.1713t1.0295,0.4185z`,
+    get width() { return getGridUnitWidth(2048); },
+    height: 16,
+    glyph: "Œ"
+  },
+  'Xœ': {
+    getPath: () => `M3.0056,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.7725,0,-1.1124,-0.514q-0.3483,0.514,-1.1264,0.514q-0.6685,0,-1.0211,-0.4059t-0.3525,-1.1728q0,-0.7837,0.3553,-1.1784t1.0351,-0.3947q0.7893,0,1.118,0.4972q0.3539,-0.4972,1.0843,-0.4972q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4747,14.4775q0,-0.6152,-0.1938,-0.9073t-0.6404,-0.2921q-0.4551,0,-0.6615,0.2992t-0.2065,0.9003q0,1.2051,0.8371,1.2051q0.4607,0,0.6629,-0.2921t0.2022,-0.9129zM4.6517,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404z`,
+    get width() { return getGridUnitWidth(1933); },
+    height: 16,
+    glyph: "œ"
+  },
+  'XŚ': {
+    getPath: () => `M3.573,14.9073q0,0.5478,-0.4284,0.8483t-1.2065,0.3006q-1.4466,0,-1.677,-1.0056l0.5197,-0.1039q0.0899,0.3567,0.382,0.5239t0.7949,0.1671q0.5197,0,0.802,-0.1784t0.2823,-0.5239q0,-0.1938,-0.0885,-0.3146t-0.2486,-0.1994t-0.382,-0.132t-0.4916,-0.1152q-0.4691,-0.1039,-0.7121,-0.2079t-0.3834,-0.2317t-0.2149,-0.2992t-0.0744,-0.3933q0,-0.5084,0.389,-0.7837t1.1138,-0.2753q0.6742,0,1.0309,0.2065t0.5,0.7037l-0.5281,0.0927q-0.0871,-0.3146,-0.3315,-0.4565t-0.677,-0.1419q-0.4747,0,-0.7247,0.1573t-0.25,0.4691q0,0.1826,0.0969,0.302t0.2795,0.2022t0.7275,0.2037q0.1826,0.0421,0.3638,0.0857t0.3469,0.1039t0.3104,0.1419t0.2514,0.1994t0.1671,0.2781t0.0604,0.3764zM1.5787,11.7022v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ś"
+  },
+  'Xś': {
+    getPath: () => `M2.6685,15.1601q0,0.4298,-0.3244,0.6629t-0.9087,0.2331q-0.5674,0,-0.875,-0.1868t-0.4003,-0.5829l0.4466,-0.0871q0.0646,0.2444,0.2669,0.3581t0.5618,0.1138q0.3848,0,0.5632,-0.118t0.1784,-0.3539q0,-0.1798,-0.1236,-0.2921t-0.3989,-0.1854l-0.3624,-0.0955q-0.4354,-0.1124,-0.6194,-0.2205t-0.2879,-0.2626t-0.1039,-0.3792q0,-0.4157,0.2963,-0.6334t0.8638,-0.2177q0.5028,0,0.7992,0.177t0.375,0.5674l-0.4551,0.0562q-0.0421,-0.2022,-0.2261,-0.3104t-0.493,-0.1081q-0.3427,0,-0.5056,0.1039t-0.1629,0.3146q0,0.1292,0.0674,0.2135t0.1994,0.1433t0.5562,0.1629q0.4017,0.1011,0.5787,0.1868t0.2795,0.1896t0.1587,0.2402t0.0562,0.3104zM1.0815,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ś"
+  },
+  'XŠ': {
+    getPath: () => `M3.573,14.9073q0,0.5478,-0.4284,0.8483t-1.2065,0.3006q-1.4466,0,-1.677,-1.0056l0.5197,-0.1039q0.0899,0.3567,0.382,0.5239t0.7949,0.1671q0.5197,0,0.802,-0.1784t0.2823,-0.5239q0,-0.1938,-0.0885,-0.3146t-0.2486,-0.1994t-0.382,-0.132t-0.4916,-0.1152q-0.4691,-0.1039,-0.7121,-0.2079t-0.3834,-0.2317t-0.2149,-0.2992t-0.0744,-0.3933q0,-0.5084,0.389,-0.7837t1.1138,-0.2753q0.6742,0,1.0309,0.2065t0.5,0.7037l-0.5281,0.0927q-0.0871,-0.3146,-0.3315,-0.4565t-0.677,-0.1419q-0.4747,0,-0.7247,0.1573t-0.25,0.4691q0,0.1826,0.0969,0.302t0.2795,0.2022t0.7275,0.2037q0.1826,0.0421,0.3638,0.0857t0.3469,0.1039t0.3104,0.1419t0.2514,0.1994t0.1671,0.2781t0.0604,0.3764zM2.2725,11.7022h-0.573l-0.6573,-0.6713v-0.059h0.2921l0.6517,0.3904h0.0056l0.6152,-0.3904h0.2949v0.059z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Š"
+  },
+  'Xš': {
+    getPath: () => `M2.6685,15.1601q0,0.4298,-0.3244,0.6629t-0.9087,0.2331q-0.5674,0,-0.875,-0.1868t-0.4003,-0.5829l0.4466,-0.0871q0.0646,0.2444,0.2669,0.3581t0.5618,0.1138q0.3848,0,0.5632,-0.118t0.1784,-0.3539q0,-0.1798,-0.1236,-0.2921t-0.3989,-0.1854l-0.3624,-0.0955q-0.4354,-0.1124,-0.6194,-0.2205t-0.2879,-0.2626t-0.1039,-0.3792q0,-0.4157,0.2963,-0.6334t0.8638,-0.2177q0.5028,0,0.7992,0.177t0.375,0.5674l-0.4551,0.0562q-0.0421,-0.2022,-0.2261,-0.3104t-0.493,-0.1081q-0.3427,0,-0.5056,0.1039t-0.1629,0.3146q0,0.1292,0.0674,0.2135t0.1994,0.1433t0.5562,0.1629q0.4017,0.1011,0.5787,0.1868t0.2795,0.1896t0.1587,0.2402t0.0562,0.3104zM1.7163,12.6264h-0.573l-0.6573,-0.7584v-0.0562h0.2921l0.6517,0.4747h0.0056l0.6152,-0.4747h0.2949v0.0562z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "š"
+  },
+  'XŪ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM2.8511,11.6039h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ū"
+  },
+  'Xū': {
+    getPath: () => `M0.882,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM2.3596,12.5281h-1.5421v-0.3567h1.5421v0.3567z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ū"
+  },
+  'XŰ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM1.25,11.7022v-0.0562l0.5534,-0.6376h0.5815v0.0815l-0.8708,0.6124h-0.264zM2.2247,11.7022v-0.0562l0.5534,-0.6376h0.5815v0.0815l-0.8708,0.6124h-0.264z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ű"
+  },
+  'Xű': {
+    getPath: () => `M0.882,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM0.7949,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264zM1.7697,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ű"
+  },
+  'XŲ': {
+    getPath: () => `M2.0534,16.0562q-0.486,0,-0.8483,-0.177t-0.5618,-0.514t-0.1994,-0.8034v-2.5197h0.5365v2.4747q0,0.5421,0.2753,0.823t0.7949,0.2809q0.5337,0,0.8301,-0.2907t0.2963,-0.8497v-2.4382h0.5337v2.4691q0,0.4803,-0.2037,0.8287t-0.5758,0.5323t-0.8778,0.184zM2.736,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Ų"
+  },
+  'Xų': {
+    getPath: () => `M0.882,12.9607v1.927q0,0.3006,0.059,0.4663t0.1882,0.2388t0.3792,0.073q0.3652,0,0.5758,-0.25t0.2107,-0.6938v-1.7612h0.5056v2.3904q0,0.5309,0.0169,0.6489h-0.4775q-0.0028,-0.014,-0.0056,-0.0758t-0.007,-0.1419t-0.0098,-0.302h-0.0084q-0.1742,0.3146,-0.4031,0.4452t-0.5688,0.1306q-0.5,0,-0.7317,-0.2486t-0.2317,-0.8216v-2.0253h0.5084zM2.8904,17.1236q-0.177,0.0758,-0.3904,0.0758q-0.2949,0,-0.4438,-0.1433t-0.1489,-0.382q0,-0.1966,0.1222,-0.382t0.3132,-0.2921h0.3736q-0.0702,0.0393,-0.1433,0.1025t-0.1334,0.1461t-0.0983,0.1812t-0.0379,0.2079q0,0.118,0.0688,0.1854t0.1952,0.0674q0.1517,0,0.323,-0.0674v0.3006z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ų"
+  },
+  // Kerning inherited from 'Y'
+  'XŸ': {
+    getPath: () => `M2.1826,14.3596v1.6404h-0.5337v-1.6404l-1.5225,-2.3174h0.5899l1.2051,1.8848l1.1994,-1.8848h0.5899zM2.2444,11.7022v-0.5169h0.4579v0.5169h-0.4579zM1.1376,11.7022v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Ÿ",
+    kerningRules: {
+      "a": getGridUnitKerningRule(152),
+      "A": getGridUnitKerningRule(152),
+      "e": getGridUnitKerningRule(188),
+      "i": getGridUnitKerningRule(76),
+      "o": getGridUnitKerningRule(188),
+      "p": getGridUnitKerningRule(152),
+      "q": getGridUnitKerningRule(188),
+      "u": getGridUnitKerningRule(113),
+      "v": getGridUnitKerningRule(113)
+    }
+  },
+  'XŹ': {
+    getPath: () => `M3.3343,16h-3.1517v-0.4017l2.4101,-3.118h-2.2051v-0.4382h2.8146v0.3904l-2.4101,3.1292h2.5421v0.4382zM1.3708,11.7022v-0.0562l0.6096,-0.6348h0.5815v0.0815l-0.8708,0.6096h-0.3202z`,
+    get width() { return getGridUnitWidth(1251); },
+    height: 16,
+    glyph: "Ź"
+  },
+  'Xź': {
+    getPath: () => `M0.2331,16v-0.3848l1.6994,-2.264h-1.6039v-0.3904h2.2022v0.3848l-1.7022,2.264h1.7612v0.3904h-2.3567zM1.0702,12.6264v-0.0562l0.6096,-0.8062h0.5815v0.0815l-0.927,0.7809h-0.264z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ź"
+  },
+  'XŻ': {
+    getPath: () => `M3.3343,16h-3.1517v-0.4017l2.4101,-3.118h-2.2051v-0.4382h2.8146v0.3904l-2.4101,3.1292h2.5421v0.4382zM1.5056,11.4916v-0.4831h0.5056v0.4831h-0.5056z`,
+    get width() { return getGridUnitWidth(1251); },
+    height: 16,
+    glyph: "Ż"
+  },
+  'Xż': {
+    getPath: () => `M0.2331,16v-0.3848l1.6994,-2.264h-1.6039v-0.3904h2.2022v0.3848l-1.7022,2.264h1.7612v0.3904h-2.3567zM1.1489,12.3146v-0.4831h0.5056v0.4831h-0.5056z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ż"
+  },
+  'XŽ': {
+    getPath: () => `M3.3343,16h-3.1517v-0.4017l2.4101,-3.118h-2.2051v-0.4382h2.8146v0.3904l-2.4101,3.1292h2.5421v0.4382zM2.1067,11.7022h-0.573l-0.6573,-0.6713v-0.059h0.2921l0.6517,0.3904h0.0056l0.6152,-0.3904h0.2949v0.059z`,
+    get width() { return getGridUnitWidth(1251); },
+    height: 16,
+    glyph: "Ž"
+  },
+  'Xž': {
+    getPath: () => `M0.2331,16v-0.3848l1.6994,-2.264h-1.6039v-0.3904h2.2022v0.3848l-1.7022,2.264h1.7612v0.3904h-2.3567zM1.6685,12.6264h-0.573l-0.6573,-0.7584v-0.0562h0.2921l0.6517,0.4747h0.0056l0.6152,-0.4747h0.2949v0.0562z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "ž"
+  },
+  'Xа': {
+    getPath: () => `M1.1629,16.0562q-0.4579,0,-0.6882,-0.2416t-0.2303,-0.6629q0,-0.4719,0.3104,-0.7247t1.0014,-0.2697l0.6826,-0.0112v-0.1657q0,-0.3708,-0.1573,-0.5309t-0.4944,-0.1601q-0.3399,0,-0.4944,0.1152t-0.1854,0.368l-0.5281,-0.0478q0.1292,-0.8202,1.2191,-0.8202q0.573,0,0.8624,0.2626t0.2893,0.7598v1.309q0,0.2247,0.059,0.3385t0.2247,0.1138q0.073,0,0.1657,-0.0197v0.3146q-0.191,0.0449,-0.3904,0.0449q-0.2809,0,-0.4087,-0.1475t-0.1447,-0.4621h-0.0169q-0.1938,0.3483,-0.4508,0.493t-0.625,0.1447zM1.2781,15.677q0.2781,0,0.4944,-0.1264t0.3413,-0.3469t0.125,-0.4537v-0.25l-0.5534,0.0112q-0.3567,0.0056,-0.5407,0.073t-0.2823,0.2079t-0.0983,0.368q0,0.2472,0.1334,0.382t0.3806,0.1348z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "а"
+  },
+  'Xб': {
+    getPath: () => `M2.5225,14.5899q0,-0.5674,-0.1854,-0.8357t-0.6039,-0.2683q-0.4466,0,-0.6559,0.2725t-0.2093,0.8315q0,0.5449,0.1952,0.8188t0.6138,0.2739q0.4522,0,0.6489,-0.2626t0.1966,-0.8301zM1.8399,13.1152q0.6236,0,0.9185,0.3666t0.2949,1.1025q0,0.7444,-0.3511,1.1081t-1.0197,0.3638q-0.691,0,-1.0183,-0.4522t-0.3272,-1.3904q0,-0.4775,0.0646,-0.8385t0.2022,-0.6222t0.3553,-0.4354t0.5478,-0.2809t1.4031,-0.2556v0.4522q-1.177,0.1517,-1.5239,0.2893t-0.4874,0.4382t-0.1517,0.8989q0.1208,-0.3511,0.4045,-0.5478t0.6882,-0.1966z`,
+    get width() { return getGridUnitWidth(1173); },
+    height: 16,
+    glyph: "б"
+  },
+  'Xв': {
+    getPath: () => `M1.5843,12.9607q0.5618,0,0.8427,0.1966t0.2809,0.5646q0,0.2612,-0.1601,0.4354t-0.4663,0.2331v0.0197q0.3624,0.0478,0.5435,0.2303t0.1812,0.4831q0,0.4129,-0.3076,0.6447t-0.8497,0.2317h-1.25v-3.0393h1.1854zM0.9045,15.6264h0.6629q0.3876,0,0.5449,-0.1194t0.1573,-0.3806q0,-0.2837,-0.1671,-0.4003t-0.5688,-0.1166h-0.6292v1.0169zM0.9045,13.3455v0.8989h0.6067q0.3596,0,0.5126,-0.1011t0.1531,-0.3539q0,-0.2303,-0.1433,-0.3371t-0.4831,-0.1067h-0.6461z`,
+    get width() { return getGridUnitWidth(1088); },
+    height: 16,
+    glyph: "в"
+  },
+  'Xг': {
+    getPath: () => `M1.9298,12.9607v0.368h-1.0253v2.6713h-0.5056v-3.0393h1.5309z`,
+    get width() { return getGridUnitWidth(747); },
+    height: 16,
+    glyph: "г"
+  },
+  'Xд': {
+    getPath: () => `M2.3427,13.3287h-0.8596q-0.1039,0.764,-0.2303,1.3301t-0.3062,0.9733h1.3961v-2.3034zM3.2584,17.1461h-0.4579v-1.1461h-2.2865v1.1461h-0.4579v-1.514h0.3343q0.2107,-0.3511,0.3652,-0.9972t0.2837,-1.6742h1.809v2.6713h0.4101v1.514z`,
+    get width() { return getGridUnitWidth(1195); },
+    height: 16,
+    glyph: "д"
+  },
+  'Xе': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "е"
+  },
+  'Xё': {
+    getPath: () => `M0.7753,14.5871q0,0.5225,0.2163,0.8062t0.632,0.2837q0.3287,0,0.5267,-0.132t0.2683,-0.3343l0.4438,0.1264q-0.2725,0.7191,-1.2388,0.7191q-0.6742,0,-1.0267,-0.4017t-0.3525,-1.1938q0,-0.7528,0.3525,-1.1545t1.007,-0.4017q1.3399,0,1.3399,1.6152v0.0674h-2.1685zM2.4213,14.1994q-0.0421,-0.4803,-0.2444,-0.7008t-0.5815,-0.2205q-0.368,0,-0.5829,0.2458t-0.2317,0.6756h1.6404zM1.9298,12.5758v-0.5169h0.4579v0.5169h-0.4579zM0.823,12.5758v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "ё"
+  },
+  'Xж': {
+    getPath: () => `M1.6713,14.6601q-0.073,0,-0.1643,-0.0169t-0.1447,-0.0393l-0.7809,1.3961h-0.5618l0.9916,-1.6629q-0.0983,-0.0815,-0.3596,-0.4635l-0.6067,-0.9129h0.5281l0.4157,0.6713q0.1854,0.2978,0.2865,0.4284t0.184,0.1812t0.2121,0.0506v-1.3315h0.5056v1.3315q0.0843,0,0.1517,-0.0225t0.1404,-0.0941t0.1657,-0.2008t0.6404,-1.014h0.5281l-0.6067,0.9129q-0.2612,0.382,-0.3596,0.4635l0.9916,1.6629h-0.5618l-0.7809,-1.3961q-0.0534,0.0225,-0.1447,0.0393t-0.1643,0.0169v1.3399h-0.5056v-1.3399z`,
+    get width() { return getGridUnitWidth(1370); },
+    height: 16,
+    glyph: "ж"
+  },
+  'Xз': {
+    getPath: () => `M1.2865,16.0562q-0.4691,0,-0.7458,-0.1756t-0.4031,-0.5379l0.4466,-0.1236q0.1489,0.4607,0.7135,0.4607q0.2697,0,0.4284,-0.132t0.1587,-0.3876q0,-0.5618,-0.9298,-0.5618v-0.3848q0.4522,0,0.6657,-0.118t0.2135,-0.3652q0,-0.2079,-0.139,-0.3287t-0.4003,-0.1208q-0.25,0,-0.4087,0.1039t-0.1924,0.3006l-0.4551,-0.0562q0.1292,-0.7247,1.059,-0.7247q0.4719,0,0.7612,0.2233t0.2893,0.5772q0,0.2837,-0.2037,0.4747t-0.493,0.2163v0.0056q0.3399,0.0365,0.5548,0.2374t0.2149,0.507q0,0.427,-0.302,0.6685t-0.8329,0.2416z`,
+    get width() { return getGridUnitWidth(939); },
+    height: 16,
+    glyph: "з"
+  },
+  'Xи': {
+    getPath: () => `M0.8876,12.9607v1.6629l-0.0281,0.7781l1.4017,-2.441h0.5534v3.0393h-0.4831v-1.8539q0,-0.1011,0.0098,-0.3062t0.0183,-0.2921l-1.4213,2.4522h-0.5393v-3.0393h0.4888z`,
+    get width() { return getGridUnitWidth(1144); },
+    height: 16,
+    glyph: "и"
+  },
+  'Xй': {
+    getPath: () => `M0.8876,12.9607v1.6629l-0.0281,0.7781l1.4017,-2.441h0.5534v3.0393h-0.4831v-1.8539q0,-0.1011,0.0098,-0.3062t0.0183,-0.2921l-1.4213,2.4522h-0.5393v-3.0393h0.4888zM1.6124,12.6292q-1,0,-1.0309,-0.8989h0.4607q0.0337,0.559,0.5702,0.559t0.5702,-0.559h0.4607q-0.0309,0.8989,-1.0309,0.8989z`,
+    get width() { return getGridUnitWidth(1144); },
+    height: 16,
+    glyph: "й"
+  },
+  'Xк': {
+    getPath: () => `M0.3876,12.9607h0.5056v1.3315q0.0843,0,0.1517,-0.0225t0.1404,-0.0941t0.1657,-0.2008t0.6404,-1.014h0.5281l-0.6067,0.9129q-0.2612,0.382,-0.3596,0.4635l0.9916,1.6629h-0.5618l-0.7809,-1.3961q-0.0534,0.0225,-0.1447,0.0393t-0.1643,0.0169v1.3399h-0.5056v-3.0393z`,
+    get width() { return getGridUnitWidth(896); },
+    height: 16,
+    glyph: "к"
+  },
+  'Xл': {
+    getPath: () => `M2.4494,16v-2.6713h-1.0534q-0.1657,1.2247,-0.2556,1.6531t-0.1938,0.6475t-0.257,0.323t-0.3947,0.1039q-0.1404,0,-0.264,-0.0365v-0.3624q0.0702,0.0253,0.191,0.0253q0.1545,0,0.2486,-0.1545t0.1713,-0.5337t0.1756,-1.1208l0.1236,-0.9129h2.0169v3.0393h-0.5084z`,
+    get width() { return getGridUnitWidth(1195); },
+    height: 16,
+    glyph: "л"
+  },
+  'Xм': {
+    getPath: () => `M2.2107,16h-0.4298l-0.9101,-2.6713q0.0169,0.4382,0.0169,0.6376v2.0337h-0.4888v-3.0393h0.7865l0.618,1.8567q0.1461,0.4017,0.191,0.8034q0.0618,-0.4522,0.191,-0.8034l0.618,-1.8567h0.7556v3.0393h-0.486v-2.0337l0.0084,-0.3202l0.014,-0.323z`,
+    get width() { return getGridUnitWidth(1408); },
+    height: 16,
+    glyph: "м"
+  },
+  'Xн': {
+    getPath: () => `M0.9045,12.9607v1.2865h1.368v-1.2865h0.5056v3.0393h-0.5056v-1.3848h-1.368v1.3848h-0.5056v-3.0393h0.5056z`,
+    get width() { return getGridUnitWidth(1131); },
+    height: 16,
+    glyph: "н"
+  },
+  'Xо': {
+    getPath: () => `M2.9579,14.4775q0,0.7978,-0.3511,1.1882t-1.0197,0.3904q-0.6657,0,-1.0056,-0.4059t-0.3399,-1.1728q0,-1.573,1.3624,-1.573q0.6966,0,1.0253,0.3834t0.3287,1.1896zM2.427,14.4775q0,-0.6292,-0.1868,-0.9143t-0.6278,-0.2851q-0.4438,0,-0.6419,0.2907t-0.198,0.9087q0,0.6011,0.1952,0.9031t0.6138,0.302q0.4551,0,0.6503,-0.2921t0.1952,-0.9129z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "о"
+  },
+  'Xп': {
+    getPath: () => `M2.7163,12.9607v3.0393h-0.5056v-2.6713h-1.3062v2.6713h-0.5056v-3.0393h2.3174z`,
+    get width() { return getGridUnitWidth(1109); },
+    height: 16,
+    glyph: "п"
+  },
+  'Xр': {
+    getPath: () => `M2.9579,14.4663q0,1.5899,-1.118,1.5899q-0.7022,0,-0.9438,-0.5281h-0.014q0.0112,0.0225,0.0112,0.4775v1.1882h-0.5056v-3.6124q0,-0.4691,-0.0169,-0.6208h0.4888q0.0028,0.0112,0.0084,0.0801t0.0126,0.2121t0.007,0.1966h0.0112q0.1348,-0.2809,0.3567,-0.4115t0.5843,-0.1306q0.5618,0,0.8399,0.3764t0.2781,1.1826zM2.427,14.4775q0,-0.6348,-0.1713,-0.9073t-0.5449,-0.2725q-0.3006,0,-0.4705,0.1264t-0.2584,0.3947t-0.0885,0.698q0,0.5983,0.191,0.882t0.6208,0.2837q0.3764,0,0.5492,-0.2767t0.1728,-0.9284z`,
+    get width() { return getGridUnitWidth(1139); },
+    height: 16,
+    glyph: "р"
+  },
+  'Xс': {
+    getPath: () => `M0.7725,14.4663q0,0.6067,0.191,0.8989t0.5758,0.2921q0.2697,0,0.4508,-0.1461t0.2233,-0.4494l0.5112,0.0337q-0.059,0.4382,-0.3736,0.6994t-0.7978,0.2612q-0.6376,0,-0.9733,-0.4031t-0.3357,-1.1756q0,-0.7669,0.3371,-1.1699t0.9663,-0.4031q0.4663,0,0.7739,0.2416t0.3862,0.6657l-0.5197,0.0393q-0.0393,-0.2528,-0.1994,-0.4017t-0.4551,-0.1489q-0.4017,0,-0.5815,0.2669t-0.1798,0.8989z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "с"
+  },
+  'Xт': {
+    getPath: () => `M0.0983,12.9607h2.4382v0.368h-0.9663v2.6713h-0.5056v-2.6713h-0.9663v-0.368z`,
+    get width() { return getGridUnitWidth(938); },
+    height: 16,
+    glyph: "т"
+  },
+  'Xу': {
+    getPath: () => `M0.5365,17.1938q-0.2079,0,-0.3483,-0.0309v-0.3792q0.1067,0.0169,0.236,0.0169q0.4719,0,0.7472,-0.6938l0.0478,-0.1208l-1.2051,-3.0253h0.5393l0.6404,1.6798q0.014,0.0393,0.0337,0.0941t0.1264,0.3666t0.1152,0.3483l0.1966,-0.5534l0.6657,-1.9354h0.5337l-1.1685,3.0393q-0.1882,0.486,-0.3511,0.7233t-0.361,0.3539t-0.448,0.1166z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "у"
+  },
+  'Xф': {
+    getPath: () => `M4.4888,14.4663q0,0.7978,-0.2598,1.1938t-0.7654,0.3961q-0.6348,0,-0.8567,-0.5281h-0.0169q0.014,0.2444,0.014,0.4775v1.1882h-0.4775v-1.1882q0,-0.3062,0.014,-0.4944h-0.014q-0.1292,0.2921,-0.3385,0.4185t-0.5211,0.1264q-0.5225,0,-0.7739,-0.3862t-0.2514,-1.1756q0,-1.5899,1.0253,-1.5899q0.3146,0,0.5239,0.1264t0.3357,0.4017h0.014l-0.014,-0.4242v-1.177h0.4775v1.1798l-0.0084,0.4382h0.014q0.1292,-0.2921,0.3315,-0.4171t0.5225,-0.125q0.514,0,0.7697,0.3834t0.2556,1.1756zM0.7725,14.4775q0,0.632,0.1531,0.9101t0.4846,0.2781q0.3652,0,0.5365,-0.2767t0.1798,-0.8778v-0.0674q0,-0.5927,-0.1671,-0.8792t-0.5435,-0.2865q-0.3399,0,-0.4916,0.2893t-0.1517,0.9101zM3.9579,14.4775q0,-0.6124,-0.1503,-0.8961t-0.4874,-0.2837q-0.264,0,-0.4129,0.1292t-0.2261,0.3947t-0.0772,0.6952v0.0646q0.0056,0.5646,0.177,0.8329t0.5337,0.2683q0.3343,0,0.4888,-0.2879t0.1545,-0.9171z`,
+    get width() { return getGridUnitWidth(1685); },
+    height: 16,
+    glyph: "ф"
+  },
+  'Xх': {
+    getPath: () => `M2.25,16l-0.8174,-1.2472l-0.823,1.2472h-0.5449l1.0815,-1.5618l-1.0309,-1.4775h0.559l0.7584,1.1826l0.7528,-1.1826h0.5646l-1.0309,1.4719l1.0955,1.5674h-0.5646z`,
+    get width() { return getGridUnitWidth(1024); },
+    height: 16,
+    glyph: "х"
+  },
+  'Xц': {
+    getPath: () => `M0.9045,12.9607v2.6713h1.3399v-2.6713h0.5056v2.6713h0.4129v1.514h-0.4579v-1.1461h-2.3062v-3.0393h0.5056z`,
+    get width() { return getGridUnitWidth(1173); },
+    height: 16,
+    glyph: "ц"
+  },
+  'Xч': {
+    getPath: () => `M0.8483,12.9607v1.1292q0,0.4551,0.4663,0.4551q0.309,0,0.7753,-0.132v-1.4522h0.5056v3.0393h-0.5056v-1.2949l-0.2191,0.0843q-0.4101,0.1573,-0.764,0.1573q-0.3624,0,-0.5632,-0.2177t-0.2008,-0.6138v-1.1545h0.5056z`,
+    get width() { return getGridUnitWidth(1067); },
+    height: 16,
+    glyph: "ч"
+  },
+  'Xш': {
+    getPath: () => `M0.3989,16v-3.0393h0.5056v2.6713h1.1517v-2.6713h0.5056v2.6713h1.1489v-2.6713h0.5056v3.0393h-3.8174z`,
+    get width() { return getGridUnitWidth(1643); },
+    height: 16,
+    glyph: "ш"
+  },
+  'Xщ': {
+    getPath: () => `M0.3989,16v-3.0393h0.5056v2.6713h1.1376v-2.6713h0.5056v2.6713h1.1348v-2.6713h0.5056v2.6713h0.4129v1.514h-0.4579v-1.1461h-3.7444z`,
+    get width() { return getGridUnitWidth(1685); },
+    height: 16,
+    glyph: "щ"
+  },
+  'Xъ': {
+    getPath: () => `M2.1938,14.2472q0.5758,0,0.8708,0.2065t0.2949,0.6531q0,0.4326,-0.3034,0.6629t-0.8596,0.2303h-1.1489v-2.6713h-0.9213v-0.368h1.427v1.2865h0.6404zM1.5534,15.6433h0.5674q0.3652,0,0.5337,-0.1292t0.1685,-0.4073q0,-0.264,-0.1629,-0.3862t-0.5365,-0.1222h-0.5702v1.0449z`,
+    get width() { return getGridUnitWidth(1280); },
+    height: 16,
+    glyph: "ъ"
+  },
+  'Xы': {
+    getPath: () => `M1.5449,14.2472q0.5758,0,0.8708,0.2065t0.2949,0.6531q0,0.4326,-0.3034,0.6629t-0.8596,0.2303h-1.1489v-3.0393h0.5056v1.2865h0.6404zM0.9045,15.6433h0.5674q0.3652,0,0.5337,-0.1292t0.1685,-0.4073q0,-0.264,-0.1629,-0.3862t-0.5365,-0.1222h-0.5702v1.0449zM3.2303,16v-3.0393h0.5056v3.0393h-0.5056z`,
+    get width() { return getGridUnitWidth(1472); },
+    height: 16,
+    glyph: "ы"
+  },
+  'Xь': {
+    getPath: () => `M1.5955,14.2472q0.5758,0,0.8708,0.2065t0.2949,0.6531q0,0.4326,-0.3034,0.6629t-0.8596,0.2303h-1.1994v-3.0393h0.5056v1.2865h0.691zM0.9045,15.6433h0.618q0.3652,0,0.5337,-0.1292t0.1685,-0.4073q0,-0.264,-0.1629,-0.3862t-0.5365,-0.1222h-0.6208v1.0449z`,
+    get width() { return getGridUnitWidth(1067); },
+    height: 16,
+    glyph: "ь"
+  },
+  'Xэ': {
+    getPath: () => `M0.1545,15.1152l0.5112,-0.0337q0.0449,0.3034,0.2317,0.4494t0.4677,0.1461q0.3624,0,0.5618,-0.2486t0.2331,-0.7823h-1.1601v-0.368h1.1601q-0.0225,-0.5309,-0.2121,-0.764t-0.5772,-0.2331q-0.5899,0,-0.6798,0.5506l-0.5197,-0.0393q0.0787,-0.4185,0.3919,-0.6531t0.7935,-0.2346q0.6461,0,0.9902,0.4045t0.3441,1.1685q0,0.7753,-0.3441,1.177t-0.9958,0.4017q-0.4972,0,-0.8174,-0.2528t-0.3792,-0.6882z`,
+    get width() { return getGridUnitWidth(1045); },
+    height: 16,
+    glyph: "э"
+  },
+  'Xю': {
+    getPath: () => `M4.073,14.4775q0,0.7978,-0.3301,1.1882t-0.9565,0.3904q-0.5955,0,-0.9143,-0.3694t-0.3441,-1.0716h-0.6236v1.3848h-0.5056v-3.0393h0.5056v1.2865h0.6264q0.0927,-1.3427,1.2725,-1.3427q0.6657,0,0.9677,0.3933t0.302,1.1798zM3.5421,14.4775q0,-0.6292,-0.1685,-0.9143t-0.5618,-0.2851q-0.3989,0,-0.5772,0.2907t-0.1784,0.9087q0,0.6124,0.177,0.9087t0.5506,0.2963q0.4101,0,0.5843,-0.2935t0.1742,-0.9115z`,
+    get width() { return getGridUnitWidth(1536); },
+    height: 16,
+    glyph: "ю"
+  },
+  'Xя': {
+    getPath: () => `M1.5028,14.7135l-0.8848,1.2865h-0.5702l0.9663,-1.323q-0.6994,-0.1433,-0.6994,-0.8764q0,-0.4185,0.3034,-0.6292t0.8848,-0.2107h1.2135v3.0393h-0.5056v-1.2865h-0.7079zM2.2107,13.3174h-0.6573q-0.3652,0,-0.5337,0.1292t-0.1685,0.3904q0,0.264,0.1503,0.3947t0.4986,0.1306h0.7107v-1.0449z`,
+    get width() { return getGridUnitWidth(1109); },
+    height: 16,
+    glyph: "я"
+  },
+  'XА': {
+    getPath: () => `M3.2781,16l-0.4522,-1.1573h-1.8034l-0.4551,1.1573h-0.5562l1.6152,-3.9579h0.6096l1.5899,3.9579h-0.5478zM1.9242,12.4466l-0.0253,0.0787q-0.0702,0.2331,-0.2079,0.5983l-0.5056,1.3006h1.4803l-0.5084,-1.3062q-0.0787,-0.1938,-0.1573,-0.4382z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "А"
+  },
+  'XБ': {
+    getPath: () => `M3.4775,14.8399q0,0.5253,-0.3624,0.8427t-1,0.3174h-1.6433v-3.9579h2.6011v0.4382h-2.0646v1.236h1.073q0.6629,0,1.0295,0.2949t0.3666,0.8287zM2.9382,14.8455q0,-0.3399,-0.2303,-0.5211t-0.691,-0.1812h-1.0084v1.4326h1.0309q0.4607,0,0.6798,-0.191t0.2191,-0.5393z`,
+    get width() { return getGridUnitWidth(1344); },
+    height: 16,
+    glyph: "Б"
+  },
+  'XВ': {
+    getPath: () => `M3.5337,14.8848q0,0.5281,-0.3848,0.8216t-1.0702,0.2935h-1.6067v-3.9579h1.4382q1.3933,0,1.3933,0.9607q0,0.3511,-0.1966,0.5899t-0.5562,0.3202q0.4719,0.0562,0.7275,0.316t0.2556,0.6559zM2.764,13.0674q0,-0.3202,-0.2191,-0.4579t-0.6348,-0.1376h-0.9017v1.2528h0.9017q0.4298,0,0.6419,-0.1615t0.2121,-0.4958zM2.9916,14.8427q0,-0.6994,-0.9831,-0.6994h-1v1.427h1.0421q0.4916,0,0.7163,-0.1826t0.2247,-0.5449z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "В"
+  },
+  'XГ': {
+    getPath: () => `M3.0084,12.0393v0.4382h-2v3.5197h-0.5365v-3.9579h2.5365z`,
+    get width() { return getGridUnitWidth(1109); },
+    height: 16,
+    glyph: "Г"
+  },
+  'XД': {
+    getPath: () => `M3.2978,15.5506h0.4916v1.5955h-0.5056v-1.1461h-2.736v1.1461h-0.5056v-1.5955h0.4045q0.2191,-0.2725,0.3722,-0.7654t0.257,-1.3104l0.1882,-1.4326h2.0337v3.5084zM2.7753,15.5506v-3.059h-1.0534l-0.1376,1.0337q-0.1039,0.7697,-0.2303,1.2556t-0.3034,0.7697h1.7247z`,
+    get width() { return getGridUnitWidth(1387); },
+    height: 16,
+    glyph: "Д"
+  },
+  'XЕ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Е"
+  },
+  'XЁ': {
+    getPath: () => `M0.4719,16v-3.9579h3.0028v0.4382h-2.4663v1.2697h2.2978v0.4326h-2.2978v1.3792h2.5815v0.4382h-3.118zM2.2921,11.7022v-0.5169h0.4579v0.5169h-0.4579zM1.1854,11.7022v-0.5169h0.4635v0.5169h-0.4635z`,
+    get width() { return getGridUnitWidth(1367); },
+    height: 16,
+    glyph: "Ё"
+  },
+  'XЖ': {
+    getPath: () => `M2.3876,14.1882q-0.1039,0,-0.2598,-0.0365t-0.2261,-0.0702l-1.1994,1.9185h-0.6236l1.4298,-2.177q-0.1348,-0.0983,-0.5028,-0.6292l-0.7949,-1.1517h0.5618l0.5758,0.8567q0.3118,0.4691,0.4466,0.6194t0.2584,0.2065t0.3343,0.0562v-1.7388h0.5365v1.7388q0.2107,0,0.3371,-0.0576t0.264,-0.2135t0.4382,-0.611l0.5758,-0.8567h0.5618l-0.7949,1.1517q-0.368,0.5309,-0.5028,0.6292l1.4298,2.177h-0.6236l-1.1994,-1.9185q-0.0702,0.0337,-0.2233,0.0702t-0.2626,0.0365v1.8118h-0.5365v-1.8118z`,
+    get width() { return getGridUnitWidth(1891); },
+    height: 16,
+    glyph: "Ж"
+  },
+  'XЗ': {
+    getPath: () => `M1.7444,16.0562q-0.573,0,-0.9438,-0.2261t-0.6124,-0.7514l0.4635,-0.2163q0.3343,0.764,1.073,0.764q0.4298,0,0.677,-0.1994t0.2472,-0.559q0,-0.3736,-0.2697,-0.5393t-0.8371,-0.1657h-0.1994v-0.4157h0.1994q0.5084,0,0.7514,-0.1671t0.243,-0.5126q0,-0.3006,-0.2037,-0.4733t-0.5829,-0.1728q-0.3539,0,-0.5955,0.1643t-0.3848,0.5295l-0.5,-0.1713q0.1966,-0.486,0.5674,-0.7219t0.9326,-0.236q0.5955,0,0.9494,0.2795t0.3539,0.7542q0,0.3567,-0.2022,0.5899t-0.5843,0.323q0.427,0.0646,0.6657,0.3104t0.2388,0.6166q0,0.5478,-0.389,0.8722t-1.0576,0.3244z`,
+    get width() { return getGridUnitWidth(1237); },
+    height: 16,
+    glyph: "З"
+  },
+  'XИ': {
+    getPath: () => `M0.4719,16v-3.9579h0.4831v2.5955q0,0.3202,-0.0225,0.7697l2.1067,-3.3652h0.6236v3.9579h-0.4775v-2.6292q0,-0.3427,0.0169,-0.7135l-2.0843,3.3427h-0.6461z`,
+    get width() { return getGridUnitWidth(1472); },
+    height: 16,
+    glyph: "И"
+  },
+  'XЙ': {
+    getPath: () => `M0.4719,16v-3.9579h0.4831v2.5955q0,0.3202,-0.0225,0.7697l2.1067,-3.3652h0.6236v3.9579h-0.4775v-2.6292q0,-0.3427,0.0169,-0.7135l-2.0843,3.3427h-0.6461zM2.0843,11.7022q-1,0,-1.0309,-0.8989h0.4607q0.0337,0.559,0.5702,0.559t0.5702,-0.559h0.4607q-0.0309,0.8989,-1.0309,0.8989z`,
+    get width() { return getGridUnitWidth(1472); },
+    height: 16,
+    glyph: "Й"
+  },
+  'XК': {
+    getPath: () => `M0.4719,12.0421h0.5365v1.7388q0.2107,0,0.3371,-0.0576t0.264,-0.2135t0.4382,-0.611l0.5758,-0.8567h0.5618l-0.7949,1.1517q-0.368,0.5309,-0.5028,0.6292l1.4298,2.177h-0.6236l-1.1994,-1.9185q-0.0702,0.0337,-0.2233,0.0702t-0.2626,0.0365v1.8118h-0.5365v-3.9579z`,
+    get width() { return getGridUnitWidth(1193); },
+    height: 16,
+    glyph: "К"
+  },
+  'XЛ': {
+    getPath: () => `M2.7837,12.4916h-1.1742l-0.1376,1.0337q-0.1433,1.118,-0.2767,1.6096t-0.3357,0.7008t-0.5674,0.2093q-0.1629,0,-0.2416,-0.0281v-0.427q0.0534,0.0197,0.1573,0.0197q0.1489,0,0.243,-0.0913t0.1756,-0.3034t0.1629,-0.6292t0.1629,-1.0281t0.1994,-1.5154h2.1545v3.9579h-0.5225v-3.5084z`,
+    get width() { return getGridUnitWidth(1344); },
+    height: 16,
+    glyph: "Л"
+  },
+  'XМ': {
+    getPath: () => `M3.8371,16v-2.6404q0,-0.4382,0.0253,-0.8427q-0.1376,0.5028,-0.2472,0.7865l-1.0225,2.6966h-0.3764l-1.0365,-2.6966l-0.1573,-0.4775l-0.0927,-0.309l0.0084,0.3118l0.0112,0.5309v2.6404h-0.4775v-3.9579h0.7051l1.0534,2.7444q0.0562,0.1657,0.1081,0.3553t0.0688,0.2739q0.0225,-0.1124,0.0941,-0.3413t0.0969,-0.2879l1.0337,-2.7444h0.6882v3.9579h-0.4831z`,
+    get width() { return getGridUnitWidth(1706); },
+    height: 16,
+    glyph: "М"
+  },
+  'XН': {
+    getPath: () => `M3.1489,16v-1.8343h-2.1404v1.8343h-0.5365v-3.9579h0.5365v1.6742h2.1404v-1.6742h0.5365v3.9579h-0.5365z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Н"
+  },
+  'XО': {
+    getPath: () => `M4.1994,14.0028q0,0.6208,-0.2374,1.0871t-0.6812,0.7163t-1.0478,0.25q-0.6096,0,-1.052,-0.2472t-0.6756,-0.7149t-0.2331,-1.0913q0,-0.9494,0.5197,-1.4846t1.4466,-0.5351q0.6039,0,1.0478,0.2402t0.6784,0.698t0.2346,1.0815zM3.6517,14.0028q0,-0.7388,-0.3694,-1.1601t-1.0435,-0.4213q-0.6798,0,-1.0506,0.4157t-0.3708,1.1657q0,0.7444,0.375,1.1812t1.0407,0.4368q0.6854,0,1.052,-0.4228t0.3666,-1.1952z`,
+    get width() { return getGridUnitWidth(1593); },
+    height: 16,
+    glyph: "О"
+  },
+  'XП': {
+    getPath: () => `M3.1433,16v-3.5056h-2.1404v3.5056h-0.5365v-3.9579h3.2135v3.9579h-0.5365z`,
+    get width() { return getGridUnitWidth(1472); },
+    height: 16,
+    glyph: "П"
+  },
+  'XР': {
+    getPath: () => `M3.5337,13.2331q0,0.5618,-0.3666,0.8933t-0.9958,0.3315h-1.1629v1.5421h-0.5365v-3.9579h1.6657q0.6657,0,1.0309,0.3118t0.3652,0.8792zM2.9944,13.2388q0,-0.7669,-0.9213,-0.7669h-1.0646v1.5618h1.0871q0.8989,0,0.8989,-0.7949z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Р"
+  },
+  'XС': {
+    getPath: () => `M2.2247,12.4213q-0.6573,0,-1.0225,0.4228t-0.3652,1.1587q0,0.7275,0.3806,1.1699t1.0295,0.4424q0.8315,0,1.25,-0.823l0.4382,0.2191q-0.2444,0.5112,-0.6868,0.7781t-1.0267,0.2669q-0.5983,0,-1.0351,-0.2486t-0.6657,-0.7107t-0.2289,-1.0941q0,-0.9466,0.5112,-1.4831t1.4157,-0.5365q0.632,0,1.0562,0.2472t0.6236,0.7331l-0.5084,0.1685q-0.1376,-0.3455,-0.4424,-0.5281t-0.7233,-0.1826z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "С"
+  },
+  'XТ': {
+    getPath: () => `M2.0225,12.4803v3.5197h-0.5337v-3.5197h-1.3596v-0.4382h3.2528v0.4382h-1.3596z`,
+    get width() { return getGridUnitWidth(1251); },
+    height: 16,
+    glyph: "Т"
+  },
+  'XУ': {
+    getPath: () => `M0.9326,16.0562q-0.1742,0,-0.3638,-0.0534t-0.3188,-0.1433l0.2275,-0.4045q0.264,0.1657,0.4663,0.1657q0.1433,0,0.2402,-0.0548t0.1952,-0.1882t0.3848,-0.6559l-1.6096,-2.6798h0.6124l1.2612,2.2022l1.0787,-2.2022h0.5758l-1.6208,3.0646q-0.2388,0.4494,-0.3876,0.6208t-0.3244,0.25t-0.4171,0.0787z`,
+    get width() { return getGridUnitWidth(1301); },
+    height: 16,
+    glyph: "У"
+  },
+  'XФ': {
+    getPath: () => `M4.0421,13.9326q0,0.4298,-0.1784,0.7626t-0.5126,0.5154t-0.7837,0.1826h-0.1124v0.6376h-0.5365v-0.6376h-0.1124q-0.4522,0,-0.7865,-0.184t-0.5112,-0.5169t-0.177,-0.7598q0,-0.6685,0.3919,-1.0379t1.1138,-0.3694h0.0815v-0.5112h0.5365v0.5112h0.0787q0.7247,0,1.1166,0.3708t0.3919,1.0365zM3.5028,13.9438q0,-1.0309,-1.0337,-1.0309h-0.014v2.0955h0.0365q0.4888,0,0.75,-0.2697t0.2612,-0.7949zM0.8708,13.9438q0,0.5253,0.2612,0.7949t0.75,0.2697h0.0365v-2.0955h-0.0253q-0.5112,0,-0.7669,0.2528t-0.2556,0.7781z`,
+    get width() { return getGridUnitWidth(1557); },
+    height: 16,
+    glyph: "Ф"
+  },
+  'XХ': {
+    getPath: () => `M3.1236,16l-1.1882,-1.7303l-1.2135,1.7303h-0.5927l1.5056,-2.0562l-1.3904,-1.9017h0.5927l1.1011,1.5534l1.0702,-1.5534h0.5927l-1.3539,1.882l1.4691,2.0758h-0.5927z`,
+    get width() { return getGridUnitWidth(1366); },
+    height: 16,
+    glyph: "Х"
+  },
+  'XЦ': {
+    getPath: () => `M4.1489,15.5506v1.5955h-0.5056v-1.1461h-3.1713v-3.9579h0.5365v3.5084h2.1264v-3.5084h0.5225v3.5084h0.4916z`,
+    get width() { return getGridUnitWidth(1515); },
+    height: 16,
+    glyph: "Ц"
+  },
+  'XЧ': {
+    getPath: () => `M2.8315,14.573q-0.4354,0.0955,-0.691,0.1292t-0.4551,0.0337q-0.6236,0,-0.9298,-0.2542t-0.3062,-0.7711v-1.6685h0.5337v1.6124q0,0.3455,0.1826,0.4972t0.559,0.1517q0.4185,0,1.1067,-0.1376v-2.1236h0.5337v3.9579h-0.5337v-1.427z`,
+    get width() { return getGridUnitWidth(1365); },
+    height: 16,
+    glyph: "Ч"
+  },
+  'XШ': {
+    getPath: () => `M0.4719,16v-3.9579h0.5365v3.5084h1.3736v-3.5084h0.5225v3.5084h1.3736v-3.5084h0.5225v3.9579h-4.3287z`,
+    get width() { return getGridUnitWidth(1877); },
+    height: 16,
+    glyph: "Ш"
+  },
+  'XЩ': {
+    getPath: () => `M5.1657,15.5506v1.5955h-0.5056v-1.1461h-4.1882v-3.9579h0.5365v3.5084h1.3118v-3.5084h0.5225v3.5084h1.309v-3.5084h0.5225v3.5084h0.4916z`,
+    get width() { return getGridUnitWidth(1920); },
+    height: 16,
+    glyph: "Щ"
+  },
+  'XЪ': {
+    getPath: () => `M1.9551,13.7163h0.9045q0.6629,0,1.0295,0.2949t0.3666,0.8287q0,0.5253,-0.3624,0.8427t-1,0.3174h-1.4747v-3.5197h-1.2893v-0.4382h1.8258v1.6742zM3.7163,14.8455q0,-0.3399,-0.2303,-0.5211t-0.691,-0.1812h-0.8399v1.4326h0.8624q0.4607,0,0.6798,-0.191t0.2191,-0.5393z`,
+    get width() { return getGridUnitWidth(1621); },
+    height: 16,
+    glyph: "Ъ"
+  },
+  'XЫ': {
+    getPath: () => `M3.4775,14.8399q0,0.5253,-0.3624,0.8427t-1,0.3174h-1.6433v-3.9579h0.5365v1.6742h1.073q0.6629,0,1.0295,0.2949t0.3666,0.8287zM2.9382,14.8455q0,-0.3399,-0.2303,-0.5211t-0.691,-0.1812h-1.0084v1.4326h1.0309q0.4607,0,0.6798,-0.191t0.2191,-0.5393zM4.0843,16v-3.9579h0.5365v3.9579h-0.5365z`,
+    get width() { return getGridUnitWidth(1813); },
+    height: 16,
+    glyph: "Ы"
+  },
+  'XЬ': {
+    getPath: () => `M3.4775,14.8399q0,0.5253,-0.3624,0.8427t-1,0.3174h-1.6433v-3.9579h0.5365v1.6742h1.073q0.6629,0,1.0295,0.2949t0.3666,0.8287zM2.9382,14.8567q0,-0.3399,-0.2303,-0.5239t-0.691,-0.184h-1.0084v1.427h1.0309q0.8989,0,0.8989,-0.7191z`,
+    get width() { return getGridUnitWidth(1344); },
+    height: 16,
+    glyph: "Ь"
+  },
+  'XЭ': {
+    getPath: () => `M2.0028,12.4213q-0.427,0,-0.7331,0.1896t-0.4326,0.5211l-0.5084,-0.1685q0.1994,-0.486,0.6236,-0.7331t1.0562,-0.2472q0.9045,0,1.4157,0.5365t0.5112,1.4831q0,0.6264,-0.2275,1.0899t-0.6615,0.7135t-1.0379,0.25q-1.1966,0,-1.7135,-1.0449l0.4382,-0.2191q0.1938,0.3933,0.5169,0.6081t0.7303,0.2149q0.5983,0,0.9733,-0.3806t0.4284,-1.0267h-1.8371v-0.4326h1.8371q-0.059,-0.6433,-0.4199,-0.9986t-0.9593,-0.3553z`,
+    get width() { return getGridUnitWidth(1472); },
+    height: 16,
+    glyph: "Э"
+  },
+  'XЮ': {
+    getPath: () => `M5.5365,14.0028q0,0.6208,-0.2247,1.0885t-0.6461,0.7163t-0.9831,0.2486q-0.8287,0,-1.316,-0.5028t-0.5295,-1.3876h-0.8287v1.8343h-0.5365v-3.9579h0.5365v1.6742h0.8371q0.0758,-0.8202,0.5576,-1.2767t1.2851,-0.4565q0.8708,0,1.3596,0.5379t0.4888,1.4817zM4.9888,14.0028q0,-0.7388,-0.3413,-1.1601t-0.9593,-0.4213q-0.6264,0,-0.9677,0.4157t-0.3413,1.1657q0,0.7444,0.3469,1.1812t0.9565,0.4368q0.6264,0,0.9663,-0.4199t0.3399,-1.198z`,
+    get width() { return getGridUnitWidth(2069); },
+    height: 16,
+    glyph: "Ю"
+  },
+  'XЯ': {
+    getPath: () => `M0.2697,16l1.1236,-1.7051q-0.4522,-0.0787,-0.7093,-0.3792t-0.257,-0.7416q0,-0.5337,0.3624,-0.8329t1.0337,-0.2992h1.8624v3.9579h-0.5365v-1.6433h-1.2331l-1.0281,1.6433h-0.618zM0.9663,13.1798q0,0.3567,0.2317,0.5548t0.6559,0.198h1.2949v-1.4607h-1.2725q-0.441,0,-0.6756,0.1812t-0.2346,0.5267z`,
+    get width() { return getGridUnitWidth(1479); },
+    height: 16,
+    glyph: "Я"
   }
 };
 

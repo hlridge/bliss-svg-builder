@@ -489,7 +489,14 @@ blissElementDefinitions['COMMA'].extraPathOptions = {
 
 
 // Add all external glyphs.
-const characters = 'abcdefghijklmnopqrstuvwxyzåäöABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ';
+// Base Latin (English) + Swedish åäöÅÄÖ
+const baseLatin = 'abcdefghijklmnopqrstuvwxyzåäöABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ';
+// Latin Extended for European languages: Spanish, French, German, Dutch, Norwegian, Danish,
+// Finnish, Icelandic, Hungarian, Polish, Lithuanian, Latvian, Portuguese, Italian, Afrikaans
+const latinExtended = 'ÀÁÂÃÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕØÙÚÛÜÝÞßàáâãæçèéêëìíîïðñòóôõøùúûüýþÿĀāĄąĆćČčĒēĖėĘęĢģĪīĮįĶķĻļŁłŃńŅņŐőŒœŚśŠšŪūŰűŲųŸŹźŻżŽž';
+// Cyrillic (Russian)
+const cyrillic = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
+const characters = baseLatin + latinExtended + cyrillic;
 
 for (let i = 0; i < characters.length; i++) {
   const x = characters[i];
