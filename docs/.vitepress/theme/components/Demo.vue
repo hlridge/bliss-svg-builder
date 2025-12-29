@@ -130,9 +130,9 @@ onMounted(async () => {
   margin-bottom: var(--bliss-gap-2);
   min-height: 130px;
 
-  /* “SVG canvas” look */
+  /* "SVG canvas" look - light background in light mode, adapts in dark mode */
   background:
-    linear-gradient(0deg, color-mix(in srgb, var(--vp-c-bg) 88%, transparent), color-mix(in srgb, var(--vp-c-bg) 88%, transparent)),
+    linear-gradient(0deg, #f8f9fb, #f8f9fb),
     linear-gradient(90deg, rgba(127,127,127,.08) 1px, transparent 1px),
     linear-gradient(0deg, rgba(127,127,127,.08) 1px, transparent 1px);
   background-size: auto, 16px 16px, 16px 16px;
@@ -147,7 +147,22 @@ onMounted(async () => {
   width: 100%;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--vp-c-bg-soft) 15%, var(--vp-c-bg));
+  /* Transparent in light mode (inherits .demo-output), light in dark mode */
+}
+
+/* Dark mode: override .demo-output background while keeping .demo-svg light */
+:deep(.dark) .demo-output,
+.dark .demo-output {
+  background:
+    linear-gradient(0deg, color-mix(in srgb, var(--vp-c-bg) 88%, transparent), color-mix(in srgb, var(--vp-c-bg) 88%, transparent)),
+    linear-gradient(90deg, rgba(127,127,127,.08) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(127,127,127,.08) 1px, transparent 1px);
+}
+
+.dark .demo-svg {
+  background: #f8f9fb;
+  border-radius: 5px;
+  box-shadow: inset 0 0 6px 4px rgba(0,0,0,0.65);
 }
 
 .demo-svg :deep(svg) {

@@ -160,7 +160,9 @@ onMounted(async () => {
 
   border-radius: var(--bliss-radius-sm);
   border: 1px solid color-mix(in srgb, var(--vp-c-brand-1) 12%, var(--bliss-border));
-  background: color-mix(in srgb, var(--vp-c-bg-soft) 15%, var(--vp-c-bg));
+
+  /* Always light background for Bliss SVG contrast in both themes */
+  background: #f8f9fb;
 }
 
 .shape-svg :deep(svg) {
