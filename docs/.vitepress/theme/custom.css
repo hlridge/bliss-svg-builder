@@ -6,3 +6,139 @@
   --vp-c-brand-1: #646cff;
   --vp-c-brand-2: #747bff;
 }
+
+/**
+ * Bliss SVG Builder – VitePress theme (merged)
+ * Keeps the "nice" first styling, but uses Bliss Maker palette + visible rose accents.
+ */
+
+:root {
+
+  --vp-c-brand-1: #b04464;
+  --vp-c-brand-2: #c85a7a;
+  --vp-c-brand-3: #8f344f;
+
+  --bliss-slate-1: #546373;
+  --bliss-slate-2: #6b7a89;
+
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-soft: #eef5f7; /* canvas-like panel */
+  --vp-c-bg-mute: #f7f9fb; /* chips / subtle fills */
+
+  --vp-c-text-1: #1f2933;
+  --vp-c-text-2: #5f6c78;
+  --vp-c-text-3: #8a96a3;
+
+  --vp-c-divider: #d6dde3;
+  --vp-c-divider-light: #e4e9ee;
+
+  --vp-code-bg: #f7f9fb;
+  --vp-code-block-bg: color-mix(in srgb, var(--vp-c-bg-soft) 45%, var(--vp-c-bg));
+
+  /* Override VitePress sidebar/nav to use bluish palette */
+  --vp-sidebar-bg-color: color-mix(in srgb, var(--vp-c-bg-soft) 35%, var(--vp-c-bg));
+  --vp-nav-bg-color: var(--vp-c-bg);
+  --vp-local-nav-bg-color: var(--vp-c-bg);
+
+  --vp-c-danger-1: #b91c1c;
+  --vp-c-danger-soft: #fde8e8;
+
+  --bliss-gradient: linear-gradient(135deg, var(--vp-c-brand-1), var(--vp-c-brand-2));
+
+  --bliss-radius-sm: 8px;
+  --bliss-radius-md: 12px;
+  --bliss-radius-lg: 16px;
+
+  --bliss-shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.06);
+  --bliss-shadow-md: 0 8px 24px rgba(0,0,0,.10);
+
+  --bliss-gap-1: 0.5rem;
+  --bliss-gap-2: 0.75rem;
+  --bliss-gap-3: 1rem;
+  --bliss-gap-4: 1.5rem;
+
+  --bliss-surface: color-mix(in srgb, var(--vp-c-bg-soft) 88%, transparent);
+  --bliss-surface-2: color-mix(in srgb, var(--vp-c-bg-mute) 88%, transparent);
+  --bliss-border: color-mix(in srgb, var(--vp-c-divider) 92%, transparent);
+
+  --bliss-mono-size: 0.875rem;
+  --bliss-mono-bg: color-mix(in srgb, var(--vp-c-bg-mute) 92%, transparent);
+
+  --bliss-ring: 0 0 0 3px color-mix(in srgb, var(--vp-c-brand-1) 32%, transparent);
+}
+
+.dark:root {
+  --vp-code-color: #d6dee6;
+
+  --vp-c-bg: #0f1720;
+  --vp-c-bg-soft: #16212c;
+  --vp-c-bg-mute: #1c2a36;
+
+  --vp-c-divider: #2a3a48;
+  --vp-c-divider-light: #344657;
+
+  --vp-c-text-1: #e6edf3;
+  --vp-c-text-2: #b8c2cc;
+  --vp-c-text-3: #8b98a6;
+
+  --vp-c-brand-1: #c85a7a;
+  --vp-c-brand-2: #d77a94;
+  --vp-c-brand-3: #b04464;
+
+  --bliss-shadow-sm: 0 1px 2px rgba(0,0,0,.35), 0 10px 30px rgba(0,0,0,.35);
+  --bliss-shadow-md: 0 18px 60px rgba(0,0,0,.45);
+
+  --bliss-border: color-mix(in srgb, var(--vp-c-divider) 75%, transparent);
+  --bliss-surface: color-mix(in srgb, var(--vp-c-bg-soft) 92%, transparent);
+  --bliss-surface-2: color-mix(in srgb, var(--vp-c-bg-mute) 92%, transparent);
+
+  --vp-c-danger-1: #f87171;
+  --vp-c-danger-soft: #3a1f25;
+
+  --bliss-ring: 0 0 0 3px color-mix(in srgb, var(--vp-c-brand-1) 38%, transparent);
+
+  --vp-code-block-bg: color-mix(in srgb, var(--vp-c-bg-soft) 45%, var(--vp-c-bg));
+
+  /* Override VitePress sidebar/nav to use consistent dark palette */
+  --vp-sidebar-bg-color: color-mix(in srgb, var(--vp-c-bg-soft) 35%, var(--vp-c-bg));
+  --vp-nav-bg-color: var(--vp-c-bg);
+  --vp-local-nav-bg-color: var(--vp-c-bg);
+}
+
+html { scroll-behavior: smooth; }
+::selection { background: color-mix(in srgb, var(--vp-c-brand-1) 28%, transparent); }
+
+.vp-doc :not(pre) > code {
+  border: 1px solid color-mix(in srgb, var(--vp-c-brand-1) 12%, var(--bliss-border));
+  background: color-mix(in srgb, var(--vp-c-bg-soft) 45%, var(--vp-c-bg));
+  border-radius: 6px;
+  padding: 0.15em 0.35em;
+}
+
+.vp-doc a {
+  color: var(--vp-c-brand-1);
+  text-decoration-color: color-mix(in srgb, var(--vp-c-brand-1) 45%, transparent);
+}
+.vp-doc a:hover {
+  text-decoration-color: var(--vp-c-brand-1);
+}
+
+.bliss-demo :focus-visible,
+.shape-gallery :focus-visible,
+.vp-doc :focus-visible {
+  outline: none;
+  box-shadow: var(--bliss-ring);
+  border-radius: 8px;
+}
+
+.vp-doc .custom-block.tip,
+.vp-doc .custom-block.info {
+  border-left-color: var(--vp-c-brand-1);
+}
+
+.vp-doc blockquote {
+  border-left-color: color-mix(in srgb, var(--vp-c-brand-1) 55%, var(--vp-c-divider));
+  background: color-mix(in srgb, var(--vp-c-brand-1) 8%, transparent);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
