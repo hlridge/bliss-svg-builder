@@ -1,10 +1,12 @@
-# Bliss SVG Builder
+# Bliss SVG Builder — SVG Generator for Blissymbolics
 
-A JavaScript library for generating SVG representations of Blissymbolics (Bliss) using a Domain-Specific Language (DSL).
+A JavaScript library for generating SVG representations of **Blissymbolics (Bliss)**, an ideographic language, using a compact Domain-Specific Language (DSL).
 
 [![npm version](https://img.shields.io/npm/v/bliss-svg-builder/alpha)](https://www.npmjs.com/package/bliss-svg-builder) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@0.1.0-alpha.6,bliss-svg-builder@0.1.0-alpha.6&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
 
-Bliss SVG Builder enables you to **programmatically generate Bliss characters** in your JavaScript applications. It's designed as a library to power AAC applications, educational tools, communication boards, and any system that needs to create or display Bliss dynamically.
+Bliss SVG Builder enables you to **programmatically generate Bliss characters and compositions** in your JavaScript applications. It's designed to power AAC applications, educational tools, communication boards, and any system that needs to **write, render, or display Bliss dynamically.**
+
+Bliss-SVG-Builder ships with a built-in set of more than 1,100 Bliss characters and 450 graphical shapes defined using the same recursive composition system available to users. You can use these directly, or define your own Bliss characters as needed.
 
 ## Installation
 
@@ -82,3 +84,5 @@ For complete documentation including DSL syntax, shapes reference, options, and 
 ## License
 
 This project is licensed under the Mozilla Public License 2.0. See the [LICENSE](./LICENSE) file for details.
+
+**Keywords:** Blissymbolics, Bliss, Blissymbols, Semantography, Blissary, AAC, ideographic language, SVG, DSL, augmentative communication, symbol composition, accessibility

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Bliss SVG Builder
   text: Generate SVG for Blissymbolics
-  tagline: Uses a powerful DSL to build Bliss characters, words, and sentences
+  tagline: Uses a powerful DSL to write Bliss characters, words, and sentences in SVG
   actions:
     - theme: brand
       text: Get Started
@@ -28,7 +28,7 @@ features:
 
 Create Bliss characters with simple input strings:
 
-<Demo code="H" title="Heart symbol" />
+<Demo code="H" title="Heart shape" />
 
 <Demo code="C8" title="Circle (diameter 8)" />
 
@@ -36,4 +36,6 @@ Create Bliss characters with simple input strings:
 
 ## What is Blissymbolics?
 
-Blissymbolics (or Bliss) is a semantic language using visual characters to represent concepts. It's widely used as an augmentative and alternative communication (AAC) system. This library makes it easy to work with the graphical representation of Bliss programmatically - from individual shapes to complete compositions.
+**Blissymbolics (or Bliss)** is an ideographic language in which meaning is expressed through the composition of Bliss characters, each of which carries its own conceptual meaning. It is widely used as an augmentative and alternative communication (AAC) system.
+
+Bliss-SVG-Builder makes it easy to work with the graphical representation of Bliss programmatically, supporting recursive composition of graphical elements and Bliss characters into complete Bliss sentences using SVG.
