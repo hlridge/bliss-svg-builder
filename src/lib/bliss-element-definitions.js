@@ -6,7 +6,7 @@
 
 import * as sc from "./bliss-shape-creators.js";
 import { glyphData } from "./bliss-glyph-data.js";
-import { alphabetData } from "../external-font-data/open-sans-svg-path-data.js";
+import { alphabetData } from "../external-font-data/liberation-sans-svg-path-data.js";
 
 /**
  * Special space glyph codes: TSP and QSP
@@ -494,7 +494,7 @@ shapeDefinitions['COMMA'].extraPathOptions = {
 };
 
 /**
- * External glyph definitions derived from alphabetData in open-sans-svg-path-data.js.
+ * External glyph definitions derived from alphabetData in liberation-sans-svg-path-data.js.
  *
  * Supported character sets:
  * - Base Latin (a-z, A-Z) - English
@@ -518,7 +518,7 @@ shapeDefinitions['COMMA'].extraPathOptions = {
  *   - Afrikaans: ê, ë, î, ï, ô, û
  * - Cyrillic (Russian): а-я, А-Я, ё, Ё
  *
- * To add more characters, add them to alphabetData in open-sans-svg-path-data.js.
+ * To add more characters, add them to alphabetData in liberation-sans-svg-path-data.js.
  */
 const externalGlyphDefinitions = {};
 for (const [code, data] of Object.entries(alphabetData)) {

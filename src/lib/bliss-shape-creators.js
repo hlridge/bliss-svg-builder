@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { alphabetData } from "../external-font-data/open-sans-svg-path-data.js";
+import { alphabetData } from "../external-font-data/liberation-sans-svg-path-data.js";
 
 /**
  * Checks if a character has hardcoded path data available.
@@ -45,7 +45,7 @@ export function createTextFallbackGlyph(str) {
       const baseline = 16;
       const textX = x - 0.3;
       const textY = y + baseline;
-      return `${closePath}<text x="${textX}" y="${textY}" font-family="Open Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${str}</text>${openPath}`;
+      return `${closePath}<text x="${textX}" y="${textY}" font-family="Liberation Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${str}</text>${openPath}`;
     },
     width,
     height,

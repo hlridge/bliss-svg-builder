@@ -1,6 +1,15 @@
-// open-sans-svg-path-data.js
-// Licensed under the Apache License, Version 2.0
-// See FONT_LICENSE file in this directory for the full license text.
+/**
+ * liberation-sans-svg-path-data.js
+ *
+ * Derived from Liberation Sans Regular (Liberation Fonts Project)
+ * Copyright © 2012–2018 Red Hat, Inc.
+ *
+ * This file contains extracted and modified glyph path data.
+ * Licensed under the Apache License, Version 2.0.
+ * See the FONT_LICENSE file in this directory for the full license text.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 // Somewhat arbitrary numbers. Need to be somewhat adjusted to align with normal font letter spacing...
 const defaultLeftSideBearing = 107;
