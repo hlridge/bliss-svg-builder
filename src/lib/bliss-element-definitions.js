@@ -6,6 +6,7 @@
 
 import * as sc from "./bliss-shape-creators.js";
 import { glyphData } from "./bliss-glyph-data.js";
+import { alphabetData } from "../external-font-data/open-sans-svg-path-data.js";
 
 /**
  * Special space glyph codes: TSP and QSP
@@ -18,16 +19,21 @@ export function isSpaceGlyph(code) {
   return SPACE_GLYPH_CODES.has(code);
 }
 
-const blissElementDefinitions = {
+// Non-shape elements: spacing and anchors
+const nonShapeDefinitions = {
   'ZSA': sc.createZeroSizedAnchor(),
-  'H': sc.createHeart(8),
-  'E': sc.createEar(8),
-  'F': sc.createFiber(8),
+  'TSP': sc.createSpace(6),
+  'QSP': sc.createSpace(2),
+};
+
+// Shape primitives
+const shapeDefinitions = {
   'DOT': sc.createDot(0.5, 0.333),
   'SDOT': sc.createDot(0.5, 0),
   'COMMA': sc.createComma(0.5, 0.333),
-  'TSP': sc.createSpace(6),
-  'QSP': sc.createSpace(2),
+  'H': sc.createHeart(8),
+  'E': sc.createEar(8),
+  'F': sc.createFiber(8),
   'C8': sc.createCircle(4),
   'C4': sc.createCircle(2),
   'C2': sc.createCircle(1),
@@ -472,45 +478,67 @@ const blissElementDefinitions = {
   'ARRQC4SECC': { codeString: "QC4SE;P3N:2.5,0" }
 };
 
-blissElementDefinitions['DOT'].extraPathOptions = {
+shapeDefinitions['DOT'].extraPathOptions = {
   baseStrokeWidth: 0.5,
   extraDotWidth: 0.333
 };
 
-blissElementDefinitions['SDOT'].extraPathOptions = {
+shapeDefinitions['SDOT'].extraPathOptions = {
   baseStrokeWidth: 0.5,
   extraDotWidth: 0
 };
 
-blissElementDefinitions['COMMA'].extraPathOptions = {
+shapeDefinitions['COMMA'].extraPathOptions = {
   baseStrokeWidth: 0.5,
   extraDotWidth: 0.333
 };
 
-
-// Add all external glyphs.
-// Base Latin (English) + Swedish åäöÅÄÖ
-const baseLatin = 'abcdefghijklmnopqrstuvwxyzåäöABCDEFGHIJKLMNOPQRSTUVWXYZÅÄÖ';
-// Latin Extended for European languages: Spanish, French, German, Dutch, Norwegian, Danish,
-// Finnish, Icelandic, Hungarian, Polish, Lithuanian, Latvian, Portuguese, Italian, Afrikaans
-const latinExtended = 'ÀÁÂÃÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕØÙÚÛÜÝÞßàáâãæçèéêëìíîïðñòóôõøùúûüýþÿĀāĄąĆćČčĒēĖėĘęĢģĪīĮįĶķĻļŁłŃńŅņŐőŒœŚśŠšŪūŰűŲųŸŹźŻżŽž';
-// Cyrillic (Russian)
-const cyrillic = 'абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ';
-const characters = baseLatin + latinExtended + cyrillic;
-
-for (let i = 0; i < characters.length; i++) {
-  const x = characters[i];
-  blissElementDefinitions[`X${x}`] = sc.createExternalGlyph(x);
+/**
+ * External glyph definitions derived from alphabetData in open-sans-svg-path-data.js.
+ *
+ * Supported character sets:
+ * - Base Latin (a-z, A-Z) - English
+ * - Latin Extended - European languages:
+ *   - Swedish/Finnish: å, ä, ö, Å, Ä, Ö
+ *   - Norwegian/Danish: å, æ, ø, Å, Æ, Ø
+ *   - Icelandic: á, é, í, ó, ú, ý, ð, þ, æ, ö, Á, É, Í, Ó, Ú, Ý, Ð, Þ, Æ, Ö
+ *   - German: ä, ö, ü, ß, Ä, Ö, Ü
+ *   - French: à, â, ç, è, é, ê, ë, î, ï, ô, ù, û, ü, ÿ, œ, æ, Œ, Æ
+ *   - Spanish: á, é, í, ó, ú, ü, ñ, Á, É, Í, Ó, Ú, Ü, Ñ
+ *   - Portuguese: á, â, ã, à, ç, é, ê, í, ó, ô, õ, ú, Á, Â, Ã, À, Ç, É, Ê, Í, Ó, Ô, Õ, Ú
+ *   - Italian: à, è, é, ì, ò, ù, À, È, É, Ì, Ò, Ù
+ *   - Dutch: é, ë, ï, ö, ü
+ *   - Polish: ą, ć, ę, ł, ń, ó, ś, ź, ż, Ą, Ć, Ę, Ł, Ń, Ó, Ś, Ź, Ż
+ *   - Czech/Slovak: á, č, é, í, ó, š, ú, ý, ž (partial)
+ *   - Hungarian: á, é, í, ó, ö, ő, ú, ü, ű, Á, É, Í, Ó, Ö, Ő, Ú, Ü, Ű
+ *   - Lithuanian: ą, č, ę, ė, į, š, ų, ū, ž, Ą, Č, Ę, Ė, Į, Š, Ų, Ū, Ž
+ *   - Latvian: ā, č, ē, ģ, ī, ķ, ļ, ņ, š, ū, ž, Ā, Č, Ē, Ģ, Ī, Ķ, Ļ, Ņ, Š, Ū, Ž
+ *   - Estonian: ä, ö, ü, õ
+ *   - Slovenian/Croatian: č, š, ž (partial)
+ *   - Afrikaans: ê, ë, î, ï, ô, û
+ * - Cyrillic (Russian): а-я, А-Я, ё, Ё
+ *
+ * To add more characters, add them to alphabetData in open-sans-svg-path-data.js.
+ */
+const externalGlyphDefinitions = {};
+for (const [code, data] of Object.entries(alphabetData)) {
+  externalGlyphDefinitions[code] = sc.createExternalGlyph(data.glyph);
 }
 
-// Indicate that all elements defined in the blissElementDefinitions object are atomic
-for (const definition of Object.values(blissElementDefinitions)) {
-  definition.isAtomic = true;
-} 
+for (const definition of Object.values(shapeDefinitions)) {
+  definition.isShape = true;
+}
 
-//glyph definitions
+const blissElementDefinitions = {
+  ...nonShapeDefinitions,
+  ...shapeDefinitions,
+  ...externalGlyphDefinitions,
+};
+
+// Add Bliss glyph definitions (B-codes use Blissary ID:s)
 for (const [code, definition] of Object.entries(glyphData)) {
-  definition.characterCode = code;
+  definition.glyphCode = code;
+  definition.isBlissGlyph = true;
 }
 Object.assign(blissElementDefinitions, glyphData);
 

@@ -225,7 +225,7 @@ export class BlissParser {
             const fallbackCode = `XTXT_${chars}`;
             if (!definitions[fallbackCode]) {
               const glyph = createTextFallbackGlyph(chars);
-              glyph.isAtomic = true;
+              glyph.isShape = true;
               definitions[fallbackCode] = glyph;
             }
             return fallbackCode;
@@ -248,7 +248,7 @@ export class BlissParser {
               const fallbackCode = `XTXT_${char}`;
               if (!definitions[fallbackCode]) {
                 const glyph = createTextFallbackGlyph(char);
-                glyph.isAtomic = true;
+                glyph.isShape = true;
                 definitions[fallbackCode] = glyph;
               }
               result.push(fallbackCode);
@@ -263,7 +263,7 @@ export class BlissParser {
               const fallbackCode = `XTXT_${chars}`;
               if (!definitions[fallbackCode]) {
                 const glyph = createTextFallbackGlyph(chars);
-                glyph.isAtomic = true;
+                glyph.isShape = true;
                 definitions[fallbackCode] = glyph;
               }
               result.push(fallbackCode);
@@ -321,7 +321,8 @@ export class BlissParser {
                 const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
                 const glyph = expandedSubPart.glyph;
                 const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
-                const characterCode = definition.characterCode;
+                const glyphCode = definition.glyphCode;
+                const isBlissGlyph = definition.isBlissGlyph;
                 return {
                   part: expandedSubPart.part,
                   ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
@@ -329,7 +330,8 @@ export class BlissParser {
                   ...(isExternalGlyph && { isExternalGlyph }),
                   ...(glyph && { glyph }),
                   ...(kerningRules && { kerningRules }),
-                  ...(characterCode && { characterCode })
+                  ...(glyphCode && { glyphCode }),
+                  ...(isBlissGlyph && { isBlissGlyph })
                 };
               });
             // Prepend options to the first expanded part
@@ -344,7 +346,8 @@ export class BlissParser {
           const isExternalGlyph = definition.isExternalGlyph;
           const kerningRules = definition.kerningRules;
           const glyph = definition.glyph;
-          const characterCode = definition.characterCode;
+          const glyphCode = definition.glyphCode;
+          const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
           return [{
             part: str,
@@ -353,7 +356,8 @@ export class BlissParser {
             ...(isExternalGlyph && { isExternalGlyph }),
             ...(glyph && { glyph }),
             ...(kerningRules && { kerningRules }),
-            ...(characterCode && { characterCode })
+            ...(glyphCode && { glyphCode }),
+            ...(isBlissGlyph && { isBlissGlyph })
           }];
         }
 
@@ -366,7 +370,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, characterCode } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph } of expandedGlyphParts) {
         if (part === "") continue;
 
         const glyphObj = {
@@ -376,7 +380,8 @@ export class BlissParser {
           ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
           ...(typeof glyph === "string" && { glyph }),
           ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules }),
-          ...(typeof characterCode === "string" && { characterCode })
+          ...(typeof glyphCode === "string" && { glyphCode }),
+          ...(isBlissGlyph === true && { isBlissGlyph })
         };
 
         const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);

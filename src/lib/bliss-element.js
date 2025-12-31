@@ -12,7 +12,8 @@ export class BlissElement {
   #blissObj
   #extraPathOptions
   #isCharacter
-  #isAtomic
+  #isShape
+  #isBlissGlyph
   #width
   #height
   #leafX
@@ -312,7 +313,8 @@ export class BlissElement {
     } else {
       if (this.#level === 2) {
         // Character level
-        this.#codeName = this.#blissObj.characterCode || this.#blissObj.code || "";
+        this.#codeName = this.#blissObj.glyphCode || this.#blissObj.code || "";
+        this.#isBlissGlyph = !!this.#blissObj.isBlissGlyph;
 
         if (!this.#blissObj.parts) {
           this.#blissObj = { parts: [this.#blissObj] };
@@ -628,8 +630,12 @@ export class BlissElement {
     return this.#blissObj.isIndicator || false;
   }
 
-  get isAtomic() {
-    return this.#isAtomic;
+  get isShape() {
+    return this.#isShape;
+  }
+
+  get isBlissGlyph() {
+    return this.#isBlissGlyph;
   }
 
   get isExternalGlyph() {
@@ -814,13 +820,14 @@ export class BlissElement {
   toJSON() {
     let obj = {};
 
-    if (this.#codeName && this.#isAtomic) {
+    // Bliss glyphs (B-codes) decompose into their component shapes
+    // Everything else (shapes, external glyphs, dots, etc.) are leaves
+    if (this.#codeName && !this.#isBlissGlyph) {
         const element = {};
         element.code = this.codeName;
         element.width = this.width;
-        element.x = this.#relativeToParentX;//this.x;
-        element.y = this.#relativeToParentY;//this.y;
-        //element.level = this.#level;  // include the level in the returned object
+        element.x = this.#relativeToParentX;
+        element.y = this.#relativeToParentY;
         obj = element;
     } else if (this.#children) {
       obj.elements = []
@@ -856,7 +863,7 @@ export class BlissElement {
   toJSONOldNotWorking() {
     const obj = {};
 
-    if (this.#codeName && this.#isAtomic) {
+    if (this.#codeName && this.#isShape) {
       const element = {};
       element.code = this.codeName;
       element.width = this.width;
@@ -879,7 +886,7 @@ export class BlissElement {
     this.#codeName = this.#blissObj.code;                       //default: empty string
     this.#extraPathOptions = definition.extraPathOptions || {}; //default: empty object
     this.#isCharacter = !!definition.isCharacter;               //default: false
-    this.#isAtomic = !!definition.isAtomic;                     //default: false
+    this.#isShape = !!definition.isShape;                      //default: false
     this.#leafWidth = definition.width;
     this.#leafHeight = definition.height;
     this.#leafX = definition.x;
