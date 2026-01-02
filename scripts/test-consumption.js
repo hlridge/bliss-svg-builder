@@ -44,7 +44,7 @@ const runConsumptionTests = () => {
 
   console.log("\n[Browser Tests] Creating test index and launching browser...");
   const indexFile = createTestIndex();
-  exec(`npx vite serve --open ${indexFile}`);
+  exec(`pnpm exec vite serve --open ${indexFile}`);
 };
 
 runConsumptionTests();
