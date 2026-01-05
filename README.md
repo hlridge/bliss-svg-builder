@@ -1,4 +1,4 @@
-# Bliss SVG Builder — SVG Generator for Blissymbolics
+# Bliss SVG Builder - SVG Generator for Blissymbolics
 
 A JavaScript library for generating SVG representations of **Blissymbolics (Bliss)**, an ideographic language, using a compact Domain-Specific Language (DSL).
 
@@ -72,10 +72,9 @@ As a result, it works in:
 
 For complete documentation including DSL syntax, shapes reference, options, and examples, visit the **[Full Documentation](https://hlridge.github.io/bliss-svg-builder/)**.
 
-- [Quick Start Guide](https://hlridge.github.io/bliss-svg-builder/guide/quick-start)
-- [Writing with Bliss](https://hlridge.github.io/bliss-svg-builder/guide/writing)
-- [DSL Syntax Reference](https://hlridge.github.io/bliss-svg-builder/guide/dsl-syntax)
-- [Shapes & Options](https://hlridge.github.io/bliss-svg-builder/reference/shapes)
+- [Get Started](https://hlridge.github.io/bliss-svg-builder/get-started/installation-setup)
+- [Handbook](https://hlridge.github.io/bliss-svg-builder/handbook/core-concepts/characters-bcodes)
+- [Reference](https://hlridge.github.io/bliss-svg-builder/reference/shapes-gallery)
 
 ## Stability Notice
 
@@ -84,5 +83,7 @@ For complete documentation including DSL syntax, shapes reference, options, and 
 ## License
 
 This project is licensed under the Mozilla Public License 2.0. See the [LICENSE](./LICENSE) file for details.
+
+---
 
 **Keywords:** Blissymbolics, Bliss, Blissymbols, Semantography, Blissary, AAC, ideographic language, SVG, DSL, augmentative communication, symbol composition, accessibility
