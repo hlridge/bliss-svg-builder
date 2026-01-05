@@ -278,94 +278,113 @@ const glyphData = {
   },
   B81: {
     codeString: "AA2N:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR ACTION"
   },
   B82: {
     codeString: "AA2E:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR ACTIVE"
   },
   B83: {
     codeString: "OC1SW:0,4;VL.25:0.5,5;DOT:0.5,6",
     isIndicator: true,
-    width: 1
+    width: 1,
+    name: "INDICATOR PRESENT CONDITIONAL"
   },
   B84: {
     codeString: "B86;B270:3,-8",
     isIndicator: true,
     anchorOffsetX: -0.5,
-    width: 3
+    width: 3,
+    name: "INDICATOR DESCRIPTION AFTER THE FACT"
   },
   B85: {
     codeString: "B270:0,-8;B86:1,0",
     isIndicator: true,
     anchorOffsetX:  0.5,
-    width: 3
+    width: 3,
+    name: "INDICATOR DESCRIPTION BEFORE THE FACT"
   },
   B86: {
     codeString: "AA2S:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR DESCRIPTION"
   },
   B87: {
     codeString: "HW2W:0,4",
     isIndicator: true,
-    width: 0.5
+    width: 0.5,
+    name: "INDICATOR FUTURE"
   },
   B88: {
     codeString: "B83;B87:2,0",
     isIndicator: true,
-    width: 2.5
+    width: 2.5,
+    name: "INDICATOR FUTURE CONDITIONAL"
   },
   B89: {
     codeString: "B91;B87:3,0",
     isIndicator: true,
-    width: 3.5
+    width: 3.5,
+    name: "INDICATOR FUTURE PASSIVE"
   },
   B90: {
     codeString: "B91;B88:3,0",
     isIndicator: true,
-    width: 5.5
+    width: 5.5,
+    name: "INDICATOR FUTURE PASSIVE CONDITIONAL"
   },
   B91: {
     codeString: "AA2W:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR PASSIVE"
   },
   B92: {
     codeString: "HW2E:0,4",
     isIndicator: true,
-    width: 0.5
+    width: 0.5,
+    name: "INDICATOR PAST"
   },
   B93: {
     codeString: "B83;B92:2,0",
     isIndicator: true,
-    width: 2.5
+    width: 2.5,
+    name: "INDICATOR PAST CONDITIONAL"
   },
   B94: {
     codeString: "B91;B93:3,0",
     isIndicator: true,
-    width: 5.5
+    width: 5.5,
+    name: "INDICATOR PAST PASSIVE CONDITIONAL"
   },
   B95: {
     codeString: "B91;B92:3,0",
     isIndicator: true,
-    width: 3.5
+    width: 3.5,
+    name: "INDICATOR PAST PASSIVE"
   },
   B96: {
     codeString: "B91;B83:3,0",
     isIndicator: true,
-    width: 4
+    width: 4,
+    name: "INDICATOR PRESENT PASSIVE CONDITIONAL"
   },
   B97: {
     codeString: "S2:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR THING"
   },
   B98: {
     codeString: "B97;B99:3,0",
     isIndicator: true,
-    width: 5
+    width: 5,
+    name: "INDICATOR PLURAL THING"
   },
   B99: {
     codeString: "DC2:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR PLURAL"
   },
   B100: {
     codeString: "DL2S:0,11"
@@ -2987,71 +3006,94 @@ const glyphData = {
   B902: {
     codeString: "B86;B81:2,0",
     isIndicator: true,
-    width: 4
+    width: 4,
+    name: "INDICATOR DESCRIPTION OF ACTION"
   },
   B903: {
     codeString: "HL2:0,5",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR CONTINUOUS"
   },
   B904: {
     codeString: "DL2N:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR DEFINITE"
   },
+  // Not planned for Unicode
   B905: {
     codeString: "AT2N:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR FEMININE"
   },
+  // Not planned for Unicode
   B906: {
     codeString: "VL2:0.5,4;HL1:0,6;DL.5N:0,4",
     isIndicator: true,
-    width: 1
+    width: 1,
+    name: "INDICATOR FIRST PERSON"
   },
   B907: {
     codeString: "VL1.25:0,4;DOT:0,6",
     isIndicator: true,
-    width: 0
+    width: 0,
+    name: "INDICATOR IMPERATIVE"
   },
+  // Not planned for Unicode
   B908: {
     codeString: "DL2S:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR INDEFINITE"
   },
+  // Not planned for Unicode
   B909: {
     codeString: "VL2:0,4",
     isIndicator: true,
-    width: 0
+    width: 0,
+    name: "INDICATOR NEUTER"
   },
+  // Not planned for Unicode
   B910: {
     codeString: "P2E:0,4;VL2:2,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR DIRECT OBJECT"
   },
   B911: {
     codeString: "B92;B86:1.5,0",
     isIndicator: true,
-    width: 3.5
+    width: 3.5,
+    name: "INDICATOR PAST PARTICIPLE"
   },
   B912: {
     codeString: "B92;B270:1.5,-8",
     isIndicator: true,
-    width: 1.5
+    width: 1.5,
+    name: "INDICATOR PAST PERFECTIVE PARTICIPLE"
   },
+  // Not planned for Unicode
   B913: {
     codeString: "SC2:0,4",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR POSSESSIVE"
   },
   B914: {
     codeString: "B928;B86:3,0",
     isIndicator: true,
-    width: 5
+    width: 5,
+    name: "INDICATOR PRESENT PARTICIPLE"
   },
+  // Not planned for Unicode
   B915: {
     codeString: "HC1N:0,4;DL1-1.5N:0,4.5;HL1:0,6",
     isIndicator: true,
-    width: 1
+    width: 1,
+    name: "INDICATOR SECOND PERSON"
   },
+  // Not planned for Unicode
   B916: {
     codeString: "OC1SW:0,4;OC1NW:0,5",
     isIndicator: true,
-    width: 1
+    width: 1,
+    name: "INDICATOR THIRD PERSON"
   },
   B917: {
     codeString: "B239;LARR4E:8,10",
@@ -3092,7 +3134,8 @@ const glyphData = {
   },
   B928: {
     codeString: "B92;B87:1.5,0",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR PRESENT"
   },
   B929: {
     codeString: "B335;B651:8,0",
@@ -3294,9 +3337,11 @@ const glyphData = {
   B991: {
     codeString: "B447;B288:2,0"
   },
+  // Not planned for Unicode
   B992: {
     codeString: "HL2:0,4;VL2:1,4;HL2:0,6",
-    isIndicator: true
+    isIndicator: true,
+    name: "INDICATOR DIMINUTIVE"
   },
   B993: {
     codeString: "HW8W:0,8;HL4:2,8;HL4:2,16;HW8E:6,8;DOT:4,12"
@@ -3916,17 +3961,20 @@ const glyphData = {
   B5996: {
     codeString: "B99;B904:3,0",
     isIndicator: true,
-    width: 5
+    width: 5,
+    name: "INDICATOR DEFINITE PLURAL"
   },
   B5997: {
     codeString: "B97;B904:3,0",
     isIndicator: true,
-    width: 5
+    width: 5,
+    name: "INDICATOR DEFINITE THING"
   },
   B5998: {
     codeString: "B97;B5996:3,0",
     isIndicator: true,
-    width: 8
+    width: 8,
+    name: "INDICATOR DEFINITE PLURAL THING"
   },
   B5999: {
     codeString: "B956:0,2"
