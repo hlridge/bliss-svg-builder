@@ -51,5 +51,5 @@ Style with options:
 Bliss-SVG-Builder makes it easy to work with the graphical representation of Bliss programmatically, supporting recursive composition of graphical elements and Bliss characters into complete Bliss sentences using SVG.
 
 <div style="text-align: center; margin: 3rem 0;">
-  <a href="/get-started/installation-setup" class="vp-button brand medium">Get Started</a>
+  <a href="./get-started/installation-setup" class="vp-button brand medium">Get Started</a>
 </div>
