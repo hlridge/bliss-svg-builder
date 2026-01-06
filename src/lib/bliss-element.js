@@ -32,6 +32,7 @@ export class BlissElement {
   #childStartOffset
   #parentElement;
   #previousElement;
+  #classifiedParts; // Cached result of #classifyParts (level 2 only)
 
   /**
    * Wraps content with <a> and/or <g> tags based on options.
@@ -131,7 +132,50 @@ export class BlissElement {
     };
   }
 
+  /**
+   * Classifies character parts into glyph parts and indicator parts.
+   * Valid pattern: [non-indicators...][indicators...] (no mixing)
+   *
+   * @param {BlissElement[]} children - Array of child elements to classify
+   * @returns {{ glyphParts: BlissElement[], indicatorParts: BlissElement[], isValidPattern: boolean }}
+   */
+  static #classifyParts(children) {
+    if (!children || children.length === 0) {
+      return { glyphParts: [], indicatorParts: [], isValidPattern: true };
+    }
+
+    const firstIndicatorIndex = children.findIndex(c => c.isIndicator);
+
+    // No indicators: all parts are glyph parts
+    if (firstIndicatorIndex === -1) {
+      return { glyphParts: children, indicatorParts: [], isValidPattern: true };
+    }
+
+    const glyphParts = children.slice(0, firstIndicatorIndex);
+    const indicatorParts = children.slice(firstIndicatorIndex);
+
+    // Validate: no non-indicators after the first indicator
+    const isValidPattern = indicatorParts.every(c => c.isIndicator);
+
+    return { glyphParts, indicatorParts, isValidPattern };
+  }
+
   #sharedOptions;
+
+  /**
+   * Gets the first character element of the first group (level 2 element).
+   * Returns null if the structure doesn't have the expected depth.
+   * @returns {BlissElement|null}
+   */
+  #getFirstCharacterElement() {
+    const firstGroup = this.#children?.[0];
+    if (!firstGroup) return null;
+
+    const firstCharacter = firstGroup.#children?.[0];
+    if (!firstCharacter || !firstCharacter.#children) return null;
+
+    return firstCharacter;
+  }
 
   /**
    * Gets inherited options by walking up the parent chain.
@@ -153,6 +197,99 @@ export class BlissElement {
       current = current.#parentElement;
     }
     return undefined;
+  }
+
+  /**
+   * Positions indicator parts as a centered group above the glyph.
+   * First indicator is positioned so the entire group is centered over the glyph anchor.
+   * Subsequent indicators are positioned relative to the previous indicator.
+   *
+   * @param {BlissElement[]} glyphParts - The non-indicator parts (the base glyph)
+   * @param {BlissElement[]} indicatorParts - The indicator parts to position
+   */
+  #positionIndicatorGroup(glyphParts, indicatorParts) {
+    if (indicatorParts.length === 0) return;
+
+    // Calculate base glyph metrics
+    // For glyph width, we need the combined width of all glyph parts
+    const glyphMinX = glyphParts.length > 0
+      ? Math.min(...glyphParts.map(p => p.#relativeToParentX))
+      : 0;
+    const glyphMaxX = glyphParts.length > 0
+      ? Math.max(...glyphParts.map(p => p.#relativeToParentX + p.width))
+      : 0;
+    const glyphWidth = glyphMaxX - glyphMinX;
+    const glyphCenterX = glyphMinX + glyphWidth / 2;
+
+    // Get anchor offset from first glyph part (or default to 0)
+    const baseAnchorOffsetX = glyphParts[0]?.anchorOffset?.x || 0;
+    const baseAnchorOffsetY = glyphParts[0]?.anchorOffset?.y || 0;
+    const anchorX = glyphCenterX + baseAnchorOffsetX;
+
+    // Calculate total indicator group width (including gaps)
+    const INDICATOR_GAP = 1;
+    const totalIndicatorWidth = indicatorParts.reduce((sum, ind) => sum + ind.width, 0)
+      + (indicatorParts.length - 1) * INDICATOR_GAP;
+
+    // Calculate shift to center ANCHORS (not visual edges) over glyph anchor.
+    //
+    // Each indicator has an anchor point at: position + width/2 + anchorOffsetX
+    // We want the midpoint of first and last anchors to align with glyphAnchorX.
+    //
+    // SINGLE INDICATOR:
+    //   anchor = x + width/2 + anchorOffsetX
+    //   We want: anchor = glyphAnchorX
+    //   So: x = glyphAnchorX - width/2 - anchorOffsetX
+    //   Without shift: x = glyphAnchorX - width/2
+    //   Therefore: shift = -anchorOffsetX
+    //
+    // MULTIPLE INDICATORS (derivation for first/last anchor midpoint):
+    //   Let P = starting position (first indicator's x)
+    //   First anchor:  P + w1/2 + a1
+    //   Last anchor:   P + totalWidth - w2/2 + a2  (where totalWidth includes gaps)
+    //   Midpoint = (firstAnchor + lastAnchor) / 2
+    //            = P + (w1/2 + a1 + totalWidth - w2/2 + a2) / 2
+    //   We want midpoint = glyphAnchorX, so:
+    //   P = glyphAnchorX - (w1/2 + a1 + totalWidth - w2/2 + a2) / 2
+    //     = glyphAnchorX - totalWidth/2 - (w1 - w2)/4 - (a1 + a2)/2
+    //   Without shift: P = glyphAnchorX - totalWidth/2
+    //   Therefore: shift = -(w1 - w2)/4 - (a1 + a2)/2
+    //                    = (w2 - w1)/4 - (a1 + a2)/2
+    //
+    const firstAnchorOffsetX = indicatorParts[0].anchorOffset?.x || 0;
+    const lastAnchorOffsetX = indicatorParts[indicatorParts.length - 1].anchorOffset?.x || 0;
+    const anchorShift = indicatorParts.length > 1
+      ? (indicatorParts[indicatorParts.length - 1].width - indicatorParts[0].width) / 4
+        - firstAnchorOffsetX / 2 - lastAnchorOffsetX / 2
+      : -firstAnchorOffsetX;
+
+    // Position indicators
+    let currentX = anchorX - totalIndicatorWidth / 2 + anchorShift;
+
+    for (const indicator of indicatorParts) {
+      // X positioning: only override if no explicit x was provided
+      // Position by left edge to maintain visual 1-unit gaps between indicators
+      // (indicator's anchorOffsetX is NOT used here - it's for single indicator centering only)
+      if (indicator.#blissObj.x === undefined) {
+        indicator.#relativeToParentX = currentX;
+      } else {
+        indicator.#relativeToParentX = indicator.#blissObj.x;
+      }
+
+      // Y positioning: use same logic as before, but reference base glyph
+      if (indicator.#blissObj.y !== undefined) {
+        indicator.#relativeToParentY = indicator.#blissObj.y;
+      } else {
+        const defaultIndicatorY = 4;
+        const baseDefaultAnchorY = 4;
+        const baseAnchorY = baseDefaultAnchorY + baseAnchorOffsetY;
+        const indicatorAnchorOffsetY = indicator.#blissObj.anchorOffsetY || 0;
+        indicator.#relativeToParentY = baseAnchorY - indicatorAnchorOffsetY - defaultIndicatorY;
+      }
+
+      // Move to next indicator position
+      currentX += indicator.width + INDICATOR_GAP;
+    }
   }
 
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0, sharedOptions = null } = {}) {
@@ -181,37 +318,20 @@ export class BlissElement {
         this.#children.push(child);
       }
       
-      try {
-        // Checks if the first glyph of the first group of the entire sequence is a glyph with indicator.
-        // TODO: add option for if overhang is accepted?
-        if (level === 0 &&
-            this.#children && 
-            this.#children[0] && 
-            this.#children[0].#children && 
-            this.#children[0].#children[0] && 
-            this.#children[0].#children[0].#children) {
-          const parentElement = this.#children[0].#children[0];
-          const nestedChildren = parentElement.#children;
-          
-          if (nestedChildren.length === 2) {
-            const firstChild = nestedChildren[0];
-            const secondChild = nestedChildren[1];
-            
-            if (!parentElement.isIndicator && !firstChild.isIndicator && secondChild.isIndicator) {
-              if (secondChild.#blissObj.x !== undefined) {
-                this.#childStartOffset = -secondChild.#blissObj.x || 0;
-              } else {
-                this.#childStartOffset = (secondChild.width / 2 + (secondChild.anchorOffset.x || 0)) - 
-                  (firstChild.width / 2 + (firstChild.anchorOffset.x || 0));
-              }
-              if (this.#childStartOffset < 0) {
-                this.#childStartOffset = 0;
-              }
-            }
+      // Calculate indicator overhang for first character
+      // TODO: add option for if overhang is accepted?
+      const firstCharacter = this.#getFirstCharacterElement();
+      if (firstCharacter && firstCharacter.#classifiedParts) {
+        const { glyphParts, indicatorParts } = firstCharacter.#classifiedParts;
+
+        // Only calculate overhang if we have both glyph parts and indicator parts
+        if (glyphParts.length > 0 && indicatorParts.length > 0 && !firstCharacter.isIndicator) {
+          // Find how far the leftmost indicator extends left of x=0 (glyph start)
+          const indicatorLeftX = indicatorParts[0].#relativeToParentX;
+          if (indicatorLeftX < 0) {
+            this.#childStartOffset = -indicatorLeftX;
           }
-        }  
-      } catch (e) {
-        console.warn("Error calculating indicator position: ", e);
+        }
       }
       this.#relativeToParentX = this.#childStartOffset + (this.#blissObj.x ?? 0);
       this.#relativeToParentY = this.#blissObj.y ?? 0;
@@ -326,13 +446,24 @@ export class BlissElement {
           this.#children.push(child);
         }
 
-        // Normalize: shift all parts so the leftmost part starts at x=0
-        // Skip normalization if this character contains a combining indicator
-        const hasCombiningIndicator = this.#children.length === 2 &&
-          !this.#children[0].isIndicator &&
-          this.#children[1].isIndicator;
+        // Classify parts into glyph parts and indicator parts (cache for reuse by getters)
+        this.#classifiedParts = BlissElement.#classifyParts(this.#children);
+        const { glyphParts, indicatorParts, isValidPattern } = this.#classifiedParts;
 
-        if (!hasCombiningIndicator && this.#children.length > 0) {
+        // Position indicators as a centered group above the glyph
+        // Only apply when:
+        // - We have BOTH glyph parts AND indicator parts
+        // - The pattern is valid (no non-indicators after the first indicator)
+        // Invalid patterns (e.g., B291;B99;H) are treated as default combination, not special indicator positioning
+        // All-indicator composites (e.g., B98) keep their internal positioning
+        const hasGlyphWithIndicators = glyphParts.length > 0 && indicatorParts.length > 0 && isValidPattern;
+        if (hasGlyphWithIndicators) {
+          this.#positionIndicatorGroup(glyphParts, indicatorParts);
+        }
+
+        // Normalize: shift parts so the leftmost starts at x=0
+        // Skip normalization for characters with indicators above glyph (they have their own positioning)
+        if (!hasGlyphWithIndicators && this.#children.length > 0) {
           const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
           if (minX !== 0) {
             for (const child of this.#children) {
@@ -490,19 +621,15 @@ export class BlissElement {
   get rightExtendedGlyphWidth() {
     if (this.#level !== 2) throw new Error('rightExtendedGlyphWidth can only be called on glyph elements (level 2)');
 
-    const glyph = this;
-    const parts = glyph.#children;
-
+    const parts = this.#children;
     if (parts.length === 0) return 0;
     if (parts.length === 1) return parts[0].width;
 
-    const allPartsAreIndicators = parts.every(part => part.isIndicator);
-    const lastPartIsIndicator = parts[parts.length - 1].isIndicator;
+    // Use cached classification (computed once in constructor)
+    const { glyphParts } = this.#classifiedParts;
 
-    let spacingParts = parts;
-    if (lastPartIsIndicator && !allPartsAreIndicators) {
-      spacingParts = parts.slice(0, -1);
-    }
+    // If no glyph parts (all indicators), use all parts for spacing
+    const spacingParts = glyphParts.length > 0 ? glyphParts : parts;
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...parts.map(part => part.#relativeToParentX + part.width));
@@ -514,21 +641,15 @@ export class BlissElement {
   get baseGlyphWidth() {
     if (this.#level !== 2) throw new Error('baseGlyphWidth can only be called on glyph elements (level 2)');
 
-    const glyph = this;
-    const parts = glyph.#children;
-
+    const parts = this.#children;
     if (parts.length === 0) return 0;
-    if (parts.length === 1) {
-      return parts[0].width;
-    }
+    if (parts.length === 1) return parts[0].width;
 
-    const allPartsAreIndicators = parts.every(part => part.isIndicator);
-    const lastPartIsIndicator = parts[parts.length - 1].isIndicator;
+    // Use cached classification (computed once in constructor)
+    const { glyphParts } = this.#classifiedParts;
 
-    let spacingParts = parts;
-    if (lastPartIsIndicator && !allPartsAreIndicators) {
-      spacingParts = parts.slice(0, -1);
-    }
+    // If no glyph parts (all indicators), use all parts for width
+    const spacingParts = glyphParts.length > 0 ? glyphParts : parts;
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...spacingParts.map(part => part.#relativeToParentX + part.width));
@@ -929,16 +1050,13 @@ export class BlissElement {
       this.#children.push(child);
     }
 
-    const isThisIndicator = this.isIndicator;
-    const isParentIndicator = this.#parentElement.isIndicator;
-    const isPreviousIndicator = this.#previousElement?.isIndicator;
-    const isPreviousBaseCharacter = this.#previousElement && !isPreviousIndicator;
-    const parentHasTwoParts = this.#parentElement && this.#parentElement.#blissObj.parts?.length === 2;
-    const isThisCombiningIndicator = this.#level === 3 && isThisIndicator && !isParentIndicator && isPreviousBaseCharacter && parentHasTwoParts;
+    // Check if this is an indicator at level 3 that will be positioned by #positionIndicatorGroup
+    // If so, skip normalization here - let level 2 handle the positioning
+    const isIndicatorAtLevel3 = this.#level === 3 && this.isIndicator;
 
     // Normalize: shift all child parts so the leftmost part starts at x=0
-    // Skip normalization for combining indicators (they have their own positioning logic)
-    if (!isThisCombiningIndicator && this.#children.length > 0) {
+    // Skip normalization for indicators that will be positioned by the parent's #positionIndicatorGroup
+    if (!isIndicatorAtLevel3 && this.#children.length > 0) {
       const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
       if (minX !== 0) {
         for (const child of this.#children) {
@@ -947,31 +1065,8 @@ export class BlissElement {
       }
     }
 
-    if (isThisCombiningIndicator) {
-      if (this.#blissObj.x !== undefined) {
-        this.#relativeToParentX = this.#blissObj.x;
-      } else {
-        const baseCharacterCenterX = this.#previousElement.width / 2;
-        const baseCharacterAnchorX = baseCharacterCenterX + (this.#previousElement.anchorOffset.x || 0);
-        const indicatorWidth = this.#blissObj.width ?? 2;
-        const indicatorHalfWidth  = indicatorWidth / 2;
-        const indicatorAnchorOffsetX = this.#blissObj.anchorOffsetX || 0;
-        this.#relativeToParentX = baseCharacterAnchorX - indicatorHalfWidth - indicatorAnchorOffsetX;
-      }
-
-      if (this.#blissObj.y !== undefined) {
-        // Explicit y coordinates are relative to the default position (0 for element, 4 for drawing)
-        // So we just use the value directly as the element's relativeToParentY
-        this.#relativeToParentY = this.#blissObj.y;
-      } else {
-        // Implicit positioning: calculate based on base character's anchor point
-        const defaultIndicatorRelativeToParentY = 4;
-        const baseCharacterDefaultAnchorY = 4;
-        const baseCharacterAnchorY = baseCharacterDefaultAnchorY + (this.#previousElement.anchorOffset.y || 0);
-        const indicatorAnchorOffsetY = this.#blissObj.anchorOffsetY || 0; //rare
-        this.#relativeToParentY = baseCharacterAnchorY - indicatorAnchorOffsetY - defaultIndicatorRelativeToParentY; //TODO: test continuous form.
-      }
-    }
+    // Note: Indicator positioning (X and Y) is now handled at level 2 by #positionIndicatorGroup
+    // This method no longer needs to calculate indicator positions
 
     this.#anchorOffsetX = this.#blissObj.anchorOffsetX || 0;
     this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
