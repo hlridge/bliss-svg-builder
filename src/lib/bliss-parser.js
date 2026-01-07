@@ -287,11 +287,18 @@ export class BlissParser {
       }
 
       function replaceWithDefinition(str, definitions) {
+        const wordCode = str;
+        let headGlyphFound = false;
+
         function expand(str, definitions) {
-          // Strip head glyph marker (^) FIRST, before any processing
           let isHeadGlyph = false;
           if (str.endsWith('^')) {
-            isHeadGlyph = true;
+            if (!headGlyphFound) {
+              isHeadGlyph = true;
+              headGlyphFound = true;
+            } else {
+              console.warn(`Multiple head markers (^) found in word: ${wordCode}. Using first marked glyph.`);
+            }
             str = str.slice(0, -1);
           }
 
