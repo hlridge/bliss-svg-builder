@@ -6,6 +6,7 @@
 
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
+import { blissModifiers } from "./bliss-modifiers.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -323,11 +324,92 @@ export class BlissParser {
           const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
           const optionsPrefix = optionsMatch ? optionsMatch[1] : '';
           const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
-          const definition = definitions[codeForLookup] || {};
+
+          // Check if this might be a WORD;INDICATORS pattern
+          const [potentialBaseCode, ...rawIndicators] = codeForLookup.split(';');
+
+          // Recursively resolve codeString to final form to check if it's a word
+          // This handles aliases like TestAlias → TestWord1 → 'H^/C'
+          const resolveToFinalCodeString = (code, visited = new Set()) => {
+            if (visited.has(code)) return null; // Cycle detection
+            visited.add(code);
+            const def = definitions[code];
+            if (!def?.codeString) return null;
+            // If codeString doesn't exist as a definition, it's the final form
+            if (!definitions[def.codeString]) return def.codeString;
+            // Otherwise, recursively resolve
+            return resolveToFinalCodeString(def.codeString, visited);
+          };
+          const resolvedCodeString = resolveToFinalCodeString(potentialBaseCode);
+          const isWordDefinition = resolvedCodeString?.includes('/') ?? false;
+
+          // Check if input has indicators that might replace existing ones
+          const hasInputIndicators = rawIndicators.length > 0;
+          // Helper: get the bare code from a string that may have options prefix
+          // Uses same logic as main parser (lines 308-326)
+          const getBareCode = (str) => {
+            // Part-level options: [options]>CODE
+            const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
+            if (partLevelMatch) {
+              return partLevelMatch[2].split(':')[0].split(';')[0];
+            }
+            // Glyph-level options: [options]CODE (not followed by >)
+            const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
+            const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
+            return code.split(':')[0].split(';')[0];
+          };
+          // Check if input indicators are actual indicators (isIndicator: true)
+          const inputIndicatorsAreRealIndicators = hasInputIndicators &&
+            rawIndicators.filter(ind => ind !== '').every(ind => definitions[getBareCode(ind)]?.isIndicator === true);
+
+          // Check if base code's definition has real indicators in its codeString
+          const baseCodeDef = definitions[potentialBaseCode];
+          const baseCodeStringParts = baseCodeDef?.codeString?.split(';') || [];
+          const baseCodeExistingIndicators = baseCodeStringParts.slice(1).map(p => p.split(':')[0]);
+          const baseCodeHasRealIndicators = baseCodeExistingIndicators.length > 0 &&
+            baseCodeExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
+
+          // For words: always use potentialBaseCode
+          // For characters: only use potentialBaseCode if we can replace indicators (both input and codeString have real indicators)
+          const canReplaceCharacterIndicators = !isWordDefinition && inputIndicatorsAreRealIndicators && baseCodeHasRealIndicators;
+          const useBaseCodeLookup = isWordDefinition || canReplaceCharacterIndicators ||
+            // Also handle removal: input has empty indicator and base code has real indicators
+            (!isWordDefinition && hasInputIndicators && rawIndicators.filter(ind => ind !== '').length === 0 && baseCodeHasRealIndicators);
+          const definition = useBaseCodeLookup
+            ? (definitions[potentialBaseCode] || {})
+            : (definitions[codeForLookup] || {});
+          const filteredIndicators = useBaseCodeLookup ? rawIndicators.filter(ind => ind !== '') : [];
 
           // If we have a codeString, recursively expand it
           if (definition.codeString) {
-            const expandedParts = definition.codeString.split('/')
+            // For non-words with indicator replacement: strip existing indicators from codeString
+            // Only replace if both the codeString's parts after ; AND the new parts are actual indicators
+            let codeStringToExpand = definition.codeString;
+
+            // Check if codeString has indicator parts (parts after first ; that are actual indicators)
+            const codeStringParts = definition.codeString.split(';');
+            const codeStringExistingIndicators = codeStringParts.slice(1).map(p => p.split(':')[0]); // Strip positioning
+            const codeStringHasRealIndicators = codeStringExistingIndicators.length > 0 &&
+              codeStringExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
+
+            // Replace indicators when: non-word, codeString has real indicators, and input has real indicators
+            const shouldReplaceIndicators = !isWordDefinition && inputIndicatorsAreRealIndicators &&
+              codeStringHasRealIndicators && !definition.codeString.includes('/');
+            // Also handle indicator removal (empty indicator like B291B97;)
+            const shouldRemoveIndicators = !isWordDefinition && hasInputIndicators && filteredIndicators.length === 0 &&
+              codeStringHasRealIndicators && !definition.codeString.includes('/');
+
+            if (shouldReplaceIndicators || shouldRemoveIndicators) {
+              // Strip existing indicators (everything after first ;)
+              codeStringToExpand = codeStringParts[0];
+              // If we have replacement indicators, add them
+              if (filteredIndicators.length > 0) {
+                codeStringToExpand += ';' + filteredIndicators.join(';');
+              }
+              // If filteredIndicators is empty, we just removed them (e.g., B291B97;)
+            }
+
+            const expandedParts = codeStringToExpand.split('/')
               .flatMap(subStr => expand(subStr, definitions))
               .map(expandedSubPart => {
                 // Apply properties from the definition, falling back to existing values
@@ -336,8 +418,8 @@ export class BlissParser {
                 const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
                 const glyph = expandedSubPart.glyph;
                 const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
-                const glyphCode = definition.glyphCode;
-                const isBlissGlyph = definition.isBlissGlyph;
+                const glyphCode = expandedSubPart.glyphCode ?? definition.glyphCode;
+                const isBlissGlyph = expandedSubPart.isBlissGlyph ?? definition.isBlissGlyph;
                 return {
                   part: expandedSubPart.part,
                   ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
@@ -346,13 +428,83 @@ export class BlissParser {
                   ...(glyph && { glyph }),
                   ...(kerningRules && { kerningRules }),
                   ...(glyphCode && { glyphCode }),
-                  ...(isBlissGlyph && { isBlissGlyph })
+                  ...(isBlissGlyph && { isBlissGlyph }),
+                  ...(expandedSubPart.isHeadGlyph && { isHeadGlyph: expandedSubPart.isHeadGlyph })
                 };
               });
-            // Apply isHeadGlyph to the first expanded part only
+
+            // Helper: Find head glyph index (explicit marker or fallback skipping modifiers)
+            const findHeadGlyphIndex = (parts) => {
+              // Check for explicit marker first
+              const explicitIndex = parts.findIndex(p => p.isHeadGlyph);
+              if (explicitIndex !== -1) return explicitIndex;
+
+              // Fallback: skip modifier patterns (keep matching until no more found)
+              let startIndex = 0;
+              let foundMatch = true;
+              while (foundMatch && startIndex < parts.length) {
+                foundMatch = false;
+                for (const modifierPattern of blissModifiers) {
+                  const modifierCodes = modifierPattern.split('/');
+                  if (startIndex + modifierCodes.length <= parts.length) {
+                    let matches = true;
+                    for (let i = 0; i < modifierCodes.length; i++) {
+                      // Check glyphCode first (preserved after expansion), then fall back to part
+                      const glyphCode = parts[startIndex + i].glyphCode || parts[startIndex + i].part.split(';')[0];
+                      if (glyphCode !== modifierCodes[i]) {
+                        matches = false;
+                        break;
+                      }
+                    }
+                    if (matches) {
+                      startIndex += modifierCodes.length;
+                      foundMatch = true;
+                      break; // Restart pattern matching from new position
+                    }
+                  }
+                }
+              }
+              return startIndex < parts.length ? startIndex : 0;
+            };
+
+            // Handle WORD;INDICATORS syntax (only for words, not single characters)
+            // Single characters with indicators are handled by parseParts later
+            if (isWordDefinition && filteredIndicators.length > 0 && expandedParts.length > 1) {
+              // It's a word (multiple glyphs) - strip and replace indicators on head glyph
+              const targetIndex = findHeadGlyphIndex(expandedParts);
+
+              // Strip existing indicators from head glyph part
+              const headPart = expandedParts[targetIndex].part;
+              const basePartWithoutIndicators = headPart.split(';')[0];
+
+              // Reattach with new indicators
+              expandedParts[targetIndex].part = basePartWithoutIndicators + ';' + filteredIndicators.join(';');
+            }
+
+            // Handle WORD; (empty indicators) - removal for words only
+            if (isWordDefinition && rawIndicators.length > 0 && filteredIndicators.length === 0 && expandedParts.length > 1) {
+              const targetIndex = findHeadGlyphIndex(expandedParts);
+
+              // Strip existing indicators from head glyph part
+              const headPart = expandedParts[targetIndex].part;
+              const basePartWithoutIndicators = headPart.split(';')[0];
+              expandedParts[targetIndex].part = basePartWithoutIndicators;
+            }
+
+            // Apply isHeadGlyph to the first expanded part only (explicit ^ marker)
             if (isHeadGlyph && expandedParts.length > 0) {
               expandedParts[0].isHeadGlyph = true;
             }
+
+            // For words without explicit marker: set isHeadGlyph only if fallback finds non-default (index > 0)
+            // This keeps data clean for toString() - only mark when deviating from default
+            if (!isHeadGlyph && expandedParts.length > 1 && !expandedParts.some(p => p.isHeadGlyph)) {
+              const fallbackIndex = findHeadGlyphIndex(expandedParts);
+              if (fallbackIndex > 0) {
+                expandedParts[fallbackIndex].isHeadGlyph = true;
+              }
+            }
+
             // Prepend options to the first expanded part
             if (optionsPrefix && expandedParts.length > 0) {
               expandedParts[0].part = optionsPrefix + expandedParts[0].part;
@@ -443,7 +595,7 @@ export class BlissParser {
             const codeString = definition.codeString;
 
             if (codeString) {
-              if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString].codeString ) {
+              if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {
                 part.parts = parseParts(definition.codeString);
                 // Keep part.code to preserve identifier alongside expansion
               } else {
