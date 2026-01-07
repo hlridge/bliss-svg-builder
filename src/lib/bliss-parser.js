@@ -288,6 +288,13 @@ export class BlissParser {
 
       function replaceWithDefinition(str, definitions) {
         function expand(str, definitions) {
+          // Strip head glyph marker (^) FIRST, before any processing
+          let isHeadGlyph = false;
+          if (str.endsWith('^')) {
+            isHeadGlyph = true;
+            str = str.slice(0, -1);
+          }
+
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
           // Don't expand codeString, but DO get kerning rules for external glyphs
           const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
@@ -297,6 +304,7 @@ export class BlissParser {
             // Return original string unchanged, but include kerning-related properties
             return [{
               part: str,
+              ...(isHeadGlyph && { isHeadGlyph }),
               ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
               ...(definition.glyph && { glyph: definition.glyph }),
               ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
@@ -334,6 +342,10 @@ export class BlissParser {
                   ...(isBlissGlyph && { isBlissGlyph })
                 };
               });
+            // Apply isHeadGlyph to the first expanded part only
+            if (isHeadGlyph && expandedParts.length > 0) {
+              expandedParts[0].isHeadGlyph = true;
+            }
             // Prepend options to the first expanded part
             if (optionsPrefix && expandedParts.length > 0) {
               expandedParts[0].part = optionsPrefix + expandedParts[0].part;
@@ -357,7 +369,8 @@ export class BlissParser {
             ...(glyph && { glyph }),
             ...(kerningRules && { kerningRules }),
             ...(glyphCode && { glyphCode }),
-            ...(isBlissGlyph && { isBlissGlyph })
+            ...(isBlissGlyph && { isBlissGlyph }),
+            ...(isHeadGlyph && { isHeadGlyph })
           }];
         }
 
@@ -370,7 +383,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph } of expandedGlyphParts) {
         if (part === "") continue;
 
         const glyphObj = {
@@ -381,7 +394,8 @@ export class BlissParser {
           ...(typeof glyph === "string" && { glyph }),
           ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules }),
           ...(typeof glyphCode === "string" && { glyphCode }),
-          ...(isBlissGlyph === true && { isBlissGlyph })
+          ...(isBlissGlyph === true && { isBlissGlyph }),
+          ...(isHeadGlyph === true && { isHeadGlyph })
         };
 
         const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);
@@ -424,7 +438,7 @@ export class BlissParser {
             if (codeString) {
               if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString].codeString ) {
                 part.parts = parseParts(definition.codeString);
-                delete part.code;  
+                // Keep part.code to preserve identifier alongside expansion
               } else {
                 part.code = definition.codeString;
               }
