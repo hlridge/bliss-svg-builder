@@ -5,6 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
+import { blissModifiers } from "./bliss-modifiers.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -158,6 +159,53 @@ export class BlissElement {
     const isValidPattern = indicatorParts.every(c => c.isIndicator);
 
     return { glyphParts, indicatorParts, isValidPattern };
+  }
+
+  /**
+   * Determines which glyph should be the head glyph (receive grammatical indicators).
+   * Uses explicit ^  marker if present, otherwise applies fallback heuristics.
+   *
+   * Fallback rules (applied when no explicit marker):
+   * 1. Skip modifier patterns defined in blissModifiers at start of word
+   * 2. Default to first remaining glyph
+   *
+   * @param {Array} glyphs - Array of glyph objects from parser (with glyphCode, isHeadGlyph, etc.)
+   * @returns {number} Index of the head glyph (0-based)
+   */
+  static #determineHeadGlyphIndex(glyphs) {
+    if (!glyphs || glyphs.length === 0) return 0;
+
+    // Check for explicit marker
+    const explicitIndex = glyphs.findIndex(g => g.isHeadGlyph === true);
+    if (explicitIndex !== -1) return explicitIndex;
+
+    // Apply fallback heuristics
+    let startIndex = 0;
+
+    // Parse modifier patterns (codeStrings like "B486" or "B1060/B578/B303")
+    for (const modifierPattern of blissModifiers) {
+      const modifierCodes = modifierPattern.split('/');
+
+      // Check if glyphs at startIndex match this modifier pattern
+      if (startIndex + modifierCodes.length <= glyphs.length) {
+        let matches = true;
+        for (let i = 0; i < modifierCodes.length; i++) {
+          const glyphCode = glyphs[startIndex + i].glyphCode || glyphs[startIndex + i].parts?.[0]?.code;
+          if (glyphCode !== modifierCodes[i]) {
+            matches = false;
+            break;
+          }
+        }
+
+        if (matches) {
+          // Skip this modifier pattern
+          startIndex += modifierCodes.length;
+        }
+      }
+    }
+
+    // Default to first non-modifier glyph (or first if all are modifiers)
+    return startIndex < glyphs.length ? startIndex : 0;
   }
 
   #sharedOptions;
@@ -372,6 +420,12 @@ export class BlissElement {
         const child = new BlissElement(glyph, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
         child.type = "glyph";
         this.#children.push(child);
+      }
+
+      // Determine head glyph using explicit marker or fallback heuristics
+      const headGlyphIndex = BlissElement.#determineHeadGlyphIndex(this.#blissObj.glyphs);
+      if (headGlyphIndex >= 0 && headGlyphIndex < this.#blissObj.glyphs.length) {
+        this.#blissObj.glyphs[headGlyphIndex].isHeadGlyph = true;
       }
 
       // Check if this is a space group (all glyphs are space glyphs: TSP or QSP)
