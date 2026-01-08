@@ -291,8 +291,28 @@ export class BlissParser {
         const wordCode = str;
         let headGlyphFound = false;
 
-        // allowIndicatorReplacement: true for top-level user input, false for codeString expansion
-        function expand(str, definitions, allowIndicatorReplacement = true) {
+        // Helper: get bare code from string with potential options prefix
+        const getBareCode = (str) => {
+          const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
+          if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
+          const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
+          const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
+          return code.split(':')[0].split(';')[0];
+        };
+
+        // Helper: resolve codeString through aliases to check if it's a word
+        const resolveToFinalCodeString = (code, visited = new Set()) => {
+          if (visited.has(code)) return null;
+          visited.add(code);
+          const def = definitions[code];
+          if (!def?.codeString) return null;
+          if (!definitions[def.codeString]) return def.codeString;
+          return resolveToFinalCodeString(def.codeString, visited);
+        };
+
+        // isTopLevel: true for user input, false for internal codeString expansion
+        // Indicator replacement only applies at top level (user input)
+        function expand(str, definitions, isTopLevel = true) {
           let isHeadGlyph = false;
           if (str.endsWith('^')) {
             if (!headGlyphFound) {
@@ -305,12 +325,10 @@ export class BlissParser {
           }
 
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
-          // Don't expand codeString, but DO get kerning rules for external glyphs
           const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
           if (partLevelMatch) {
-            const codeForKerning = partLevelMatch[2].split(':')[0]; // Strip any :x,y positioning
+            const codeForKerning = partLevelMatch[2].split(':')[0];
             const definition = definitions[codeForKerning] || {};
-            // Return original string unchanged, but include kerning-related properties
             return [{
               part: str,
               ...(isHeadGlyph && { isHeadGlyph }),
@@ -320,57 +338,36 @@ export class BlissParser {
             }];
           }
 
-          // Strip leading glyph-level bracket options to get the actual code for lookup
-          // Only matches [options]code (NOT [options]>code, which are part-level options)
+          // Strip leading glyph-level bracket options
           const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
           const optionsPrefix = optionsMatch ? optionsMatch[1] : '';
           const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
 
-          // Check if this might be a WORD;INDICATORS pattern
           const [potentialBaseCode, ...rawIndicators] = codeForLookup.split(';');
           const filteredIndicators = rawIndicators.filter(ind => ind !== '');
           const hasInputIndicators = rawIndicators.length > 0;
 
-          // Recursively resolve codeString to final form to check if it's a word
-          const resolveToFinalCodeString = (code, visited = new Set()) => {
-            if (visited.has(code)) return null;
-            visited.add(code);
-            const def = definitions[code];
-            if (!def?.codeString) return null;
-            if (!definitions[def.codeString]) return def.codeString;
-            return resolveToFinalCodeString(def.codeString, visited);
-          };
           const resolvedCodeString = resolveToFinalCodeString(potentialBaseCode);
           const isWordDefinition = resolvedCodeString?.includes('/') ?? false;
 
-          // Helper: get bare code from string with potential options prefix
-          const getBareCode = (str) => {
-            const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
-            if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
-            const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
-            const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
-            return code.split(':')[0].split(';')[0];
-          };
-
-          // Check if input indicators are real indicators (isIndicator: true)
-          const inputIndicatorsAreRealIndicators = filteredIndicators.length > 0 &&
+          // Check if input indicators are real indicators (for replacement)
+          const inputIndicatorsAreReal = filteredIndicators.length > 0 &&
             filteredIndicators.every(ind => definitions[getBareCode(ind)]?.isIndicator === true);
 
-          // Check if base code's definition has real indicators in its codeString
+          // Check if base code supports indicator replacement
           const baseCodeDef = definitions[potentialBaseCode];
           const baseCodeStringParts = baseCodeDef?.codeString?.split(';') || [];
           const baseCodeExistingIndicators = baseCodeStringParts.slice(1).map(p => p.split(':')[0]);
-          const baseCodeHasRealIndicators = baseCodeExistingIndicators.length > 0 &&
+          const baseCodeSupportsReplacement = baseCodeExistingIndicators.length > 0 &&
             baseCodeExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
 
-          // Determine indicator operation (for non-words with real existing indicators)
-          // Only apply when processing user input, not during codeString expansion
-          const canModifyIndicators = allowIndicatorReplacement && !isWordDefinition && baseCodeHasRealIndicators;
-          const shouldReplaceIndicators = canModifyIndicators && inputIndicatorsAreRealIndicators;
-          const shouldRemoveIndicators = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
+          // Indicator replacement: only for top-level, non-words, with matching indicator types
+          const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement;
+          const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
+          const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
 
-          // Use base code lookup for words, or for characters when replacing/removing indicators
-          const useBaseCodeLookup = isWordDefinition || shouldReplaceIndicators || shouldRemoveIndicators;
+          // Use base code lookup for words, or when replacing/removing indicators
+          const useBaseCodeLookup = isWordDefinition || shouldReplace || shouldRemove;
           const definition = useBaseCodeLookup
             ? (definitions[potentialBaseCode] || {})
             : (definitions[codeForLookup] || {});
@@ -379,8 +376,8 @@ export class BlissParser {
           if (definition.codeString) {
             let codeStringToExpand = definition.codeString;
 
-            // Replace/remove indicators on non-word definitions
-            if (shouldReplaceIndicators || shouldRemoveIndicators) {
+            // Modify codeString for indicator replacement/removal
+            if (shouldReplace || shouldRemove) {
               const codeStringParts = definition.codeString.split(';');
               codeStringToExpand = codeStringParts[0];
               if (filteredIndicators.length > 0) {
