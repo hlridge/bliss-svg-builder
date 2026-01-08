@@ -385,16 +385,26 @@ export class BlissParser {
               }
             }
 
-            const expandedParts = codeStringToExpand.split('/')
-              .flatMap(subStr => expand(subStr, definitions, false))
-              .map(expandedSubPart => {
+            // First expand to get all parts (including nested expansions)
+            const rawExpandedParts = codeStringToExpand.split('/')
+              .flatMap(subStr => expand(subStr, definitions, false));
+
+            // Check if final expansion has multiple glyphs (word vs single-character composite)
+            // This covers nested aliases like TestAlias → TestWord1 → H/C
+            const isMultiGlyphWord = rawExpandedParts.length > 1;
+
+            const expandedParts = rawExpandedParts.map(expandedSubPart => {
                 // Apply properties from the definition, falling back to existing values
                 const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
                 const isExternalGlyph = expandedSubPart.isExternalGlyph;
                 const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
                 const glyph = expandedSubPart.glyph;
                 const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
-                const glyphCode = expandedSubPart.glyphCode ?? definition.glyphCode;
+                // Only inherit glyphCode for single-character composites (like B502)
+                // For multi-glyph words, each part keeps its own glyphCode
+                const glyphCode = isMultiGlyphWord
+                  ? expandedSubPart.glyphCode
+                  : (expandedSubPart.glyphCode ?? definition.glyphCode);
                 const isBlissGlyph = expandedSubPart.isBlissGlyph ?? definition.isBlissGlyph;
                 return {
                   part: expandedSubPart.part,
@@ -443,28 +453,33 @@ export class BlissParser {
               return startIndex < parts.length ? startIndex : 0;
             };
 
-            // Handle WORD;INDICATORS syntax (only for words, not single characters)
+            // Helper to get base code from expanded glyph, handling composite glyphs
+            const getBaseCode = (glyph) => {
+              // Use glyphCode only if it's a simple code (no / or ; which indicate codeStrings/words)
+              // This preserves composite glyphs like B502 = 'DOT:2,10;HL4:0,12;DOT:2,14'
+              const isSimpleGlyphCode = glyph.glyphCode &&
+                !glyph.glyphCode.includes('/') &&
+                !glyph.glyphCode.includes(';');
+              return isSimpleGlyphCode ? glyph.glyphCode : glyph.part.split(';')[0];
+            };
+
+            // Handle WORD;INDICATORS syntax (only for multi-glyph words, not single characters)
             // Single characters with indicators are handled by parseParts later
-            if (isWordDefinition && filteredIndicators.length > 0 && expandedParts.length > 1) {
+            // Use expandedParts.length to detect words (covers aliases like TestAlias → TestWord1 → H^/C)
+            if (expandedParts.length > 1 && filteredIndicators.length > 0) {
               // It's a word (multiple glyphs) - strip and replace indicators on head glyph
               const targetIndex = findHeadGlyphIndex(expandedParts);
-
-              // Strip existing indicators from head glyph part
-              const headPart = expandedParts[targetIndex].part;
-              const basePartWithoutIndicators = headPart.split(';')[0];
+              const baseCode = getBaseCode(expandedParts[targetIndex]);
 
               // Reattach with new indicators
-              expandedParts[targetIndex].part = basePartWithoutIndicators + ';' + filteredIndicators.join(';');
+              expandedParts[targetIndex].part = baseCode + ';' + filteredIndicators.join(';');
             }
 
-            // Handle WORD; (empty indicators) - removal for words only
-            if (isWordDefinition && rawIndicators.length > 0 && filteredIndicators.length === 0 && expandedParts.length > 1) {
+            // Handle WORD; (empty indicators) - removal for multi-glyph words only
+            if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
               const targetIndex = findHeadGlyphIndex(expandedParts);
-
-              // Strip existing indicators from head glyph part
-              const headPart = expandedParts[targetIndex].part;
-              const basePartWithoutIndicators = headPart.split(';')[0];
-              expandedParts[targetIndex].part = basePartWithoutIndicators;
+              const baseCode = getBaseCode(expandedParts[targetIndex]);
+              expandedParts[targetIndex].part = baseCode;
             }
 
             // Apply isHeadGlyph to the first expanded part only (explicit ^ marker)
