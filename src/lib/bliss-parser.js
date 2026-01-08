@@ -291,7 +291,8 @@ export class BlissParser {
         const wordCode = str;
         let headGlyphFound = false;
 
-        function expand(str, definitions) {
+        // allowIndicatorReplacement: true for top-level user input, false for codeString expansion
+        function expand(str, definitions, allowIndicatorReplacement = true) {
           let isHeadGlyph = false;
           if (str.endsWith('^')) {
             if (!headGlyphFound) {
@@ -327,40 +328,33 @@ export class BlissParser {
 
           // Check if this might be a WORD;INDICATORS pattern
           const [potentialBaseCode, ...rawIndicators] = codeForLookup.split(';');
+          const filteredIndicators = rawIndicators.filter(ind => ind !== '');
+          const hasInputIndicators = rawIndicators.length > 0;
 
           // Recursively resolve codeString to final form to check if it's a word
-          // This handles aliases like TestAlias → TestWord1 → 'H^/C'
           const resolveToFinalCodeString = (code, visited = new Set()) => {
-            if (visited.has(code)) return null; // Cycle detection
+            if (visited.has(code)) return null;
             visited.add(code);
             const def = definitions[code];
             if (!def?.codeString) return null;
-            // If codeString doesn't exist as a definition, it's the final form
             if (!definitions[def.codeString]) return def.codeString;
-            // Otherwise, recursively resolve
             return resolveToFinalCodeString(def.codeString, visited);
           };
           const resolvedCodeString = resolveToFinalCodeString(potentialBaseCode);
           const isWordDefinition = resolvedCodeString?.includes('/') ?? false;
 
-          // Check if input has indicators that might replace existing ones
-          const hasInputIndicators = rawIndicators.length > 0;
-          // Helper: get the bare code from a string that may have options prefix
-          // Uses same logic as main parser (lines 308-326)
+          // Helper: get bare code from string with potential options prefix
           const getBareCode = (str) => {
-            // Part-level options: [options]>CODE
             const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
-            if (partLevelMatch) {
-              return partLevelMatch[2].split(':')[0].split(';')[0];
-            }
-            // Glyph-level options: [options]CODE (not followed by >)
+            if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
             const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
             const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
             return code.split(':')[0].split(';')[0];
           };
-          // Check if input indicators are actual indicators (isIndicator: true)
-          const inputIndicatorsAreRealIndicators = hasInputIndicators &&
-            rawIndicators.filter(ind => ind !== '').every(ind => definitions[getBareCode(ind)]?.isIndicator === true);
+
+          // Check if input indicators are real indicators (isIndicator: true)
+          const inputIndicatorsAreRealIndicators = filteredIndicators.length > 0 &&
+            filteredIndicators.every(ind => definitions[getBareCode(ind)]?.isIndicator === true);
 
           // Check if base code's definition has real indicators in its codeString
           const baseCodeDef = definitions[potentialBaseCode];
@@ -369,48 +363,33 @@ export class BlissParser {
           const baseCodeHasRealIndicators = baseCodeExistingIndicators.length > 0 &&
             baseCodeExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
 
-          // For words: always use potentialBaseCode
-          // For characters: only use potentialBaseCode if we can replace indicators (both input and codeString have real indicators)
-          const canReplaceCharacterIndicators = !isWordDefinition && inputIndicatorsAreRealIndicators && baseCodeHasRealIndicators;
-          const useBaseCodeLookup = isWordDefinition || canReplaceCharacterIndicators ||
-            // Also handle removal: input has empty indicator and base code has real indicators
-            (!isWordDefinition && hasInputIndicators && rawIndicators.filter(ind => ind !== '').length === 0 && baseCodeHasRealIndicators);
+          // Determine indicator operation (for non-words with real existing indicators)
+          // Only apply when processing user input, not during codeString expansion
+          const canModifyIndicators = allowIndicatorReplacement && !isWordDefinition && baseCodeHasRealIndicators;
+          const shouldReplaceIndicators = canModifyIndicators && inputIndicatorsAreRealIndicators;
+          const shouldRemoveIndicators = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
+
+          // Use base code lookup for words, or for characters when replacing/removing indicators
+          const useBaseCodeLookup = isWordDefinition || shouldReplaceIndicators || shouldRemoveIndicators;
           const definition = useBaseCodeLookup
             ? (definitions[potentialBaseCode] || {})
             : (definitions[codeForLookup] || {});
-          const filteredIndicators = useBaseCodeLookup ? rawIndicators.filter(ind => ind !== '') : [];
 
           // If we have a codeString, recursively expand it
           if (definition.codeString) {
-            // For non-words with indicator replacement: strip existing indicators from codeString
-            // Only replace if both the codeString's parts after ; AND the new parts are actual indicators
             let codeStringToExpand = definition.codeString;
 
-            // Check if codeString has indicator parts (parts after first ; that are actual indicators)
-            const codeStringParts = definition.codeString.split(';');
-            const codeStringExistingIndicators = codeStringParts.slice(1).map(p => p.split(':')[0]); // Strip positioning
-            const codeStringHasRealIndicators = codeStringExistingIndicators.length > 0 &&
-              codeStringExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
-
-            // Replace indicators when: non-word, codeString has real indicators, and input has real indicators
-            const shouldReplaceIndicators = !isWordDefinition && inputIndicatorsAreRealIndicators &&
-              codeStringHasRealIndicators && !definition.codeString.includes('/');
-            // Also handle indicator removal (empty indicator like B291B97;)
-            const shouldRemoveIndicators = !isWordDefinition && hasInputIndicators && filteredIndicators.length === 0 &&
-              codeStringHasRealIndicators && !definition.codeString.includes('/');
-
+            // Replace/remove indicators on non-word definitions
             if (shouldReplaceIndicators || shouldRemoveIndicators) {
-              // Strip existing indicators (everything after first ;)
+              const codeStringParts = definition.codeString.split(';');
               codeStringToExpand = codeStringParts[0];
-              // If we have replacement indicators, add them
               if (filteredIndicators.length > 0) {
                 codeStringToExpand += ';' + filteredIndicators.join(';');
               }
-              // If filteredIndicators is empty, we just removed them (e.g., B291B97;)
             }
 
             const expandedParts = codeStringToExpand.split('/')
-              .flatMap(subStr => expand(subStr, definitions))
+              .flatMap(subStr => expand(subStr, definitions, false))
               .map(expandedSubPart => {
                 // Apply properties from the definition, falling back to existing values
                 const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
