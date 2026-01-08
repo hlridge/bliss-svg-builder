@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
-import { blissModifiers } from "./bliss-modifiers.js";
+import { blissHeadGlyphExclusions } from "./bliss-head-glyph-exclusions.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -430,7 +430,7 @@ export class BlissParser {
               let foundMatch = true;
               while (foundMatch && startIndex < parts.length) {
                 foundMatch = false;
-                for (const modifierPattern of blissModifiers) {
+                for (const modifierPattern of blissHeadGlyphExclusions) {
                   const modifierCodes = modifierPattern.split('/');
                   if (startIndex + modifierCodes.length <= parts.length) {
                     let matches = true;
