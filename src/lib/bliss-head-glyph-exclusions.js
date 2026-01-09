@@ -23,14 +23,16 @@
  */
 
 export const blissHeadGlyphExclusions = [
-  'B233',
-  'B1060/B578/B303',
-  'B1060/B578/B608',
-  'B1060/B578',
-  'B578/B303',
-  'B578/B608',
-  'B449/B401',
-  'B449',
-  'B502',
-  'B486',
+  'B233', // combine marker
+  'B937', // more (comparative)
+  'B968', // most (superlative)
+  'B1060/B578/B303', // looks similar to
+  'B1060/B578/B608', // sounds similar to
+  'B1060/B578', // similar to
+  'B578/B303', // looks like
+  'B578/B608', // sounds like
+  'B449/B401', // not (logical negation)
+  'B449', // without (privative negation)
+  'B486', // opposite to (antonymy)
+  'B502', // part of
 ];
