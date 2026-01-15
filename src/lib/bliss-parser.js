@@ -361,8 +361,13 @@ export class BlissParser {
           const baseCodeSupportsReplacement = baseCodeExistingIndicators.length > 0 &&
             baseCodeExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
 
+          // Don't apply indicator replacement to compound indicators (like B928 = B92;B87)
+          // These are indicators composed of multiple indicator parts, not characters with replaceable indicators
+          const baseIsCompoundIndicator = baseCodeDef?.isIndicator === true;
+
           // Indicator replacement: only for top-level, non-words, with matching indicator types
-          const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement;
+          // Skip if the base code itself is an indicator (compound indicators should keep their structure)
+          const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement && !baseIsCompoundIndicator;
           const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
           const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
 
