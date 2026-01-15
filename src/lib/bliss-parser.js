@@ -291,6 +291,52 @@ export class BlissParser {
         const wordCode = str;
         let headGlyphFound = false;
 
+        // Helper: Find head glyph index (explicit marker or fallback skipping modifiers)
+        // Defined at top level for use in both ;; handling and expand()
+        const findHeadGlyphIndex = (parts) => {
+          // Check for explicit marker first
+          const explicitIndex = parts.findIndex(p => p.isHeadGlyph);
+          if (explicitIndex !== -1) return explicitIndex;
+
+          // Fallback: skip modifier patterns (keep matching until no more found)
+          let startIndex = 0;
+          let foundMatch = true;
+          while (foundMatch && startIndex < parts.length) {
+            foundMatch = false;
+            for (const modifierPattern of blissHeadGlyphExclusions) {
+              const modifierCodes = modifierPattern.split('/');
+              if (startIndex + modifierCodes.length <= parts.length) {
+                let matches = true;
+                for (let i = 0; i < modifierCodes.length; i++) {
+                  // Check glyphCode first (preserved after expansion), then fall back to part
+                  const glyphCode = parts[startIndex + i].glyphCode || parts[startIndex + i].part.split(';')[0];
+                  if (glyphCode !== modifierCodes[i]) {
+                    matches = false;
+                    break;
+                  }
+                }
+                if (matches) {
+                  startIndex += modifierCodes.length;
+                  foundMatch = true;
+                  break; // Restart pattern matching from new position
+                }
+              }
+            }
+          }
+          return startIndex < parts.length ? startIndex : 0;
+        };
+
+        // Helper to get base code from expanded glyph, handling composite glyphs
+        // Defined at top level for use in both ;; handling and expand()
+        const getBaseCode = (glyph) => {
+          // Use glyphCode only if it's a simple code (no / or ; which indicate codeStrings/words)
+          // This preserves composite glyphs like B502 = 'DOT:2,10;HL4:0,12;DOT:2,14'
+          const isSimpleGlyphCode = glyph.glyphCode &&
+            !glyph.glyphCode.includes('/') &&
+            !glyph.glyphCode.includes(';');
+          return isSimpleGlyphCode ? glyph.glyphCode : glyph.part.split(';')[0];
+        };
+
         // Helper: get bare code from string with potential options prefix
         const getBareCode = (str) => {
           const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
@@ -309,6 +355,44 @@ export class BlissParser {
           if (!definitions[def.codeString]) return def.codeString;
           return resolveToFinalCodeString(def.codeString, visited);
         };
+
+        // Detect ;; for word-level indicators on inline multi-character expressions
+        // Pattern: baseCode;;indicators where indicators go on head glyph
+        // This enables word-level indicators without pre-defining words
+        const wordLevelMatch = str.match(/^(.+);;(.*)$/);
+        if (wordLevelMatch) {
+          const [_, baseCode, indicators] = wordLevelMatch;
+
+          // Process baseCode using the normal flow (splits on / and expands each part)
+          // This recursive call handles everything: definitions, ^markers, options, etc.
+          const expandedParts = baseCode.split('/').flatMap(strPart => expand(strPart, definitions));
+
+          if (expandedParts.length > 1) {
+            // Multiple glyphs: Apply indicators to head glyph
+            const targetIndex = findHeadGlyphIndex(expandedParts);
+            const bareCode = getBaseCode(expandedParts[targetIndex]);
+
+            if (indicators) {
+              // Attach indicators to head glyph
+              expandedParts[targetIndex].part = bareCode + ';' + indicators;
+            } else {
+              // Empty ;; - strip indicators from head glyph
+              expandedParts[targetIndex].part = bareCode;
+            }
+
+            // Mark as head glyph if not default (index > 0) and not already marked
+            if (targetIndex > 0 && !expandedParts.some(p => p.isHeadGlyph)) {
+              expandedParts[targetIndex].isHeadGlyph = true;
+            }
+          } else if (expandedParts.length === 1 && indicators) {
+            // Single glyph: ;; behaves like ; (attach indicator to the single glyph)
+            // Use glyphCode if available to match B291;B86 behavior (preserves character code)
+            const baseCode = getBaseCode(expandedParts[0]);
+            expandedParts[0].part = baseCode + ';' + indicators;
+          }
+
+          return expandedParts;
+        }
 
         // isTopLevel: true for user input, false for internal codeString expansion
         // Indicator replacement only applies at top level (user input)
@@ -423,50 +507,6 @@ export class BlissParser {
                   ...(expandedSubPart.isHeadGlyph && { isHeadGlyph: expandedSubPart.isHeadGlyph })
                 };
               });
-
-            // Helper: Find head glyph index (explicit marker or fallback skipping modifiers)
-            const findHeadGlyphIndex = (parts) => {
-              // Check for explicit marker first
-              const explicitIndex = parts.findIndex(p => p.isHeadGlyph);
-              if (explicitIndex !== -1) return explicitIndex;
-
-              // Fallback: skip modifier patterns (keep matching until no more found)
-              let startIndex = 0;
-              let foundMatch = true;
-              while (foundMatch && startIndex < parts.length) {
-                foundMatch = false;
-                for (const modifierPattern of blissHeadGlyphExclusions) {
-                  const modifierCodes = modifierPattern.split('/');
-                  if (startIndex + modifierCodes.length <= parts.length) {
-                    let matches = true;
-                    for (let i = 0; i < modifierCodes.length; i++) {
-                      // Check glyphCode first (preserved after expansion), then fall back to part
-                      const glyphCode = parts[startIndex + i].glyphCode || parts[startIndex + i].part.split(';')[0];
-                      if (glyphCode !== modifierCodes[i]) {
-                        matches = false;
-                        break;
-                      }
-                    }
-                    if (matches) {
-                      startIndex += modifierCodes.length;
-                      foundMatch = true;
-                      break; // Restart pattern matching from new position
-                    }
-                  }
-                }
-              }
-              return startIndex < parts.length ? startIndex : 0;
-            };
-
-            // Helper to get base code from expanded glyph, handling composite glyphs
-            const getBaseCode = (glyph) => {
-              // Use glyphCode only if it's a simple code (no / or ; which indicate codeStrings/words)
-              // This preserves composite glyphs like B502 = 'DOT:2,10;HL4:0,12;DOT:2,14'
-              const isSimpleGlyphCode = glyph.glyphCode &&
-                !glyph.glyphCode.includes('/') &&
-                !glyph.glyphCode.includes(';');
-              return isSimpleGlyphCode ? glyph.glyphCode : glyph.part.split(';')[0];
-            };
 
             // Handle WORD;INDICATORS syntax (only for multi-glyph words, not single characters)
             // Single characters with indicators are handled by parseParts later
