@@ -3273,6 +3273,9 @@ const glyphData = {
   B971: {
     codeString: "B411;B457:2,0"
   },
+  B972: {
+    codeString: "XA;XB:3.87;XC:7.75"
+  },
   B973: {
     codeString: "B651;LARR4S:0,14"
   },
