@@ -26,6 +26,9 @@ export const blissHeadGlyphExclusions = [
   'B233', // combine marker
   'B937', // more (comparative)
   'B968', // most (superlative)
+  'B368/B368/B368', // many/much x3 (city)
+  'B368/B368', // many/much x2 (ocean, town)
+  'B368', // many/much (lake, village)
   'B1060/B578/B303', // looks similar to
   'B1060/B578/B608', // sounds similar to
   'B1060/B578', // similar to
