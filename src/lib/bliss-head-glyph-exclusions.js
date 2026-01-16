@@ -88,7 +88,7 @@ export const blissHeadGlyphExclusions = [
   'B368', // many/much (lake, village)
   // pending: few (not yet in bliss-glyph-data.js)
   'B117', // all
-  'B647', // any
+  'B100', // any
   'B11/B117', // both
   'B10/B117', // each/every
   'B286', // either
