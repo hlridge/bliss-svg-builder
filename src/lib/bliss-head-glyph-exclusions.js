@@ -10,9 +10,11 @@
  * Characters and sequences to skip when finding the head glyph (the character
  * that receives grammatical indicators).
  *
- * Includes:
- * - Prefix modifiers: opposite of, part of, etc.
- * - Combine markers: quotation marks, structural joining characters
+ * Priority hierarchy for head glyph selection (highest to lowest):
+ * 1. Non-exclusions - always head if present
+ * 2. Regular exclusions - head if no non-exclusions available
+ * 3. Low-priority exclusions (B401, B699) - head only if alone or with same/lower priority
+ * 4. Absolute never-head (B233) - can NEVER be head (structural marker like quotation marks)
  *
  * When prefix modifiers are used, it's recommended to mark the head glyph
  * explicitly with ^ to avoid ambiguity.
@@ -22,12 +24,49 @@
  * 'B486/B1108;B86^' (narrow)
  */
 
+/**
+ * Absolute never-head codes.
+ * These can NEVER be head glyphs, even as a fallback.
+ * They are purely structural markers (like quotation marks).
+ */
+export const absoluteNeverHead = [
+  'B233', // combine marker (structural, like quotation mark)
+];
+
+/**
+ * Low-priority exclusions.
+ * These are skipped as prefixes like regular exclusions, but can only be head
+ * when alone or together with other low-priority codes (no regular exclusions present).
+ */
+export const lowPriorityExclusions = [
+  'B401', // exclamatory - when alone or with other B401s, can take indicator
+  'B699', // interrogative - when alone or with other B699s, can take indicator
+];
+
+/**
+ * Conditional exceptions.
+ * Format: [excludedCode, notExcludedWhenFollowedBy]
+ * The excludedCode is NOT treated as an exclusion when immediately followed by
+ * the specified code.
+ */
+export const conditionalExceptions = [
+  ['B10', 'B4'], // B10 (one) is NOT excluded when followed by B4
+];
+
+/**
+ * Main exclusion list.
+ * Characters and sequences to skip when finding the head glyph.
+ * Includes all categories (regular, low-priority, and never-head).
+ */
 export const blissHeadGlyphExclusions = [
-  // Structural markers
+  // Structural markers (absolute never-head)
   'B233', // combine marker
 
+  // Pragmatic lexical markers (low-priority)
+  'B401', // exclamatory when used as a prefix, otherwise a specifier
+  'B699', // interrogative when used as a prefix, otherwise a specifier
+
   // Scalar degree operators
-  'B401', // intensity
   'B937', // more (comparative)
   'B968', // most (superlative)
   // pending: less, least (not yet in bliss-glyph-data.js)
@@ -75,7 +114,7 @@ export const blissHeadGlyphExclusions = [
   'B676', // under, below
   'B1102', // under (ground level)
   'B331', // instead of
-  'B333', // for the purpose of
+  'B332', // for the purpose of
   'B337', // from
   'B657', // to, toward
   'B653', // through
@@ -100,7 +139,7 @@ export const blissHeadGlyphExclusions = [
   'B1153', // three quarters
   'B559/B11', // several
   'B9', // zero
-  'B10', // one
+  'B10', // one (note: NOT excluded when followed by B4 - see conditionalExceptions)
   'B11', // two
   'B12', // three
   'B13', // four

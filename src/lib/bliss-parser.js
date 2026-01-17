@@ -6,7 +6,12 @@
 
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
-import { blissHeadGlyphExclusions } from "./bliss-head-glyph-exclusions.js";
+import {
+  blissHeadGlyphExclusions,
+  absoluteNeverHead,
+  lowPriorityExclusions,
+  conditionalExceptions
+} from "./bliss-head-glyph-exclusions.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -298,32 +303,57 @@ export class BlissParser {
           const explicitIndex = parts.findIndex(p => p.isHeadGlyph);
           if (explicitIndex !== -1) return explicitIndex;
 
-          // Fallback: skip modifier patterns (keep matching until no more found)
+          const getCode = (i) => parts[i].glyphCode || parts[i].part.split(';')[0];
+
+          // Check if exclusion applies (handles conditional exceptions like B10/B4)
+          const isExcluded = (code, index) => {
+            for (const [excl, notWhenFollowedBy] of conditionalExceptions) {
+              if (code === excl && index + 1 < parts.length && getCode(index + 1) === notWhenFollowedBy) {
+                return false;
+              }
+            }
+            return true;
+          };
+
+          // Skip modifier patterns from start
           let startIndex = 0;
           let foundMatch = true;
           while (foundMatch && startIndex < parts.length) {
             foundMatch = false;
-            for (const modifierPattern of blissHeadGlyphExclusions) {
-              const modifierCodes = modifierPattern.split('/');
-              if (startIndex + modifierCodes.length <= parts.length) {
+            for (const pattern of blissHeadGlyphExclusions) {
+              const codes = pattern.split('/');
+              if (startIndex + codes.length <= parts.length) {
                 let matches = true;
-                for (let i = 0; i < modifierCodes.length; i++) {
-                  // Check glyphCode first (preserved after expansion), then fall back to part
-                  const glyphCode = parts[startIndex + i].glyphCode || parts[startIndex + i].part.split(';')[0];
-                  if (glyphCode !== modifierCodes[i]) {
+                for (let i = 0; i < codes.length; i++) {
+                  const code = getCode(startIndex + i);
+                  if (code !== codes[i] || (codes.length === 1 && !isExcluded(code, startIndex + i))) {
                     matches = false;
                     break;
                   }
                 }
                 if (matches) {
-                  startIndex += modifierCodes.length;
+                  startIndex += codes.length;
                   foundMatch = true;
-                  break; // Restart pattern matching from new position
+                  break;
                 }
               }
             }
           }
-          return startIndex < parts.length ? startIndex : 0;
+
+          if (startIndex < parts.length) return startIndex;
+
+          // All exclusions: find best head by priority (regular > low-priority > never-head)
+          let best = 0;
+          let bestPriority = absoluteNeverHead.includes(getCode(0)) ? 0 : lowPriorityExclusions.includes(getCode(0)) ? 1 : 2;
+          for (let i = 1; i < parts.length; i++) {
+            const code = getCode(i);
+            const priority = absoluteNeverHead.includes(code) ? 0 : lowPriorityExclusions.includes(code) ? 1 : 2;
+            if (priority > bestPriority || (priority === bestPriority && priority > 0)) {
+              best = i;
+              bestPriority = priority;
+            }
+          }
+          return best;
         };
 
         // Helper to get base code from expanded glyph, handling composite glyphs
