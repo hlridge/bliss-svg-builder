@@ -488,7 +488,7 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
         openWrapper: `<g stroke-width="${dotStrokeWidth}">`,
         openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
-        closeDotPath: `</path>`,
+        closeDotPath: `"></path>`,
         closeWrapper: `</g>`,
         openPath: `<path d="`
       };
@@ -546,12 +546,12 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
         openDotWrapper: `<g stroke-width="${dotStrokeWidth}">`,
         openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
-        closeDotPath: `</path>`,
+        closeDotPath: `"></path>`,
         closeDotWrapper: `</g>`,
         openCommaWrapper: `<g stroke-width="${commaStrokeWidth}">`,
         openCommaPath: `<path d="`,
         commaPath: `M${commaStartX},${commaStartY}q${commaQX},${commaQY} ${commaEndX},${commaEndY}`,
-        closeCommaPath: `</path>`,
+        closeCommaPath: `"></path>`,
         closeCommaWrapper: `</g>`,
         openPath: `<path d="`
       };
