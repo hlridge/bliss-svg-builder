@@ -31,9 +31,9 @@ In Bliss, indicators are diacritic markers that go above the base character.
 
 See the [Indicators Reference](/reference/indicators-reference) for the complete list.
 
-## Adding Indicators
+## Attaching Indicators
 
-Use `;` to add an indicator to a character:
+Use `;` to attach an indicator to a character:
 
 <Demo code="B431;B81" title="B431;B81 - to love (love + action indicator)" />
 
