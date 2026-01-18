@@ -380,13 +380,11 @@ class BlissSVGBuilder {
     const content = this.composition.getSvgContent();
 
     // If content already contains complete SVG tags (like <g> from hierarchical options), return as-is
-    if (content.includes('<g ')) {
+    if (content.startsWith('<')) {
       return content;
     }
 
     // Otherwise, wrap raw path data in a <path> element
-    // Note: DOT/COMMA have extraPathOptions that embed </path><path.../><path d=" in the content
-    // which gets wrapped properly here
     return `<path d="${content}"></path>`;
   }
 
@@ -644,6 +642,10 @@ class BlissSVGBuilder {
 `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="tiny" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}" fill="${fill}" stroke="${stroke}" stroke-linejoin="${strokeLinejoin}" stroke-linecap="${strokeLinecap}" stroke-width="${strokeWidthAttr}"${attrsStr}>
   ${title}${desc}${backgroundRect}${gridPath}${content}${svgText}
 </svg>`;
+
+    // Clean up empty <path d=""></path> elements from DOT/COMMA/external glyphs
+    svgStr = svgStr.replace(/<path d=""><\/path>/g, '');
+
     return svgStr;
   }
 }

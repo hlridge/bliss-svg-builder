@@ -46,8 +46,8 @@ export class BlissElement {
   static #wrapWithAnchorAndGroup(content, options) {
     const { anchorAttrs, groupAttrs, hasHref } = BlissElement.#separateAnchorAndGroupOptions(options);
 
-    // For content that's already tagged (starts with '<'), use as-is
-    // For raw path data, wrap in <path>
+    // Content that starts with '<' is already wrapped in proper tags
+    // Raw path data or fragments need wrapping
     const needsPathWrapper = !content.startsWith('<');
 
     if (hasHref) {
