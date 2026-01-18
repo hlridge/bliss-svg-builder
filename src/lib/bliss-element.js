@@ -1016,11 +1016,16 @@ export class BlissElement {
     
     this.getSvgContent = (x = 0, y = 0) => {
       // Build path options with inheritance: extraPathOptions < inherited < element-level
-      // Use #getInheritedOption for color which already handles the inheritance chain
+      // Use #getInheritedOption for options which already handle the inheritance chain
       const inheritedColor = this.#getInheritedOption('color');
+      const inheritedStrokeWidth = this.#getInheritedOption('strokeWidth');
+      const inheritedDotExtraWidth = this.#getInheritedOption('dotExtraWidth');
+
       const pathOptions = {
         ...this.#extraPathOptions,
-        ...(inheritedColor !== undefined && { color: inheritedColor })
+        ...(inheritedColor !== undefined && { color: inheritedColor }),
+        ...(inheritedStrokeWidth !== undefined && { baseStrokeWidth: inheritedStrokeWidth }),
+        ...(inheritedDotExtraWidth !== undefined && { extraDotWidth: inheritedDotExtraWidth })
       };
       const pathData = definition.getPath(
         this.#relativeToParentX + x,

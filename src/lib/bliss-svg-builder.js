@@ -319,7 +319,7 @@ class BlissSVGBuilder {
       'gridSkyStrokeWidth', 'gridEarthStrokeWidth', 'gridMajorStrokeWidth', 'gridMediumStrokeWidth', 'gridMinorStrokeWidth',
       'cropTop', 'cropBottom', 'cropLeft', 'cropRight',
       'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
-      'dotExtraWidth', 'background', 'charSpace', 'wordSpace', 'punctuationSpace', 'externalGlyphSpace',
+      'strokeWidth', 'dotExtraWidth', 'background', 'charSpace', 'wordSpace', 'punctuationSpace', 'externalGlyphSpace',
       'minWidth', 'centered', 'text', 'svgDesc', 'svgTitle', 'svgHeight',
       'x', 'y', 'relativeKerning', 'absoluteKerning'
     ]);
