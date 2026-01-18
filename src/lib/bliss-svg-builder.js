@@ -7,13 +7,15 @@
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS } from "./bliss-constants.js";
 
 class BlissSVGBuilder {
   #processedOptions;
 
   // Processes raw options (kebab-case) into internal options (camelCase).
   // Bulk options expanded here (not in output): 'margin', 'crop', 'grid-color', 'grid-stroke-width'.
-  #processOptions(rawOptions = {}) {
+  // @param {boolean} addBuilderDefaults - If true, adds defaults for builder-level options (grid, etc.)
+  #processOptions(rawOptions = {}, addBuilderDefaults = false) {
     const options = {};
 
     // stroke-width: Number, clamped 0.1-1.5
@@ -139,96 +141,102 @@ class BlissSVGBuilder {
     }
 
     // Grid colors - hierarchy: bulk → category → specific
-    // Start with defaults
-    let skyColor = "#858585";
-    let earthColor = "#858585";
-    let majorColor = "#c7c7c7";  // major grid (non-semantic)
-    let mediumColor = "#ebebeb";
-    let minorColor = "#ebebeb";
+    // Only process if builder defaults requested or if grid options present
+    if (addBuilderDefaults || Object.keys(rawOptions).some(k => k.startsWith('grid-'))) {
+      // Start with defaults
+      let skyColor = "#858585";
+      let earthColor = "#858585";
+      let majorColor = "#c7c7c7";  // major grid (non-semantic)
+      let mediumColor = "#ebebeb";
+      let minorColor = "#ebebeb";
 
-    // Apply bulk option (sets all grid colors)
-    if ('grid-color' in rawOptions) {
-      const gc = rawOptions['grid-color'];
-      skyColor = earthColor = majorColor = mediumColor = minorColor = gc;
+      // Apply bulk option (sets all grid colors)
+      if ('grid-color' in rawOptions) {
+        const gc = rawOptions['grid-color'];
+        skyColor = earthColor = majorColor = mediumColor = minorColor = gc;
+      }
+
+      // Apply category option for major grids (overrides bulk for major lines)
+      if ('grid-major-color' in rawOptions) {
+        const gmc = rawOptions['grid-major-color'];
+        skyColor = earthColor = majorColor = gmc;
+      }
+
+      // Apply category option for medium grid (overrides bulk)
+      if ('grid-medium-color' in rawOptions) {
+        mediumColor = rawOptions['grid-medium-color'];
+      }
+
+      // Apply category option for minor grid (overrides bulk)
+      if ('grid-minor-color' in rawOptions) {
+        minorColor = rawOptions['grid-minor-color'];
+      }
+
+      // Apply specific options (most specific, override everything)
+      if ('grid-sky-color' in rawOptions) {
+        skyColor = rawOptions['grid-sky-color'];
+      }
+
+      if ('grid-earth-color' in rawOptions) {
+        earthColor = rawOptions['grid-earth-color'];
+      }
+
+      // Assign to options object
+      options.gridSkyColor = skyColor;
+      options.gridEarthColor = earthColor;
+      options.gridMajorColor = majorColor;
+      options.gridMediumColor = mediumColor;
+      options.gridMinorColor = minorColor;
     }
-
-    // Apply category option for major grids (overrides bulk for major lines)
-    if ('grid-major-color' in rawOptions) {
-      const gmc = rawOptions['grid-major-color'];
-      skyColor = earthColor = majorColor = gmc;
-    }
-
-    // Apply category option for medium grid (overrides bulk)
-    if ('grid-medium-color' in rawOptions) {
-      mediumColor = rawOptions['grid-medium-color'];
-    }
-
-    // Apply category option for minor grid (overrides bulk)
-    if ('grid-minor-color' in rawOptions) {
-      minorColor = rawOptions['grid-minor-color'];
-    }
-
-    // Apply specific options (most specific, override everything)
-    if ('grid-sky-color' in rawOptions) {
-      skyColor = rawOptions['grid-sky-color'];
-    }
-
-    if ('grid-earth-color' in rawOptions) {
-      earthColor = rawOptions['grid-earth-color'];
-    }
-
-    // Assign to options object
-    options.gridSkyColor = skyColor;
-    options.gridEarthColor = earthColor;
-    options.gridMajorColor = majorColor;
-    options.gridMediumColor = mediumColor;
-    options.gridMinorColor = minorColor;
 
     // Grid stroke widths - same hierarchy pattern
-    // Start with defaults
-    let skyWidth = 0.166;
-    let earthWidth = 0.166;
-    let majorWidth = 0.166;  // major grid (non-semantic)
-    let mediumWidth = 0.166;
-    let minorWidth = 0.166;
+    // Only process if builder defaults requested or if grid options present
+    if (addBuilderDefaults || Object.keys(rawOptions).some(k => k.startsWith('grid-'))) {
+      // Start with defaults
+      let skyWidth = 0.166;
+      let earthWidth = 0.166;
+      let majorWidth = 0.166;  // major grid (non-semantic)
+      let mediumWidth = 0.166;
+      let minorWidth = 0.166;
 
-    // Apply bulk option (sets all grid widths)
-    if ('grid-stroke-width' in rawOptions) {
-      const gsw = Number(rawOptions['grid-stroke-width']);
-      skyWidth = earthWidth = majorWidth = mediumWidth = minorWidth = gsw;
+      // Apply bulk option (sets all grid widths)
+      if ('grid-stroke-width' in rawOptions) {
+        const gsw = Number(rawOptions['grid-stroke-width']);
+        skyWidth = earthWidth = majorWidth = mediumWidth = minorWidth = gsw;
+      }
+
+      // Apply category option for major grids (overrides bulk for major lines)
+      if ('grid-major-stroke-width' in rawOptions) {
+        const gmsw = Number(rawOptions['grid-major-stroke-width']);
+        skyWidth = earthWidth = majorWidth = gmsw;
+      }
+
+      // Apply category option for medium grid (overrides bulk)
+      if ('grid-medium-stroke-width' in rawOptions) {
+        mediumWidth = Number(rawOptions['grid-medium-stroke-width']);
+      }
+
+      // Apply category option for minor grid (overrides bulk)
+      if ('grid-minor-stroke-width' in rawOptions) {
+        minorWidth = Number(rawOptions['grid-minor-stroke-width']);
+      }
+
+      // Apply specific options (most specific, override everything)
+      if ('grid-sky-stroke-width' in rawOptions) {
+        skyWidth = Number(rawOptions['grid-sky-stroke-width']);
+      }
+
+      if ('grid-earth-stroke-width' in rawOptions) {
+        earthWidth = Number(rawOptions['grid-earth-stroke-width']);
+      }
+
+      // Assign to options object
+      options.gridSkyStrokeWidth = skyWidth;
+      options.gridEarthStrokeWidth = earthWidth;
+      options.gridMajorStrokeWidth = majorWidth;
+      options.gridMediumStrokeWidth = mediumWidth;
+      options.gridMinorStrokeWidth = minorWidth;
     }
-
-    // Apply category option for major grids (overrides bulk for major lines)
-    if ('grid-major-stroke-width' in rawOptions) {
-      const gmsw = Number(rawOptions['grid-major-stroke-width']);
-      skyWidth = earthWidth = majorWidth = gmsw;
-    }
-
-    // Apply category option for medium grid (overrides bulk)
-    if ('grid-medium-stroke-width' in rawOptions) {
-      mediumWidth = Number(rawOptions['grid-medium-stroke-width']);
-    }
-
-    // Apply category option for minor grid (overrides bulk)
-    if ('grid-minor-stroke-width' in rawOptions) {
-      minorWidth = Number(rawOptions['grid-minor-stroke-width']);
-    }
-
-    // Apply specific options (most specific, override everything)
-    if ('grid-sky-stroke-width' in rawOptions) {
-      skyWidth = Number(rawOptions['grid-sky-stroke-width']);
-    }
-
-    if ('grid-earth-stroke-width' in rawOptions) {
-      earthWidth = Number(rawOptions['grid-earth-stroke-width']);
-    }
-
-    // Assign to options object
-    options.gridSkyStrokeWidth = skyWidth;
-    options.gridEarthStrokeWidth = earthWidth;
-    options.gridMajorStrokeWidth = majorWidth;
-    options.gridMediumStrokeWidth = mediumWidth;
-    options.gridMinorStrokeWidth = minorWidth;
 
     // crop: Sets ALL 4 crop values
     if ('crop' in rawOptions && !isNaN(rawOptions['crop'])) {
@@ -275,10 +283,10 @@ class BlissSVGBuilder {
       options.svgHeight = Number(rawOptions['svg-height']);
     }
 
-    // Preserve any options that weren't explicitly processed (like fill, opacity, id, etc.)
-    // Skip kebab-case keys since those are transformed to camelCase above
+    // Preserve any options that weren't explicitly processed (like fill, opacity, stroke-dasharray, etc.)
+    // Only skip options that are in KNOWN_OPTION_KEYS (already processed above)
     for (const [key, value] of Object.entries(rawOptions)) {
-      if (!(key in options) && !key.includes('-')) {
+      if (!KNOWN_OPTION_KEYS.has(key)) {
         options[key] = value;
       }
     }
@@ -286,11 +294,34 @@ class BlissSVGBuilder {
     return options;
   }
 
+  // Recursively process options at all levels (groups, glyphs, parts)
+  #processAllOptions(obj, isTopLevel = false) {
+    if (obj.options) {
+      obj.options = this.#processOptions(obj.options, isTopLevel);
+    }
+    if (obj.groups) {
+      for (const group of obj.groups) {
+        this.#processAllOptions(group, false);
+      }
+    }
+    if (obj.glyphs) {
+      for (const glyph of obj.glyphs) {
+        this.#processAllOptions(glyph, false);
+      }
+    }
+    if (obj.parts) {
+      for (const part of obj.parts) {
+        this.#processAllOptions(part, false);
+      }
+    }
+  }
+
   constructor(input) {
     const blissObj = BlissParser.parse(input);
 
-    // Process options (apply clamping, defaults, bulk expansion) and store back in blissObj
-    blissObj.options = this.#processOptions(blissObj.options);
+    // Process options at all levels (global, group, glyph, part)
+    // Only top level gets builder defaults (grid, margins, etc.)
+    this.#processAllOptions(blissObj, true);
 
     const {
       charSpace,
@@ -311,19 +342,6 @@ class BlissSVGBuilder {
     // Store processed options privately for svgCode getter
     this.#processedOptions = blissObj.options;
 
-    // Internal options that should NOT be rendered as SVG attributes.
-    // Builder-level: handled by SVG construction logic (margins, grid, cropping, etc.)
-    // Element-level: handled by element positioning logic (x, y, kerning)
-    const internalOptions = new Set([
-      'grid', 'gridSkyColor', 'gridEarthColor', 'gridMajorColor', 'gridMediumColor', 'gridMinorColor',
-      'gridSkyStrokeWidth', 'gridEarthStrokeWidth', 'gridMajorStrokeWidth', 'gridMediumStrokeWidth', 'gridMinorStrokeWidth',
-      'cropTop', 'cropBottom', 'cropLeft', 'cropRight',
-      'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
-      'strokeWidth', 'dotExtraWidth', 'background', 'charSpace', 'wordSpace', 'punctuationSpace', 'externalGlyphSpace',
-      'minWidth', 'centered', 'text', 'svgDesc', 'svgTitle', 'svgHeight',
-      'x', 'y', 'relativeKerning', 'absoluteKerning'
-    ]);
-
     const attrMap = { 'color': 'stroke' };
     const escapeHtml = (str) => String(str)
       .replace(/&/g, '&amp;')
@@ -335,7 +353,7 @@ class BlissSVGBuilder {
     // Store global options that should become SVG attributes
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
-      if (!internalOptions.has(key)) {
+      if (!INTERNAL_OPTIONS.has(key)) {
         const attrName = attrMap[key] || key;
         this.globalSvgAttributes[attrName] = escapeHtml(value);
       }

@@ -5,6 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
+import { INTERNAL_OPTIONS } from "./bliss-constants.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -80,18 +81,12 @@ export class BlissElement {
       'referrerpolicy'
     ]);
 
-    // Element-level options that should NOT be rendered as SVG attributes.
-    // These are handled by element positioning/layout logic, not SVG attributes.
-    // Multi-level options (strokeWidth, color, fill, opacity, etc.) are NOT listed - they should render as attributes.
-    const internalOptions = new Set([
-      'x',
-      'y',
-      'relativeKerning',
-      'absoluteKerning'
-    ]);
+    // Use shared INTERNAL_OPTIONS constant
+    // Multi-level options (strokeWidth, color, fill, opacity, etc.) are NOT in this set - they should render as attributes.
 
     const attrMap = {
-      'color': 'stroke'
+      'color': 'stroke',
+      'strokeWidth': 'stroke-width'
     };
 
     const escapeHtml = (str) => String(str)
@@ -107,7 +102,7 @@ export class BlissElement {
     let hasPointerEvents = false;
 
     for (const [key, value] of Object.entries(options)) {
-      if (internalOptions.has(key)) continue;
+      if (INTERNAL_OPTIONS.has(key)) continue;
 
       const escapedValue = escapeHtml(value);
 

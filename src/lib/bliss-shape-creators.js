@@ -485,8 +485,11 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
       const dotStrokeRadius = dotStrokeWidth / 2;
       return {
         closePath: `"></path>`,
-        openDotPath: `<path stroke-width="${dotStrokeWidth}" d="`,
+        openWrapper: `<g stroke-width="${dotStrokeWidth}">`,
+        openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
+        closeDotPath: `</path>`,
+        closeWrapper: `</g>`,
         openPath: `<path d="`
       };
     },
@@ -505,8 +508,8 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
    * @returns {Object} - An object with closePath, openPath, dotPath and openPath properties.
    */
   dot.getPath = (x, y, settings = { baseStrokeWidth: defaultBaseStrokeWidth, extraDotWidth: defaultExtraDotWidth }) => {
-    const { closePath, openDotPath, dotPath, openPath } = dot.getDotData(x, y, settings);
-    return `${closePath}${openDotPath}${dotPath}${closePath}${openPath}`;
+    const { closePath, openWrapper, openDotPath, dotPath, closeDotPath, closeWrapper, openPath } = dot.getDotData(x, y, settings);
+    return `${closePath}${openWrapper}${openDotPath}${dotPath}${closeDotPath}${closeWrapper}${openPath}`;
   };
 
   return dot;
@@ -540,10 +543,16 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
       const commaQY = commaStrokeWidth * 2.5;
       return {
         closePath: `"></path>`,
-        openDotPath: `<path stroke-width="${dotStrokeWidth}" d="`,
+        openDotWrapper: `<g stroke-width="${dotStrokeWidth}">`,
+        openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
-        openCommaPath: `<path stroke-width="${commaStrokeWidth}" d="`,
+        closeDotPath: `</path>`,
+        closeDotWrapper: `</g>`,
+        openCommaWrapper: `<g stroke-width="${commaStrokeWidth}">`,
+        openCommaPath: `<path d="`,
         commaPath: `M${commaStartX},${commaStartY}q${commaQX},${commaQY} ${commaEndX},${commaEndY}`,
+        closeCommaPath: `</path>`,
+        closeCommaWrapper: `</g>`,
         openPath: `<path d="`
       };
     },
@@ -562,8 +571,8 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
    * @returns {Object} - An object with closePath, openDotPath, dotPath, openCommaPath, commaPath and openPath properties.
    */
   comma.getPath = (x, y, settings = { baseStrokeWidth: defaultBaseStrokeWidth, extraDotWidth: defaultExtraDotWidth }) => {
-    const { closePath, openDotPath, dotPath, openCommaPath, commaPath, openPath } = comma.getCommaData(x, y, settings);
-    return `${closePath}${openDotPath}${dotPath}${closePath}${openCommaPath}${commaPath}${closePath}${openPath}`;
+    const { closePath, openDotWrapper, openDotPath, dotPath, closeDotPath, closeDotWrapper, openCommaWrapper, openCommaPath, commaPath, closeCommaPath, closeCommaWrapper, openPath } = comma.getCommaData(x, y, settings);
+    return `${closePath}${openDotWrapper}${openDotPath}${dotPath}${closeDotPath}${closeDotWrapper}${openCommaWrapper}${openCommaPath}${commaPath}${closeCommaPath}${closeCommaWrapper}${openPath}`;
   };
 
   return comma;
