@@ -63,3 +63,18 @@ console.log(builder.svgCode);
   document.body.appendChild(builder.svgElement);
 </script>
 ```
+
+## Sharing Examples
+
+Create shareable examples on CodePen or JSFiddle using unpkg.
+
+Paste this in the JavaScript panel (with module mode enabled):
+
+```js
+import { BlissSVGBuilder } from 'https://unpkg.com/bliss-svg-builder@alpha/dist/bliss-svg-builder.esm.js';
+
+const builder = new BlissSVGBuilder('B313');  // "feeling"
+document.body.appendChild(builder.svgElement);
+```
+
+Perfect for bug reports, demos, or collaborating with others.
