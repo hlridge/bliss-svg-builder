@@ -1,6 +1,6 @@
 {
   "name": "bliss-svg-builder",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "Generate SVG for Blissymbolics (Bliss) using a DSL to compose characters, words, and sentences.",
   "main": "dist/bliss-svg-builder.cjs",
   "module": "dist/bliss-svg-builder.esm.js",
