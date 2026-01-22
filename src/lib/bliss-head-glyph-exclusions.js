@@ -78,9 +78,15 @@ export const blissHeadGlyphExclusions = [
   // Concept-transforming operators
   'B1060/B578/B303', // looks similar to
   'B1060/B578/B608', // sounds similar to
+  'B1060/B578/B374', // feels similar to
+  'B1060/B578/B473', // smells similar to
+  'B1060/B578/B642', // tastes similar to
   'B1060/B578', // similar to
   'B578/B303', // looks like
   'B578/B608', // sounds like
+  'B578/B374', // feels like
+  'B578/B473', // smells like
+  'B578/B642', // tastes like
   'B348', // generalization of
 
   // Relational operators
