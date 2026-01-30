@@ -27,7 +27,7 @@ yarn add bliss-svg-builder
 ### Node.js (ES Modules)
 
 ```js
-import { BlissSVGBuilder } from 'bliss-svg-builder';
+import { BlissSVGBuilder } from 'bliss-svg-builder@alpha';
 
 const builder = new BlissSVGBuilder('B313');  // "feeling"
 console.log(builder.svgCode);
@@ -36,7 +36,7 @@ console.log(builder.svgCode);
 ### Node.js (CommonJS)
 
 ```js
-const { BlissSVGBuilder } = require('bliss-svg-builder');
+const { BlissSVGBuilder } = require('bliss-svg-builder@alpha');
 
 const builder = new BlissSVGBuilder('B313');  // "feeling"
 console.log(builder.svgCode);
@@ -46,7 +46,7 @@ console.log(builder.svgCode);
 
 ```html
 <script type="module">
-  import { BlissSVGBuilder } from 'bliss-svg-builder';
+  import { BlissSVGBuilder } from 'bliss-svg-builder@alpha';
 
   const builder = new BlissSVGBuilder('B313');  // "feeling"
   document.body.appendChild(builder.svgElement);
