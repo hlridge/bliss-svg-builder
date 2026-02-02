@@ -1829,8 +1829,7 @@ const glyphData = {
     anchorOffsetX: -2
   },
   B543: {
-    codeString: "HW2N:1,9.5;VL6:1,10;HL2:0,12;HL3:1,16;HC2E:4,14",
-    anchorOffsetX: 0.5
+    codeString: "HW2N:1,9.5;VL6:1,10;HL2:0,12;HL3:1,16;HC2E:4,14"
   },
   B544: {
     codeString: "DOT:0,16;DOT:4,12;DOT:4,16"
