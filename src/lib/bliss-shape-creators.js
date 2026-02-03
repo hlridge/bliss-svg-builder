@@ -34,21 +34,24 @@ export function createTextFallbackGlyph(str) {
   }, 0);
   const charSpacing = (str.length - 1) * defaultCharSpace;
   const width = charWidths + charSpacing;
-  const height = 16; // Match external glyph maxY values
+  // Approximate content bounds for effectiveBounds calculation.
+  // y=11 is a rough minY; actual values vary per glyph (TODO: compute from path data).
+  const approxMinY = 11;
+  const maxY = 16;
 
   return {
     getPath: (x, y, options = {}) => {
       const fill = options.color || '#000000';
       const closePath = `"></path>`;
       const openPath = `<path d="`;
-      // External glyphs have baseline at y≈16, font-size 5.7 gives x-height of ~4
       const baseline = 16;
       const textX = x - 0.3;
       const textY = y + baseline;
       return `${closePath}<text x="${textX}" y="${textY}" font-family="Liberation Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${str}</text>${openPath}`;
     },
     width,
-    height,
+    y: approxMinY,
+    height: maxY - approxMinY,
     isExternalGlyph: true,
     isTextFallback: true,
     glyph: str,
@@ -619,6 +622,12 @@ export function createExternalGlyph(glyph) {
 
   const round = (num) => parseFloat(num.toFixed(4));
 
+  // Approximate content bounds for effectiveBounds calculation.
+  // y=11 is a rough minY; actual values vary per glyph (TODO: compute from path data).
+  // aObj.height is actually maxY (where the bottom of the glyph path sits), not content height.
+  const approxMinY = 11;
+  const maxY = aObj.height || 0;
+
   return {
     getPath: (x, y, options = {}) => {
       // Transform all M coordinates directly (paths use relative commands after M)
@@ -631,7 +640,8 @@ export function createExternalGlyph(glyph) {
       return `${closePath}${openGlyphPath}${transformedPath}${closePath}${openPath}`;
     },
     width: aObj.width || 0,
-    height: aObj.height || 0,
+    y: approxMinY,
+    height: maxY - approxMinY,
     // Indicates that this "shape" is an external, non-Bliss glyph.
     isExternalGlyph: true,
     // The glyph represented.
