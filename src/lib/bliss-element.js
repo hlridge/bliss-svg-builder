@@ -457,11 +457,11 @@ export class BlissElement {
           this.#positionIndicatorGroup(glyphParts, indicatorParts);
         }
 
-        // Normalize: shift parts so the leftmost starts at x=0
+        // Normalize: shift parts right only if any child extends left of origin (negative x)
         // Skip normalization for characters with indicators above glyph (they have their own positioning)
         if (!hasGlyphWithIndicators && this.#children.length > 0) {
           const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
-          if (minX !== 0) {
+          if (minX < 0) {
             for (const child of this.#children) {
               child.#relativeToParentX -= minX;
             }
@@ -608,7 +608,9 @@ export class BlissElement {
     if (this.#level === 0) {
       width = maxRelativeXPlusWidth - minRelativeX + this.#childStartOffset;
     } else {
-      width = maxRelativeXPlusWidth - minRelativeX;
+      // When minRelativeX > 0, the left boundary is still the element's origin (0),
+      // not the leftmost child. Only subtract negative offsets (e.g., indicator overhang).
+      width = maxRelativeXPlusWidth - Math.min(0, minRelativeX);
     }
 
     return width;
@@ -619,7 +621,6 @@ export class BlissElement {
 
     const parts = this.#children;
     if (parts.length === 0) return 0;
-    if (parts.length === 1) return parts[0].width;
 
     // Use cached classification (computed once in constructor)
     const { glyphParts } = this.#classifiedParts;
@@ -629,7 +630,9 @@ export class BlissElement {
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...parts.map(part => part.#relativeToParentX + part.width));
-    const rightExtendedGlyphWidth = maxRelativeXPlusWidth - minRelativeX;
+    // When minRelativeX > 0, the left boundary is still the element's origin (0).
+    // Only subtract negative offsets (e.g., indicator overhang).
+    const rightExtendedGlyphWidth = maxRelativeXPlusWidth - Math.min(0, minRelativeX);
 
     return rightExtendedGlyphWidth;
   }
@@ -639,7 +642,6 @@ export class BlissElement {
 
     const parts = this.#children;
     if (parts.length === 0) return 0;
-    if (parts.length === 1) return parts[0].width;
 
     // Use cached classification (computed once in constructor)
     const { glyphParts } = this.#classifiedParts;
@@ -649,7 +651,9 @@ export class BlissElement {
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...spacingParts.map(part => part.#relativeToParentX + part.width));
-    const baseGlyphWidth = maxRelativeXPlusWidth - minRelativeX;
+    // When minRelativeX > 0, the left boundary is still the element's origin (0).
+    // Only subtract negative offsets (e.g., indicator overhang).
+    const baseGlyphWidth = maxRelativeXPlusWidth - Math.min(0, minRelativeX);
 
     return baseGlyphWidth;
   }
