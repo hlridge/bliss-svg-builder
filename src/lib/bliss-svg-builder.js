@@ -121,16 +121,6 @@ class BlissSVGBuilder {
       }
     }
 
-    // auto-crop: Boolean ("1" -> true, "0" -> false)
-    // When true, crops to effectiveBounds removing dead space
-    if ('auto-crop' in rawOptions) {
-      if (rawOptions['auto-crop'] === "1") {
-        options.autoCrop = true;
-      } else if (rawOptions['auto-crop'] === "0") {
-        options.autoCrop = false;
-      }
-    }
-
     // grid: Boolean ("1" -> true, "0" -> false)
     if ('grid' in rawOptions) {
       if (rawOptions.grid === "1") {
@@ -238,27 +228,37 @@ class BlissSVGBuilder {
       options.gridMinorStrokeWidth = minorWidth;
     }
 
-    // crop: Sets ALL 4 crop values
-    if ('crop' in rawOptions && !isNaN(rawOptions['crop'])) {
-      const c = Number(rawOptions['crop']);
-      options.cropTop = c;
-      options.cropBottom = c;
-      options.cropLeft = c;
-      options.cropRight = c;
+    // crop: Sets ALL 4 crop values (number or 'auto')
+    if ('crop' in rawOptions) {
+      const c = rawOptions['crop'];
+      if (c === 'auto') {
+        options.cropTop = 'auto';
+        options.cropBottom = 'auto';
+        options.cropLeft = 'auto';
+        options.cropRight = 'auto';
+      } else if (!isNaN(c)) {
+        const n = Number(c);
+        options.cropTop = n;
+        options.cropBottom = n;
+        options.cropLeft = n;
+        options.cropRight = n;
+      }
     }
 
     // Individual crop values (override the above if present)
+    // Each can be a number or 'auto'
+    const parseCropValue = (val) => val === 'auto' ? 'auto' : Number(val);
     if ('crop-top' in rawOptions) {
-      options.cropTop = Number(rawOptions['crop-top']);
+      options.cropTop = parseCropValue(rawOptions['crop-top']);
     }
     if ('crop-bottom' in rawOptions) {
-      options.cropBottom = Number(rawOptions['crop-bottom']);
+      options.cropBottom = parseCropValue(rawOptions['crop-bottom']);
     }
     if ('crop-left' in rawOptions) {
-      options.cropLeft = Number(rawOptions['crop-left']);
+      options.cropLeft = parseCropValue(rawOptions['crop-left']);
     }
     if ('crop-right' in rawOptions) {
-      options.cropRight = Number(rawOptions['crop-right']);
+      options.cropRight = parseCropValue(rawOptions['crop-right']);
     }
 
     // Other string options
@@ -498,32 +498,25 @@ class BlissSVGBuilder {
     // User-provided options with defaults
     const color = this.#processedOptions.color ?? "#000000";
     const strokeWidth = this.#processedOptions.strokeWidth ?? 0.5;
-    const cropTop = this.#processedOptions.cropTop ?? 0;
-    const cropBottom = this.#processedOptions.cropBottom ?? 0;
-    const cropLeft = this.#processedOptions.cropLeft ?? 0;
-    const cropRight = this.#processedOptions.cropRight ?? 0;
     const marginTop = this.#processedOptions.marginTop ?? 0.75;
     const marginBottom = this.#processedOptions.marginBottom ?? 0.75;
     const marginLeft = this.#processedOptions.marginLeft ?? 0.75;
     const marginRight = this.#processedOptions.marginRight ?? 0.75;
 
-    // Apply auto-crop using effectiveBounds if enabled
-    let autoCropTop = 0;
-    let autoCropBottom = 0;
-    let autoCropLeft = 0;
-    let autoCropRight = 0;
+    // Compute crop values - can be numeric or 'auto' (computed from effectiveBounds)
+    const bounds = this.composition.effectiveBounds;
+    const rawCropTop = this.#processedOptions.cropTop ?? 0;
+    const rawCropBottom = this.#processedOptions.cropBottom ?? 0;
+    const rawCropLeft = this.#processedOptions.cropLeft ?? 0;
+    const rawCropRight = this.#processedOptions.cropRight ?? 0;
 
-    if (this.#processedOptions.autoCrop) {
-      const bounds = this.composition.effectiveBounds;
+    const cropTop = rawCropTop === 'auto' ? bounds.minY : rawCropTop;
+    const cropBottom = rawCropBottom === 'auto' ? (height - bounds.maxY) : rawCropBottom;
+    const cropLeft = rawCropLeft === 'auto' ? bounds.minX : rawCropLeft;
+    const cropRight = rawCropRight === 'auto' ? (width - bounds.maxX) : rawCropRight;
 
-      autoCropLeft = bounds.minX;
-      autoCropRight = width - bounds.maxX;
-      autoCropTop = bounds.minY;
-      autoCropBottom = height - bounds.maxY;
-    }
-
-    let viewBoxX = -marginLeft + cropLeft + autoCropLeft;
-    const viewBoxY = -marginTop + cropTop + autoCropTop;
+    let viewBoxX = -marginLeft + cropLeft;
+    const viewBoxY = -marginTop + cropTop;
     let gridOffsetX = 0;
 
     if ((this.#processedOptions.centered ?? 1) === 1 && width > this.composition.width) {
@@ -537,8 +530,8 @@ class BlissSVGBuilder {
       gridOffsetX = viewBoxX + marginLeft;
     }
     const content = this.svgContent;
-    const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight - autoCropLeft - autoCropRight;
-    const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom - autoCropTop - autoCropBottom;
+    const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight;
+    const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom;
     const svgAttributeMultiplier = 6;
 
     // Calculate SVG element dimensions (maintaining aspect ratio)

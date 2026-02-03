@@ -11,7 +11,7 @@
 export const KNOWN_OPTION_KEYS = new Set([
   'stroke-width', 'dot-extra-width', 'char-space', 'word-space', 'external-glyph-space',
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
-  'min-width', 'centered', 'auto-crop', 'freestyle',
+  'min-width', 'centered', 'freestyle',
   'crop', 'crop-top', 'crop-bottom', 'crop-left', 'crop-right',
   'grid', 'grid-color', 'grid-major-color', 'grid-medium-color', 'grid-minor-color',
   'grid-sky-color', 'grid-earth-color',
