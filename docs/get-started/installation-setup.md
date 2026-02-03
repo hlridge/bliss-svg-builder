@@ -7,19 +7,19 @@ Get Bliss SVG Builder installed and render your first SVG.
 ### Using npm
 
 ```bash
-npm install bliss-svg-builder
+npm install bliss-svg-builder@alpha
 ```
 
 ### Using pnpm
 
 ```bash
-pnpm add bliss-svg-builder
+pnpm add bliss-svg-builder@alpha
 ```
 
 ### Using yarn
 
 ```bash
-yarn add bliss-svg-builder
+yarn add bliss-svg-builder@alpha
 ```
 
 ## Import Patterns

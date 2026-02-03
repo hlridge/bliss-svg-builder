@@ -28,4 +28,4 @@ Style at any level - the entire composition, individual words, characters, or ev
 
 <Demo code="B513/B10/AK:-8/[color=red;stroke-width=0.3]HL8:0,18//[style='filter: drop-shadow(0 0 0.5px rgba(255, 0, 0, 1)) drop-shadow(0 0 1px rgba(255, 0, 0, .75))']B431;[color=black;stroke-width=1]>B81/AK:-9/[color=lightgreen;stroke-width=0.75]>B81//[stroke-width=1;color=black]|ZSA/AK:8/B414/B167/AK:-16/[stroke-width=0.5;color=orange][stroke-dasharray=0 0.80]>B414/[stroke-width=0.5;color=orange]B167//B4" title="Style elements at any level" />
 
-Ready to dive deeper? Head to the [Handbook](/handbook/core-concepts/characters-bcodes) for comprehensive guides on all features.
+Ready to dive deeper? Head to the [Handbook](/handbook/writing/characters-bcodes) for comprehensive guides on all features.
