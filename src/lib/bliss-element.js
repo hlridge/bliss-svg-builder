@@ -15,6 +15,7 @@ export class BlissElement {
   #isCharacter
   #isShape
   #isBlissGlyph
+  #isExternalGlyph
   #width
   #height
   #leafX
@@ -431,6 +432,7 @@ export class BlissElement {
         // Character level
         this.#codeName = this.#blissObj.glyphCode || this.#blissObj.code || "";
         this.#isBlissGlyph = !!this.#blissObj.isBlissGlyph;
+        this.#isExternalGlyph = !!this.#blissObj.isExternalGlyph;
 
         if (!this.#blissObj.parts) {
           this.#blissObj = { parts: [this.#blissObj] };
@@ -696,7 +698,7 @@ export class BlissElement {
     if (this.#height !== undefined) {
       return this.#height;
     }
-    if (this.#isCharacter) {
+    if (this.isGlyph) {
       return 20;
     }
     if (this.#children && this.#children.length > 0) {
@@ -760,7 +762,11 @@ export class BlissElement {
   }
 
   get isExternalGlyph() {
-    return this.#blissObj.isExternalGlyph;
+    return this.#isExternalGlyph;
+  }
+
+  get isGlyph() {
+    return this.#isBlissGlyph || this.#isExternalGlyph;
   }
 
   get effectiveBounds() {
