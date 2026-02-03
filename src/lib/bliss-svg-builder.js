@@ -516,17 +516,10 @@ class BlissSVGBuilder {
     if (this.#processedOptions.autoCrop) {
       const bounds = this.composition.effectiveBounds;
 
-      if (this.#processedOptions.freestyle) {
-        // Freestyle mode: crop all sides
-        autoCropLeft = bounds.minX;
-        autoCropRight = width - bounds.maxX;
-        autoCropTop = bounds.minY;
-        autoCropBottom = height - bounds.maxY;
-      } else {
-        // Writing mode: crop vertically only (preserve horizontal spacing)
-        autoCropTop = bounds.minY;
-        autoCropBottom = height - bounds.maxY;
-      }
+      autoCropLeft = bounds.minX;
+      autoCropRight = width - bounds.maxX;
+      autoCropTop = bounds.minY;
+      autoCropBottom = height - bounds.maxY;
     }
 
     let viewBoxX = -marginLeft + cropLeft + autoCropLeft;
