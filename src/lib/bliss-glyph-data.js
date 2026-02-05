@@ -4013,6 +4013,38 @@ const glyphData = {
   },
   B6168: {
     codeString: "B303;B651:4,0"
+  },
+  B6232: {
+    codeString: "B917;B651:2,0",
+    anchorOffsetX: -1
+  },
+  B6287: {
+    codeString: "B700;HL8:2,12;HL8:2,16;B700:8,0"
+  },
+  B6300: {
+    codeString: "B303;VL2:2,8;VL2:2,14;HL8:2,8;HL8:2,16;VL8:10,8",
+    anchorOffsetX: 1
+  },
+  B6321: {
+    codeString: "DL1N:0,8;VL4:1,8;DL1N:1,11;B968:3,0"
+  },
+  B6414: {
+    codeString: "DL8-4N:0,10"
+  },
+  B6415: {
+    codeString: "DL8-4S:0,10"
+  },
+  B6420: {
+    codeString: "DL4-8N:0,8"
+  },
+  B6435: {
+    codeString: "HC8W:0,8;HW8W:2,8;B622:4,0"
+  },
+  B6436: {
+    codeString: "HC2N:0,4",
+    isIndicator: true,
+    name: "INDICATOR ABSTRACT"
+
   }
 }
 

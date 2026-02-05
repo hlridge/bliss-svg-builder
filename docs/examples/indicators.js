@@ -6,6 +6,7 @@ export const indicators = {
   B5996: { name: "INDICATOR DEFINITE PLURAL", purpose: "Definite + plural combined" },
   B904: { name: "INDICATOR DEFINITE", purpose: "Marks definiteness" },
   B97: { name: "INDICATOR THING", purpose: "Marks concrete sense" },
+  B6436: { name: "INDICATOR ABSTRACT", purpose: "Marks abstract sense" },
   B98: { name: "INDICATOR PLURAL THING", purpose: "Marks plural concrete sense" },
   B5998: { name: "INDICATOR DEFINITE PLURAL THING", purpose: "Definite + plural + thing combined" },
   B5997: { name: "INDICATOR DEFINITE THING", purpose: "Definite + thing combined" },
@@ -55,7 +56,7 @@ export const indicators = {
 export const indicatorGroups = [
   {
     name: "Nominal Indicators",
-    codes: ['B99', 'B5996', 'B904', 'B97', 'B98', 'B5998', 'B5997']
+    codes: ['B99', 'B5996', 'B904', 'B97', 'B6436', 'B98', 'B5998', 'B5997']
   },
   {
     name: "Verbal Indicators",
