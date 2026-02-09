@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, isSafeAttributeName } from "./bliss-constants.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -97,7 +97,7 @@ export class BlissElement {
 
     // Values are already escaped by #processOptions at the input boundary
     for (const [key, value] of Object.entries(options)) {
-      if (INTERNAL_OPTIONS.has(key)) continue;
+      if (INTERNAL_OPTIONS.has(key) || !isSafeAttributeName(key)) continue;
 
       if (anchorAttrNames.has(key)) {
         if (key === 'href') hasHref = true;

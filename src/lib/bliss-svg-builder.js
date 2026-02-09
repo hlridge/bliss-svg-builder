@@ -7,7 +7,7 @@
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName } from "./bliss-constants.js";
 
 class BlissSVGBuilder {
   #processedOptions;
@@ -350,7 +350,7 @@ class BlissSVGBuilder {
     // Values are already escaped by #processOptions at the input boundary
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
-      if (!INTERNAL_OPTIONS.has(key)) {
+      if (!INTERNAL_OPTIONS.has(key) && isSafeAttributeName(key)) {
         const attrName = attrMap[key] || key;
         this.globalSvgAttributes[attrName] = value;
       }

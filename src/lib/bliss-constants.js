@@ -21,6 +21,11 @@ export const KNOWN_OPTION_KEYS = new Set([
 ]);
 
 /**
+ * Returns false for event handler attribute names (on*) to prevent XSS.
+ */
+export const isSafeAttributeName = (name) => !/^on/i.test(name);
+
+/**
  * Escapes HTML special characters to prevent XSS in SVG output.
  */
 export const escapeHtml = (str) => String(str)
