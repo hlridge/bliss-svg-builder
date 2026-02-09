@@ -95,12 +95,22 @@ export class BlissElement {
     let hasHref = false;
     let hasPointerEvents = false;
 
+    const isSafeHref = (value) => {
+      const trimmed = String(value).trim().toLowerCase();
+      return !trimmed.startsWith('javascript:') &&
+             !trimmed.startsWith('data:') &&
+             !trimmed.startsWith('vbscript:');
+    };
+
     // Values are already escaped by #processOptions at the input boundary
     for (const [key, value] of Object.entries(options)) {
       if (INTERNAL_OPTIONS.has(key) || !isSafeAttributeName(key)) continue;
 
       if (anchorAttrNames.has(key)) {
-        if (key === 'href') hasHref = true;
+        if (key === 'href') {
+          if (!isSafeHref(value)) continue;
+          hasHref = true;
+        }
         anchorAttrs.push(`${key}="${value}"`);
       } else {
         const attrName = attrMap[key] || key;
