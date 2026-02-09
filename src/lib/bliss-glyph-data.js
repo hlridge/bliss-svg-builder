@@ -4016,7 +4016,7 @@ const glyphData = {
   },
   B6232: {
     codeString: "B917;B651:2,0",
-    anchorOffsetX: -1
+    anchorOffsetX: -2
   },
   B6287: {
     codeString: "B700;HL8:2,12;HL8:2,16;B700:8,0"
@@ -4026,7 +4026,12 @@ const glyphData = {
     anchorOffsetX: 1
   },
   B6321: {
-    codeString: "DL1N:0,8;VL4:1,8;DL1N:1,11;B968:3,0"
+    codeString: "DL1N:0,8;VL4:1,8;DL1N:1,11;B968:3,0",
+    anchorOffsetX: 1.5
+  },
+  B6393: {
+    codeString: "P4S:0,7;B1116",
+    anchorOffsetY: -1
   },
   B6414: {
     codeString: "DL8-4N:0,10"
@@ -4044,8 +4049,14 @@ const glyphData = {
     codeString: "HC2N:0,4",
     isIndicator: true,
     name: "INDICATOR ABSTRACT"
-
-  }
+  },
+  B6437: {
+    codeString: "B814;B695:6,0"
+  },
+  B6438: {
+    codeString: "DL1N:0,8;VL4:1,8;DL1N:1,11;B937:3,0",
+    anchorOffsetX: 1.5
+  },
 }
 
 export { glyphData };
