@@ -1051,6 +1051,7 @@ export class BlissElement {
   }
 
   #handleCompositeElement(parts) {
+    if (this.#level > 50) throw new Error('Maximum element nesting depth exceeded');
     this.#children = [];
 
     for (const part of parts) {

@@ -426,7 +426,8 @@ export class BlissParser {
 
         // isTopLevel: true for user input, false for internal codeString expansion
         // Indicator replacement only applies at top level (user input)
-        function expand(str, definitions, isTopLevel = true) {
+        function expand(str, definitions, isTopLevel = true, depth = 0) {
+          if (depth > 50) throw new Error('Maximum recursion depth exceeded');
           let isHeadGlyph = false;
           if (str.endsWith('^')) {
             if (!headGlyphFound) {
@@ -506,7 +507,7 @@ export class BlissParser {
 
             // First expand to get all parts (including nested expansions)
             const rawExpandedParts = codeStringToExpand.split('/')
-              .flatMap(subStr => expand(subStr, definitions, false));
+              .flatMap(subStr => expand(subStr, definitions, false, depth + 1));
 
             // Check if final expansion has multiple glyphs (word vs single-character composite)
             // This covers nested aliases like TestAlias → TestWord1 → H/C
@@ -649,7 +650,8 @@ export class BlissParser {
           glyphCodeString = glyphMatch[2];
         }
 
-        const parseParts = (partsString) => {
+        const parseParts = (partsString, depth = 0) => {
+          if (depth > 50) throw new Error('Maximum recursion depth exceeded');
           const parts = [];
 
           // Split on ; (brackets are already replaced with placeholders at this point)
@@ -662,7 +664,7 @@ export class BlissParser {
 
             if (codeString) {
               if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {
-                part.parts = parseParts(definition.codeString);
+                part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.code to preserve identifier alongside expansion
               } else {
                 part.code = definition.codeString;
