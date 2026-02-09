@@ -7,7 +7,7 @@
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml } from "./bliss-constants.js";
 
 class BlissSVGBuilder {
   #processedOptions;
@@ -171,12 +171,12 @@ class BlissSVGBuilder {
         earthColor = rawOptions['grid-earth-color'];
       }
 
-      // Assign to options object
-      options.gridSkyColor = skyColor;
-      options.gridEarthColor = earthColor;
-      options.gridMajorColor = majorColor;
-      options.gridMediumColor = mediumColor;
-      options.gridMinorColor = minorColor;
+      // Assign to options object (escaped for safe SVG output)
+      options.gridSkyColor = escapeHtml(skyColor);
+      options.gridEarthColor = escapeHtml(earthColor);
+      options.gridMajorColor = escapeHtml(majorColor);
+      options.gridMediumColor = escapeHtml(mediumColor);
+      options.gridMinorColor = escapeHtml(minorColor);
     }
 
     // Grid stroke widths - same hierarchy pattern
@@ -263,19 +263,19 @@ class BlissSVGBuilder {
 
     // Other string options
     if ('color' in rawOptions) {
-      options.color = rawOptions.color;
+      options.color = escapeHtml(rawOptions.color);
     }
     if ('background' in rawOptions) {
-      options.background = rawOptions.background; // empty string => transparent background
+      options.background = escapeHtml(rawOptions.background); // empty string => transparent background
     }
     if ('text' in rawOptions) {
-      options.text = rawOptions.text;
+      options.text = escapeHtml(rawOptions.text);
     }
     if ('svg-desc' in rawOptions) {
-      options.svgDesc = rawOptions['svg-desc'];
+      options.svgDesc = escapeHtml(rawOptions['svg-desc']);
     }
     if ('svg-title' in rawOptions) {
-      options.svgTitle = rawOptions['svg-title'];
+      options.svgTitle = escapeHtml(rawOptions['svg-title']);
     }
 
     // SVG element height (presentation size, not viewBox)
@@ -285,9 +285,11 @@ class BlissSVGBuilder {
 
     // Preserve any options that weren't explicitly processed (like fill, opacity, stroke-dasharray, etc.)
     // Only skip options that are in KNOWN_OPTION_KEYS (already processed above)
+    // String values are escaped here at the input boundary so downstream code can use them safely.
+    // Numeric values pass through as-is — they're used for calculations, not SVG markup.
     for (const [key, value] of Object.entries(rawOptions)) {
       if (!KNOWN_OPTION_KEYS.has(key)) {
-        options[key] = value;
+        options[key] = typeof value === 'string' ? escapeHtml(value) : value;
       }
     }
 
@@ -343,19 +345,14 @@ class BlissSVGBuilder {
     this.#processedOptions = blissObj.options;
 
     const attrMap = { 'color': 'stroke' };
-    const escapeHtml = (str) => String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
 
     // Store global options that should become SVG attributes
+    // Values are already escaped by #processOptions at the input boundary
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (!INTERNAL_OPTIONS.has(key)) {
         const attrName = attrMap[key] || key;
-        this.globalSvgAttributes[attrName] = escapeHtml(value);
+        this.globalSvgAttributes[attrName] = value;
       }
     }
 

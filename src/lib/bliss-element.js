@@ -90,30 +90,22 @@ export class BlissElement {
       'strokeWidth': 'stroke-width'
     };
 
-    const escapeHtml = (str) => String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
     const anchorAttrs = [];
     const groupAttrs = [];
     let hasHref = false;
     let hasPointerEvents = false;
 
+    // Values are already escaped by #processOptions at the input boundary
     for (const [key, value] of Object.entries(options)) {
       if (INTERNAL_OPTIONS.has(key)) continue;
 
-      const escapedValue = escapeHtml(value);
-
       if (anchorAttrNames.has(key)) {
         if (key === 'href') hasHref = true;
-        anchorAttrs.push(`${key}="${escapedValue}"`);
+        anchorAttrs.push(`${key}="${value}"`);
       } else {
         const attrName = attrMap[key] || key;
         if (key === 'pointer-events') hasPointerEvents = true;
-        groupAttrs.push(`${attrName}="${escapedValue}"`);
+        groupAttrs.push(`${attrName}="${value}"`);
       }
     }
 

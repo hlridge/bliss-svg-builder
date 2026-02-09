@@ -21,6 +21,16 @@ export const KNOWN_OPTION_KEYS = new Set([
 ]);
 
 /**
+ * Escapes HTML special characters to prevent XSS in SVG output.
+ */
+export const escapeHtml = (str) => String(str)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
+
+/**
  * Options that should NOT be rendered as SVG attributes.
  *
  * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)
