@@ -105,6 +105,9 @@ export class BlissParser {
   }
 
   static fromString(inputString) {
+    if (typeof inputString === 'string' && inputString.length > 10_000) {
+      throw new Error('Input string exceeds maximum length of 10,000 characters');
+    }
     inputString = inputString.trim();
     let result = { groups: [] };
 
