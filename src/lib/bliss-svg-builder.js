@@ -457,28 +457,32 @@ class BlissSVGBuilder {
    */
   static extendData(data) {
     if (data) {
-      for (let key in data) {
-        let entry = data[key];
-        
+      for (const key of Object.keys(data)) {
+        const entry = data[key];
+
         if (entry.hasOwnProperty('codeString') && typeof entry.codeString === 'string') {
-          let validEntry = { codeString: entry.codeString };
-  
+          if (blissElementDefinitions[key]) {
+            console.warn(`extendData: overwriting existing definition for "${key}"`);
+          }
+
+          const validEntry = { codeString: entry.codeString };
+
           if (entry.hasOwnProperty('isIndicator') && typeof entry.isIndicator === 'boolean') {
             validEntry.isIndicator = entry.isIndicator;
           }
-          
-          if (entry.hasOwnProperty('anchorOffsetX') && typeof entry.anchorOffsetX === 'number') {
+
+          if (entry.hasOwnProperty('anchorOffsetX') && typeof entry.anchorOffsetX === 'number' && isFinite(entry.anchorOffsetX)) {
             validEntry.anchorOffsetX = entry.anchorOffsetX;
           }
 
-          if (entry.hasOwnProperty('anchorOffsetY') && typeof entry.anchorOffsetY === 'number') {
+          if (entry.hasOwnProperty('anchorOffsetY') && typeof entry.anchorOffsetY === 'number' && isFinite(entry.anchorOffsetY)) {
             validEntry.anchorOffsetY = entry.anchorOffsetY;
           }
 
-          if (entry.hasOwnProperty('width') && typeof entry.width === 'number') {
+          if (entry.hasOwnProperty('width') && typeof entry.width === 'number' && isFinite(entry.width)) {
             validEntry.width = entry.width;
           }
-          
+
           blissElementDefinitions[key] = validEntry;
         } else {
           console.warn(`Invalid entry for key: ${key}`);
