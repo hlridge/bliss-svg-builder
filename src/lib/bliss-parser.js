@@ -41,7 +41,7 @@ export class BlissParser {
     const extractedContent = optionsString.match(/\[([^\]]*)\]/)?.[1];
     if (!extractedContent) return;
 
-    const parsedObject = {};
+    const parsedObject = Object.create(null);
 
     const regex = /([\w-]+)\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^;]+)/g;
     let match;
