@@ -389,7 +389,7 @@ class BlissSVGBuilder {
    * Returns the SVG as a DOM Element.
    * This property is useful when you need to directly manipulate the SVG using the native DOM API.
    * 
-   * @returns {HTMLElement} SVG DOM element
+   * @returns {SVGSVGElement} SVG DOM element
    */
   get svgElement() {
     const parser = new DOMParser();

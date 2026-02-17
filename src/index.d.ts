@@ -6,7 +6,7 @@ export declare class BlissSVGBuilder {
    * Creates an instance of BlissSVGBuilder.
    * @param input The input data for initializing the SVG.
    */
-  constructor(input: any);
+  constructor(input: string);
 
   /**
    * Returns the SVG content (path elements and groups) as a string.
@@ -16,7 +16,7 @@ export declare class BlissSVGBuilder {
   /**
    * Returns the SVG as a DOM Element.
    */
-  readonly svgElement: HTMLElement;
+  readonly svgElement: SVGSVGElement;
 
   /**
    * Returns the SVG code as a string, without the XML declaration.
@@ -44,5 +44,11 @@ export declare class BlissSVGBuilder {
    * Extends the library with custom data.
    * @param data The custom data as a key-value pair object.
    */
-  static extendData(data: Record<string, any>): void;
+  static extendData(data: Record<string, {
+    codeString: string;
+    isIndicator?: boolean;
+    anchorOffsetX?: number;
+    anchorOffsetY?: number;
+    width?: number;
+  }>): void;
 }
