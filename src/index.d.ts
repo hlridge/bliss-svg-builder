@@ -1,7 +1,7 @@
 /**
  * BlissSVGBuilder class for creating and managing SVG content.
  */
-declare class BlissSVGBuilder {
+export declare class BlissSVGBuilder {
   /**
    * Creates an instance of BlissSVGBuilder.
    * @param input The input data for initializing the SVG.
@@ -46,11 +46,3 @@ declare class BlissSVGBuilder {
    */
   static extendData(data: Record<string, any>): void;
 }
-
-// If your library is a CommonJS module
-declare module 'bliss-svg-builder' {
-  export = BlissSVGBuilder;
-}
-
-// If your library is an ES6 module
-export = { BlissSVGBuilder };
