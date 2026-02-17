@@ -4002,7 +4002,7 @@ const glyphData = {
     codeString: "B213;LARR4E:8,10",
     anchorOffsetX: -2
   },
-  B6091: {
+  B6091: { // Temporarily removed from Blissary as its status for inclusion by BCI is unclear. Graphically, it's the opposite of COMPRESSION B1008.
     codeString: "B145;B651:8,0;B335:12,0"
   },
   B6106: {
