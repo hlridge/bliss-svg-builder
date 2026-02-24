@@ -11,7 +11,6 @@ export const indicators = {
   B5998: { name: "INDICATOR DEFINITE PLURAL THING", purpose: "Definite + plural + thing combined" },
   B5997: { name: "INDICATOR DEFINITE THING", purpose: "Definite + thing combined" },
   B908: { name: "INDICATOR INDEFINITE", purpose: "Marks indefiniteness" },
-  TBD_ABSTRACT: { name: "INDICATOR ABSTRACT", purpose: "Marks abstract sense", isTbd: true },
 
   // Verbal Indicators
   B81: { name: "INDICATOR ACTION", purpose: "Marks as action (verb)" },
@@ -68,6 +67,6 @@ export const indicatorGroups = [
   },
   {
     name: "Indicators Not Planned for Unicode",
-    codes: ['B908', 'TBD_ABSTRACT', 'B910', 'TBD_INDIRECT_OBJECT', 'B905', 'B909', 'B906', 'B915', 'B916', 'B913', 'B992']
+    codes: ['B908', 'B910', 'TBD_INDIRECT_OBJECT', 'B905', 'B909', 'B906', 'B915', 'B916', 'B913', 'B992']
   }
 ];
