@@ -36,6 +36,13 @@ export const escapeHtml = (str) => String(str)
   .replace(/'/g, '&#39;');
 
 /**
+ * Converts a camelCase string to kebab-case.
+ * e.g., strokeWidth → stroke-width, gridSkyColor → grid-sky-color
+ * Single-word keys (color, grid, margin) pass through unchanged.
+ */
+export const camelToKebab = (str) => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+
+/**
  * Options that should NOT be rendered as SVG attributes.
  *
  * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)

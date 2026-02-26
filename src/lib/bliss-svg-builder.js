@@ -7,7 +7,7 @@
 import { blissElementDefinitions } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab } from "./bliss-constants.js";
 
 class BlissSVGBuilder {
   #processedOptions;
@@ -318,8 +318,31 @@ class BlissSVGBuilder {
     }
   }
 
-  constructor(input) {
+  constructor(input, options = {}) {
+    const { defaults, overrides } = options ?? {};
     const blissObj = BlissParser.parse(input);
+
+    // Convert object options (camelCase, native types) to raw format (kebab-case, strings)
+    const toRaw = (obj) => {
+      const raw = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value === null || value === undefined) continue;
+        const kebabKey = camelToKebab(key);
+        if (typeof value === 'boolean') {
+          raw[kebabKey] = value ? '1' : '0';
+        } else {
+          raw[kebabKey] = String(value);
+        }
+      }
+      return raw;
+    };
+
+    // Merge: defaults (lowest) < string options (middle) < overrides (highest)
+    if (defaults || overrides) {
+      const rawDefaults = defaults ? toRaw(defaults) : {};
+      const rawOverrides = overrides ? toRaw(overrides) : {};
+      blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
+    }
 
     // Process options at all levels (global, group, glyph, part)
     // Only top level gets builder defaults (grid, margins, etc.)
