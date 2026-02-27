@@ -539,8 +539,280 @@ class BlissSVGBuilder {
     return { wordCount: words.length, characterCount };
   }
 
+  // --- Manipulation helpers ---
+
+  // Space codes used in space groups
+  static #SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA', 'SP']);
+
+  /** Returns true if a raw group is a space group */
+  static #isRawSpaceGroup(group) {
+    if (!group.glyphs || group.glyphs.length === 0) return false;
+    return group.glyphs.every(g =>
+      g.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(g.parts[0].code)
+    );
+  }
+
+  /** Returns array of group indices that are word groups (non-space) */
+  #getWordGroupIndices() {
+    const obj = this.toJSON();
+    const indices = [];
+    for (let i = 0; i < (obj.groups || []).length; i++) {
+      if (!BlissSVGBuilder.#isRawSpaceGroup(obj.groups[i])) {
+        indices.push(i);
+      }
+    }
+    return { obj, indices };
+  }
+
+  /** Creates a default space group for insertion between words */
+  static #makeSpaceGroup() {
+    return { glyphs: [{ parts: [{ code: 'TSP' }] }] };
+  }
+
+  /**
+   * Removes a character (glyph) from a word.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  removeCharacter(wordIndex, charIndex) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const gi = indices[wordIndex];
+    const group = obj.groups[gi];
+    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
+    group.glyphs.splice(charIndex, 1);
+    // If word is now empty, remove the word and adjacent space
+    if (group.glyphs.length === 0) {
+      return this.#removeWordGroup(obj, gi, indices);
+    }
+    return obj;
+  }
+
+  /**
+   * Replaces a character (glyph) in a word with a new code.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {string} newCode - New code string for the replacement
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  replaceCharacter(wordIndex, charIndex, newCode) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const gi = indices[wordIndex];
+    const group = obj.groups[gi];
+    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
+    // Parse the new code to get its structure
+    const parsed = BlissParser.parse(newCode);
+    const newGlyph = parsed.groups?.[0]?.glyphs?.[0];
+    if (!newGlyph) return null;
+    // Normalize glyphCode→code
+    if (newGlyph.glyphCode) {
+      newGlyph.code = newGlyph.glyphCode;
+      delete newGlyph.glyphCode;
+    }
+    group.glyphs[charIndex] = newGlyph;
+    return obj;
+  }
+
+  /**
+   * Inserts a character (glyph) at a position in a word.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Insert position (0 = before first, length = after last)
+   * @param {string} code - Code string for the new character
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  insertCharacter(wordIndex, charIndex, code) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const gi = indices[wordIndex];
+    const group = obj.groups[gi];
+    if (!group.glyphs || charIndex < 0 || charIndex > group.glyphs.length) return null;
+    const parsed = BlissParser.parse(code);
+    const newGlyph = parsed.groups?.[0]?.glyphs?.[0];
+    if (!newGlyph) return null;
+    if (newGlyph.glyphCode) {
+      newGlyph.code = newGlyph.glyphCode;
+      delete newGlyph.glyphCode;
+    }
+    group.glyphs.splice(charIndex, 0, newGlyph);
+    return obj;
+  }
+
+  /** Internal: removes a word group and its adjacent space from groups array */
+  #removeWordGroup(obj, groupIndex, wordIndices) {
+    const groups = obj.groups;
+    // Determine which space group to also remove
+    const prevIsSpace = groupIndex > 0 && BlissSVGBuilder.#isRawSpaceGroup(groups[groupIndex - 1]);
+    const nextIsSpace = groupIndex < groups.length - 1 && BlissSVGBuilder.#isRawSpaceGroup(groups[groupIndex + 1]);
+
+    if (prevIsSpace) {
+      // Remove space before + the word
+      groups.splice(groupIndex - 1, 2);
+    } else if (nextIsSpace) {
+      // Remove the word + space after
+      groups.splice(groupIndex, 2);
+    } else {
+      // No adjacent space, just remove the word
+      groups.splice(groupIndex, 1);
+    }
+    return obj;
+  }
+
+  /**
+   * Removes an entire word.
+   * @param {number} wordIndex - Word index (0-based)
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  removeWord(wordIndex) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    return this.#removeWordGroup(obj, indices[wordIndex], indices);
+  }
+
+  /**
+   * Inserts a new word at the given position.
+   * @param {number} wordIndex - Insert position (0 = before first, length = after last)
+   * @param {string} code - Code string for the new word
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  insertWord(wordIndex, code) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex > indices.length) return null;
+    const parsed = BlissParser.parse(code);
+    const newGroup = parsed.groups?.[0];
+    if (!newGroup) return null;
+    // Normalize glyphCode→code
+    if (newGroup.glyphs) {
+      for (const glyph of newGroup.glyphs) {
+        if (glyph.glyphCode) {
+          glyph.code = glyph.glyphCode;
+          delete glyph.glyphCode;
+        }
+      }
+    }
+
+    const groups = obj.groups;
+    if (indices.length === 0) {
+      // No words yet, just add
+      groups.push(newGroup);
+    } else if (wordIndex === 0) {
+      // Insert before first word, add space after
+      const firstWordGi = indices[0];
+      groups.splice(firstWordGi, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
+    } else if (wordIndex >= indices.length) {
+      // Append after last word, add space before
+      const lastWordGi = indices[indices.length - 1];
+      groups.splice(lastWordGi + 1, 0, BlissSVGBuilder.#makeSpaceGroup(), newGroup);
+    } else {
+      // Insert between existing words
+      const targetGi = indices[wordIndex];
+      groups.splice(targetGi, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
+    }
+    return obj;
+  }
+
+  /**
+   * Removes an element by its snapshot ID. Works for glyphs and word groups.
+   * @param {string} id - The UUID of the element to remove
+   * @returns {Object|null} JSON object for constructor, or null if not found
+   */
+  removeById(id) {
+    const el = this.getElementById(id);
+    if (!el) return null;
+
+    // If it's a word group (level 1), find its word index
+    if (el.type === 'group' && el.level === 1) {
+      const words = this.words;
+      const wordIndex = words.findIndex(w => w.id === id);
+      if (wordIndex >= 0) return this.removeWord(wordIndex);
+      return null;
+    }
+
+    // If it's a glyph (level 2), find word and char index
+    if (el.type === 'glyph' && el.level === 2) {
+      const words = this.words;
+      for (let wi = 0; wi < words.length; wi++) {
+        const chars = words[wi].children.filter(c => c.type === 'glyph');
+        for (let ci = 0; ci < chars.length; ci++) {
+          if (chars[ci].id === id) return this.removeCharacter(wi, ci);
+        }
+      }
+      return null;
+    }
+
+    return null;
+  }
+
   toString() {
-    return this.composition.toString();
+    const obj = this.toJSON();
+
+    // Serialize a part (and its nested parts) with ; delimiter and :x,y positions
+    function serializeParts(parts) {
+      return parts.map(part => {
+        let str = part.code;
+        if (part.x || part.y) {
+          str += `:${part.x || 0},${part.y || 0}`;
+        }
+        return str;
+      }).join(';');
+    }
+
+    // Serialize a glyph: B-codes emit their code, compositions emit parts
+    function serializeGlyph(glyph) {
+      if (glyph.isBlissGlyph && glyph.code) {
+        return glyph.code;
+      }
+      if (glyph.parts) {
+        return serializeParts(glyph.parts);
+      }
+      return glyph.code || '';
+    }
+
+    // Check if a group is a space (TSP, QSP, etc.)
+    const SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA']);
+    function isSpaceGroup(group) {
+      if (!group.glyphs || group.glyphs.length === 0) return false;
+      return group.glyphs.every(g =>
+        g.parts?.length === 1 && SPACE_CODES.has(g.parts[0].code)
+      );
+    }
+
+    // Check if all space parts in a group are implicit (from //)
+    function isAllImplicitSpace(group) {
+      return group.glyphs.every(g =>
+        g.parts?.every(p => p._implicit)
+      );
+    }
+
+    const segments = [];
+    for (const group of obj.groups || []) {
+      if (!group.glyphs) continue;
+      if (isSpaceGroup(group)) {
+        const hasNonDefaultSpace = group.glyphs.some(g =>
+          g.parts?.some(p => p._differsFromDefault)
+        );
+        if (hasNonDefaultSpace) {
+          // Explicit space codes that differ from default — keep them
+          const codes = group.glyphs.map(g => g.parts[0].code);
+          segments.push(codes.join('/'));
+        } else {
+          // Default spaces — use // shorthand, N spaces = N+1 slashes
+          const slashes = '/'.repeat(group.glyphs.length + 1);
+          segments.push(slashes);
+        }
+        continue;
+      }
+      const glyphStrs = group.glyphs.map(serializeGlyph).filter(Boolean);
+      segments.push(glyphStrs.join('/'));
+    }
+    // Join: slash-only segments already include separators, others need /
+    return segments.reduce((acc, seg) => {
+      if (acc === '') return seg;
+      if (seg.startsWith('/')) return acc + seg;
+      if (acc.endsWith('/')) return acc + seg;
+      return acc + '/' + seg;
+    }, '');
   }
 
   /**
@@ -549,9 +821,39 @@ class BlissSVGBuilder {
    *
    * @returns {Object} Plain object with groups/glyphs/options structure
    */
+  /**
+   * Returns the normalized parsed structure. Aliases are resolved to canonical
+   * codes, B-codes are preserved as character-level units.
+   * Feed this back into the constructor to recreate an identical builder.
+   *
+   * @returns {Object} Plain object with groups/glyphs/options structure
+   */
   toJSON() {
     const obj = structuredClone(this.#rawBlissObj);
     // Normalize glyph-level objects: expose glyphCode as 'code' for public API
+    if (obj.groups) {
+      for (const group of obj.groups) {
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (glyph.glyphCode) {
+              glyph.code = glyph.glyphCode;
+              delete glyph.glyphCode;
+            }
+          }
+        }
+      }
+    }
+    return obj;
+  }
+
+  /**
+   * Returns the raw parsed input structure, preserving exact input as written.
+   * Use this for builders like Bliss Maker that need part-level fidelity.
+   *
+   * @returns {Object} Raw parsed structure with groups/glyphs/parts
+   */
+  toRawJSON() {
+    const obj = structuredClone(this.#rawBlissObj);
     if (obj.groups) {
       for (const group of obj.groups) {
         if (group.glyphs) {

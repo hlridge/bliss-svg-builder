@@ -828,6 +828,8 @@ export class BlissElement {
       codeName: this.#codeName || '',
       x: absX,
       y: absY,
+      offsetX: this.#relativeToParentX,
+      offsetY: this.#relativeToParentY,
       width: this.width,
       height: this.height,
       advanceX: this.#advanceX || 0,
@@ -1022,9 +1024,10 @@ export class BlissElement {
   toJSON() {
     let obj = {};
 
-    // Bliss glyphs (B-codes) decompose into their component shapes
-    // Everything else (shapes, external glyphs, dots, etc.) are leaves
-    if (this.#codeName && !this.#isBlissGlyph) {
+    // B-code glyphs with a known code are emitted as leaf nodes (normalized)
+    // Shapes, external glyphs, and other named elements are also leaves
+    // Only unnamed composites (no codeName) recurse into children
+    if (this.#codeName) {
         const element = {};
         element.code = this.codeName;
         element.width = this.width;
