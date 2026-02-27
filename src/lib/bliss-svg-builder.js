@@ -721,21 +721,31 @@ class BlissSVGBuilder {
     const el = this.getElementById(id);
     if (!el) return null;
 
-    // If it's a word group (level 1), find its word index
+    const { obj, indices } = this.#getWordGroupIndices();
+
+    // If it's a word group (level 1), find its word index and remove directly
     if (el.type === 'group' && el.level === 1) {
       const words = this.words;
       const wordIndex = words.findIndex(w => w.id === id);
-      if (wordIndex >= 0) return this.removeWord(wordIndex);
-      return null;
+      if (wordIndex < 0) return null;
+      return this.#removeWordGroup(obj, indices[wordIndex], indices);
     }
 
-    // If it's a glyph (level 2), find word and char index
+    // If it's a glyph (level 2), find word and char index and remove directly
     if (el.type === 'glyph' && el.level === 2) {
       const words = this.words;
       for (let wi = 0; wi < words.length; wi++) {
         const chars = words[wi].children.filter(c => c.type === 'glyph');
         for (let ci = 0; ci < chars.length; ci++) {
-          if (chars[ci].id === id) return this.removeCharacter(wi, ci);
+          if (chars[ci].id === id) {
+            const gi = indices[wi];
+            const group = obj.groups[gi];
+            group.glyphs.splice(ci, 1);
+            if (group.glyphs.length === 0) {
+              return this.#removeWordGroup(obj, gi, indices);
+            }
+            return obj;
+          }
         }
       }
       return null;
@@ -751,8 +761,8 @@ class BlissSVGBuilder {
     function serializeParts(parts) {
       return parts.map(part => {
         let str = part.code;
-        if (part.x || part.y) {
-          str += `:${part.x || 0},${part.y || 0}`;
+        if (part.x !== undefined || part.y !== undefined) {
+          str += `:${part.x ?? 0},${part.y ?? 0}`;
         }
         return str;
       }).join(';');
@@ -775,13 +785,6 @@ class BlissSVGBuilder {
       if (!group.glyphs || group.glyphs.length === 0) return false;
       return group.glyphs.every(g =>
         g.parts?.length === 1 && SPACE_CODES.has(g.parts[0].code)
-      );
-    }
-
-    // Check if all space parts in a group are implicit (from //)
-    function isAllImplicitSpace(group) {
-      return group.glyphs.every(g =>
-        g.parts?.every(p => p._implicit)
       );
     }
 
@@ -815,12 +818,6 @@ class BlissSVGBuilder {
     }, '');
   }
 
-  /**
-   * Returns the parsed structure as a plain object suitable for round-tripping.
-   * Feed this back into the constructor to recreate an identical builder.
-   *
-   * @returns {Object} Plain object with groups/glyphs/options structure
-   */
   /**
    * Returns the normalized parsed structure. Aliases are resolved to canonical
    * codes, B-codes are preserved as character-level units.
