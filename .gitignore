@@ -19,6 +19,9 @@ vitest.config.js
 # IDE files
 .vscode/
 
+# Git worktrees
+.worktrees/
+
 # VitePress build artifacts
 docs/.vitepress/cache/
 docs/.vitepress/dist/
