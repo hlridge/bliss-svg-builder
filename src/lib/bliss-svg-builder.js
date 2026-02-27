@@ -424,6 +424,121 @@ class BlissSVGBuilder {
     return this.#elementsCache;
   }
 
+  /**
+   * Depth-first traversal of all element snapshots.
+   * Return false from the callback to stop traversal early.
+   *
+   * @param {function(ElementSnapshot): boolean|void} callback
+   */
+  traverse(callback) {
+    function walk(el) {
+      if (callback(el) === false) return false;
+      for (const child of el.children) {
+        if (walk(child) === false) return false;
+      }
+    }
+    walk(this.elements);
+  }
+
+  /**
+   * Find all element snapshots matching a predicate.
+   *
+   * @param {function(ElementSnapshot): boolean} predicate
+   * @returns {ElementSnapshot[]}
+   */
+  query(predicate) {
+    const results = [];
+    this.traverse(el => { if (predicate(el)) results.push(el); });
+    return results;
+  }
+
+  /**
+   * Look up an element snapshot by its ID.
+   *
+   * @param {string} id
+   * @returns {ElementSnapshot|null}
+   */
+  getElementById(id) {
+    let found = null;
+    this.traverse(el => {
+      if (el.id === id) { found = el; return false; }
+    });
+    return found;
+  }
+
+  #wordsCache;
+
+  /**
+   * Returns non-space group snapshots (words only, no space groups).
+   * Cached and frozen.
+   *
+   * @returns {ElementSnapshot[]}
+   */
+  get words() {
+    if (!this.#wordsCache) {
+      const groups = this.elements.children.filter(g =>
+        g.type === 'group' && g.children.some(c => c.codeName !== '')
+      );
+      this.#wordsCache = Object.freeze(groups);
+    }
+    return this.#wordsCache;
+  }
+
+  /**
+   * @param {number} index - Word index (0-based)
+   * @returns {ElementSnapshot|null}
+   */
+  getWord(index) {
+    if (index < 0 || index >= this.words.length) return null;
+    return this.words[index];
+  }
+
+  /**
+   * @param {number} wordIndex - Word index (0-based)
+   * @returns {ElementSnapshot[]}
+   */
+  getCharacters(wordIndex) {
+    const word = this.getWord(wordIndex);
+    if (!word) return [];
+    return word.children.filter(c => c.type === 'glyph');
+  }
+
+  /**
+   * @param {number} wordIndex
+   * @param {number} charIndex
+   * @returns {ElementSnapshot|null}
+   */
+  getCharacter(wordIndex, charIndex) {
+    const chars = this.getCharacters(wordIndex);
+    if (charIndex < 0 || charIndex >= chars.length) return null;
+    return chars[charIndex];
+  }
+
+  /**
+   * Returns the head glyph of a word (the semantically primary character).
+   *
+   * @param {number} wordIndex
+   * @returns {ElementSnapshot|null}
+   */
+  getHeadGlyph(wordIndex) {
+    const chars = this.getCharacters(wordIndex);
+    return chars.find(c => c.isHeadGlyph) ?? null;
+  }
+
+  /**
+   * Returns word and character counts.
+   *
+   * @returns {{ wordCount: number, characterCount: number }}
+   */
+  get stats() {
+    const words = this.words;
+    let characterCount = 0;
+    for (const word of words) {
+      characterCount += word.children.filter(c => c.type === 'glyph').length;
+    }
+    return { wordCount: words.length, characterCount };
+  }
+
   toString() {
     return this.composition.toString();
   }
