@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab } from "./bliss-constants.js";
@@ -732,13 +732,12 @@ class BlissSVGBuilder {
 
     return codes.filter(code => {
       const def = blissElementDefinitions[code];
-      switch (filter.type) {
-        case 'shape': return def.isShape === true;
-        case 'glyph': return def.isBlissGlyph === true || (def.codeString && !def.isShape && !def.isExternalGlyph);
-        case 'externalGlyph': return def.isExternalGlyph === true;
-        case 'space': return isSpaceGlyph(code) || def.advanceWidth !== undefined;
-        default: return true;
-      }
+      // Uses same type detection logic as getDefinition() to ensure consistency
+      const type = def.isShape ? 'shape'
+        : def.isExternalGlyph ? 'externalGlyph'
+        : (def.isBlissGlyph || def.codeString) ? 'glyph'
+        : 'space';
+      return type === filter.type;
     });
   }
 
