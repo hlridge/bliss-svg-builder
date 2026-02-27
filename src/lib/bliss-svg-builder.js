@@ -382,6 +382,21 @@ class BlissSVGBuilder {
     this.composition = new BlissElement(blissObj, { sharedOptions });
   }
 
+  #elementsCache;
+
+  /**
+   * Returns the root element snapshot — a frozen tree of all element data.
+   * Cached on first access (builder instances are immutable).
+   *
+   * @returns {ElementSnapshot} Frozen root snapshot with nested children
+   */
+  get elements() {
+    if (!this.#elementsCache) {
+      this.#elementsCache = this.composition.snapshot();
+    }
+    return this.#elementsCache;
+  }
+
   toString() {
     return this.composition.toString();
   }

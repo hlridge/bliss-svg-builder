@@ -7,8 +7,15 @@
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { INTERNAL_OPTIONS, isSafeAttributeName } from "./bliss-constants.js";
 
+// Simple counter-based ID generator (works in all environments)
+let nextId = 0;
+function generateId() {
+  return `el_${++nextId}`;
+}
+
 export class BlissElement {
   //#region Private Properties
+  #id
   #level
   #blissObj
   #extraPathOptions
@@ -291,6 +298,7 @@ export class BlissElement {
   }
 
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0, sharedOptions = null } = {}) {
+    this.#id = generateId();
     this.#blissObj = blissObj;
     this.#parentElement = parentElement;
     this.#previousElement = previousElement;
@@ -769,6 +777,73 @@ export class BlissElement {
 
   get isGlyph() {
     return this.#isBlissGlyph || this.#isExternalGlyph;
+  }
+
+  get id() {
+    return this.#id;
+  }
+
+  /**
+   * Returns a frozen snapshot of this element's data.
+   * Snapshots are plain objects safe to expose publicly — no live references.
+   *
+   * @param {number} [parentOffsetX=0] - Accumulated x offset from ancestors
+   * @param {number} [parentOffsetY=0] - Accumulated y offset from ancestors
+   * @param {number} [index=0] - Index within parent's children
+   * @returns {Object} Frozen ElementSnapshot
+   */
+  snapshot(parentOffsetX = 0, parentOffsetY = 0, index = 0) {
+    const absX = parentOffsetX + this.#relativeToParentX;
+    const absY = parentOffsetY + this.#relativeToParentY;
+
+    let childSnapshots = (this.#children || []).map((child, i) =>
+      child.snapshot(absX, absY, i)
+    );
+
+    // For group elements (level 1): resolve isHeadGlyph so every word has exactly one.
+    // The parser only marks head glyphs in non-default cases (optimization for toString).
+    // The public API should always have exactly one isHeadGlyph per word.
+    if (this.#level === 1 && childSnapshots.length > 0) {
+      const hasExplicitHead = childSnapshots.some(c => c.isHeadGlyph);
+      if (!hasExplicitHead) {
+        // Default: first glyph is the head glyph
+        childSnapshots = childSnapshots.map((c, i) =>
+          i === 0 ? Object.freeze({ ...c, isHeadGlyph: true }) : c
+        );
+      }
+    }
+
+    const children = Object.freeze(childSnapshots);
+
+    // Determine type from level and set type
+    let type;
+    if (this.#level === 0) type = 'root';
+    else if (this.type === 'group') type = 'group';
+    else if (this.type === 'glyph') type = 'glyph';
+    else if (this.type === 'characterPart') type = 'characterPart';
+    else if (this.#isShape || (this.#leafWidth !== undefined)) type = 'shape';
+    else type = 'part';
+
+    return Object.freeze({
+      id: this.#id,
+      type,
+      codeName: this.#codeName || '',
+      x: absX,
+      y: absY,
+      width: this.width,
+      height: this.height,
+      advanceX: this.#advanceX || 0,
+      level: this.#level,
+      bounds: Object.freeze(this.effectiveBounds),
+      isIndicator: this.isIndicator,
+      isShape: !!this.#isShape,
+      isBlissGlyph: !!this.#isBlissGlyph,
+      isExternalGlyph: !!this.#isExternalGlyph,
+      isHeadGlyph: !!this.#blissObj.isHeadGlyph,
+      index,
+      parentId: this.#parentElement?.#id ?? null,
+      children
+    });
   }
 
   get effectiveBounds() {
