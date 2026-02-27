@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab } from "./bliss-constants.js";
@@ -470,48 +470,288 @@ class BlissSVGBuilder {
   // ...more methods...
 
   /**
-   * Extends the blissElementDefinitions with custom data.
-   *
-   * @static
-   * @param {Object.<string, { codeString: string, isIndicator?: boolean, anchorOffsetX?: number, anchorOffsetY?: number, width?: number }>} data 
-   *     Character code in the format { B1: { codeString: "..." }, B2: { codeString: "..." } }
-   *     Optional properties: isIndicator, anchorOffsetX, anchorOffsetY, width.
-   *     Use this function before invoking new to extend Bliss-SVG-Builder with custom data.
+   * @deprecated Use defineShape(), defineGlyph(), defineExternalGlyph(), or define() instead.
    */
   static extendData(data) {
+    console.warn('BlissSVGBuilder.extendData() is deprecated. Use define(), defineShape(), defineGlyph(), or defineExternalGlyph() instead.');
     if (data) {
-      for (const key of Object.keys(data)) {
-        const entry = data[key];
+      BlissSVGBuilder.define(data);
+    }
+  }
 
-        if (entry.hasOwnProperty('codeString') && typeof entry.codeString === 'string') {
-          if (blissElementDefinitions[key]) {
-            console.warn(`extendData: overwriting existing definition for "${key}"`);
-          }
+  // Validates a definition code string
+  static #validateCode(code) {
+    if (typeof code !== 'string' || code.length === 0) {
+      throw new Error('Definition code must be a non-empty string.');
+    }
+  }
 
-          const validEntry = { codeString: entry.codeString };
+  /**
+   * Define a primitive shape with a getPath function.
+   *
+   * @param {string} code - Shape code (e.g., "MYCIRCLE")
+   * @param {Object} definition
+   * @param {function} definition.getPath - Function(x, y, options) returning SVG path string
+   * @param {number} definition.width - Shape width
+   * @param {number} definition.height - Shape height
+   * @param {number} [definition.x=0] - Default x offset
+   * @param {number} [definition.y=0] - Default y offset
+   * @param {Object} [definition.extraPathOptions] - Extra options passed to getPath
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false] - Allow overwriting existing definitions
+   */
+  static defineShape(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
 
-          if (entry.hasOwnProperty('isIndicator') && typeof entry.isIndicator === 'boolean') {
-            validEntry.isIndicator = entry.isIndicator;
-          }
+    if (typeof definition?.getPath !== 'function') {
+      throw new Error(`defineShape("${code}"): "getPath" must be a function.`);
+    }
+    if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
+      throw new Error(`defineShape("${code}"): "width" must be a finite number.`);
+    }
+    if (typeof definition.height !== 'number' || !isFinite(definition.height)) {
+      throw new Error(`defineShape("${code}"): "height" must be a finite number.`);
+    }
 
-          if (entry.hasOwnProperty('anchorOffsetX') && typeof entry.anchorOffsetX === 'number' && isFinite(entry.anchorOffsetX)) {
-            validEntry.anchorOffsetX = entry.anchorOffsetX;
-          }
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`defineShape("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
 
-          if (entry.hasOwnProperty('anchorOffsetY') && typeof entry.anchorOffsetY === 'number' && isFinite(entry.anchorOffsetY)) {
-            validEntry.anchorOffsetY = entry.anchorOffsetY;
-          }
+    const entry = {
+      getPath: definition.getPath,
+      width: definition.width,
+      height: definition.height,
+      isShape: true
+    };
+    if (definition.x !== undefined) entry.x = definition.x;
+    if (definition.y !== undefined) entry.y = definition.y;
+    if (definition.extraPathOptions) entry.extraPathOptions = definition.extraPathOptions;
 
-          if (entry.hasOwnProperty('width') && typeof entry.width === 'number' && isFinite(entry.width)) {
-            validEntry.width = entry.width;
-          }
+    blissElementDefinitions[code] = entry;
+  }
 
-          blissElementDefinitions[key] = validEntry;
+  /**
+   * Define a Bliss glyph (composite character defined by codeString).
+   *
+   * @param {string} code - Glyph code (e.g., "B5000")
+   * @param {Object} definition
+   * @param {string} definition.codeString - Composition string (e.g., "H:0,8;VL8")
+   * @param {boolean} [definition.isIndicator=false]
+   * @param {number} [definition.anchorOffsetX]
+   * @param {number} [definition.anchorOffsetY]
+   * @param {number} [definition.width] - Width override
+   * @param {Object} [definition.kerningRules]
+   * @param {boolean} [definition.shrinksPrecedingWordSpace=false]
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false]
+   */
+  static defineGlyph(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
+
+    if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
+      throw new Error(`defineGlyph("${code}"): "codeString" must be a non-empty string.`);
+    }
+
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`defineGlyph("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
+
+    const entry = {
+      codeString: definition.codeString,
+      glyphCode: code,
+      isBlissGlyph: true
+    };
+    if (definition.isIndicator === true) entry.isIndicator = true;
+    if (typeof definition.anchorOffsetX === 'number' && isFinite(definition.anchorOffsetX)) {
+      entry.anchorOffsetX = definition.anchorOffsetX;
+    }
+    if (typeof definition.anchorOffsetY === 'number' && isFinite(definition.anchorOffsetY)) {
+      entry.anchorOffsetY = definition.anchorOffsetY;
+    }
+    if (typeof definition.width === 'number' && isFinite(definition.width)) {
+      entry.width = definition.width;
+    }
+    if (definition.kerningRules && typeof definition.kerningRules === 'object') {
+      entry.kerningRules = { ...definition.kerningRules };
+    }
+    if (definition.shrinksPrecedingWordSpace === true) {
+      entry.shrinksPrecedingWordSpace = true;
+    }
+
+    blissElementDefinitions[code] = entry;
+  }
+
+  /**
+   * Define an external glyph (e.g., Latin/Cyrillic character from SVG path data).
+   *
+   * @param {string} code - External glyph code (e.g., "Xα")
+   * @param {Object} definition
+   * @param {function} definition.getPath - Function(x, y, options) returning SVG path string
+   * @param {number} definition.width - Glyph width
+   * @param {string} definition.glyph - Character identifier
+   * @param {number} [definition.y] - Y offset
+   * @param {number} [definition.height] - Glyph height
+   * @param {Object} [definition.kerningRules]
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false]
+   */
+  static defineExternalGlyph(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
+
+    if (typeof definition?.getPath !== 'function') {
+      throw new Error(`defineExternalGlyph("${code}"): "getPath" must be a function.`);
+    }
+    if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
+      throw new Error(`defineExternalGlyph("${code}"): "width" must be a finite number.`);
+    }
+    if (typeof definition.glyph !== 'string' || definition.glyph.length === 0) {
+      throw new Error(`defineExternalGlyph("${code}"): "glyph" must be a non-empty string.`);
+    }
+
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`defineExternalGlyph("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
+
+    const entry = {
+      getPath: definition.getPath,
+      width: definition.width,
+      glyph: definition.glyph,
+      isExternalGlyph: true
+    };
+    if (typeof definition.y === 'number') entry.y = definition.y;
+    if (typeof definition.height === 'number') entry.height = definition.height;
+    if (definition.kerningRules && typeof definition.kerningRules === 'object') {
+      entry.kerningRules = { ...definition.kerningRules };
+    }
+
+    blissElementDefinitions[code] = entry;
+  }
+
+  /**
+   * Define one or more definitions of any type (auto-detected from definition shape).
+   * - Has getPath function → shape
+   * - Has codeString → glyph
+   * - Has glyph + isExternalGlyph → external glyph
+   *
+   * @param {Object.<string, Object>} definitions - Map of code → definition
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false]
+   * @returns {{ defined: string[], skipped: string[], errors: string[] }}
+   */
+  static define(definitions, options = {}) {
+    const result = { defined: [], skipped: [], errors: [] };
+
+    if (!definitions || typeof definitions !== 'object') {
+      return result;
+    }
+
+    for (const [code, definition] of Object.entries(definitions)) {
+      try {
+        if (typeof definition?.getPath === 'function' && !definition.isExternalGlyph) {
+          BlissSVGBuilder.defineShape(code, definition, options);
+        } else if (typeof definition?.getPath === 'function' && definition.isExternalGlyph) {
+          BlissSVGBuilder.defineExternalGlyph(code, definition, options);
+        } else if (typeof definition?.codeString === 'string') {
+          BlissSVGBuilder.defineGlyph(code, definition, options);
         } else {
-          console.warn(`Invalid entry for key: ${key}`);
+          result.errors.push(`"${code}": unable to detect definition type. Provide getPath (shape), codeString (glyph), or getPath+isExternalGlyph (external glyph).`);
+          continue;
+        }
+        result.defined.push(code);
+      } catch (err) {
+        if (err.message.includes('already exists')) {
+          result.skipped.push(code);
+        } else {
+          result.errors.push(`"${code}": ${err.message}`);
         }
       }
     }
+
+    return result;
+  }
+
+  /**
+   * Check if a code is defined.
+   * @param {string} code
+   * @returns {boolean}
+   */
+  static isDefined(code) {
+    return code in blissElementDefinitions;
+  }
+
+  /**
+   * Get definition metadata for a code (frozen copy, not the live object).
+   * Functions (like getPath) are excluded from the copy.
+   *
+   * @param {string} code
+   * @returns {Object|null} Frozen metadata object, or null if not found
+   */
+  static getDefinition(code) {
+    const def = blissElementDefinitions[code];
+    if (!def) return null;
+
+    const copy = {};
+    for (const [key, value] of Object.entries(def)) {
+      if (typeof value === 'function') continue;
+      if (typeof value === 'object' && value !== null) {
+        copy[key] = Object.freeze({ ...value });
+      } else {
+        copy[key] = value;
+      }
+    }
+
+    // Add computed type
+    if (def.isShape) copy.type = 'shape';
+    else if (def.isExternalGlyph) copy.type = 'externalGlyph';
+    else if (def.isBlissGlyph) copy.type = 'glyph';
+    else if (def.codeString) copy.type = 'glyph';
+    else copy.type = 'space';
+
+    copy.isBuiltIn = builtInCodes.has(code);
+
+    return Object.freeze(copy);
+  }
+
+  /**
+   * List all defined codes, optionally filtered by type.
+   *
+   * @param {Object} [filter]
+   * @param {'shape'|'glyph'|'externalGlyph'|'space'} [filter.type]
+   * @returns {string[]}
+   */
+  static listDefinitions(filter = {}) {
+    const codes = Object.keys(blissElementDefinitions);
+
+    if (!filter.type) return codes;
+
+    return codes.filter(code => {
+      const def = blissElementDefinitions[code];
+      switch (filter.type) {
+        case 'shape': return def.isShape === true;
+        case 'glyph': return def.isBlissGlyph === true || (def.codeString && !def.isShape && !def.isExternalGlyph);
+        case 'externalGlyph': return def.isExternalGlyph === true;
+        case 'space': return code === 'TSP' || code === 'QSP' || code === 'ZSA';
+        default: return true;
+      }
+    });
+  }
+
+  /**
+   * Remove a custom definition. Built-in definitions cannot be removed.
+   *
+   * @param {string} code
+   * @returns {boolean} true if removed
+   * @throws {Error} If attempting to remove a built-in definition
+   */
+  static removeDefinition(code) {
+    if (builtInCodes.has(code)) {
+      throw new Error(`removeDefinition("${code}"): cannot remove built-in definitions.`);
+    }
+    if (!(code in blissElementDefinitions)) {
+      return false;
+    }
+    delete blissElementDefinitions[code];
+    return true;
   }
 
   get #svgCode() {
