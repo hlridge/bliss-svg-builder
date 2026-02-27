@@ -318,9 +318,33 @@ class BlissSVGBuilder {
     }
   }
 
+  #rawBlissObj; // Stored for toJSON() round-trip
+
   constructor(input, options = {}) {
     const { defaults, overrides } = options ?? {};
-    const blissObj = BlissParser.parse(input);
+
+    if (typeof input !== 'string' && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+      throw new Error('Input must be a DSL string or a plain object from toJSON()');
+    }
+
+    // Accept both string (DSL) and object (from toJSON()) input
+    const blissObj = (typeof input === 'string')
+      ? BlissParser.parse(input)
+      : structuredClone(input);
+
+    // Reverse toJSON() normalization: code → glyphCode (internal field name)
+    if (typeof input !== 'string' && blissObj.groups) {
+      for (const group of blissObj.groups) {
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (glyph.code && !glyph.glyphCode) {
+              glyph.glyphCode = glyph.code;
+              delete glyph.code;
+            }
+          }
+        }
+      }
+    }
 
     // Convert object options (camelCase, native types) to raw format (kebab-case, strings)
     const toRaw = (obj) => {
@@ -343,6 +367,9 @@ class BlissSVGBuilder {
       const rawOverrides = overrides ? toRaw(overrides) : {};
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
+
+    // Store a clean copy after option merging but before processing mutates it
+    this.#rawBlissObj = structuredClone(blissObj);
 
     // Process options at all levels (global, group, glyph, part)
     // Only top level gets builder defaults (grid, margins, etc.)
@@ -401,8 +428,28 @@ class BlissSVGBuilder {
     return this.composition.toString();
   }
 
+  /**
+   * Returns the parsed structure as a plain object suitable for round-tripping.
+   * Feed this back into the constructor to recreate an identical builder.
+   *
+   * @returns {Object} Plain object with groups/glyphs/options structure
+   */
   toJSON() {
-    return this.composition.toJSON();
+    const obj = structuredClone(this.#rawBlissObj);
+    // Normalize glyph-level objects: expose glyphCode as 'code' for public API
+    if (obj.groups) {
+      for (const group of obj.groups) {
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (glyph.glyphCode) {
+              glyph.code = glyph.glyphCode;
+              delete glyph.glyphCode;
+            }
+          }
+        }
+      }
+    }
+    return obj;
   }
 
   /**
