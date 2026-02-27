@@ -807,9 +807,7 @@ export class BlissElement {
       const hasExplicitHead = childSnapshots.some(c => c.isHeadGlyph);
       if (!hasExplicitHead) {
         // Default: first glyph is the head glyph
-        childSnapshots = childSnapshots.map((c, i) =>
-          i === 0 ? Object.freeze({ ...c, isHeadGlyph: true }) : c
-        );
+        childSnapshots[0] = Object.freeze({ ...childSnapshots[0], isHeadGlyph: true });
       }
     }
 
@@ -834,7 +832,7 @@ export class BlissElement {
       height: this.height,
       advanceX: this.#advanceX || 0,
       level: this.#level,
-      bounds: Object.freeze(this.effectiveBounds),
+      bounds: Object.freeze(this.#calculateBounds(parentOffsetX, parentOffsetY)),
       isIndicator: this.isIndicator,
       isShape: !!this.#isShape,
       isBlissGlyph: !!this.#isBlissGlyph,
