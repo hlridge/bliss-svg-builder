@@ -552,9 +552,9 @@ class BlissSVGBuilder {
     );
   }
 
-  /** Returns array of group indices that are word groups (non-space) */
-  #getWordGroupIndices() {
-    const obj = this.toJSON();
+  /** Returns cloned object and array of group indices that are word groups (non-space) */
+  #getWordGroupIndices(raw = false) {
+    const obj = raw ? this.toRawJSON() : this.toJSON();
     const indices = [];
     for (let i = 0; i < (obj.groups || []).length; i++) {
       if (!BlissSVGBuilder.#isRawSpaceGroup(obj.groups[i])) {
@@ -752,6 +752,84 @@ class BlissSVGBuilder {
     }
 
     return null;
+  }
+
+  // --- Part-level manipulation (operates on raw structure) ---
+
+  /** Validates word/char/part indices and returns the parts array, or null */
+  #getPartsRef(obj, indices, wordIndex, charIndex) {
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const group = obj.groups[indices[wordIndex]];
+    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
+    const glyph = group.glyphs[charIndex];
+    if (!glyph.parts) return null;
+    return { parts: glyph.parts, glyph, group, gi: indices[wordIndex] };
+  }
+
+  /**
+   * Removes a part from a character's composition.
+   * If the last part is removed, the character itself is removed.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {number} partIndex - Part index within character (0-based)
+   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
+   */
+  removePart(wordIndex, charIndex, partIndex) {
+    const { obj, indices } = this.#getWordGroupIndices(true);
+    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
+    if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
+    ref.parts.splice(partIndex, 1);
+    // If no parts left, remove the character
+    if (ref.parts.length === 0) {
+      ref.group.glyphs.splice(charIndex, 1);
+      if (ref.group.glyphs.length === 0) {
+        return this.#removeWordGroup(obj, ref.gi, indices);
+      }
+    }
+    return obj;
+  }
+
+  /**
+   * Replaces a part in a character's composition. Preserves the original position.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {number} partIndex - Part index within character (0-based)
+   * @param {string} newCode - New code for the replacement part
+   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
+   */
+  replacePart(wordIndex, charIndex, partIndex, newCode) {
+    const { obj, indices } = this.#getWordGroupIndices(true);
+    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
+    if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
+    const oldPart = ref.parts[partIndex];
+    ref.parts[partIndex] = {
+      code: newCode,
+      ...(oldPart.x !== undefined && { x: oldPart.x }),
+      ...(oldPart.y !== undefined && { y: oldPart.y }),
+    };
+    return obj;
+  }
+
+  /**
+   * Inserts a part into a character's composition.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {number} partIndex - Insert position (0 = before first, length = after last)
+   * @param {string} code - Code for the new part
+   * @param {Object} [position] - Optional { x, y } position
+   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
+   */
+  insertPart(wordIndex, charIndex, partIndex, code, position) {
+    const { obj, indices } = this.#getWordGroupIndices(true);
+    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
+    if (!ref || partIndex < 0 || partIndex > ref.parts.length) return null;
+    const newPart = { code };
+    if (position) {
+      if (position.x !== undefined) newPart.x = position.x;
+      if (position.y !== undefined) newPart.y = position.y;
+    }
+    ref.parts.splice(partIndex, 0, newPart);
+    return obj;
   }
 
   toString() {
