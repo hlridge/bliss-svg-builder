@@ -228,6 +228,8 @@ class BlissSVGBuilder {
         options.cropRight = 'auto';
       } else if (c === 'auto-height') {
         options.autoHeight = true;
+      } else if (c === 'compact') {
+        options.cropCompact = true;
       } else if (!isNaN(c)) {
         const n = Number(c);
         options.cropTop = n;
@@ -1270,6 +1272,47 @@ class BlissSVGBuilder {
     return true;
   }
 
+  // Compute how many grid units to crop from top in compact mode.
+  // Walks L2 characters and their L3 parts to find anchorOffsetY values.
+  // Returns a value in [0, 4]. Default is 4 (crop all from top).
+  #getCompactCropFromTop() {
+    const cropValues = [];
+
+    for (const group of this.composition.children) {
+      for (const character of group.children) {
+        // Standalone indicator → default cropTop=4
+        if (character.isIndicator) {
+          cropValues.push(4);
+          continue;
+        }
+
+        // Standalone predefined or user-defined glyph → look up definition
+        if (character.isBlissGlyph) {
+          const def = blissElementDefinitions[character.codeName];
+          const offsetY = def?.anchorOffsetY ?? 0;
+          // Clamp: only negative values reduce cropTop; positive treated as 0
+          const clamped = Math.min(0, offsetY);
+          cropValues.push(Math.max(0, 4 + clamped));
+          continue;
+        }
+
+        // Composite character: check L3 parts
+        const nonIndicatorParts = character.children.filter(p => !p.isIndicator);
+        if (nonIndicatorParts.length === 1) {
+          // Single non-indicator part (glyph + indicator pattern)
+          const offsetY = nonIndicatorParts[0].anchorOffset.y;
+          const clamped = Math.min(0, offsetY);
+          cropValues.push(Math.max(0, 4 + clamped));
+        } else {
+          // Multiple non-indicator parts (inline-defined) or raw shapes → default
+          cropValues.push(4);
+        }
+      }
+    }
+
+    return cropValues.length > 0 ? Math.min(...cropValues) : 4;
+  }
+
   get #svgCode() {
     // Computed rendering dimensions
     const width = Math.max(this.composition.width, this.#processedOptions.minWidth ?? 0);
@@ -1285,10 +1328,21 @@ class BlissSVGBuilder {
 
     // Compute crop values - can be numeric or 'auto' (computed from effectiveBounds)
     const bounds = this.composition.effectiveBounds;
-    const rawCropTop = this.#processedOptions.cropTop ?? 0;
-    const rawCropBottom = this.#processedOptions.cropBottom ?? 0;
     const rawCropLeft = this.#processedOptions.cropLeft ?? 0;
     const rawCropRight = this.#processedOptions.cropRight ?? 0;
+
+    // Compact mode provides default vertical crop values.
+    // Explicit crop-top/crop-bottom override (not add to) the compact defaults.
+    let rawCropTop, rawCropBottom;
+    if (this.#processedOptions.cropCompact) {
+      const compactTop = this.#getCompactCropFromTop();
+      const compactBottom = 4 - compactTop;
+      rawCropTop = this.#processedOptions.cropTop ?? compactTop;
+      rawCropBottom = this.#processedOptions.cropBottom ?? compactBottom;
+    } else {
+      rawCropTop = this.#processedOptions.cropTop ?? 0;
+      rawCropBottom = this.#processedOptions.cropBottom ?? 0;
+    }
 
     const cropTop = rawCropTop === 'auto' ? bounds.minY : rawCropTop;
     const cropBottom = rawCropBottom === 'auto' ? (height - bounds.maxY) : rawCropBottom;

@@ -88,6 +88,7 @@ export const INTERNAL_OPTIONS = new Set([
   'minWidth',
   'centered',
   'autoHeight',
+  'cropCompact',
   'text',
   'svgDesc',
   'svgTitle',
