@@ -189,9 +189,11 @@ export class BlissParser {
           // For now, mark it and we'll resolve after parsing all groups
         }
         // Convert codes: SP→TSP (or QSP), keep TSP/QSP as-is
-        const spaceGlyphs = codes.map(code => ({
-          parts: [{ code: code === 'SP' ? 'TSP' : code }]
-        }));
+        // Mark whether each space was from SP (implicit) or user-specified
+        const spaceGlyphs = codes.map(code => {
+          const fromSP = code === 'SP';
+          return { parts: [{ code: fromSP ? 'TSP' : code, _fromSP: fromSP }] };
+        });
         parsedGroups.push({ glyphs: spaceGlyphs, _isSpaceGroup: true, _spaceIndex: gi });
         continue;
       }
@@ -704,19 +706,30 @@ export class BlissParser {
       parsedGroups.push(group);
     }
 
-    // Step 4: Resolve SP→QSP for single-space groups before punctuation
+    // Step 4: Resolve SP→QSP for space groups before punctuation
+    // For implicit spaces (_fromSP): change code to QSP
+    // For explicit spaces: compare against default and flag _differsFromDefault
     for (let i = 0; i < parsedGroups.length; i++) {
       const group = parsedGroups[i];
-      if (group._isSpaceGroup && group.glyphs.length === 1) {
+      if (group._isSpaceGroup) {
+        // Determine default space code for this position
         const nextGroup = parsedGroups[i + 1];
-        if (nextGroup && !nextGroup._isSpaceGroup) {
-          // Check if next group is punctuation-only
-          const isPunctuation = nextGroup.glyphs?.every(g =>
-            g.shrinksPrecedingWordSpace === true
-          ) ?? false;
-          if (isPunctuation) {
-            group.glyphs[0].parts[0].code = 'QSP';
+        const isPunctuation = nextGroup && !nextGroup._isSpaceGroup &&
+          (nextGroup.glyphs?.every(g => g.shrinksPrecedingWordSpace === true) ?? false);
+        const defaultCode = isPunctuation ? 'QSP' : 'TSP';
+
+        for (const glyph of group.glyphs) {
+          const part = glyph.parts[0];
+          if (part._fromSP) {
+            // Implicit space: resolve to default
+            part.code = defaultCode;
+          } else {
+            // Explicit space: flag if it differs from default
+            if (part.code !== defaultCode) {
+              part._differsFromDefault = true;
+            }
           }
+          delete part._fromSP;
         }
       }
       // Clean up internal markers

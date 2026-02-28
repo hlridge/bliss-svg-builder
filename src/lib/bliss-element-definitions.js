@@ -542,4 +542,7 @@ for (const [code, definition] of Object.entries(glyphData)) {
 }
 Object.assign(blissElementDefinitions, glyphData);
 
-export { blissElementDefinitions };
+// Track built-in codes so removeDefinition can prevent deleting them
+const builtInCodes = new Set(Object.keys(blissElementDefinitions));
+
+export { blissElementDefinitions, builtInCodes };

@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab } from "./bliss-constants.js";
@@ -318,9 +318,33 @@ class BlissSVGBuilder {
     }
   }
 
+  #rawBlissObj; // Stored for toJSON() round-trip
+
   constructor(input, options = {}) {
     const { defaults, overrides } = options ?? {};
-    const blissObj = BlissParser.parse(input);
+
+    if (typeof input !== 'string' && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+      throw new Error('Input must be a DSL string or a plain object from toJSON()');
+    }
+
+    // Accept both string (DSL) and object (from toJSON()) input
+    const blissObj = (typeof input === 'string')
+      ? BlissParser.parse(input)
+      : structuredClone(input);
+
+    // Reverse toJSON() normalization: code → glyphCode (internal field name)
+    if (typeof input !== 'string' && blissObj.groups) {
+      for (const group of blissObj.groups) {
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (glyph.code && !glyph.glyphCode) {
+              glyph.glyphCode = glyph.code;
+              delete glyph.code;
+            }
+          }
+        }
+      }
+    }
 
     // Convert object options (camelCase, native types) to raw format (kebab-case, strings)
     const toRaw = (obj) => {
@@ -343,6 +367,9 @@ class BlissSVGBuilder {
       const rawOverrides = overrides ? toRaw(overrides) : {};
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
+
+    // Store a clean copy after option merging but before processing mutates it
+    this.#rawBlissObj = structuredClone(blissObj);
 
     // Process options at all levels (global, group, glyph, part)
     // Only top level gets builder defaults (grid, margins, etc.)
@@ -382,13 +409,518 @@ class BlissSVGBuilder {
     this.composition = new BlissElement(blissObj, { sharedOptions });
   }
 
-  toString() {
-    return this.composition.toString();
+  #elementsCache;
+
+  /**
+   * Returns the root element snapshot — a frozen tree of all element data.
+   * Cached on first access (builder instances are immutable).
+   *
+   * @returns {ElementSnapshot} Frozen root snapshot with nested children
+   */
+  get elements() {
+    if (!this.#elementsCache) {
+      this.#elementsCache = this.composition.snapshot();
+    }
+    return this.#elementsCache;
   }
 
-  toJSON() {
-    return this.composition.toJSON();
+  /**
+   * Depth-first traversal of all element snapshots.
+   * Return false from the callback to stop traversal early.
+   *
+   * @param {function(ElementSnapshot): boolean|void} callback
+   */
+  traverse(callback) {
+    function walk(el) {
+      if (callback(el) === false) return false;
+      for (const child of el.children) {
+        if (walk(child) === false) return false;
+      }
+    }
+    walk(this.elements);
   }
+
+  /**
+   * Find all element snapshots matching a predicate.
+   *
+   * @param {function(ElementSnapshot): boolean} predicate
+   * @returns {ElementSnapshot[]}
+   */
+  query(predicate) {
+    const results = [];
+    this.traverse(el => { if (predicate(el)) results.push(el); });
+    return results;
+  }
+
+  /**
+   * Look up an element snapshot by its ID.
+   *
+   * @param {string} id
+   * @returns {ElementSnapshot|null}
+   */
+  getElementById(id) {
+    let found = null;
+    this.traverse(el => {
+      if (el.id === id) { found = el; return false; }
+    });
+    return found;
+  }
+
+  #wordsCache;
+
+  /**
+   * Returns non-space group snapshots (words only, no space groups).
+   * Cached and frozen.
+   *
+   * @returns {ElementSnapshot[]}
+   */
+  get words() {
+    if (!this.#wordsCache) {
+      const groups = this.elements.children.filter(g =>
+        g.type === 'group' && g.children.some(c => c.codeName !== '')
+      );
+      this.#wordsCache = Object.freeze(groups);
+    }
+    return this.#wordsCache;
+  }
+
+  /**
+   * @param {number} index - Word index (0-based)
+   * @returns {ElementSnapshot|null}
+   */
+  getWord(index) {
+    if (index < 0 || index >= this.words.length) return null;
+    return this.words[index];
+  }
+
+  /**
+   * @param {number} wordIndex - Word index (0-based)
+   * @returns {ElementSnapshot[]}
+   */
+  getCharacters(wordIndex) {
+    const word = this.getWord(wordIndex);
+    if (!word) return [];
+    return word.children.filter(c => c.type === 'glyph');
+  }
+
+  /**
+   * @param {number} wordIndex
+   * @param {number} charIndex
+   * @returns {ElementSnapshot|null}
+   */
+  getCharacter(wordIndex, charIndex) {
+    const chars = this.getCharacters(wordIndex);
+    if (charIndex < 0 || charIndex >= chars.length) return null;
+    return chars[charIndex];
+  }
+
+  /**
+   * Returns the head glyph of a word (the semantically primary character).
+   *
+   * @param {number} wordIndex
+   * @returns {ElementSnapshot|null}
+   */
+  getHeadGlyph(wordIndex) {
+    const chars = this.getCharacters(wordIndex);
+    return chars.find(c => c.isHeadGlyph) ?? null;
+  }
+
+  /**
+   * Returns word and character counts.
+   *
+   * @returns {{ wordCount: number, characterCount: number }}
+   */
+  get stats() {
+    const words = this.words;
+    let characterCount = 0;
+    for (const word of words) {
+      characterCount += word.children.filter(c => c.type === 'glyph').length;
+    }
+    return { wordCount: words.length, characterCount };
+  }
+
+  // --- Manipulation helpers ---
+
+  // Space codes used in space groups
+  static #SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA', 'SP']);
+
+  /** Returns true if a raw group is a space group */
+  static #isRawSpaceGroup(group) {
+    if (!group.glyphs || group.glyphs.length === 0) return false;
+    return group.glyphs.every(g =>
+      g.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(g.parts[0].code)
+    );
+  }
+
+  /** Returns cloned object and array of group indices that are word groups (non-space) */
+  #getWordGroupIndices() {
+    const obj = this.toJSON();
+    const indices = [];
+    for (let i = 0; i < (obj.groups || []).length; i++) {
+      if (!BlissSVGBuilder.#isRawSpaceGroup(obj.groups[i])) {
+        indices.push(i);
+      }
+    }
+    return { obj, indices };
+  }
+
+  /** Creates a default space group for insertion between words */
+  static #makeSpaceGroup() {
+    return { glyphs: [{ parts: [{ code: 'TSP' }] }] };
+  }
+
+  /**
+   * Removes a character (glyph) from a word.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  removeCharacter(wordIndex, charIndex) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const gi = indices[wordIndex];
+    const group = obj.groups[gi];
+    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
+    group.glyphs.splice(charIndex, 1);
+    // If word is now empty, remove the word and adjacent space
+    if (group.glyphs.length === 0) {
+      return this.#removeWordGroup(obj, gi);
+    }
+    return obj;
+  }
+
+  /**
+   * Replaces a character (glyph) in a word with a new code.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {string} newCode - New code string for the replacement
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  replaceCharacter(wordIndex, charIndex, newCode) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const gi = indices[wordIndex];
+    const group = obj.groups[gi];
+    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
+    // Parse the new code to get its structure
+    const parsed = BlissParser.parse(newCode);
+    const newGlyph = parsed.groups?.[0]?.glyphs?.[0];
+    if (!newGlyph) return null;
+    // Normalize glyphCode→code
+    if (newGlyph.glyphCode) {
+      newGlyph.code = newGlyph.glyphCode;
+      delete newGlyph.glyphCode;
+    }
+    group.glyphs[charIndex] = newGlyph;
+    return obj;
+  }
+
+  /**
+   * Inserts a character (glyph) at a position in a word.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Insert position (0 = before first, length = after last)
+   * @param {string} code - Code string for the new character
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  insertCharacter(wordIndex, charIndex, code) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const gi = indices[wordIndex];
+    const group = obj.groups[gi];
+    if (!group.glyphs || charIndex < 0 || charIndex > group.glyphs.length) return null;
+    const parsed = BlissParser.parse(code);
+    const newGlyph = parsed.groups?.[0]?.glyphs?.[0];
+    if (!newGlyph) return null;
+    if (newGlyph.glyphCode) {
+      newGlyph.code = newGlyph.glyphCode;
+      delete newGlyph.glyphCode;
+    }
+    group.glyphs.splice(charIndex, 0, newGlyph);
+    return obj;
+  }
+
+  /** Internal: removes a word group and its adjacent space from groups array */
+  #removeWordGroup(obj, groupIndex) {
+    const groups = obj.groups;
+    // Determine which space group to also remove
+    const prevIsSpace = groupIndex > 0 && BlissSVGBuilder.#isRawSpaceGroup(groups[groupIndex - 1]);
+    const nextIsSpace = groupIndex < groups.length - 1 && BlissSVGBuilder.#isRawSpaceGroup(groups[groupIndex + 1]);
+
+    if (prevIsSpace) {
+      // Remove space before + the word
+      groups.splice(groupIndex - 1, 2);
+    } else if (nextIsSpace) {
+      // Remove the word + space after
+      groups.splice(groupIndex, 2);
+    } else {
+      // No adjacent space, just remove the word
+      groups.splice(groupIndex, 1);
+    }
+    return obj;
+  }
+
+  /**
+   * Removes an entire word.
+   * @param {number} wordIndex - Word index (0-based)
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  removeWord(wordIndex) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    return this.#removeWordGroup(obj, indices[wordIndex]);
+  }
+
+  /**
+   * Inserts a new word at the given position.
+   * @param {number} wordIndex - Insert position (0 = before first, length = after last)
+   * @param {string} code - Code string for the new word
+   * @returns {Object|null} JSON object for constructor, or null if out of range
+   */
+  insertWord(wordIndex, code) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    if (wordIndex < 0 || wordIndex > indices.length) return null;
+    const parsed = BlissParser.parse(code);
+    const newGroup = parsed.groups?.[0];
+    if (!newGroup) return null;
+    // Normalize glyphCode→code
+    if (newGroup.glyphs) {
+      for (const glyph of newGroup.glyphs) {
+        if (glyph.glyphCode) {
+          glyph.code = glyph.glyphCode;
+          delete glyph.glyphCode;
+        }
+      }
+    }
+
+    const groups = obj.groups;
+    if (indices.length === 0) {
+      // No words yet, just add
+      groups.push(newGroup);
+    } else if (wordIndex === 0) {
+      // Insert before first word, add space after
+      const firstWordGi = indices[0];
+      groups.splice(firstWordGi, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
+    } else if (wordIndex >= indices.length) {
+      // Append after last word, add space before
+      const lastWordGi = indices[indices.length - 1];
+      groups.splice(lastWordGi + 1, 0, BlissSVGBuilder.#makeSpaceGroup(), newGroup);
+    } else {
+      // Insert between existing words
+      const targetGi = indices[wordIndex];
+      groups.splice(targetGi, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
+    }
+    return obj;
+  }
+
+  /**
+   * Removes an element by its snapshot ID. Works for glyphs and word groups.
+   * @param {string} id - The UUID of the element to remove
+   * @returns {Object|null} JSON object for constructor, or null if not found
+   */
+  removeById(id) {
+    const el = this.getElementById(id);
+    if (!el) return null;
+
+    const { obj, indices } = this.#getWordGroupIndices();
+
+    // If it's a word group (level 1), find its word index and remove directly
+    if (el.type === 'group' && el.level === 1) {
+      const words = this.words;
+      const wordIndex = words.findIndex(w => w.id === id);
+      if (wordIndex < 0) return null;
+      return this.#removeWordGroup(obj, indices[wordIndex]);
+    }
+
+    // If it's a glyph (level 2), find word and char index and remove directly
+    if (el.type === 'glyph' && el.level === 2) {
+      const words = this.words;
+      for (let wi = 0; wi < words.length; wi++) {
+        const chars = words[wi].children.filter(c => c.type === 'glyph');
+        for (let ci = 0; ci < chars.length; ci++) {
+          if (chars[ci].id === id) {
+            const gi = indices[wi];
+            const group = obj.groups[gi];
+            group.glyphs.splice(ci, 1);
+            if (group.glyphs.length === 0) {
+              return this.#removeWordGroup(obj, gi);
+            }
+            return obj;
+          }
+        }
+      }
+      return null;
+    }
+
+    return null;
+  }
+
+  // --- Part-level manipulation (operates on raw structure) ---
+
+  /** Validates word/char/part indices and returns the parts array, or null */
+  #getPartsRef(obj, indices, wordIndex, charIndex) {
+    if (wordIndex < 0 || wordIndex >= indices.length) return null;
+    const group = obj.groups[indices[wordIndex]];
+    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
+    const glyph = group.glyphs[charIndex];
+    if (!glyph.parts) return null;
+    return { parts: glyph.parts, glyph, group, gi: indices[wordIndex] };
+  }
+
+  /**
+   * Removes a part from a character's composition.
+   * If the last part is removed, the character itself is removed.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {number} partIndex - Part index within character (0-based)
+   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
+   */
+  removePart(wordIndex, charIndex, partIndex) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
+    if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
+    ref.parts.splice(partIndex, 1);
+    // If no parts left, remove the character
+    if (ref.parts.length === 0) {
+      ref.group.glyphs.splice(charIndex, 1);
+      if (ref.group.glyphs.length === 0) {
+        return this.#removeWordGroup(obj, ref.gi);
+      }
+    }
+    return obj;
+  }
+
+  /**
+   * Replaces a part in a character's composition. Preserves the original position.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {number} partIndex - Part index within character (0-based)
+   * @param {string} newCode - New code for the replacement part
+   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
+   */
+  replacePart(wordIndex, charIndex, partIndex, newCode) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
+    if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
+    const oldPart = ref.parts[partIndex];
+    ref.parts[partIndex] = {
+      code: newCode,
+      ...(oldPart.x !== undefined && { x: oldPart.x }),
+      ...(oldPart.y !== undefined && { y: oldPart.y }),
+    };
+    return obj;
+  }
+
+  /**
+   * Inserts a part into a character's composition.
+   * @param {number} wordIndex - Word index (0-based)
+   * @param {number} charIndex - Character index within word (0-based)
+   * @param {number} partIndex - Insert position (0 = before first, length = after last)
+   * @param {string} code - Code for the new part
+   * @param {Object} [position] - Optional { x, y } position
+   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
+   */
+  insertPart(wordIndex, charIndex, partIndex, code, position) {
+    const { obj, indices } = this.#getWordGroupIndices();
+    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
+    if (!ref || partIndex < 0 || partIndex > ref.parts.length) return null;
+    const newPart = { code };
+    if (position) {
+      if (position.x !== undefined) newPart.x = position.x;
+      if (position.y !== undefined) newPart.y = position.y;
+    }
+    ref.parts.splice(partIndex, 0, newPart);
+    return obj;
+  }
+
+  toString() {
+    const obj = this.toJSON();
+
+    // Serialize a part (and its nested parts) with ; delimiter and :x,y positions
+    function serializeParts(parts) {
+      return parts.map(part => {
+        let str = part.code;
+        if (part.x !== undefined || part.y !== undefined) {
+          str += `:${part.x ?? 0},${part.y ?? 0}`;
+        }
+        return str;
+      }).join(';');
+    }
+
+    // Serialize a glyph: B-codes emit their code, compositions emit parts
+    function serializeGlyph(glyph) {
+      if (glyph.isBlissGlyph && glyph.code) {
+        return glyph.code;
+      }
+      if (glyph.parts) {
+        return serializeParts(glyph.parts);
+      }
+      return glyph.code || '';
+    }
+
+    // Check if a group is a space (TSP, QSP, etc.)
+    const SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA']);
+    function isSpaceGroup(group) {
+      if (!group.glyphs || group.glyphs.length === 0) return false;
+      return group.glyphs.every(g =>
+        g.parts?.length === 1 && SPACE_CODES.has(g.parts[0].code)
+      );
+    }
+
+    const segments = [];
+    for (const group of obj.groups || []) {
+      if (!group.glyphs) continue;
+      if (isSpaceGroup(group)) {
+        const hasNonDefaultSpace = group.glyphs.some(g =>
+          g.parts?.some(p => p._differsFromDefault)
+        );
+        if (hasNonDefaultSpace) {
+          // Explicit space codes that differ from default — keep them
+          const codes = group.glyphs.map(g => g.parts[0].code);
+          segments.push(codes.join('/'));
+        } else {
+          // Default spaces — use // shorthand, N spaces = N+1 slashes
+          const slashes = '/'.repeat(group.glyphs.length + 1);
+          segments.push(slashes);
+        }
+        continue;
+      }
+      const glyphStrs = group.glyphs.map(serializeGlyph).filter(Boolean);
+      segments.push(glyphStrs.join('/'));
+    }
+    // Join: slash-only segments already include separators, others need /
+    return segments.reduce((acc, seg) => {
+      if (acc === '') return seg;
+      if (seg.startsWith('/')) return acc + seg;
+      if (acc.endsWith('/')) return acc + seg;
+      return acc + '/' + seg;
+    }, '');
+  }
+
+  /**
+   * Returns the normalized parsed structure. Aliases are resolved to canonical
+   * codes, B-codes are preserved as character-level units.
+   * Feed this back into the constructor to recreate an identical builder.
+   *
+   * @returns {Object} Plain object with groups/glyphs/options structure
+   */
+  toJSON() {
+    const obj = structuredClone(this.#rawBlissObj);
+    // Normalize glyph-level objects: expose glyphCode as 'code' for public API
+    if (obj.groups) {
+      for (const group of obj.groups) {
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (glyph.glyphCode) {
+              glyph.code = glyph.glyphCode;
+              delete glyph.glyphCode;
+            }
+          }
+        }
+      }
+    }
+    return obj;
+  }
+
 
   /**
    * Returns the SVG content (path elements and groups) as a string.
@@ -470,48 +1002,293 @@ class BlissSVGBuilder {
   // ...more methods...
 
   /**
-   * Extends the blissElementDefinitions with custom data.
-   *
-   * @static
-   * @param {Object.<string, { codeString: string, isIndicator?: boolean, anchorOffsetX?: number, anchorOffsetY?: number, width?: number }>} data 
-   *     Character code in the format { B1: { codeString: "..." }, B2: { codeString: "..." } }
-   *     Optional properties: isIndicator, anchorOffsetX, anchorOffsetY, width.
-   *     Use this function before invoking new to extend Bliss-SVG-Builder with custom data.
+   * @deprecated Use defineShape(), defineGlyph(), defineExternalGlyph(), or define() instead.
    */
   static extendData(data) {
+    console.warn('BlissSVGBuilder.extendData() is deprecated. Use define(), defineShape(), defineGlyph(), or defineExternalGlyph() instead.');
     if (data) {
-      for (const key of Object.keys(data)) {
-        const entry = data[key];
+      const result = BlissSVGBuilder.define(data, { overwrite: true });
+      if (result.errors.length > 0) {
+        console.warn('extendData errors:', result.errors);
+      }
+    }
+  }
 
-        if (entry.hasOwnProperty('codeString') && typeof entry.codeString === 'string') {
-          if (blissElementDefinitions[key]) {
-            console.warn(`extendData: overwriting existing definition for "${key}"`);
-          }
+  // Validates a definition code string
+  static #validateCode(code) {
+    if (typeof code !== 'string' || code.length === 0) {
+      throw new Error('Definition code must be a non-empty string.');
+    }
+  }
 
-          const validEntry = { codeString: entry.codeString };
+  /**
+   * Define a primitive shape with a getPath function.
+   *
+   * @param {string} code - Shape code (e.g., "MYCIRCLE")
+   * @param {Object} definition
+   * @param {function} definition.getPath - Function(x, y, options) returning SVG path string
+   * @param {number} definition.width - Shape width
+   * @param {number} definition.height - Shape height
+   * @param {number} [definition.x=0] - Default x offset
+   * @param {number} [definition.y=0] - Default y offset
+   * @param {Object} [definition.extraPathOptions] - Extra options passed to getPath
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false] - Allow overwriting existing definitions
+   */
+  static defineShape(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
 
-          if (entry.hasOwnProperty('isIndicator') && typeof entry.isIndicator === 'boolean') {
-            validEntry.isIndicator = entry.isIndicator;
-          }
+    if (typeof definition?.getPath !== 'function') {
+      throw new Error(`defineShape("${code}"): "getPath" must be a function.`);
+    }
+    if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
+      throw new Error(`defineShape("${code}"): "width" must be a finite number.`);
+    }
+    if (typeof definition.height !== 'number' || !isFinite(definition.height)) {
+      throw new Error(`defineShape("${code}"): "height" must be a finite number.`);
+    }
 
-          if (entry.hasOwnProperty('anchorOffsetX') && typeof entry.anchorOffsetX === 'number' && isFinite(entry.anchorOffsetX)) {
-            validEntry.anchorOffsetX = entry.anchorOffsetX;
-          }
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`defineShape("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
 
-          if (entry.hasOwnProperty('anchorOffsetY') && typeof entry.anchorOffsetY === 'number' && isFinite(entry.anchorOffsetY)) {
-            validEntry.anchorOffsetY = entry.anchorOffsetY;
-          }
+    const entry = {
+      getPath: definition.getPath,
+      width: definition.width,
+      height: definition.height,
+      isShape: true
+    };
+    if (definition.x !== undefined) entry.x = definition.x;
+    if (definition.y !== undefined) entry.y = definition.y;
+    if (definition.extraPathOptions) entry.extraPathOptions = definition.extraPathOptions;
 
-          if (entry.hasOwnProperty('width') && typeof entry.width === 'number' && isFinite(entry.width)) {
-            validEntry.width = entry.width;
-          }
+    blissElementDefinitions[code] = entry;
+  }
 
-          blissElementDefinitions[key] = validEntry;
+  /**
+   * Define a Bliss glyph (composite character defined by codeString).
+   *
+   * @param {string} code - Glyph code (e.g., "B5000")
+   * @param {Object} definition
+   * @param {string} definition.codeString - Composition string (e.g., "H:0,8;VL8")
+   * @param {boolean} [definition.isIndicator=false]
+   * @param {number} [definition.anchorOffsetX]
+   * @param {number} [definition.anchorOffsetY]
+   * @param {number} [definition.width] - Width override
+   * @param {Object} [definition.kerningRules]
+   * @param {boolean} [definition.shrinksPrecedingWordSpace=false]
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false]
+   */
+  static defineGlyph(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
+
+    if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
+      throw new Error(`defineGlyph("${code}"): "codeString" must be a non-empty string.`);
+    }
+
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`defineGlyph("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
+
+    const entry = {
+      codeString: definition.codeString,
+      glyphCode: code,
+      isBlissGlyph: true
+    };
+    if (definition.isIndicator === true) entry.isIndicator = true;
+    if (typeof definition.anchorOffsetX === 'number' && isFinite(definition.anchorOffsetX)) {
+      entry.anchorOffsetX = definition.anchorOffsetX;
+    }
+    if (typeof definition.anchorOffsetY === 'number' && isFinite(definition.anchorOffsetY)) {
+      entry.anchorOffsetY = definition.anchorOffsetY;
+    }
+    if (typeof definition.width === 'number' && isFinite(definition.width)) {
+      entry.width = definition.width;
+    }
+    if (definition.kerningRules && typeof definition.kerningRules === 'object') {
+      entry.kerningRules = { ...definition.kerningRules };
+    }
+    if (definition.shrinksPrecedingWordSpace === true) {
+      entry.shrinksPrecedingWordSpace = true;
+    }
+
+    blissElementDefinitions[code] = entry;
+  }
+
+  /**
+   * Define an external glyph (e.g., Latin/Cyrillic character from SVG path data).
+   *
+   * @param {string} code - External glyph code (e.g., "Xα")
+   * @param {Object} definition
+   * @param {function} definition.getPath - Function(x, y, options) returning SVG path string
+   * @param {number} definition.width - Glyph width
+   * @param {string} definition.glyph - Character identifier
+   * @param {number} [definition.y] - Y offset
+   * @param {number} [definition.height] - Glyph height
+   * @param {Object} [definition.kerningRules]
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false]
+   */
+  static defineExternalGlyph(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
+
+    if (typeof definition?.getPath !== 'function') {
+      throw new Error(`defineExternalGlyph("${code}"): "getPath" must be a function.`);
+    }
+    if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
+      throw new Error(`defineExternalGlyph("${code}"): "width" must be a finite number.`);
+    }
+    if (typeof definition.glyph !== 'string' || definition.glyph.length === 0) {
+      throw new Error(`defineExternalGlyph("${code}"): "glyph" must be a non-empty string.`);
+    }
+
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`defineExternalGlyph("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
+
+    const entry = {
+      getPath: definition.getPath,
+      width: definition.width,
+      glyph: definition.glyph,
+      isExternalGlyph: true
+    };
+    if (typeof definition.y === 'number') entry.y = definition.y;
+    if (typeof definition.height === 'number') entry.height = definition.height;
+    if (definition.kerningRules && typeof definition.kerningRules === 'object') {
+      entry.kerningRules = { ...definition.kerningRules };
+    }
+
+    blissElementDefinitions[code] = entry;
+  }
+
+  /**
+   * Define one or more definitions of any type (auto-detected from definition shape).
+   * - Has getPath function → shape
+   * - Has codeString → glyph
+   * - Has getPath + glyph string → external glyph
+   *
+   * @param {Object.<string, Object>} definitions - Map of code → definition
+   * @param {Object} [options]
+   * @param {boolean} [options.overwrite=false]
+   * @returns {{ defined: string[], skipped: string[], errors: string[] }}
+   */
+  static define(definitions, options = {}) {
+    const result = { defined: [], skipped: [], errors: [] };
+
+    if (!definitions || typeof definitions !== 'object') {
+      return result;
+    }
+
+    for (const [code, definition] of Object.entries(definitions)) {
+      try {
+        if (typeof definition?.getPath === 'function' && typeof definition?.glyph === 'string') {
+          BlissSVGBuilder.defineExternalGlyph(code, definition, options);
+        } else if (typeof definition?.getPath === 'function') {
+          BlissSVGBuilder.defineShape(code, definition, options);
+        } else if (typeof definition?.codeString === 'string') {
+          BlissSVGBuilder.defineGlyph(code, definition, options);
         } else {
-          console.warn(`Invalid entry for key: ${key}`);
+          result.errors.push(`"${code}": unable to detect definition type. Provide getPath+width+height (shape), codeString (glyph), or getPath+glyph (external glyph).`);
+          continue;
+        }
+        result.defined.push(code);
+      } catch (err) {
+        if (err.message.includes('already exists')) {
+          result.skipped.push(code);
+        } else {
+          result.errors.push(`"${code}": ${err.message}`);
         }
       }
     }
+
+    return result;
+  }
+
+  /**
+   * Check if a code is defined.
+   * @param {string} code
+   * @returns {boolean}
+   */
+  static isDefined(code) {
+    return code in blissElementDefinitions;
+  }
+
+  /**
+   * Get definition metadata for a code (frozen copy, not the live object).
+   * Functions (like getPath) are excluded from the copy.
+   *
+   * @param {string} code
+   * @returns {Object|null} Frozen metadata object, or null if not found
+   */
+  static getDefinition(code) {
+    const def = blissElementDefinitions[code];
+    if (!def) return null;
+
+    const copy = {};
+    for (const [key, value] of Object.entries(def)) {
+      if (typeof value === 'function') continue;
+      if (typeof value === 'object' && value !== null) {
+        copy[key] = Object.freeze({ ...value });
+      } else {
+        copy[key] = value;
+      }
+    }
+
+    // Add computed type.
+    // Two glyph detection paths: isBlissGlyph (set on B-code definitions loaded from glyph data)
+    // and codeString fallback (for custom glyphs added via defineGlyph or old extendData).
+    if (def.isShape) copy.type = 'shape';
+    else if (def.isExternalGlyph) copy.type = 'externalGlyph';
+    else if (def.isBlissGlyph) copy.type = 'glyph';
+    else if (def.codeString) copy.type = 'glyph';
+    else copy.type = 'space';
+
+    copy.isBuiltIn = builtInCodes.has(code);
+    if (typeof def.getPath === 'function') copy.hasGetPath = true;
+
+    return Object.freeze(copy);
+  }
+
+  /**
+   * List all defined codes, optionally filtered by type.
+   *
+   * @param {Object} [filter]
+   * @param {'shape'|'glyph'|'externalGlyph'|'space'} [filter.type]
+   * @returns {string[]}
+   */
+  static listDefinitions(filter = {}) {
+    const codes = Object.keys(blissElementDefinitions);
+
+    if (!filter.type) return codes;
+
+    return codes.filter(code => {
+      const def = blissElementDefinitions[code];
+      // Uses same type detection logic as getDefinition() to ensure consistency
+      const type = def.isShape ? 'shape'
+        : def.isExternalGlyph ? 'externalGlyph'
+        : (def.isBlissGlyph || def.codeString) ? 'glyph'
+        : 'space';
+      return type === filter.type;
+    });
+  }
+
+  /**
+   * Remove a custom definition. Built-in definitions cannot be removed.
+   *
+   * @param {string} code
+   * @returns {boolean} true if removed
+   * @throws {Error} If attempting to remove a built-in definition
+   */
+  static removeDefinition(code) {
+    if (builtInCodes.has(code)) {
+      throw new Error(`removeDefinition("${code}"): cannot remove built-in definitions.`);
+    }
+    if (!(code in blissElementDefinitions)) {
+      return false;
+    }
+    delete blissElementDefinitions[code];
+    return true;
   }
 
   get #svgCode() {

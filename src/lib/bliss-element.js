@@ -7,8 +7,18 @@
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { INTERNAL_OPTIONS, isSafeAttributeName } from "./bliss-constants.js";
 
+// Simple counter-based ID generator (works in all environments).
+// IDs are ephemeral — they reset with each builder instance and are not
+// stable across re-renders. Future work: propagate IDs through round-trips
+// so that elements retain identity after manipulation (needed for Bliss Maker).
+let nextId = 0;
+function generateId() {
+  return `el_${++nextId}`;
+}
+
 export class BlissElement {
   //#region Private Properties
+  #id
   #level
   #blissObj
   #extraPathOptions
@@ -291,6 +301,7 @@ export class BlissElement {
   }
 
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0, sharedOptions = null } = {}) {
+    this.#id = generateId();
     this.#blissObj = blissObj;
     this.#parentElement = parentElement;
     this.#previousElement = previousElement;
@@ -771,6 +782,73 @@ export class BlissElement {
     return this.#isBlissGlyph || this.#isExternalGlyph;
   }
 
+  get id() {
+    return this.#id;
+  }
+
+  /**
+   * Returns a frozen snapshot of this element's data.
+   * Snapshots are plain objects safe to expose publicly — no live references.
+   *
+   * @param {number} [parentOffsetX=0] - Accumulated x offset from ancestors
+   * @param {number} [parentOffsetY=0] - Accumulated y offset from ancestors
+   * @param {number} [index=0] - Index within parent's children
+   * @returns {Object} Frozen ElementSnapshot
+   */
+  snapshot(parentOffsetX = 0, parentOffsetY = 0, index = 0) {
+    const absX = parentOffsetX + this.#relativeToParentX;
+    const absY = parentOffsetY + this.#relativeToParentY;
+
+    let childSnapshots = (this.#children || []).map((child, i) =>
+      child.snapshot(absX, absY, i)
+    );
+
+    // For group elements (level 1): resolve isHeadGlyph so every word has exactly one.
+    // The parser only marks head glyphs in non-default cases (optimization for toString).
+    // The public API should always have exactly one isHeadGlyph per word.
+    if (this.#level === 1 && childSnapshots.length > 0) {
+      const hasExplicitHead = childSnapshots.some(c => c.isHeadGlyph);
+      if (!hasExplicitHead) {
+        // Default: first glyph is the head glyph
+        childSnapshots[0] = Object.freeze({ ...childSnapshots[0], isHeadGlyph: true });
+      }
+    }
+
+    const children = Object.freeze(childSnapshots);
+
+    // Determine type from level and set type
+    let type;
+    if (this.#level === 0) type = 'root';
+    else if (this.type === 'group') type = 'group';
+    else if (this.type === 'glyph') type = 'glyph';
+    else if (this.type === 'characterPart') type = 'characterPart';
+    else if (this.#isShape || (this.#leafWidth !== undefined)) type = 'shape';
+    else type = 'part';
+
+    return Object.freeze({
+      id: this.#id,
+      type,
+      codeName: this.#codeName || '',
+      x: absX,
+      y: absY,
+      offsetX: this.#relativeToParentX,
+      offsetY: this.#relativeToParentY,
+      width: this.width,
+      height: this.height,
+      advanceX: this.#advanceX || 0,
+      level: this.#level,
+      bounds: Object.freeze(this.#calculateBounds(parentOffsetX, parentOffsetY)),
+      isIndicator: this.isIndicator,
+      isShape: !!this.#isShape,
+      isBlissGlyph: !!this.#isBlissGlyph,
+      isExternalGlyph: !!this.#isExternalGlyph,
+      isHeadGlyph: !!this.#blissObj.isHeadGlyph,
+      index,
+      parentId: this.#parentElement?.#id ?? null,
+      children
+    });
+  }
+
   get effectiveBounds() {
     // Accumulate offsets from all ancestors
     let offsetX = 0;
@@ -949,9 +1027,10 @@ export class BlissElement {
   toJSON() {
     let obj = {};
 
-    // Bliss glyphs (B-codes) decompose into their component shapes
-    // Everything else (shapes, external glyphs, dots, etc.) are leaves
-    if (this.#codeName && !this.#isBlissGlyph) {
+    // B-code glyphs with a known code are emitted as leaf nodes (normalized)
+    // Shapes, external glyphs, and other named elements are also leaves
+    // Only unnamed composites (no codeName) recurse into children
+    if (this.#codeName) {
         const element = {};
         element.code = this.codeName;
         element.width = this.width;
@@ -968,46 +1047,6 @@ export class BlissElement {
     return obj;
   }
 
-  toJSONOld4() {
-    const obj = {};
-    
-    if (this.#codeName) {
-        const element = {};
-        element.code = this.codeName;
-        element.width = this.width;
-        element.x = this.x;
-        element.y = this.y;
-        element.level = this.#level;
-        obj.elements = [];
-        obj.elements.push(element);
-    } else if (this.#children) {
-        const elements = this.#children.map(child => child.toJSON().elements);
-        obj.elements = [];
-        obj.elements = obj.elements.concat(...elements);
-    }
-    
-    return obj;
-  }
-
-  toJSONOldNotWorking() {
-    const obj = {};
-
-    if (this.#codeName && this.#isShape) {
-      const element = {};
-      element.code = this.codeName;
-      element.width = this.width;
-      element.x = this.x;
-      element.y = this.y;
-      obj.atomicElements = [];
-      obj.atomicElements.push(element);
-    } else if (this.#children) {
-      const elements = this.#children.map(child => child.toJSON().atomicElements); //doesn't work
-      obj.elements = [];
-      obj.elements = obj.elements.concat(...elements);
-    }
-
-    return obj;
-  }
 
   #handlePredefinedElement(definition) {
     if (typeof definition?.getPath !== 'function') throw new Error('An element is only predefined if has a proper getPath function.');
