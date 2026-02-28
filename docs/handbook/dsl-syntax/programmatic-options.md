@@ -196,10 +196,12 @@ function renderWithBranding(userInput) {
 
 ## Edge Cases
 
+Recall the constructor signature: `new BlissSVGBuilder(input, { defaults, overrides })`
+
 | Scenario | Behavior |
 |----------|----------|
-| No second parameter | Works exactly as before |
-| `null` second parameter | Treated as no options |
+| No second parameter | No effect — only the DSL string is used |
+| `null` second parameter | No effect — treated the same as omitting it |
 | Empty `defaults: {}` | No effect |
 | Empty `overrides: {}` | No effect |
 | `null`/`undefined` values in objects | Silently skipped |
