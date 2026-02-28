@@ -385,7 +385,6 @@ class BlissSVGBuilder {
     const sharedOptions = {
       charSpace: charSpace ?? 2,
       wordSpace: wordSpace ?? 8,
-      punctuationSpace: (wordSpace ?? 8) / 2,
       externalGlyphSpace: externalGlyphSpace ?? 0.8
     };
 

@@ -306,7 +306,7 @@ export class BlissElement {
     this.#parentElement = parentElement;
     this.#previousElement = previousElement;
     this.#level = level;
-    this.#sharedOptions = sharedOptions || { charSpace: 2, wordSpace: 8, punctuationSpace: 4, externalGlyphSpace: 0.8 };
+    this.#sharedOptions = sharedOptions || { charSpace: 2, wordSpace: 8, externalGlyphSpace: 0.8 };
 
     this.#codeName = "";
     this.#relativeToParentX = 0;

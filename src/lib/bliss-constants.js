@@ -83,7 +83,7 @@ export const INTERNAL_OPTIONS = new Set([
   'background',
   'charSpace',
   'wordSpace',
-  'punctuationSpace',
+
   'externalGlyphSpace',
   'minWidth',
   'centered',
