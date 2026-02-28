@@ -111,16 +111,6 @@ class BlissSVGBuilder {
       options.centered = (centered === 0) ? 0 : 1;
     }
 
-    // freestyle: Boolean ("1" -> true, "0" -> false)
-    // When true, uses actual composition height instead of fixed 20 units
-    if ('freestyle' in rawOptions) {
-      if (rawOptions.freestyle === "1") {
-        options.freestyle = true;
-      } else if (rawOptions.freestyle === "0") {
-        options.freestyle = false;
-      }
-    }
-
     // grid: Boolean ("1" -> true, "0" -> false)
     if ('grid' in rawOptions) {
       if (rawOptions.grid === "1") {
@@ -236,6 +226,8 @@ class BlissSVGBuilder {
         options.cropBottom = 'auto';
         options.cropLeft = 'auto';
         options.cropRight = 'auto';
+      } else if (c === 'auto-height') {
+        options.autoHeight = true;
       } else if (!isNaN(c)) {
         const n = Number(c);
         options.cropTop = n;
@@ -1281,7 +1273,7 @@ class BlissSVGBuilder {
   get #svgCode() {
     // Computed rendering dimensions
     const width = Math.max(this.composition.width, this.#processedOptions.minWidth ?? 0);
-    const height = this.#processedOptions.freestyle ? this.composition.height : 20;
+    const height = this.#processedOptions.autoHeight ? this.composition.height : 20;
 
     // User-provided options with defaults
     const color = this.#processedOptions.color ?? "#000000";

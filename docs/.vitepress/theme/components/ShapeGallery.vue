@@ -74,7 +74,7 @@ onMounted(async () => {
           }
         }
 
-        const builder = new BlissSVGBuilder(`[freestyle=1;grid=1;grid-sky-color=#c7c7c7]||${renderCode}`);
+        const builder = new BlissSVGBuilder(`[crop=auto-height;grid=1;grid-sky-color=#c7c7c7]||${renderCode}`);
         svgs.value[code] = builder.svgCode;
       } catch (e) {
         svgs.value[code] = `<div class="svg-error">Error: ${e.message}</div>`;

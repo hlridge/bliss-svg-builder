@@ -32,10 +32,10 @@ document.getElementById('container').appendChild(svgElement);
 
 ## Examples
 
-**Simple shape** - Heart with freestyle mode
+**Simple shape** - Heart with auto-height crop
 
 ```
-[freestyle=1;background=#fafafa]||H
+[crop=auto-height;background=#fafafa]||H
 ```
 
 ![Heart shape](assets/heart-shape.svg)
