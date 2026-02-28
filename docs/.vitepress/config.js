@@ -35,8 +35,8 @@ export default defineConfig({
           items: [
             { text: 'Installation & Setup', link: '/get-started/installation-setup' },
             { text: 'Characters & B-Codes', link: '/get-started/characters-bcodes' },
-            { text: 'Words & Sentences', link: '/get-started/words-sentences', badge: 'Soon' },
-            { text: 'Styling Basics', link: '/get-started/styling-basics', badge: 'Soon' }
+            { text: 'Words & Sentences', link: '/get-started/words-sentences' },
+            { text: 'Styling Basics', link: '/get-started/styling-basics' }
           ]
         }
       ],
@@ -44,9 +44,9 @@ export default defineConfig({
         {
           text: 'Writing',
           items: [
-            { text: 'Characters & B-Codes', link: '/handbook/writing/characters-bcodes', badge: 'Soon' },
-            { text: 'Words & Sentences', link: '/handbook/writing/words-sentences', badge: 'Soon' },
-            { text: 'Shapes', link: '/handbook/writing/shapes', badge: 'Soon' },
+            { text: 'Characters & B-Codes', link: '/handbook/writing/characters-bcodes' },
+            { text: 'Words & Sentences', link: '/handbook/writing/words-sentences' },
+            { text: 'Shapes', link: '/handbook/writing/shapes' },
             { text: 'Latin & Cyrillic', link: '/handbook/writing/latin-cyrillic', badge: 'Soon' },
             { text: 'Custom Codes', link: '/handbook/writing/custom-codes', badge: 'Soon' }
           ]
@@ -54,33 +54,32 @@ export default defineConfig({
         {
           text: 'Styling',
           items: [
-            { text: 'Color & Stroke', link: '/handbook/styling/color-stroke', badge: 'Soon' },
-            { text: 'Backgrounds & Accessibility', link: '/handbook/styling/backgrounds-accessibility', badge: 'Soon' }
+            { text: 'Color & Stroke', link: '/handbook/styling/color-stroke' },
+            { text: 'Backgrounds & Accessibility', link: '/handbook/styling/backgrounds-accessibility' }
           ]
         },
         {
           text: 'Spacing & Layout',
           items: [
-            { text: 'Spacing', link: '/handbook/spacing-layout/spacing', badge: 'Soon' },
-            { text: 'Sizing', link: '/handbook/spacing-layout/sizing', badge: 'Soon' },
-            { text: 'Margins & Cropping', link: '/handbook/spacing-layout/margins-cropping', badge: 'Soon' },
-            { text: 'Positioning', link: '/handbook/spacing-layout/positioning', badge: 'Soon' }
+            { text: 'Spacing', link: '/handbook/spacing-layout/spacing' },
+            { text: 'Sizing', link: '/handbook/spacing-layout/sizing' },
+            { text: 'Margins & Cropping', link: '/handbook/spacing-layout/margins-cropping' },
+            { text: 'Positioning', link: '/handbook/spacing-layout/positioning' }
           ]
         },
         {
           text: 'Coordinate System',
           items: [
-            { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid', badge: 'Soon' },
-            { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization', badge: 'Soon' }
+            { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid' },
+            { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization' }
           ]
         },
         {
           text: 'DSL Syntax',
           items: [
-            { text: 'Syntax Overview', link: '/handbook/dsl-syntax/syntax-overview', badge: 'Soon' },
-            { text: 'Options System', link: '/handbook/dsl-syntax/options-system', badge: 'Soon' },
-            { text: 'Programmatic Options', link: '/handbook/dsl-syntax/programmatic-options' },
-            { text: 'Complete Examples', link: '/handbook/dsl-syntax/complete-examples', badge: 'Soon' }
+            { text: 'Syntax Overview', link: '/handbook/dsl-syntax/syntax-overview' },
+            { text: 'Options System', link: '/handbook/dsl-syntax/options-system' },
+            { text: 'Programmatic Options', link: '/handbook/dsl-syntax/programmatic-options' }
           ]
         }
       ],
@@ -90,9 +89,9 @@ export default defineConfig({
           items: [
             { text: 'Shapes Gallery', link: '/reference/shapes-gallery' },
             { text: 'Indicators Reference', link: '/reference/indicators-reference' },
-            { text: 'Options Quick Reference', link: '/reference/options-quick-reference', badge: 'Soon' },
-            { text: 'DSL Syntax Quick Reference', link: '/reference/dsl-syntax-quick-reference', badge: 'Soon' },
-            { text: 'API Documentation', link: '/reference/api-documentation', badge: 'Soon' }
+            { text: 'Options Quick Reference', link: '/reference/options-quick-reference' },
+            { text: 'DSL Syntax Quick Reference', link: '/reference/dsl-syntax-quick-reference' },
+            { text: 'API Documentation', link: '/reference/api-documentation' }
           ]
         }
       ]
