@@ -23,7 +23,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Get Started', link: '/get-started/installation-setup' },
-      { text: 'Handbook', link: '/handbook/writing/characters-bcodes' },
+      { text: 'Handbook', link: '/handbook/' },
       { text: 'Reference', link: '/reference/shapes-gallery' },
       { text: 'Playground', link: '/playground/' }
     ],
@@ -79,6 +79,7 @@ export default defineConfig({
           items: [
             { text: 'Syntax Overview', link: '/handbook/dsl-syntax/syntax-overview', badge: 'Soon' },
             { text: 'Options System', link: '/handbook/dsl-syntax/options-system', badge: 'Soon' },
+            { text: 'Programmatic Options', link: '/handbook/dsl-syntax/programmatic-options' },
             { text: 'Complete Examples', link: '/handbook/dsl-syntax/complete-examples', badge: 'Soon' }
           ]
         }
