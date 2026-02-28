@@ -553,8 +553,8 @@ class BlissSVGBuilder {
   }
 
   /** Returns cloned object and array of group indices that are word groups (non-space) */
-  #getWordGroupIndices(raw = false) {
-    const obj = raw ? this.toRawJSON() : this.toJSON();
+  #getWordGroupIndices() {
+    const obj = this.toJSON();
     const indices = [];
     for (let i = 0; i < (obj.groups || []).length; i++) {
       if (!BlissSVGBuilder.#isRawSpaceGroup(obj.groups[i])) {
@@ -584,7 +584,7 @@ class BlissSVGBuilder {
     group.glyphs.splice(charIndex, 1);
     // If word is now empty, remove the word and adjacent space
     if (group.glyphs.length === 0) {
-      return this.#removeWordGroup(obj, gi, indices);
+      return this.#removeWordGroup(obj, gi);
     }
     return obj;
   }
@@ -640,7 +640,7 @@ class BlissSVGBuilder {
   }
 
   /** Internal: removes a word group and its adjacent space from groups array */
-  #removeWordGroup(obj, groupIndex, wordIndices) {
+  #removeWordGroup(obj, groupIndex) {
     const groups = obj.groups;
     // Determine which space group to also remove
     const prevIsSpace = groupIndex > 0 && BlissSVGBuilder.#isRawSpaceGroup(groups[groupIndex - 1]);
@@ -667,7 +667,7 @@ class BlissSVGBuilder {
   removeWord(wordIndex) {
     const { obj, indices } = this.#getWordGroupIndices();
     if (wordIndex < 0 || wordIndex >= indices.length) return null;
-    return this.#removeWordGroup(obj, indices[wordIndex], indices);
+    return this.#removeWordGroup(obj, indices[wordIndex]);
   }
 
   /**
@@ -728,7 +728,7 @@ class BlissSVGBuilder {
       const words = this.words;
       const wordIndex = words.findIndex(w => w.id === id);
       if (wordIndex < 0) return null;
-      return this.#removeWordGroup(obj, indices[wordIndex], indices);
+      return this.#removeWordGroup(obj, indices[wordIndex]);
     }
 
     // If it's a glyph (level 2), find word and char index and remove directly
@@ -742,7 +742,7 @@ class BlissSVGBuilder {
             const group = obj.groups[gi];
             group.glyphs.splice(ci, 1);
             if (group.glyphs.length === 0) {
-              return this.#removeWordGroup(obj, gi, indices);
+              return this.#removeWordGroup(obj, gi);
             }
             return obj;
           }
@@ -775,7 +775,7 @@ class BlissSVGBuilder {
    * @returns {Object|null} Raw JSON object for constructor, or null if out of range
    */
   removePart(wordIndex, charIndex, partIndex) {
-    const { obj, indices } = this.#getWordGroupIndices(true);
+    const { obj, indices } = this.#getWordGroupIndices();
     const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
     if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
     ref.parts.splice(partIndex, 1);
@@ -783,7 +783,7 @@ class BlissSVGBuilder {
     if (ref.parts.length === 0) {
       ref.group.glyphs.splice(charIndex, 1);
       if (ref.group.glyphs.length === 0) {
-        return this.#removeWordGroup(obj, ref.gi, indices);
+        return this.#removeWordGroup(obj, ref.gi);
       }
     }
     return obj;
@@ -798,7 +798,7 @@ class BlissSVGBuilder {
    * @returns {Object|null} Raw JSON object for constructor, or null if out of range
    */
   replacePart(wordIndex, charIndex, partIndex, newCode) {
-    const { obj, indices } = this.#getWordGroupIndices(true);
+    const { obj, indices } = this.#getWordGroupIndices();
     const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
     if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
     const oldPart = ref.parts[partIndex];
@@ -820,7 +820,7 @@ class BlissSVGBuilder {
    * @returns {Object|null} Raw JSON object for constructor, or null if out of range
    */
   insertPart(wordIndex, charIndex, partIndex, code, position) {
-    const { obj, indices } = this.#getWordGroupIndices(true);
+    const { obj, indices } = this.#getWordGroupIndices();
     const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
     if (!ref || partIndex < 0 || partIndex > ref.parts.length) return null;
     const newPart = { code };
@@ -921,28 +921,6 @@ class BlissSVGBuilder {
     return obj;
   }
 
-  /**
-   * Returns the raw parsed input structure, preserving exact input as written.
-   * Use this for builders like Bliss Maker that need part-level fidelity.
-   *
-   * @returns {Object} Raw parsed structure with groups/glyphs/parts
-   */
-  toRawJSON() {
-    const obj = structuredClone(this.#rawBlissObj);
-    if (obj.groups) {
-      for (const group of obj.groups) {
-        if (group.glyphs) {
-          for (const glyph of group.glyphs) {
-            if (glyph.glyphCode) {
-              glyph.code = glyph.glyphCode;
-              delete glyph.glyphCode;
-            }
-          }
-        }
-      }
-    }
-    return obj;
-  }
 
   /**
    * Returns the SVG content (path elements and groups) as a string.

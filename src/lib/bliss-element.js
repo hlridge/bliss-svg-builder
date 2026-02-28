@@ -1047,46 +1047,6 @@ export class BlissElement {
     return obj;
   }
 
-  toJSONOld4() {
-    const obj = {};
-    
-    if (this.#codeName) {
-        const element = {};
-        element.code = this.codeName;
-        element.width = this.width;
-        element.x = this.x;
-        element.y = this.y;
-        element.level = this.#level;
-        obj.elements = [];
-        obj.elements.push(element);
-    } else if (this.#children) {
-        const elements = this.#children.map(child => child.toJSON().elements);
-        obj.elements = [];
-        obj.elements = obj.elements.concat(...elements);
-    }
-    
-    return obj;
-  }
-
-  toJSONOldNotWorking() {
-    const obj = {};
-
-    if (this.#codeName && this.#isShape) {
-      const element = {};
-      element.code = this.codeName;
-      element.width = this.width;
-      element.x = this.x;
-      element.y = this.y;
-      obj.atomicElements = [];
-      obj.atomicElements.push(element);
-    } else if (this.#children) {
-      const elements = this.#children.map(child => child.toJSON().atomicElements); //doesn't work
-      obj.elements = [];
-      obj.elements = obj.elements.concat(...elements);
-    }
-
-    return obj;
-  }
 
   #handlePredefinedElement(definition) {
     if (typeof definition?.getPath !== 'function') throw new Error('An element is only predefined if has a proper getPath function.');
