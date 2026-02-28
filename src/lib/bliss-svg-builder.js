@@ -1001,18 +1001,6 @@ class BlissSVGBuilder {
 
   // ...more methods...
 
-  /**
-   * @deprecated Use defineShape(), defineGlyph(), defineExternalGlyph(), or define() instead.
-   */
-  static extendData(data) {
-    console.warn('BlissSVGBuilder.extendData() is deprecated. Use define(), defineShape(), defineGlyph(), or defineExternalGlyph() instead.');
-    if (data) {
-      const result = BlissSVGBuilder.define(data, { overwrite: true });
-      if (result.errors.length > 0) {
-        console.warn('extendData errors:', result.errors);
-      }
-    }
-  }
 
   // Validates a definition code string
   static #validateCode(code) {
