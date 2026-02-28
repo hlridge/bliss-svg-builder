@@ -59,6 +59,15 @@ export default defineConfig({
           ]
         },
         {
+          text: 'Syntax & Options',
+          items: [
+            { text: 'DSL Syntax Overview', link: '/handbook/syntax-options/syntax-overview' },
+            { text: 'Options System', link: '/handbook/syntax-options/options-system' },
+            { text: 'SVG Pass-Through Attributes', link: '/handbook/syntax-options/svg-pass-through' },
+            { text: 'Programmatic Options', link: '/handbook/syntax-options/programmatic-options' }
+          ]
+        },
+        {
           text: 'Spacing & Layout',
           items: [
             { text: 'Spacing', link: '/handbook/spacing-layout/spacing' },
@@ -72,14 +81,6 @@ export default defineConfig({
           items: [
             { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid' },
             { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization' }
-          ]
-        },
-        {
-          text: 'DSL Syntax',
-          items: [
-            { text: 'Syntax Overview', link: '/handbook/dsl-syntax/syntax-overview' },
-            { text: 'Options System', link: '/handbook/dsl-syntax/options-system' },
-            { text: 'Programmatic Options', link: '/handbook/dsl-syntax/programmatic-options' }
           ]
         }
       ],

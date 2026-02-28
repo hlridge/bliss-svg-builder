@@ -44,7 +44,7 @@ The DSL has four composition levels:
 | (none) | Character | `[color=green]B313` | ↓ |
 | `>` | Part | `[color=orange]>B313` | Highest |
 
-More specific scopes override broader ones. See [Options System](/handbook/dsl-syntax/options-system) for cascading rules.
+More specific scopes override broader ones. See [Options System](/handbook/syntax-options/options-system) for cascading rules.
 
 ## Coordinates
 

@@ -27,7 +27,7 @@ const styled = new BlissSVGBuilder('B313', {
 });
 ```
 
-The second parameter uses camelCase keys and native JS types. See [Programmatic Options](/handbook/dsl-syntax/programmatic-options) for the full key mapping and precedence rules.
+The second parameter uses camelCase keys and native JS types. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules.
 
 ### Round-trip from toJSON()
 

@@ -22,7 +22,7 @@ How to control spatial arrangement — word and character spacing, kerning, SVG 
 
 How the grid works — the unit system, coordinate zones, and customizing the grid's visual appearance.
 
-### [DSL Syntax](/handbook/dsl-syntax/syntax-overview)
+### [Syntax & Options](/handbook/syntax-options/syntax-overview)
 
 The complete syntax reference — full grammar specification, the options cascade system, programmatic options via JavaScript, and real-world recipes.
 

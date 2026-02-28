@@ -2,7 +2,7 @@
 
 Quick reference for all available options.
 
-Options can be set in the [DSL string](/handbook/dsl-syntax/options-system) or [programmatically](/handbook/dsl-syntax/programmatic-options) via the constructor.
+Options can be set in the [DSL string](/handbook/syntax-options/options-system) or [programmatically](/handbook/syntax-options/programmatic-options) via the constructor.
 
 ---
 

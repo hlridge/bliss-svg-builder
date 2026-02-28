@@ -66,11 +66,11 @@ Beyond the named options above, you can pass through arbitrary SVG attributes, i
 [class=bliss-word;id=greeting]||B313//B431
 ```
 
-This lets your application's CSS or JavaScript target specific characters. Like visual options, these work at [any scope level](/handbook/dsl-syntax/options-system).
+This lets your application's CSS or JavaScript target specific characters. Like visual options, these work at [any scope level](/handbook/syntax-options/options-system).
 
 ## Scoping
 
-Visual options (`color`, `stroke-width`, `fill`, `opacity`), SVG attributes, styles, classes, and IDs can all be applied at any scope — global, word, character, or part. Layout options (grid, margin, crop, etc.) are global-only. See the [Options System](/handbook/dsl-syntax/options-system) for how scoping and cascade work.
+Visual options (`color`, `stroke-width`, `fill`, `opacity`), SVG attributes, styles, classes, and IDs can all be applied at any scope — global, word, character, or part. Layout options (grid, margin, crop, etc.) are global-only. See the [Options System](/handbook/syntax-options/options-system) for how scoping and cascade work.
 
 ## Options Reference
 

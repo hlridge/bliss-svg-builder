@@ -116,14 +116,14 @@ In this example:
 
 ## Which Options Support Scoping?
 
-Most visual options can be applied at any scope:
+Built-in visual options can be applied at any scope:
 
 | Option | Global | Word | Character | Part |
 |--------|:------:|:----:|:---------:|:----:|
 | `color` | ✓ | ✓ | ✓ | ✓ |
 | `stroke-width` | ✓ | ✓ | ✓ | ✓ |
-| `fill` | ✓ | ✓ | ✓ | ✓ |
-| `opacity` | ✓ | ✓ | ✓ | ✓ |
+
+[SVG pass-through attributes](/handbook/syntax-options/svg-pass-through) (like `fill`, `opacity`, `stroke-dasharray`, etc.) also work at any scope.
 
 Some options only make sense at global scope:
 
