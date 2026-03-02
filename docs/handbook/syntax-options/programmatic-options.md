@@ -114,7 +114,7 @@ Options use **camelCase** keys with native JavaScript types — not the kebab-ca
 | `charSpace` | `char-space` | number | `4` |
 | `wordSpace` | `word-space` | number | `10` |
 | `background` | `background` | string | `'#fff'` |
-| `centered` | `centered` | boolean | `false` |
+| `center` | `center` | boolean | `false` |
 | `crop` | `crop` | number or string | `'auto'` |
 | `svgHeight` | `svg-height` | number | `100` |
 | `gridColor` | `grid-color` | string | `'#ccc'` |

@@ -108,10 +108,10 @@ class BlissSVGBuilder {
       options.minWidth = minWidth;
     }
 
-    // centered: Number, 0 (left-aligned) or 1 (centered, default)
-    if ('centered' in rawOptions && !isNaN(rawOptions['centered'])) {
-      const centered = Number(rawOptions['centered']);
-      options.centered = (centered === 0) ? 0 : 1;
+    // center: Number, 0 (left-aligned, default) or 1 (centered)
+    if ('center' in rawOptions && !isNaN(rawOptions['center'])) {
+      const center = Number(rawOptions['center']);
+      options.center = (center === 0) ? 0 : 1;
     }
 
     // grid: Boolean ("1" -> true, "0" -> false)
@@ -1199,7 +1199,7 @@ class BlissSVGBuilder {
     const viewBoxY = -marginTop + cropTop;
     let gridOffsetX = 0;
 
-    if ((this.#processedOptions.centered ?? 1) === 1 && width > this.composition.width) {
+    if ((this.#processedOptions.center ?? 0) === 1 && width > this.composition.width) {
       const leftOverhang = -this.composition.x;
       const rightOverhang = (this.composition.x + this.composition.width) - this.composition.baseWidth;
       const maxOverhang = Math.max(leftOverhang, rightOverhang);

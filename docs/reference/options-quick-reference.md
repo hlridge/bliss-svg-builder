@@ -32,7 +32,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | Option | Default | Values | Description |
 |--------|---------|--------|-------------|
 | `min-width` | `0` | ≥0 | Minimum composition width |
-| `centered` | `1` | 0, 1 | Center content in available width |
+| `center` | `0` | 0, 1 | Center content in available width |
 
 ---
 

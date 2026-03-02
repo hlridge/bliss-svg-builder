@@ -83,21 +83,21 @@ This is useful when you need consistent widths across different characters:
 
 ## Centering
 
-By default, content is centered within its width. Disable with `centered=0`:
+By default, content is left-aligned within its width. Enable centering with `center=1`:
 
-<Demo code="[min-width=20]||B313" title="Centered (default)" />
+<Demo code="[min-width=20]||B313" title="Left-aligned (default)" />
 
-<Demo code="[min-width=20;centered=0]||B313" title="Left-aligned (centered=0)" />
+<Demo code="[min-width=20;center=1]||B313" title="Centered (center=1)" />
 
 Centering is most visible when using `min-width` or with asymmetric indicators:
 
 <Demo code="B431;B81" title="With indicator: centered" />
 
-<Demo code="[centered=0]||B431;B81" title="With indicator: left-aligned" />
+<Demo code="[center=0]||B431;B81" title="With indicator: left-aligned" />
 
 | Option | Default | Values |
 |--------|---------|--------|
-| `centered` | `1` | `0` or `1` |
+| `center` | `0` | `0` or `1` |
 
 ## Combined Examples
 
@@ -127,4 +127,4 @@ For AAC communication boards:
 |--------|---------|--------|-------------|
 | `crop` | `0` | Number, `auto`, `auto-vertical`, `compact` | Cropping mode |
 | `min-width` | none | Number | Minimum composition width |
-| `centered` | `1` | `0`, `1` | Center content within width |
+| `center` | `0` | `0`, `1` | Center content within width |
