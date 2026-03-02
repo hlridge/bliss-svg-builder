@@ -7,55 +7,80 @@
 import { camelToKebab } from "./bliss-constants.js";
 
 /**
- * A lightweight handle that references a position in `#rawBlissObj`.
- * Survives `#rebuild()` because it references by position, not identity.
+ * A lightweight handle that references a node in `#rawBlissObj` by identity.
+ * Survives `#rebuild()` because it holds a direct reference to the raw node,
+ * and resolves its current index dynamically when needed.
  */
 export class ElementHandle {
   #ctx;
   #level;
-  #path;
+  #nodeRef;
+  #parentRef;
 
-  constructor(ctx, level, path) {
+  constructor(ctx, level, nodeRef, parentRef) {
     this.#ctx = ctx;
     this.#level = level;
-    this.#path = path;
+    this.#nodeRef = nodeRef;
+    this.#parentRef = parentRef;
   }
 
   get level() {
     return this.#level;
   }
 
-  // Navigate to the target node in #rawBlissObj
-  #resolveNode() {
-    const raw = this.#ctx.getRaw();
-    const groups = raw.groups;
-    const { groupIndex, glyphIndex, partIndex } = this.#path;
-
-    const group = groups[groupIndex];
-    if (!group) return null;
-    if (this.#level === 'group') return group;
-
-    const glyph = group.glyphs?.[glyphIndex];
-    if (!glyph) return null;
-    if (this.#level === 'glyph') return glyph;
-
-    const part = glyph.parts?.[partIndex];
-    return part ?? null;
+  // Resolve the current index of this node within its parent array
+  #resolveIndex() {
+    if (this.#level === 'group') {
+      const groups = this.#ctx.getRaw().groups;
+      return groups.indexOf(this.#nodeRef);
+    }
+    if (this.#level === 'glyph') {
+      const groupIndex = this.#ctx.getRaw().groups.indexOf(this.#parentRef);
+      if (groupIndex < 0) return null;
+      const glyphIndex = this.#parentRef.glyphs?.indexOf(this.#nodeRef) ?? -1;
+      if (glyphIndex < 0) return null;
+      return { groupIndex, glyphIndex };
+    }
+    if (this.#level === 'part') {
+      const raw = this.#ctx.getRaw();
+      const groupIndex = raw.groups.indexOf(this.#parentRef.group);
+      if (groupIndex < 0) return null;
+      const glyphIndex = this.#parentRef.group.glyphs?.indexOf(this.#parentRef.glyph) ?? -1;
+      if (glyphIndex < 0) return null;
+      const partIndex = this.#parentRef.glyph.parts?.indexOf(this.#nodeRef) ?? -1;
+      if (partIndex < 0) return null;
+      return { groupIndex, glyphIndex, partIndex };
+    }
+    return null;
   }
 
-  // Parse a DSL code string and extract the first glyph from the result
+  // Parse a DSL code string and extract the first glyph from the result.
+  // Validates that the code represents exactly one glyph (no / or // separators).
   #parseGlyph(code) {
     const parsed = this.#ctx.parse(code);
-    return parsed.groups?.[0]?.glyphs?.[0] ?? null;
+    if (!parsed.groups || parsed.groups.length !== 1) {
+      throw new Error(`Expected a single glyph, but code "${code}" produced ${parsed.groups?.length ?? 0} groups`);
+    }
+    const group = parsed.groups[0];
+    if (!group.glyphs || group.glyphs.length !== 1) {
+      throw new Error(`Expected a single glyph, but code "${code}" produced ${group.glyphs?.length ?? 0} glyphs`);
+    }
+    return group.glyphs[0];
   }
 
   // Parse a DSL code string in part context by embedding it in a helper glyph.
   // This ensures composite codes like B303 get proper nested parts expansion.
+  // Validates that the code represents exactly one part (no ;, / or // separators).
   #parsePart(code) {
     const parsed = this.#ctx.parse(`H;${code}`);
-    const glyph = parsed.groups?.[0]?.glyphs?.[0];
-    // Return the second part (the one we added), not the helper H
-    return glyph?.parts?.[1] ?? null;
+    if (!parsed.groups || parsed.groups.length !== 1) {
+      throw new Error(`Expected a single part, but code "${code}" produced multiple groups`);
+    }
+    const glyph = parsed.groups[0]?.glyphs?.[0];
+    if (!glyph?.parts || glyph.parts.length !== 2) {
+      throw new Error(`Expected a single part, but code "${code}" produced ${(glyph?.parts?.length ?? 1) - 1} parts`);
+    }
+    return glyph.parts[1];
   }
 
   // Apply defaults/overrides merge to a node's options
@@ -77,12 +102,15 @@ export class ElementHandle {
    */
   headGlyph() {
     if (this.#level !== 'group') return null;
-    const group = this.#resolveNode();
+    const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
+
+    const groupIndex = this.#ctx.getRaw().groups.indexOf(this.#nodeRef);
+    if (groupIndex < 0) return null;
 
     // Find the head glyph via the snapshot tree
     const snap = this.#ctx.getSnapshot();
-    const groupSnap = snap.children[this.#path.groupIndex];
+    const groupSnap = snap.children[groupIndex];
     if (!groupSnap) return null;
 
     const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
@@ -90,40 +118,29 @@ export class ElementHandle {
     const index = headIndex >= 0 ? headIndex : 0;
 
     if (index >= group.glyphs.length) return null;
-    return new ElementHandle(this.#ctx, 'glyph', {
-      groupIndex: this.#path.groupIndex,
-      glyphIndex: index
-    });
+    return new ElementHandle(this.#ctx, 'glyph', group.glyphs[index], group);
   }
 
   glyph(index) {
     if (this.#level !== 'group') return null;
-    const group = this.#resolveNode();
+    const group = this.#nodeRef;
     if (!group?.glyphs || index < 0 || index >= group.glyphs.length) return null;
-    return new ElementHandle(this.#ctx, 'glyph', {
-      groupIndex: this.#path.groupIndex,
-      glyphIndex: index
-    });
+    return new ElementHandle(this.#ctx, 'glyph', group.glyphs[index], group);
   }
 
   part(index) {
     if (this.#level === 'glyph') {
-      const glyph = this.#resolveNode();
+      const glyph = this.#nodeRef;
       if (!glyph?.parts || index < 0 || index >= glyph.parts.length) return null;
-      return new ElementHandle(this.#ctx, 'part', {
-        groupIndex: this.#path.groupIndex,
-        glyphIndex: this.#path.glyphIndex,
-        partIndex: index
+      return new ElementHandle(this.#ctx, 'part', glyph.parts[index], {
+        group: this.#parentRef,
+        glyph
       });
     }
     if (this.#level === 'part') {
-      // Recursive part navigation for nested parts (future)
-      const part = this.#resolveNode();
+      const part = this.#nodeRef;
       if (!part?.parts || index < 0 || index >= part.parts.length) return null;
-      return new ElementHandle(this.#ctx, 'part', {
-        ...this.#path,
-        partIndex: index
-      });
+      return new ElementHandle(this.#ctx, 'part', part.parts[index], this.#parentRef);
     }
     return null;
   }
@@ -132,10 +149,9 @@ export class ElementHandle {
 
   addGlyph(code, opts) {
     if (this.#level !== 'group') return this;
-    const group = this.#resolveNode();
+    const group = this.#nodeRef;
     if (!group) return this;
     const newGlyph = this.#parseGlyph(code);
-    if (!newGlyph) return this;
     this.#applyDefaultsOverrides(newGlyph, opts);
     if (!group.glyphs) group.glyphs = [];
     group.glyphs.push(newGlyph);
@@ -145,10 +161,9 @@ export class ElementHandle {
 
   insertGlyph(index, code, opts) {
     if (this.#level !== 'group') return this;
-    const group = this.#resolveNode();
+    const group = this.#nodeRef;
     if (!group) return this;
     const newGlyph = this.#parseGlyph(code);
-    if (!newGlyph) return this;
     this.#applyDefaultsOverrides(newGlyph, opts);
     if (!group.glyphs) group.glyphs = [];
     group.glyphs.splice(index, 0, newGlyph);
@@ -158,10 +173,9 @@ export class ElementHandle {
 
   addPart(code, opts) {
     if (this.#level !== 'glyph') return this;
-    const glyph = this.#resolveNode();
+    const glyph = this.#nodeRef;
     if (!glyph) return this;
     const newPart = this.#parsePart(code);
-    if (!newPart) return this;
     this.#applyDefaultsOverrides(newPart, opts);
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.push(newPart);
@@ -171,10 +185,9 @@ export class ElementHandle {
 
   insertPart(index, code, opts) {
     if (this.#level !== 'glyph') return this;
-    const glyph = this.#resolveNode();
+    const glyph = this.#nodeRef;
     if (!glyph) return this;
     const newPart = this.#parsePart(code);
-    if (!newPart) return this;
     this.#applyDefaultsOverrides(newPart, opts);
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.splice(index, 0, newPart);
@@ -187,26 +200,32 @@ export class ElementHandle {
   remove() {
     const raw = this.#ctx.getRaw();
     const groups = raw.groups;
-    const { groupIndex, glyphIndex, partIndex } = this.#path;
 
     if (this.#level === 'part') {
-      const glyph = groups[groupIndex]?.glyphs?.[glyphIndex];
+      const idx = this.#resolveIndex();
+      if (!idx) return undefined;
+      const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return undefined;
+      const partIndex = glyph.parts.indexOf(this.#nodeRef);
+      if (partIndex < 0) return undefined;
       glyph.parts.splice(partIndex, 1);
       // Cascade: last part → remove glyph
       if (glyph.parts.length === 0) {
-        return this.#removeGlyphAt(groups, groupIndex, glyphIndex);
+        return this.#removeGlyphFromGroup(groups, this.#parentRef.group, glyph);
       }
       this.#ctx.rebuild();
       return undefined;
     }
 
     if (this.#level === 'glyph') {
-      return this.#removeGlyphAt(groups, groupIndex, glyphIndex);
+      const group = this.#parentRef;
+      return this.#removeGlyphFromGroup(groups, group, this.#nodeRef);
     }
 
     if (this.#level === 'group') {
-      this.#ctx.removeWordGroup(raw, groupIndex);
+      const groupIndex = groups.indexOf(this.#nodeRef);
+      if (groupIndex < 0) return undefined;
+      this.#ctx.removeGlyphGroup(raw, groupIndex);
       this.#ctx.rebuild();
       return undefined;
     }
@@ -214,14 +233,18 @@ export class ElementHandle {
     return undefined;
   }
 
-  #removeGlyphAt(groups, groupIndex, glyphIndex) {
+  #removeGlyphFromGroup(groups, group, glyph) {
     const raw = this.#ctx.getRaw();
-    const group = groups[groupIndex];
     if (!group?.glyphs) return undefined;
+    const glyphIndex = group.glyphs.indexOf(glyph);
+    if (glyphIndex < 0) return undefined;
     group.glyphs.splice(glyphIndex, 1);
     // Cascade: last glyph → remove group + space
     if (group.glyphs.length === 0) {
-      this.#ctx.removeWordGroup(raw, groupIndex);
+      const groupIndex = groups.indexOf(group);
+      if (groupIndex >= 0) {
+        this.#ctx.removeGlyphGroup(raw, groupIndex);
+      }
     }
     this.#ctx.rebuild();
     return undefined;
@@ -230,28 +253,28 @@ export class ElementHandle {
   // --- Mutation: replace ---
 
   replace(code, opts) {
-    const raw = this.#ctx.getRaw();
-    const groups = raw.groups;
-    const { groupIndex, glyphIndex, partIndex } = this.#path;
-
     if (this.#level === 'glyph') {
-      const group = groups[groupIndex];
+      const group = this.#parentRef;
       if (!group?.glyphs) return this;
+      const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
+      if (glyphIndex < 0) return this;
       const newGlyph = this.#parseGlyph(code);
-      if (!newGlyph) return this;
       this.#applyDefaultsOverrides(newGlyph, opts);
       group.glyphs[glyphIndex] = newGlyph;
+      this.#nodeRef = newGlyph;
       this.#ctx.rebuild();
       return this;
     }
 
     if (this.#level === 'part') {
-      const glyph = groups[groupIndex]?.glyphs?.[glyphIndex];
+      const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return this;
+      const partIndex = glyph.parts.indexOf(this.#nodeRef);
+      if (partIndex < 0) return this;
       const newPart = this.#parsePart(code);
-      if (!newPart) return this;
       this.#applyDefaultsOverrides(newPart, opts);
       glyph.parts[partIndex] = newPart;
+      this.#nodeRef = newPart;
       this.#ctx.rebuild();
       return this;
     }
@@ -262,7 +285,7 @@ export class ElementHandle {
   // --- Mutation: options ---
 
   setOptions(options) {
-    const node = this.#resolveNode();
+    const node = this.#nodeRef;
     if (!node) return this;
     const rawOpts = this.#ctx.toRaw(options);
     node.options = { ...(node.options ?? {}), ...rawOpts };
@@ -271,7 +294,7 @@ export class ElementHandle {
   }
 
   removeOptions(...keys) {
-    const node = this.#resolveNode();
+    const node = this.#nodeRef;
     if (!node?.options) return this;
     for (const key of keys) {
       const kebab = camelToKebab(key);

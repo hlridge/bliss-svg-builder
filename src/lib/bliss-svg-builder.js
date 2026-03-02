@@ -362,7 +362,7 @@ class BlissSVGBuilder {
       toRaw: (obj) => BlissSVGBuilder.#toRaw(obj),
       isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
       makeSpaceGroup: () => BlissSVGBuilder.#makeSpaceGroup(),
-      removeWordGroup: (obj, gi) => this.#removeWordGroup(obj, gi),
+      removeGlyphGroup: (obj, gi) => this.#removeGlyphGroup(obj, gi),
       getSnapshot: () => this.snapshot(),
     };
   }
@@ -460,25 +460,28 @@ class BlissSVGBuilder {
   getElementById(id) {
     const snap = this.snapshot();
     const groups = snap.children;
+    const rawGroups = this.#rawBlissObj.groups;
 
-    // Walk snapshot tree in parallel with raw group indices
+    // Walk snapshot tree in parallel with raw groups
     for (let rawGi = 0; rawGi < groups.length; rawGi++) {
       const groupSnap = groups[rawGi];
-      if (BlissSVGBuilder.#isRawSpaceGroup(this.#rawBlissObj.groups[rawGi])) continue;
+      const rawGroup = rawGroups[rawGi];
+      if (BlissSVGBuilder.#isRawSpaceGroup(rawGroup)) continue;
 
       if (groupSnap.id === id) {
-        return new ElementHandle(this.#mutationCtx, 'group', { groupIndex: rawGi });
+        return new ElementHandle(this.#mutationCtx, 'group', rawGroup);
       }
 
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
       for (let gi = 0; gi < glyphs.length; gi++) {
+        const rawGlyph = rawGroup.glyphs[gi];
         if (glyphs[gi].id === id) {
-          return new ElementHandle(this.#mutationCtx, 'glyph', { groupIndex: rawGi, glyphIndex: gi });
+          return new ElementHandle(this.#mutationCtx, 'glyph', rawGlyph, rawGroup);
         }
         const parts = glyphs[gi].children;
         for (let pi = 0; pi < parts.length; pi++) {
           if (parts[pi].id === id) {
-            return new ElementHandle(this.#mutationCtx, 'part', { groupIndex: rawGi, glyphIndex: gi, partIndex: pi });
+            return new ElementHandle(this.#mutationCtx, 'part', rawGlyph.parts[pi], { group: rawGroup, glyph: rawGlyph });
           }
         }
       }
@@ -508,7 +511,8 @@ class BlissSVGBuilder {
     if (index < 0) return null;
     const indices = this.#getNonSpaceGroupIndices();
     if (index >= indices.length) return null;
-    return new ElementHandle(this.#mutationCtx, 'group', { groupIndex: indices[index] });
+    const rawGroup = this.#rawBlissObj.groups[indices[index]];
+    return new ElementHandle(this.#mutationCtx, 'group', rawGroup);
   }
 
   /**
@@ -524,10 +528,7 @@ class BlissSVGBuilder {
       const group = this.#rawBlissObj.groups[gi];
       const glyphs = group.glyphs || [];
       if (flatIndex < count + glyphs.length) {
-        return new ElementHandle(this.#mutationCtx, 'glyph', {
-          groupIndex: gi,
-          glyphIndex: flatIndex - count
-        });
+        return new ElementHandle(this.#mutationCtx, 'glyph', glyphs[flatIndex - count], group);
       }
       count += glyphs.length;
     }
@@ -557,7 +558,7 @@ class BlissSVGBuilder {
   // --- Builder Convenience Methods ---
 
   /**
-   * Appends a new word group with automatic space management.
+   * Appends a new glyph group with automatic space management.
    * @param {string} code - DSL code string
    * @param {{ defaults?, overrides? }} [opts]
    * @returns {this}
@@ -596,7 +597,8 @@ class BlissSVGBuilder {
       return this.addGroup(code, opts);
     }
     const lastGi = indices[indices.length - 1];
-    const handle = new ElementHandle(this.#mutationCtx, 'group', { groupIndex: lastGi });
+    const rawGroup = this.#rawBlissObj.groups[lastGi];
+    const handle = new ElementHandle(this.#mutationCtx, 'group', rawGroup);
     handle.addGlyph(code, opts);
     return this;
   }
@@ -664,8 +666,8 @@ class BlissSVGBuilder {
     return { glyphs: [{ parts: [{ code: 'TSP' }] }] };
   }
 
-  /** Internal: removes a word group and its adjacent space from groups array */
-  #removeWordGroup(obj, groupIndex) {
+  /** Internal: removes a glyph group and its adjacent space from groups array */
+  #removeGlyphGroup(obj, groupIndex) {
     const groups = obj.groups;
     // Determine which space group to also remove
     const prevIsSpace = groupIndex > 0 && BlissSVGBuilder.#isRawSpaceGroup(groups[groupIndex - 1]);
