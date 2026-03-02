@@ -229,8 +229,8 @@ class BlissSVGBuilder {
         options.cropBottom = 'auto';
         options.cropLeft = 'auto';
         options.cropRight = 'auto';
-      } else if (c === 'auto-height') {
-        options.autoHeight = true;
+      } else if (c === 'auto-vertical') {
+        options.autoVertical = true;
       } else if (c === 'compact') {
         options.cropCompact = true;
       } else if (!isNaN(c)) {
@@ -1159,7 +1159,7 @@ class BlissSVGBuilder {
   get #svgCode() {
     // Computed rendering dimensions
     const width = Math.max(this.composition.width, this.#processedOptions.minWidth ?? 0);
-    const height = this.#processedOptions.autoHeight ? this.composition.height : 20;
+    const height = 20;
 
     // User-provided options with defaults
     const color = this.#processedOptions.color ?? "#000000";
@@ -1182,6 +1182,9 @@ class BlissSVGBuilder {
       const compactBottom = 4 - compactTop;
       rawCropTop = this.#processedOptions.cropTop ?? compactTop;
       rawCropBottom = this.#processedOptions.cropBottom ?? compactBottom;
+    } else if (this.#processedOptions.autoVertical) {
+      rawCropTop = this.#processedOptions.cropTop ?? 'auto';
+      rawCropBottom = this.#processedOptions.cropBottom ?? 'auto';
     } else {
       rawCropTop = this.#processedOptions.cropTop ?? 0;
       rawCropBottom = this.#processedOptions.cropBottom ?? 0;

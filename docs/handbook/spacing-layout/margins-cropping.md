@@ -144,7 +144,7 @@ The grid shows the coordinate system. Cropping removes visible grid area:
 
 | Option | Default | Values | Description |
 |--------|---------|--------|-------------|
-| `crop` | `0` | Number, `auto`, `auto-height`, `compact` | All sides (see [Sizing](/handbook/spacing-layout/sizing) for named modes) |
+| `crop` | `0` | Number, `auto`, `auto-vertical`, `compact` | All sides (see [Sizing](/handbook/spacing-layout/sizing) for named modes) |
 | `crop-top` | `0` | Number or `auto` | Top only |
 | `crop-bottom` | `0` | Number or `auto` | Bottom only |
 | `crop-left` | `0` | Number or `auto` | Left only |

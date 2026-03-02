@@ -10,7 +10,7 @@ Bliss characters use a standard 20-unit grid height. This ensures consistent siz
 
 <Demo code="[grid=1]||B1103" title="Same height, different character" />
 
-The character content area normally stays within y=8 to y=16, with space above for indicators.
+Most glyph content appears within y=8 to y=16 (the main content area), with space above for indicators.
 
 ## Crop Modes
 
@@ -26,15 +26,15 @@ Crops all sides to the actual content pixel bounds — the tightest possible fit
 
 You can also auto-crop individual sides with `crop-top=auto`, `crop-bottom=auto`, etc. See [Margins & Cropping](/handbook/spacing-layout/margins-cropping) for details.
 
-### `crop=auto-height`
+### `crop=auto-vertical`
 
 Fits the SVG height to the actual content without affecting horizontal layout. This removes the fixed 20-unit height and is intended for building shapes on a freeform canvas:
 
 <Demo code="[grid=1]||H:0,8" title="Standard: full 20-unit height" />
 
-<Demo code="[grid=1;crop=auto-height]||H:0,8" title="crop=auto-height: fits to content height" />
+<Demo code="[grid=1;crop=auto-vertical]||H:0,8" title="crop=auto-vertical: fits to content height" />
 
-**Use `crop=auto-height`** when:
+**Use `crop=auto-vertical`** when:
 - Building custom shapes from primitives
 - Creating icons or decorative elements
 - Content doesn't need to align with standard Bliss text
@@ -43,7 +43,7 @@ Fits the SVG height to the actual content without affecting horizontal layout. T
 - Working with B-codes (they have proper dimensions)
 - Characters need to align in sentences
 
-<Demo code="[crop=auto-height]||C8:0,8;DOT:4,12" title="Custom shape with auto-height" />
+<Demo code="[crop=auto-vertical]||C8:0,8;DOT:4,12" title="Custom shape with auto-vertical" />
 
 ### `crop=compact`
 
@@ -105,9 +105,9 @@ Centering is most visible when using `min-width` or with asymmetric indicators:
 
 For icon-like usage with consistent dimensions:
 
-<Demo code="[crop=auto-height;min-width=12]||H:0,8" title="Heart icon" />
+<Demo code="[crop=auto-vertical;min-width=12]||H:0,8" title="Heart icon" />
 
-<Demo code="[crop=auto-height;min-width=12]||C8:0,8" title="Circle icon" />
+<Demo code="[crop=auto-vertical;min-width=12]||C8:0,8" title="Circle icon" />
 
 ### Compact Board Cells
 
@@ -125,6 +125,6 @@ For AAC communication boards:
 
 | Option | Default | Values | Description |
 |--------|---------|--------|-------------|
-| `crop` | `0` | Number, `auto`, `auto-height`, `compact` | Cropping mode |
+| `crop` | `0` | Number, `auto`, `auto-vertical`, `compact` | Cropping mode |
 | `min-width` | none | Number | Minimum composition width |
 | `centered` | `1` | `0`, `1` | Center content within width |

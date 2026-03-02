@@ -52,7 +52,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 
 | Option | Default | Type | Description |
 |--------|---------|------|-------------|
-| `crop` | `0` | Number, `auto`, `auto-height`, `compact` | All sides or named mode |
+| `crop` | `0` | Number, `auto`, `auto-vertical`, `compact` | All sides or named mode |
 | `crop-top` | `0` | Number or `auto` | Crop from top |
 | `crop-bottom` | `0` | Number or `auto` | Crop from bottom |
 | `crop-left` | `0` | Number or `auto` | Crop from left |

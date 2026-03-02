@@ -399,7 +399,7 @@ BlissSVGBuilder.defineShape('DIAMOND', {
   height: 8
 });
 
-new BlissSVGBuilder('[crop=auto-height]||DIAMOND:0,8').svgCode;
+new BlissSVGBuilder('[crop=auto-vertical]||DIAMOND:0,8').svgCode;
 ```
 
 | Property | Type | Required | Description |

@@ -6,11 +6,11 @@ Control where elements appear within your Bliss compositions.
 
 Position shapes using `:x,y` after the code:
 
-<Demo code="[grid=1;crop=auto-height]||DOT:0,0" title="DOT at (0,0)" />
+<Demo code="[grid=1;crop=auto-vertical]||DOT:0,0" title="DOT at (0,0)" />
 
-<Demo code="[grid=1;crop=auto-height]||DOT:4,8" title="DOT at (4,8)" />
+<Demo code="[grid=1;crop=auto-vertical]||DOT:4,8" title="DOT at (4,8)" />
 
-<Demo code="[grid=1;crop=auto-height]||DOT:8,16" title="DOT at (8,16)" />
+<Demo code="[grid=1;crop=auto-vertical]||DOT:8,16" title="DOT at (8,16)" />
 
 Coordinates are in grid units. See [Understanding the Grid](/handbook/coordinate-system/understanding-the-grid) for coordinate system details.
 
@@ -23,9 +23,9 @@ CODE:x      → y defaults to 0
 CODE:,y     → x defaults to 0
 ```
 
-<Demo code="[grid=1;crop=auto-height]||C8" title="C8 (defaults to 0,0)" />
+<Demo code="[grid=1;crop=auto-vertical]||C8" title="C8 (defaults to 0,0)" />
 
-<Demo code="[grid=1;crop=auto-height]||C8:4,8" title="C8:4,8 (explicit)" />
+<Demo code="[grid=1;crop=auto-vertical]||C8:4,8" title="C8:4,8 (explicit)" />
 
 ## Indicator Positioning
 
@@ -70,11 +70,11 @@ Use manual positioning when:
 
 Build complex characters by positioning multiple elements:
 
-<Demo code="[grid=1;crop=auto-height]||C8:0,8;DOT:4,12" title="Circle + centered dot" />
+<Demo code="[grid=1;crop=auto-vertical]||C8:0,8;DOT:4,12" title="Circle + centered dot" />
 
-<Demo code="[grid=1;crop=auto-height]||VL8:4,8;HL8:0,12" title="Cross from lines" />
+<Demo code="[grid=1;crop=auto-vertical]||VL8:4,8;HL8:0,12" title="Cross from lines" />
 
-<Demo code="[grid=1;crop=auto-height]||C8:0,8;C4:2,10;C2:3,11" title="Nested circles" />
+<Demo code="[grid=1;crop=auto-vertical]||C8:0,8;C4:2,10;C2:3,11" title="Nested circles" />
 
 Each element is positioned independently. Use the grid to visualize alignment.
 
@@ -94,11 +94,13 @@ Understanding these compositions helps when creating custom compounds.
 
 ### Centering Elements
 
-The character content area is typically 8 units wide (x=0 to x=8). To center an element:
+Narrow glyphs can be given a minimum width with `min-width`, and centered within that width using `centered=1`:
 
-<Demo code="[grid=1;crop=auto-height]||C4:2,10" title="4-unit circle centered: (8-4)/2 = 2" />
+<Demo code="[grid=1;crop=auto-vertical]||C4:0,10" title="4-unit circle, no min-width" />
 
-<Demo code="[grid=1;crop=auto-height]||C2:3,10" title="2-unit circle centered: (8-2)/2 = 3" />
+<Demo code="[grid=1;crop=auto-vertical;min-width=8]||C4:0,10" title="min-width=8 adds space to the right" />
+
+<Demo code="[grid=1;crop=auto-vertical;min-width=8;centered=1]||C4:0,10" title="centered=1 centers within the min-width" />
 
 ### Vertical Alignment
 
@@ -107,7 +109,7 @@ Character content typically occupies y=8 to y=16:
 - `y=16` is the "earth line" (bottom of content)
 - `y=12` is vertically centered
 
-<Demo code="[grid=1;crop=auto-height]||HL8:0,8;HL8:0,12;HL8:0,16" title="Sky (8), center (12), earth (16)" />
+<Demo code="[grid=1;crop=auto-vertical]||HL8:0,8;HL8:0,12;HL8:0,16" title="Sky (8), center (12), earth (16)" />
 
 ## Position via Options
 
@@ -119,13 +121,13 @@ As an alternative to `:x,y` suffix syntax, you can set position using options:
 
 This is useful when combining position with other part-level options like color:
 
-<Demo code="[grid=1;crop=auto-height]||C8:0,8;[color=red;x=2;y=10]>DOT" title="Positioned via options" />
+<Demo code="[grid=1;crop=auto-vertical]||C8:0,8;[color=red;x=2;y=10]>DOT" title="Positioned via options" />
 
 ## Zero-Sized Anchor (ZSA)
 
 `ZSA` is an invisible element that occupies no space. It prevents the automatic normalization that shifts elements to start at x=0:
 
-<Demo code="[grid=1;crop=auto-height]||ZSA;C4:4,10" title="ZSA keeps circle at x=4 (not shifted to 0)" />
+<Demo code="[grid=1;crop=auto-vertical]||ZSA;C4:4,10" title="ZSA keeps circle at x=4 (not shifted to 0)" />
 
 Without `ZSA`, the circle would be normalized to x=0. This is useful when you need absolute positioning within the coordinate system.
 

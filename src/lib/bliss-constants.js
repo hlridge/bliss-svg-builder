@@ -87,7 +87,7 @@ export const INTERNAL_OPTIONS = new Set([
   'externalGlyphSpace',
   'minWidth',
   'centered',
-  'autoHeight',
+  'autoVertical',
   'cropCompact',
   'text',
   'svgDesc',
