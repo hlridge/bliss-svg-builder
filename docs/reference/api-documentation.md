@@ -106,7 +106,7 @@ const obj = builder.toJSON();
 //   groups: [
 //     { glyphs: [{ code: 'B313', ... }, { code: 'B1103', ... }] },
 //     { glyphs: [{ code: 'TSP' }] },
-//     { glyphs: [{ code: 'B431', parts: [{ code: 'B431' }, { code: 'B81' }] }] }
+//     { glyphs: [{ parts: [{ code: 'B431' }, { code: 'B81' }] }] }
 //   ],
 //   options: { ... }
 // }
