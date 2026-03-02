@@ -82,6 +82,12 @@ export default defineConfig({
             { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid' },
             { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization' }
           ]
+        },
+        {
+          text: 'Programmatic',
+          items: [
+            { text: 'Programmatic Mutation', link: '/handbook/programmatic/mutation' }
+          ]
         }
       ],
       '/reference/': [

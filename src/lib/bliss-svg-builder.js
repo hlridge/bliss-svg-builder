@@ -536,15 +536,26 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Shortcut for glyph(flatGlyphIndex).part(partIndex).
-   * @param {number} flatGlyphIndex
-   * @param {number} partIndex
+   * Returns a live ElementHandle for the part at the given flat index across all glyphs.
+   * @param {number} flatIndex
    * @returns {ElementHandle|null}
    */
-  part(flatGlyphIndex, partIndex) {
-    const g = this.glyph(flatGlyphIndex);
-    if (!g) return null;
-    return g.part(partIndex);
+  part(flatIndex) {
+    if (flatIndex < 0) return null;
+    const indices = this.#getNonSpaceGroupIndices();
+    let count = 0;
+    for (const gi of indices) {
+      const group = this.#rawBlissObj.groups[gi];
+      const glyphs = group.glyphs || [];
+      for (const glyph of glyphs) {
+        const parts = glyph.parts || [];
+        if (flatIndex < count + parts.length) {
+          return new ElementHandle(this.#mutationCtx, 'part', parts[flatIndex - count], { group, glyph });
+        }
+        count += parts.length;
+      }
+    }
+    return null;
   }
 
   /**

@@ -126,6 +126,240 @@ builder.toString();
 
 Use for: serializing back to DSL format, logging, debugging.
 
+## Navigation
+
+Methods for traversing the element tree. All navigation returns live `ElementHandle` objects (see below) or `null` when out of range.
+
+### `group(index)`
+
+Returns a live handle for the glyph group at the given index, skipping space groups:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103//B431');
+const first = builder.group(0);  // B313/B1103
+const second = builder.group(1); // B431
+builder.group(99);               // null
+```
+
+### `glyph(flatIndex)`
+
+Returns a live handle for the glyph at a flat index across all groups:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103//B431');
+builder.glyph(0); // B313
+builder.glyph(1); // B1103
+builder.glyph(2); // B431
+```
+
+### `part(flatIndex)`
+
+Returns a live handle for the part at a flat index across all glyphs in all groups:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431;B81');
+builder.part(0); // B313's single part
+builder.part(1); // B431 (first part of second glyph)
+builder.part(2); // B81 (second part of second glyph)
+```
+
+### `getElementById(id)`
+
+Returns a live handle for the element matching a snapshot ID:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103');
+const snap = builder.snapshot();
+const id = snap.children[0].children[0].id;
+builder.getElementById(id); // live handle for B313
+```
+
+### `snapshot()`
+
+Returns a frozen element tree for read-only inspection:
+
+```js
+const snap = builder.snapshot();
+snap.children;  // groups (frozen)
+```
+
+### `stats`
+
+Returns group and glyph counts:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103//B431');
+builder.stats; // { groupCount: 2, glyphCount: 3 }
+```
+
+### `traverse(callback)`
+
+Depth-first walk of all element snapshots. Return `false` to stop early:
+
+```js
+builder.traverse(el => {
+  console.log(el.type, el.codeName);
+});
+```
+
+### `query(predicate)`
+
+Returns all element snapshots matching a predicate:
+
+```js
+const glyphs = builder.query(el => el.type === 'glyph');
+```
+
+## Builder Mutation
+
+Methods on the builder instance for modifying content. All return `this` for chaining.
+
+### `addGroup(code, opts?)`
+
+Appends a new glyph group with automatic space management:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+builder.addGroup('B431');
+// equivalent to new BlissSVGBuilder('B313//B431')
+```
+
+### `addGlyph(code, opts?)`
+
+Appends a glyph to the last glyph group. Creates a group if the builder is empty:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+builder.addGlyph('B1103');
+// equivalent to new BlissSVGBuilder('B313/B1103')
+```
+
+### `clear()`
+
+Removes all content:
+
+```js
+builder.clear();
+builder.toJSON().groups; // []
+```
+
+## ElementHandle
+
+A live reference to a group, glyph, or part in the element tree. Handles survive rebuilds and reflect the current state. Obtained via `group()`, `glyph()`, `part()`, or `getElementById()`.
+
+### Navigation
+
+#### `.level`
+
+Returns `'group'`, `'glyph'`, or `'part'`.
+
+#### `.glyph(index)`
+
+On a group handle, returns a handle for the glyph at the given index within that group:
+
+```js
+builder.group(0).glyph(1); // second glyph in first group
+```
+
+#### `.part(index)`
+
+On a glyph handle, returns a handle for the part at the given index:
+
+```js
+builder.glyph(0).part(0); // first part of first glyph
+```
+
+On a part handle, returns a handle for a nested sub-part.
+
+#### `.headGlyph()`
+
+On a group handle, returns the head glyph (the main glyph in a composition):
+
+```js
+builder.group(0).headGlyph();
+```
+
+### Structural Mutation
+
+All structural methods trigger a rebuild and return `this` (except `remove()` which returns `undefined`).
+
+#### `.addGlyph(code, opts?)`
+
+Appends a glyph to this group:
+
+```js
+builder.group(0).addGlyph('B1103');
+```
+
+#### `.insertGlyph(index, code, opts?)`
+
+Inserts a glyph at a specific position within this group:
+
+```js
+builder.group(0).insertGlyph(0, 'B431'); // prepend
+```
+
+#### `.addPart(code, opts?)`
+
+Appends a part to this glyph:
+
+```js
+builder.glyph(0).addPart('B81');
+```
+
+#### `.insertPart(index, code, opts?)`
+
+Inserts a part at a specific position within this glyph:
+
+```js
+builder.glyph(0).insertPart(0, 'B81'); // prepend
+```
+
+#### `.remove()`
+
+Removes the element from its parent. Cascading: removing the last glyph in a group removes the group; removing the last part in a glyph removes the glyph:
+
+```js
+builder.glyph(1).remove();
+```
+
+#### `.replace(code, opts?)`
+
+Replaces the element with new content:
+
+```js
+builder.glyph(0).replace('B431');
+```
+
+### Options Mutation
+
+#### `.setOptions(options)`
+
+Merges options onto the element (camelCase keys):
+
+```js
+builder.glyph(0).setOptions({ color: 'red', strokeWidth: 0.6 });
+```
+
+#### `.removeOptions(...keys)`
+
+Removes specific option keys:
+
+```js
+builder.glyph(0).removeOptions('color', 'strokeWidth');
+```
+
+### Defaults and Overrides
+
+All mutation methods that accept a `code` parameter also accept an optional second parameter `{ defaults, overrides }` — the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
+
+```js
+builder.group(0).addGlyph('[color=red]B431', {
+  defaults: { strokeWidth: 0.6 },  // applied if not set in DSL
+  overrides: { fill: 'blue' }       // always applied
+});
+```
+
 ## Definition API
 
 Static methods for registering custom codes. All definitions are global — once defined, any `BlissSVGBuilder` instance can use them.
