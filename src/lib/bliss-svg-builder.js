@@ -8,9 +8,12 @@ import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitio
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab } from "./bliss-constants.js";
+import { ElementHandle } from "./element-handle.js";
 
 class BlissSVGBuilder {
   #processedOptions;
+  #sharedOptions;
+  #mutationCtx;
 
   // Processes raw options (kebab-case) into internal options (camelCase).
   // Bulk options expanded here (not in output): 'margin', 'crop', 'grid-color', 'grid-stroke-width'.
@@ -340,66 +343,69 @@ class BlissSVGBuilder {
       }
     }
 
-    // Convert object options (camelCase, native types) to raw format (kebab-case, strings)
-    const toRaw = (obj) => {
-      const raw = {};
-      for (const [key, value] of Object.entries(obj)) {
-        if (value === null || value === undefined) continue;
-        const kebabKey = camelToKebab(key);
-        if (typeof value === 'boolean') {
-          raw[kebabKey] = value ? '1' : '0';
-        } else {
-          raw[kebabKey] = String(value);
-        }
-      }
-      return raw;
-    };
-
     // Merge: defaults (lowest) < string options (middle) < overrides (highest)
     if (defaults || overrides) {
-      const rawDefaults = defaults ? toRaw(defaults) : {};
-      const rawOverrides = overrides ? toRaw(overrides) : {};
+      const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
+      const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
 
     // Store a clean copy after option merging but before processing mutates it
     this.#rawBlissObj = structuredClone(blissObj);
 
-    // Process options at all levels (global, group, glyph, part)
-    // Only top level gets builder defaults (grid, margins, etc.)
+    this.#rebuild();
+
+    this.#mutationCtx = {
+      getRaw: () => this.#rawBlissObj,
+      rebuild: () => this.#rebuild(),
+      parse: (code) => BlissParser.parse(code),
+      toRaw: (obj) => BlissSVGBuilder.#toRaw(obj),
+      isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
+      makeSpaceGroup: () => BlissSVGBuilder.#makeSpaceGroup(),
+      removeWordGroup: (obj, gi) => this.#removeWordGroup(obj, gi),
+      getSnapshot: () => this.snapshot(),
+    };
+  }
+
+  static #toRaw(obj) {
+    const raw = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value === null || value === undefined) continue;
+      const kebabKey = camelToKebab(key);
+      if (typeof value === 'boolean') {
+        raw[kebabKey] = value ? '1' : '0';
+      } else {
+        raw[kebabKey] = String(value);
+      }
+    }
+    return raw;
+  }
+
+  #rebuild() {
+    this.#elementsCache = undefined;
+    this.#wordsCache = undefined;
+
+    const blissObj = structuredClone(this.#rawBlissObj);
     this.#processAllOptions(blissObj, true);
 
-    const {
-      charSpace,
-      wordSpace,
-      externalGlyphSpace,
-      ...remainingOptions
-    } = blissObj.options ?? {};
-
-    const sharedOptions = {
+    const { charSpace, wordSpace, externalGlyphSpace, ...remainingOptions } = blissObj.options ?? {};
+    this.#sharedOptions = {
       charSpace: charSpace ?? 2,
       wordSpace: wordSpace ?? 8,
       externalGlyphSpace: externalGlyphSpace ?? 0.8
     };
-
     blissObj.options = remainingOptions;
-
-    // Store processed options privately for svgCode getter
     this.#processedOptions = blissObj.options;
 
     const attrMap = { 'color': 'stroke' };
-
-    // Store global options that should become SVG attributes
-    // Values are already escaped by #processOptions at the input boundary
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (!INTERNAL_OPTIONS.has(key) && isSafeAttributeName(key)) {
-        const attrName = attrMap[key] || key;
-        this.globalSvgAttributes[attrName] = value;
+        this.globalSvgAttributes[attrMap[key] || key] = value;
       }
     }
 
-    this.composition = new BlissElement(blissObj, { sharedOptions });
+    this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });
   }
 
   #elementsCache;
@@ -446,17 +452,163 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Look up an element snapshot by its ID.
+   * Look up an element by its snapshot ID, returning a live ElementHandle.
    *
    * @param {string} id
-   * @returns {ElementSnapshot|null}
+   * @returns {ElementHandle|null}
    */
   getElementById(id) {
-    let found = null;
-    this.traverse(el => {
-      if (el.id === id) { found = el; return false; }
-    });
-    return found;
+    const snap = this.snapshot();
+    const groups = snap.children;
+
+    // Walk snapshot tree in parallel with raw group indices
+    for (let rawGi = 0; rawGi < groups.length; rawGi++) {
+      const groupSnap = groups[rawGi];
+      if (BlissSVGBuilder.#isRawSpaceGroup(this.#rawBlissObj.groups[rawGi])) continue;
+
+      if (groupSnap.id === id) {
+        return new ElementHandle(this.#mutationCtx, 'group', { groupIndex: rawGi });
+      }
+
+      const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+      for (let gi = 0; gi < glyphs.length; gi++) {
+        if (glyphs[gi].id === id) {
+          return new ElementHandle(this.#mutationCtx, 'glyph', { groupIndex: rawGi, glyphIndex: gi });
+        }
+        const parts = glyphs[gi].children;
+        for (let pi = 0; pi < parts.length; pi++) {
+          if (parts[pi].id === id) {
+            return new ElementHandle(this.#mutationCtx, 'part', { groupIndex: rawGi, glyphIndex: gi, partIndex: pi });
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // --- Live Navigation ---
+
+  #getNonSpaceGroupIndices() {
+    const indices = [];
+    const groups = this.#rawBlissObj.groups || [];
+    for (let i = 0; i < groups.length; i++) {
+      if (!BlissSVGBuilder.#isRawSpaceGroup(groups[i])) {
+        indices.push(i);
+      }
+    }
+    return indices;
+  }
+
+  /**
+   * Returns a live ElementHandle for the non-space group at the given index.
+   * @param {number} index
+   * @returns {ElementHandle|null}
+   */
+  group(index) {
+    if (index < 0) return null;
+    const indices = this.#getNonSpaceGroupIndices();
+    if (index >= indices.length) return null;
+    return new ElementHandle(this.#mutationCtx, 'group', { groupIndex: indices[index] });
+  }
+
+  /**
+   * Returns a live ElementHandle for the glyph at the given flat index across all groups.
+   * @param {number} flatIndex
+   * @returns {ElementHandle|null}
+   */
+  glyph(flatIndex) {
+    if (flatIndex < 0) return null;
+    const indices = this.#getNonSpaceGroupIndices();
+    let count = 0;
+    for (const gi of indices) {
+      const group = this.#rawBlissObj.groups[gi];
+      const glyphs = group.glyphs || [];
+      if (flatIndex < count + glyphs.length) {
+        return new ElementHandle(this.#mutationCtx, 'glyph', {
+          groupIndex: gi,
+          glyphIndex: flatIndex - count
+        });
+      }
+      count += glyphs.length;
+    }
+    return null;
+  }
+
+  /**
+   * Shortcut for glyph(flatGlyphIndex).part(partIndex).
+   * @param {number} flatGlyphIndex
+   * @param {number} partIndex
+   * @returns {ElementHandle|null}
+   */
+  part(flatGlyphIndex, partIndex) {
+    const g = this.glyph(flatGlyphIndex);
+    if (!g) return null;
+    return g.part(partIndex);
+  }
+
+  /**
+   * Returns a frozen snapshot of the element tree.
+   * @returns {ElementSnapshot}
+   */
+  snapshot() {
+    return this.elements;
+  }
+
+  // --- Builder Convenience Methods ---
+
+  /**
+   * Appends a new word group with automatic space management.
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  addGroup(code, opts) {
+    const parsed = BlissParser.parse(code);
+    const newGroup = parsed.groups?.[0];
+    if (!newGroup) return this;
+    if (opts) {
+      const { defaults, overrides } = opts;
+      if (defaults || overrides) {
+        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
+        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
+        newGroup.options = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
+      }
+    }
+    const groups = this.#rawBlissObj.groups;
+    if (groups.length > 0) {
+      groups.push(BlissSVGBuilder.#makeSpaceGroup());
+    }
+    groups.push(newGroup);
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Appends a glyph to the last non-space group (creates one if empty).
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  addGlyph(code, opts) {
+    const indices = this.#getNonSpaceGroupIndices();
+    if (indices.length === 0) {
+      // Empty builder — create a new group with this glyph
+      return this.addGroup(code, opts);
+    }
+    const lastGi = indices[indices.length - 1];
+    const handle = new ElementHandle(this.#mutationCtx, 'group', { groupIndex: lastGi });
+    handle.addGlyph(code, opts);
+    return this;
+  }
+
+  /**
+   * Removes all content from the builder.
+   * @returns {this}
+   */
+  clear() {
+    this.#rawBlissObj.groups = [];
+    this.#rebuild();
+    return this;
   }
 
   #wordsCache;
@@ -478,58 +630,20 @@ class BlissSVGBuilder {
   }
 
   /**
-   * @param {number} index - Word index (0-based)
-   * @returns {ElementSnapshot|null}
-   */
-  getWord(index) {
-    if (index < 0 || index >= this.words.length) return null;
-    return this.words[index];
-  }
-
-  /**
-   * @param {number} wordIndex - Word index (0-based)
-   * @returns {ElementSnapshot[]}
-   */
-  getCharacters(wordIndex) {
-    const word = this.getWord(wordIndex);
-    if (!word) return [];
-    return word.children.filter(c => c.type === 'glyph');
-  }
-
-  /**
-   * @param {number} wordIndex
-   * @param {number} charIndex
-   * @returns {ElementSnapshot|null}
-   */
-  getCharacter(wordIndex, charIndex) {
-    const chars = this.getCharacters(wordIndex);
-    if (charIndex < 0 || charIndex >= chars.length) return null;
-    return chars[charIndex];
-  }
-
-  /**
-   * Returns the head glyph of a word (the semantically primary character).
-   *
-   * @param {number} wordIndex
-   * @returns {ElementSnapshot|null}
-   */
-  getHeadGlyph(wordIndex) {
-    const chars = this.getCharacters(wordIndex);
-    return chars.find(c => c.isHeadGlyph) ?? null;
-  }
-
-  /**
-   * Returns word and character counts.
+   * Returns group and glyph counts.
    *
    * @returns {{ wordCount: number, characterCount: number }}
    */
   get stats() {
-    const words = this.words;
-    let characterCount = 0;
-    for (const word of words) {
-      characterCount += word.children.filter(c => c.type === 'glyph').length;
+    const indices = this.#getNonSpaceGroupIndices();
+    let glyphCount = 0;
+    for (const gi of indices) {
+      glyphCount += (this.#rawBlissObj.groups[gi].glyphs || []).length;
     }
-    return { wordCount: words.length, characterCount };
+    return {
+      groupCount: indices.length, glyphCount,
+      wordCount: indices.length, characterCount: glyphCount // deprecated aliases
+    };
   }
 
   // --- Manipulation helpers ---
@@ -545,91 +659,9 @@ class BlissSVGBuilder {
     );
   }
 
-  /** Returns cloned object and array of group indices that are word groups (non-space) */
-  #getWordGroupIndices() {
-    const obj = this.toJSON();
-    const indices = [];
-    for (let i = 0; i < (obj.groups || []).length; i++) {
-      if (!BlissSVGBuilder.#isRawSpaceGroup(obj.groups[i])) {
-        indices.push(i);
-      }
-    }
-    return { obj, indices };
-  }
-
   /** Creates a default space group for insertion between words */
   static #makeSpaceGroup() {
     return { glyphs: [{ parts: [{ code: 'TSP' }] }] };
-  }
-
-  /**
-   * Removes a character (glyph) from a word.
-   * @param {number} wordIndex - Word index (0-based)
-   * @param {number} charIndex - Character index within word (0-based)
-   * @returns {Object|null} JSON object for constructor, or null if out of range
-   */
-  removeCharacter(wordIndex, charIndex) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    if (wordIndex < 0 || wordIndex >= indices.length) return null;
-    const gi = indices[wordIndex];
-    const group = obj.groups[gi];
-    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
-    group.glyphs.splice(charIndex, 1);
-    // If word is now empty, remove the word and adjacent space
-    if (group.glyphs.length === 0) {
-      return this.#removeWordGroup(obj, gi);
-    }
-    return obj;
-  }
-
-  /**
-   * Replaces a character (glyph) in a word with a new code.
-   * @param {number} wordIndex - Word index (0-based)
-   * @param {number} charIndex - Character index within word (0-based)
-   * @param {string} newCode - New code string for the replacement
-   * @returns {Object|null} JSON object for constructor, or null if out of range
-   */
-  replaceCharacter(wordIndex, charIndex, newCode) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    if (wordIndex < 0 || wordIndex >= indices.length) return null;
-    const gi = indices[wordIndex];
-    const group = obj.groups[gi];
-    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
-    // Parse the new code to get its structure
-    const parsed = BlissParser.parse(newCode);
-    const newGlyph = parsed.groups?.[0]?.glyphs?.[0];
-    if (!newGlyph) return null;
-    // Normalize glyphCode→code
-    if (newGlyph.glyphCode) {
-      newGlyph.code = newGlyph.glyphCode;
-      delete newGlyph.glyphCode;
-    }
-    group.glyphs[charIndex] = newGlyph;
-    return obj;
-  }
-
-  /**
-   * Inserts a character (glyph) at a position in a word.
-   * @param {number} wordIndex - Word index (0-based)
-   * @param {number} charIndex - Insert position (0 = before first, length = after last)
-   * @param {string} code - Code string for the new character
-   * @returns {Object|null} JSON object for constructor, or null if out of range
-   */
-  insertCharacter(wordIndex, charIndex, code) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    if (wordIndex < 0 || wordIndex >= indices.length) return null;
-    const gi = indices[wordIndex];
-    const group = obj.groups[gi];
-    if (!group.glyphs || charIndex < 0 || charIndex > group.glyphs.length) return null;
-    const parsed = BlissParser.parse(code);
-    const newGlyph = parsed.groups?.[0]?.glyphs?.[0];
-    if (!newGlyph) return null;
-    if (newGlyph.glyphCode) {
-      newGlyph.code = newGlyph.glyphCode;
-      delete newGlyph.glyphCode;
-    }
-    group.glyphs.splice(charIndex, 0, newGlyph);
-    return obj;
   }
 
   /** Internal: removes a word group and its adjacent space from groups array */
@@ -649,179 +681,6 @@ class BlissSVGBuilder {
       // No adjacent space, just remove the word
       groups.splice(groupIndex, 1);
     }
-    return obj;
-  }
-
-  /**
-   * Removes an entire word.
-   * @param {number} wordIndex - Word index (0-based)
-   * @returns {Object|null} JSON object for constructor, or null if out of range
-   */
-  removeWord(wordIndex) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    if (wordIndex < 0 || wordIndex >= indices.length) return null;
-    return this.#removeWordGroup(obj, indices[wordIndex]);
-  }
-
-  /**
-   * Inserts a new word at the given position.
-   * @param {number} wordIndex - Insert position (0 = before first, length = after last)
-   * @param {string} code - Code string for the new word
-   * @returns {Object|null} JSON object for constructor, or null if out of range
-   */
-  insertWord(wordIndex, code) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    if (wordIndex < 0 || wordIndex > indices.length) return null;
-    const parsed = BlissParser.parse(code);
-    const newGroup = parsed.groups?.[0];
-    if (!newGroup) return null;
-    // Normalize glyphCode→code
-    if (newGroup.glyphs) {
-      for (const glyph of newGroup.glyphs) {
-        if (glyph.glyphCode) {
-          glyph.code = glyph.glyphCode;
-          delete glyph.glyphCode;
-        }
-      }
-    }
-
-    const groups = obj.groups;
-    if (indices.length === 0) {
-      // No words yet, just add
-      groups.push(newGroup);
-    } else if (wordIndex === 0) {
-      // Insert before first word, add space after
-      const firstWordGi = indices[0];
-      groups.splice(firstWordGi, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
-    } else if (wordIndex >= indices.length) {
-      // Append after last word, add space before
-      const lastWordGi = indices[indices.length - 1];
-      groups.splice(lastWordGi + 1, 0, BlissSVGBuilder.#makeSpaceGroup(), newGroup);
-    } else {
-      // Insert between existing words
-      const targetGi = indices[wordIndex];
-      groups.splice(targetGi, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
-    }
-    return obj;
-  }
-
-  /**
-   * Removes an element by its snapshot ID. Works for glyphs and word groups.
-   * @param {string} id - The UUID of the element to remove
-   * @returns {Object|null} JSON object for constructor, or null if not found
-   */
-  removeById(id) {
-    const el = this.getElementById(id);
-    if (!el) return null;
-
-    const { obj, indices } = this.#getWordGroupIndices();
-
-    // If it's a word group (level 1), find its word index and remove directly
-    if (el.type === 'group' && el.level === 1) {
-      const words = this.words;
-      const wordIndex = words.findIndex(w => w.id === id);
-      if (wordIndex < 0) return null;
-      return this.#removeWordGroup(obj, indices[wordIndex]);
-    }
-
-    // If it's a glyph (level 2), find word and char index and remove directly
-    if (el.type === 'glyph' && el.level === 2) {
-      const words = this.words;
-      for (let wi = 0; wi < words.length; wi++) {
-        const chars = words[wi].children.filter(c => c.type === 'glyph');
-        for (let ci = 0; ci < chars.length; ci++) {
-          if (chars[ci].id === id) {
-            const gi = indices[wi];
-            const group = obj.groups[gi];
-            group.glyphs.splice(ci, 1);
-            if (group.glyphs.length === 0) {
-              return this.#removeWordGroup(obj, gi);
-            }
-            return obj;
-          }
-        }
-      }
-      return null;
-    }
-
-    return null;
-  }
-
-  // --- Part-level manipulation (operates on raw structure) ---
-
-  /** Validates word/char/part indices and returns the parts array, or null */
-  #getPartsRef(obj, indices, wordIndex, charIndex) {
-    if (wordIndex < 0 || wordIndex >= indices.length) return null;
-    const group = obj.groups[indices[wordIndex]];
-    if (!group.glyphs || charIndex < 0 || charIndex >= group.glyphs.length) return null;
-    const glyph = group.glyphs[charIndex];
-    if (!glyph.parts) return null;
-    return { parts: glyph.parts, glyph, group, gi: indices[wordIndex] };
-  }
-
-  /**
-   * Removes a part from a character's composition.
-   * If the last part is removed, the character itself is removed.
-   * @param {number} wordIndex - Word index (0-based)
-   * @param {number} charIndex - Character index within word (0-based)
-   * @param {number} partIndex - Part index within character (0-based)
-   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
-   */
-  removePart(wordIndex, charIndex, partIndex) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
-    if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
-    ref.parts.splice(partIndex, 1);
-    // If no parts left, remove the character
-    if (ref.parts.length === 0) {
-      ref.group.glyphs.splice(charIndex, 1);
-      if (ref.group.glyphs.length === 0) {
-        return this.#removeWordGroup(obj, ref.gi);
-      }
-    }
-    return obj;
-  }
-
-  /**
-   * Replaces a part in a character's composition. Preserves the original position.
-   * @param {number} wordIndex - Word index (0-based)
-   * @param {number} charIndex - Character index within word (0-based)
-   * @param {number} partIndex - Part index within character (0-based)
-   * @param {string} newCode - New code for the replacement part
-   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
-   */
-  replacePart(wordIndex, charIndex, partIndex, newCode) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
-    if (!ref || partIndex < 0 || partIndex >= ref.parts.length) return null;
-    const oldPart = ref.parts[partIndex];
-    ref.parts[partIndex] = {
-      code: newCode,
-      ...(oldPart.x !== undefined && { x: oldPart.x }),
-      ...(oldPart.y !== undefined && { y: oldPart.y }),
-    };
-    return obj;
-  }
-
-  /**
-   * Inserts a part into a character's composition.
-   * @param {number} wordIndex - Word index (0-based)
-   * @param {number} charIndex - Character index within word (0-based)
-   * @param {number} partIndex - Insert position (0 = before first, length = after last)
-   * @param {string} code - Code for the new part
-   * @param {Object} [position] - Optional { x, y } position
-   * @returns {Object|null} Raw JSON object for constructor, or null if out of range
-   */
-  insertPart(wordIndex, charIndex, partIndex, code, position) {
-    const { obj, indices } = this.#getWordGroupIndices();
-    const ref = this.#getPartsRef(obj, indices, wordIndex, charIndex);
-    if (!ref || partIndex < 0 || partIndex > ref.parts.length) return null;
-    const newPart = { code };
-    if (position) {
-      if (position.x !== undefined) newPart.x = position.x;
-      if (position.y !== undefined) newPart.y = position.y;
-    }
-    ref.parts.splice(partIndex, 0, newPart);
     return obj;
   }
 
@@ -964,35 +823,6 @@ class BlissSVGBuilder {
   get standaloneSvg() {
     return `<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n${this.#svgCode}`;
   }
-
-  set code(settingsAndCodesString) {
-    if (typeof settingsAndCodesString !== "string") throw new Error("Code must be a string");
-
-    const settings = this.parseSettings(settingsAndCodesString);
-    this.validateSettings(settings);
-    this.applySettings(settings);
-
-    this.pathProperties.path = this.getFullPath(settingsAndCodesString);
-    this.pathProperties.code = settingsAndCodesString;
-  }
-
-  parseSettings(settingsAndCodesString) {
-    // Implement the logic of parsing settings here...
-  }
-
-  validateSettings(settings) {
-    // Implement the logic of validating settings here...
-  }
-
-  applySettings(settings) {
-    // Implement the logic of applying settings here...
-  }
-
-  getFullPath(settingsAndCodesString) {
-    // Implement the logic of getting full path here...
-  }
-
-  // ...more methods...
 
 
   // Validates a definition code string
