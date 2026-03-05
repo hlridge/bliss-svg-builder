@@ -30,6 +30,7 @@
     "test:unit:ui": "vitest --ui --project unit",
     "test:integration": "vitest run --project integration",
     "test:integration:ui": "vitest --ui --project integration",
+    "dev:playground": "vite --open dev/playground.html",
     "dev:temp": "vite --open temp/test.html",
     "test:e2e": "vitest run --project e2e",
     "test:e2e:ui": "vitest --ui --project e2e",

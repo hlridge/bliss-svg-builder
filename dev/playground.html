@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bliss SVG Builder — Dev Playground</title>
+  <link rel="stylesheet" href="playground.css">
+</head>
+<body>
+
+  <!-- Input Area -->
+  <header id="input-area">
+    <h1>Bliss Dev Playground</h1>
+    <div id="input-fields">
+      <div id="input-row">
+        <label>
+          <span>Input string</span>
+          <input type="text" id="input-string" placeholder="[grid=1;color=red]||B291/B291;B99" spellcheck="false" autofocus>
+        </label>
+        <button id="add-btn" title="Add to list">+ Add</button>
+        <button id="add-setup-btn" title="Add a define() setup card">+ Setup</button>
+      </div>
+      <div id="input-row-2">
+        <label>
+          <span>Defaults (JS object)</span>
+          <input type="text" id="defaults-input" placeholder='{ "grid": 1, "color": "red" }' spellcheck="false">
+        </label>
+        <label>
+          <span>Overrides (JS object)</span>
+          <input type="text" id="overrides-input" placeholder='{ "stroke-width": 0.5 }' spellcheck="false">
+        </label>
+      </div>
+      <div id="preview-area">
+        <div id="preview-svg"></div>
+        <div id="preview-error"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <nav id="toolbar">
+    <span id="case-count">0 cases</span>
+    <div id="toolbar-actions">
+      <button id="export-btn" title="Copy all test cases as JSON to clipboard">Export</button>
+      <button id="import-btn" title="Import test cases from JSON">Import</button>
+      <button id="clear-btn" title="Clear localStorage and reload from file">Reset</button>
+    </div>
+  </nav>
+
+  <!-- Test Case List -->
+  <main id="case-list"></main>
+
+  <!-- Import modal -->
+  <dialog id="import-dialog">
+    <h3>Import Test Cases</h3>
+    <textarea id="import-textarea" placeholder="Paste JSON array here..." rows="10"></textarea>
+    <div id="import-actions">
+      <button id="import-cancel">Cancel</button>
+      <button id="import-confirm">Import</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="playground.js"></script>
+</body>
+</html>
