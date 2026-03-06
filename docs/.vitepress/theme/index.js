@@ -2,6 +2,7 @@ import DefaultTheme from 'vitepress/theme';
 import Demo from './components/Demo.vue';
 import ShapeGallery from './components/ShapeGallery.vue';
 import IndicatorsTable from './components/IndicatorsTable.vue';
+import ExclusionsTable from './components/ExclusionsTable.vue';
 import './custom.css';
 
 export default {
@@ -10,5 +11,6 @@ export default {
     app.component('Demo', Demo);
     app.component('ShapeGallery', ShapeGallery);
     app.component('IndicatorsTable', IndicatorsTable);
+    app.component('ExclusionsTable', ExclusionsTable);
   }
 };
