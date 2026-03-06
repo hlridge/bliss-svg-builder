@@ -52,19 +52,17 @@ export default defineConfig({
           ]
         },
         {
+          text: 'Coordinate System',
+          items: [
+            { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid' },
+            { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization' }
+          ]
+        },
+        {
           text: 'Styling',
           items: [
             { text: 'Color & Stroke', link: '/handbook/styling/color-stroke' },
             { text: 'Backgrounds & Accessibility', link: '/handbook/styling/backgrounds-accessibility' }
-          ]
-        },
-        {
-          text: 'Syntax & Options',
-          items: [
-            { text: 'DSL Syntax Overview', link: '/handbook/syntax-options/syntax-overview' },
-            { text: 'Options System', link: '/handbook/syntax-options/options-system' },
-            { text: 'SVG Pass-Through Attributes', link: '/handbook/syntax-options/svg-pass-through' },
-            { text: 'Programmatic Options', link: '/handbook/syntax-options/programmatic-options' }
           ]
         },
         {
@@ -77,10 +75,12 @@ export default defineConfig({
           ]
         },
         {
-          text: 'Coordinate System',
+          text: 'Syntax & Options',
           items: [
-            { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid' },
-            { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization' }
+            { text: 'DSL Syntax Overview', link: '/handbook/syntax-options/syntax-overview' },
+            { text: 'Options System', link: '/handbook/syntax-options/options-system' },
+            { text: 'SVG Pass-Through Attributes', link: '/handbook/syntax-options/svg-pass-through' },
+            { text: 'Programmatic Options', link: '/handbook/syntax-options/programmatic-options' }
           ]
         },
         {
@@ -96,6 +96,7 @@ export default defineConfig({
           items: [
             { text: 'Shapes Gallery', link: '/reference/shapes-gallery' },
             { text: 'Indicators Reference', link: '/reference/indicators-reference' },
+            { text: 'Head Glyph Exclusions', link: '/reference/head-glyph-exclusions' },
             { text: 'Options Quick Reference', link: '/reference/options-quick-reference' },
             { text: 'DSL Syntax Quick Reference', link: '/reference/dsl-syntax-quick-reference' },
             { text: 'API Documentation', link: '/reference/api-documentation' }
