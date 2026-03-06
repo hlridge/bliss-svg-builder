@@ -39,7 +39,7 @@ export const quarterCircles = {
     "QC1NW", "QC1NE", "QC1SW", "QC1SE",
     "QC.5NW", "QC.5NE", "QC.5SW", "QC.5SE"
   ],
-  description: "[Q]uarter [C]ircle with diameter [4/2/1/.5] towards [NW/NE/SW/SE]"
+  description: "[Q]uarter [C]ircle with radius [4/2/1/.5] towards [NW/NE/SW/SE]"
 };
 
 export const openCircles = {
@@ -285,6 +285,6 @@ export const arrowQuarterCircle = {
     "LARRQC4NWCC", "LARRQC4SWCC", "LARRQC4NECC", "LARRQC4SECC",
     "ARRQC4NWCC", "ARRQC4SWCC", "ARRQC4NECC", "ARRQC4SECC"
   ],
-  description: "[L]arge [ARR]ow from [Q]uarter [C]ircle with diameter [4] facing [NW/NE/SW/SE] [C]lockwise or [CC]ounter-clockwise"
+  description: "[L]arge [ARR]ow from [Q]uarter [C]ircle with radius [4] facing [NW/NE/SW/SE] [C]lockwise or [CC]ounter-clockwise"
 };
 

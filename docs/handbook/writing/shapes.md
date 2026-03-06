@@ -1,35 +1,39 @@
 # Shapes
 
-Shapes are the geometric primitives used to construct Bliss characters. Most users work with B-codes, but shapes give you the power to create custom characters.
+Shapes are the geometric primitives that all Bliss characters are built from. Every B-code is ultimately defined as a combination of shapes placed on a grid. Understanding shapes is the best starting point for understanding how Bliss SVG Builder constructs its output.
 
-## When to Use Shapes
+Characters are built recursively: a character can reference other characters and shapes as part of its composition, and shapes themselves can be built from smaller shapes. The key distinction is that a shape can only incorporate other shapes, never a character, while a character can incorporate both.
 
-**Use B-codes** when a standard Blissymbolics character exists:
+When creating compound characters, you'll often reference B-codes rather than raw shapes, because B-codes carry semantic meaning that shapes alone don't have. But the shapes are always there underneath, and the DSL lets you use them directly to create characters that don't already exist as B-codes.
 
-<Demo code="B313" title="B313 - use the B-code" />
+If you prefer a visual, interactive approach to building characters from shapes, check out [Bliss Maker](https://blissary.com/maker) on Blissary.com.
 
-**Use shapes** when you need to create something custom that doesn't exist in the dictionary:
+## Shape Codes, B-Codes, or Both
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14" title="Custom smiley (no B-code exists)" />
+You can create characters from shape codes, from existing characters' B-codes, or from a combination of them.
 
-Most users never need shapes directly. B-codes handle the vast majority of use cases.
+<Demo code="B313" title="B313 - an existing B-code" />
+
+<Demo code="C8:0,8;DOT:2,11;DOT:6,11;HW4S:2,13" title="Built from shape codes" />
+
+<Demo code="B313;DOT:2,11;DOT:6,11;HW4S:2,13" title="A combination of both" />
 
 ## Shape Categories
 
 Shapes fall into several categories:
 
-| Category | Examples | Purpose |
+| Category | Examples | Description |
 |----------|----------|---------|
 | Iconic | `H`, `E`, `F` | Symbolic shapes (heart, ear, fiber) |
-| Circles | `C8`, `C4`, `C2`, `C1` | Sized circles |
-| Half Circles | `HC8N`, `HC8S`, `HC8E`, `HC8W` | Cardinal orientations |
-| Quarter Circles | `QC4NE`, `QC4NW`, `QC4SE`, `QC4SW` | Corner quarters |
-| Lines | `VL8`, `HL8`, `DL8NE`, `DL8NW` | Vertical, horizontal, diagonal |
-| Angles | `RA90NE`, `AA60N` | Right angles, acute angles |
-| Arrows | `AN`, `AS`, `AE`, `AW` | Directional arrows |
+| Circles | `C8`, `C4`, `C2`, `C1` | Full circles by diameter |
+| Half Circles | `HC8N`, `HC8S`, `HC8E`, `HC8W` | Half circles by diameter and direction |
+| Quarter Circles | `QC4NE`, `QC4NW`, `QC4SE`, `QC4SW` | Quarter circles by radius and direction |
+| Lines | `VL8`, `HL8`, `DL8N`, `DL8S` | Vertical, horizontal, diagonal |
+| Angles | `RA8NE`, `AA8N` | Right angles, acute angles |
+| Arrows | `ARR8N`, `LARR8N` | Arrows and large arrows |
 | Crosses | `SC8`, `DC8` | Straight and diagonal crosses |
 | Dots | `DOT` | Point marker |
-| Waves | `W8`, `HW4N` | Wave patterns |
+| Waves | `W8`, `HW4N` | Waves and half-waves (arcs) |
 | Squares | `SQ8`, `SQ4` | Solid squares |
 | Rectangles | `RE84`, `RE82` | Width × height rectangles |
 
@@ -37,37 +41,37 @@ See the [Shapes Gallery](/reference/shapes-gallery) for a complete visual refere
 
 ## Shape Naming Conventions
 
-Shapes follow predictable naming patterns:
+All shape codes are semantically named, following predictable patterns:
 
 ### Size Suffixes
 
 `8`, `4`, `2`, `1` indicate size in grid units:
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,8" title="C8 - circle, 8 units" />
+<Demo code="[grid=1;crop=auto-vertical]||C8:0,8" title="C8 - [C]ircle with diameter [8]" />
 
-<Demo code="[grid=1;crop=auto-vertical]||C4:0,8" title="C4 - circle, 4 units" />
+<Demo code="[grid=1;crop=auto-vertical]||C4:0,8" title="C4 - [C]ircle with diameter [4]" />
 
-<Demo code="[grid=1;crop=auto-vertical]||C2:0,8" title="C2 - circle, 2 units" />
+<Demo code="[grid=1;crop=auto-vertical]||C2:0,8" title="C2 - [C]ircle with diameter [2]" />
 
 ### Direction Suffixes
 
 `N`, `S`, `E`, `W`, `NE`, `SE`, `SW`, `NW` indicate orientation:
 
-<Demo code="[grid=1;crop=auto-vertical]||HC8N:0,8" title="HC8N - half circle, opening north" />
+<Demo code="[grid=1;crop=auto-vertical]||HC8N:0,8" title="HC8N - [H]alf [C]ircle with diameter [8] towards [N]orth" />
 
-<Demo code="[grid=1;crop=auto-vertical]||HC8S:0,8" title="HC8S - half circle, opening south" />
+<Demo code="[grid=1;crop=auto-vertical]||HC8S:0,8" title="HC8S - [H]alf [C]ircle with diameter [8] towards [S]outh" />
 
-<Demo code="[grid=1;crop=auto-vertical]||AN:0,8" title="AN - arrow pointing north" />
+<Demo code="[grid=1;crop=auto-vertical]||LARR8N:0,8" title="LARR8N - [L]arge [ARR]ow with length [8] pointing towards [N]orth" />
 
-<Demo code="[grid=1;crop=auto-vertical]||DL8NE:0,8" title="DL8NE - diagonal line, northeast" />
+<Demo code="[grid=1;crop=auto-vertical]||DL8N:0,8" title="DL8N - [D]iagonal [L]ine with size [8] towards [N]orth" />
 
 ### Combined Patterns
 
 Some shapes use both size and direction:
 
-<Demo code="[grid=1;crop=auto-vertical]||QC4NE:0,8" title="QC4NE - quarter circle, 4 units, northeast" />
+<Demo code="[grid=1;crop=auto-vertical]||QC4NE:0,8" title="QC4NE - [Q]uarter [C]ircle with radius [4] towards [NE]" />
 
-<Demo code="[grid=1;crop=auto-vertical]||QC4SW:0,8" title="QC4SW - quarter circle, 4 units, southwest" />
+<Demo code="[grid=1;crop=auto-vertical]||QC4SW:0,8" title="QC4SW - [Q]uarter [C]ircle with radius [4] towards [SW]" />
 
 ## Building Custom Characters
 
@@ -75,33 +79,19 @@ Some shapes use both size and direction:
 
 Use `:x,y` to place shapes on the grid:
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,8" title="Circle at (0,8)" />
+<Demo code="[grid=1]||C8:0,8" title="Circle at (0,8)" />
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:4,8" title="Circle at (4,8) - shifted right" />
+<Demo code="[grid=1]||C8:4,8" title="Circle at (4,8) - shifted right" />
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,12" title="Circle at (0,12) - shifted down" />
+<Demo code="[grid=1]||C8:0,12" title="Circle at (0,12) - shifted down" />
 
 ### Combining Shapes
 
 Use `;` to combine shapes into a single character:
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,8;DOT:4,12" title="Circle + centered dot" />
+<Demo code="[grid=1]||C8:0,8;DOT:4,12" title="Circle + centered dot" />
 
-<Demo code="[grid=1;crop=auto-vertical]||VL8:0,8;VL8:8,8;HL8:0,8;HL8:0,16" title="Rectangle from lines" />
-
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,8;DOT:2,10;DOT:6,10;HC4S:4,13" title="Smiley face" />
-
-Each shape is positioned independently. Enable `grid=1` to visualize the coordinate system.
-
-### The `crop=auto-vertical` Option
-
-When building with shapes directly, use `crop=auto-vertical` to fit the SVG height to the actual content instead of the fixed 20-unit grid:
-
-```
-[crop=auto-vertical]||C8:0,8;DOT:4,12
-```
-
-Without it, the builder assumes standard character dimensions. See the [Sizing guide](/handbook/spacing-layout/sizing) for details on all crop modes.
+<Demo code="[grid=1]||VL8:0,8;VL8:8,8;HL8:0,8;HL8:0,16" title="Square from lines" />
 
 ## How B-Codes Use Shapes
 
@@ -115,17 +105,8 @@ Compound characters combine multiple elements:
 
 <Demo code="B1103" title="B1103 - understanding" />
 
-<Demo code="[grid=1]||B335;B412:4,0" title="Defined as B335;B412:4,0 (knowledge + into)" />
-
-Understanding these definitions helps when creating custom characters that integrate with standard ones.
+<Demo code="[grid=1]||B335;B412:4,0" title="Defined as B335;B412:4,0 (forward + knowledge)" />
 
 ## Registering Custom Characters
 
 Once you've designed a character from shapes, you can register it as a reusable code so it works just like a B-code. See the [Custom Codes guide](/handbook/writing/custom-codes) for how to define and register custom characters.
-
-## Best Practices
-
-1. **Prefer B-codes** — Only use shapes when no B-code exists
-2. **Use the grid** — Enable `grid=1` while designing to see coordinates
-3. **Standard positioning** — Character content normally stays within y=8 and y=16
-
