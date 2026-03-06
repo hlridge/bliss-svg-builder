@@ -1,21 +1,65 @@
 # Words & Sentences
 
-In [Get Started](/get-started/words-sentences) you learned that `/` combines characters into words and `//` separates words in a sentence. This page covers the full composition system — word-level indicators, the head glyph algorithm, and punctuation.
+In [Get Started](/get-started/words-sentences) you learned that `/` combines characters into words and `//` separates words in a sentence. This page covers the full composition system: words, sentences, word-level indicators, the head glyph algorithm, and punctuation.
 
 ## Separators Overview
 
 Pattern: single = character level, double = word level.
 
-| Separator | Level | Purpose | Example |
+| Separator | Scope | Purpose | Example |
 |-----------|-------|---------|---------|
-| `;` | Part | Attach indicator to a character | `B431;B81` |
-| `/` | Character | Combine characters into a word | `B313/B1103` |
-| `;;` | Word | Attach indicator to the head glyph | `B313/B1103;;B81` |
-| `//` | Sentence | Separate words | `B313//B431` |
+| `;` | Within a character | Combine parts or attach indicator | `B431;B81` |
+| `/` | Within a word | Combine characters | `B313/B1103` |
+| `;;` | On a word | Attach indicator to head glyph | `B313/B1103;;B81` |
+| `//` | Between words | Separate words | `B313//B431` |
 
-## Indicators: Character-Level vs Word-Level
+## Words: The `/` Separator
 
-Indicators modify grammatical function (see [Characters & B-Codes](/handbook/writing/characters-bcodes) for the full indicator table). They can attach at two different levels.
+Use `/` to combine characters into a word:
+
+<Demo code="B313/B1103" title="feeling + understanding = empathy" />
+
+<Demo code="B513/B431" title="person + love = sweetheart, lover" />
+
+<Demo code="B313/B678" title="feeling + up = happiness" />
+
+Each character maintains standard spacing within the word. This spacing can be customized. See the [Spacing guide](/handbook/spacing-layout/spacing).
+
+## Sentences: The `//` Separator
+
+Use `//` to separate words in a sentence:
+
+<Demo code="B313/B1103//B431" title="Two words separated by space" />
+
+<Demo code="B513/B10//B431;B81//B414/B167//B4" title="I love Blissymbolics." />
+
+<Demo code="B513/B10//B313;B81/B319//B278;B81//B278/B462//B4" title="I want to listen to music." />
+
+- `B513/B10`: person + one = I, me
+- `B313;B81/B319`: feeling + action indicator + fire = to want
+- `B278;B81`: ear, hearing + action indicator = to hear, to listen
+- `B278/B462`: ear, hearing + musical note = music
+- `B4`: period
+
+### Extended Spacing with `///`
+
+Use `///` to insert an additional word space. Each extra `/` adds another space:
+
+<Demo code="B313//B431///B1103" title="Extra space before the last word" />
+
+This is useful for visual grouping or creating deliberate pauses in a sentence. See the [Spacing guide](/handbook/spacing-layout/spacing) for the exact unit values.
+
+## Indicators and the Head Glyph
+
+Indicators modify grammatical function. In a multi-character word, an indicator must attach to a specific character: the **head glyph**.
+
+Bliss literature often uses the term *classifier* for the conceptual core of a compound word. In some descriptions, the term is also used for the character that receives the indicator, even when that character alone does not represent the full core concept.
+
+To avoid this ambiguity, this documentation distinguishes the two levels. The *classifier* refers to the conceptual core of the compound, while the **head glyph** is the single character that receives the indicator.
+
+Some indicators operate at the character level. For example, the *thing indicator* always targets a specific character regardless of word structure. Most indicators, however, target the **head glyph** when applied to a word.
+
+Indicators can be attached at two levels: to a specific character with `;`, or to the head glyph with `;;`.
 
 ### Character-Level Indicators (`;`)
 
@@ -31,15 +75,13 @@ You choose exactly which character gets the indicator.
 
 ### Word-Level Indicators (`;;`)
 
-Use `;;` to attach an indicator to the **head glyph** — the main character in a multi-character word:
+Use `;;` to attach an indicator to the **head glyph** of the word:
 
-<Demo code="B313/B1103;;B81" title="empathy as verb (B81 on head)" />
+<Demo code="B313/B1103;;B81" title="feeling + understanding + action indicator = to empathize (head: feeling)" />
 
-<Demo code="B486/B1108;;B86" title="cold as description (B86 on head)" />
+<Demo code="B313/B678;;B81" title="feeling + up + action indicator = to rejoice (head: feeling)" />
 
-<Demo code="B278/B462;;B81" title="music player as action" />
-
-The head glyph is determined automatically. You don't need to know which character is the head — the library figures it out using the rules below.
+The head glyph is determined automatically. You don't need to know which character is the head. The library figures it out using the rules below.
 
 ### When to Use Each
 
@@ -49,15 +91,17 @@ The head glyph is determined automatically. You don't need to know which charact
 
 ## The Head Glyph Algorithm
 
-When you use `;;`, the library determines which character in a word is the "head" — the core concept that should receive the indicator. It uses three rules in order:
+When you use `;;`, the library determines which character is the head glyph. It uses three rules in order:
 
-1. **Explicit marker (`^`)** — You can mark a character as the head: `B313^/B1103;;B81`
-2. **Exclusion heuristics** — Certain characters are never heads (see below)
-3. **Default** — The first non-excluded character is the head
+1. **Explicit marker (`^`)**: Override for rare edge cases*: `B313^/B1103;;B81`
+2. **Exclusion heuristics**: Certain characters are never heads (see below)
+3. **Default**: The first non-excluded character is the head
+
+*\* Could be useful in rare cases for [predefined words](/reference/api-documentation#define-definitions-options) if the heuristic would pick the wrong head glyph. For manually composed words, you can attach the indicator directly with `;` instead.*
 
 ### What Gets Excluded
 
-Grammatical elements that modify or relate concepts are skipped when finding the head glyph:
+The following types of concepts are skipped from the start of the word when finding the head glyph:
 
 | Category | What it includes | Why excluded |
 |----------|------------------|--------------|
@@ -66,63 +110,20 @@ Grammatical elements that modify or relate concepts are skipped when finding the
 | **Identity operators** | not, opposite | Negate or invert the concept |
 | **Concept transformers** | similar to, looks like, sounds like | Compare or relate concepts |
 | **Relational operators** | on, in, from, to, before, after, through, etc. | Prepositions that relate concepts |
-| **Quantifiers** | all, any, many, numbers (0-9), half, etc. | Quantity modifiers |
+| **Determiners** | a, the | Specify definiteness, not meaning |
+| **Quantifiers** | all, many, numbers (0-9), half, etc. | Quantity modifiers |
 
-### Examples
+See the [Head Glyph Exclusions reference](/reference/head-glyph-exclusions) for the complete list.
 
-<Demo code="B486/B1108;;B86" title="opposite + heat = cold (head: heat)" />
+<Demo code="B486/B378;;B86" title="opposite + heat + description indicator = cold (head: heat)" />
 
-<Demo code="B368/B189;;B86" title="many + house = village (head: house)" />
+<Demo code="B368/B392;;B99" title="many + house + plural indicator = villages (head: house)" />
 
-<Demo code="B493/B291;;B81" title="over + ground = to fly (head: ground)" />
+<Demo code="B449/B608;;B86" title="without + sound + description indicator = silent (head: sound)" />
 
-<Demo code="B117/B513;;B86" title="all + person = everyone (head: person)" />
+<Demo code="B968/B313/B678;;B86" title="most + happiness + description indicator = happiest (head: feeling)" />
 
-In each case, the grammatical modifier is skipped and the indicator appears on the core concept.
-
-### Combining Multiple Parts
-
-You can build complex compositions with multiple parts using `;`:
-
-<Demo code="[grid=1]||B335;B412:4,0" title="knowledge + into = understanding" />
-
-## Words: The `/` Separator
-
-Use `/` to combine characters into a word:
-
-<Demo code="B313/B1103" title="feeling + understanding = empathy" />
-
-<Demo code="B513/B431" title="person + love = sweetheart, lover" />
-
-<Demo code="B278/B462" title="music + container = music player" />
-
-Each character maintains standard spacing within the word. This spacing can be customized — see the [Spacing guide](/handbook/spacing-layout/spacing).
-
-## Sentences: The `//` Separator
-
-Use `//` to separate words in a sentence:
-
-<Demo code="B313/B1103//B431//B4" title="Three words with period" />
-
-<Demo code="B513/B10//B431;B81//B414/B167" title="I love Blissymbolics" />
-
-### Extended Spacing with `///`
-
-Use `///` to insert an additional word space. Each extra `/` adds another space:
-
-<Demo code="B313//B431///B1103" title="Extra space before the last word" />
-
-This is useful for visual grouping or creating deliberate pauses in a sentence. See the [Spacing guide](/handbook/spacing-layout/spacing) for the exact unit values.
-
-### Complete Sentence Breakdown
-
-<Demo code="B513/B10//B313;B81/B319//B278;B81//B278/B462//B4" title="I want to listen to music." />
-
-- `B513/B10` — person + one = I
-- `B313;B81/B319` — feeling+action / ear = want to hear
-- `B278;B81` — music + action = to listen
-- `B278/B462` — music + container = music player
-- `B4` — period
+In each case, the excluded character is skipped and the indicator appears on the head glyph.
 
 ## Punctuation
 
@@ -132,16 +133,16 @@ Blissymbolics has standard punctuation characters:
 |------|--------|-------|
 | `B4` | Period | End of statement |
 | `B5` | Comma | Pause, list separator |
-| `B1` | Question mark | Questions |
-| `B2` | Exclamation mark | Emphasis |
+| `B3` | Question mark | Questions |
+| `B1` | Exclamation mark | Emphasis |
 
 <Demo code="B313/B1103//B4" title="Statement with period" />
 
-<Demo code="B313/B1103//B1" title="Question" />
+<Demo code="B313/B1103//B3" title="Question" />
 
-<Demo code="B313/B1103//B2" title="Exclamation" />
+<Demo code="B313/B1103//B1" title="Exclamation" />
 
-Certain punctuation characters automatically receive tighter spacing — the library inserts a quarter space (QSP) before them instead of the normal three-quarter space (TSP), pulling them closer to the preceding word.
+Certain punctuation characters automatically receive tighter spacing. The library inserts a quarter space (QSP) before them instead of the normal three-quarter space (TSP), pulling them closer to the preceding word.
 
 Similarly, digits are automatically kerned to sit closer together, halving the normal character spacing between them.
 
