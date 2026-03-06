@@ -21,6 +21,7 @@ export default defineConfig({
   },
 
   themeConfig: {
+    externalLinkIcon: true,
     nav: [
       { text: 'Get Started', link: '/get-started/installation-setup' },
       { text: 'Handbook', link: '/handbook/' },
