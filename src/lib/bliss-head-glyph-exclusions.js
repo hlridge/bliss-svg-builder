@@ -69,7 +69,8 @@ export const blissHeadGlyphExclusions = [
   // Scalar degree operators
   'B937', // more (comparative)
   'B968', // most (superlative)
-  // pending: less, least (not yet in bliss-glyph-data.js)
+  'B6438', // less (comparative)
+  'B6321', // least (superlative)
 
   // Identity-affecting operators
   'B449/B401', // not (logical negation)
@@ -127,13 +128,16 @@ export const blissHeadGlyphExclusions = [
   'B677', // until
   'B160', // belongs to
 
+  // Determiners
+  'B100', // a, an (indefinite)
+  'B647', // the (definite)
+
   // Quantifiers
   'B368/B368/B368', // many/much x3 (city)
   'B368/B368', // many/much x2 (ocean, town)
   'B368', // many/much (lake, village)
   // pending: few (not yet in bliss-glyph-data.js)
   'B117', // all
-  'B100', // any
   'B11/B117', // both
   'B10/B117', // each/every
   'B286', // either
