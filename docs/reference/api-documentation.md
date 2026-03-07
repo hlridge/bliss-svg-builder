@@ -374,11 +374,21 @@ BlissSVGBuilder.defineGlyph('SMILEY', {
 });
 
 new BlissSVGBuilder('SMILEY').svgCode; // renders the smiley
+
+// With default SVG attributes (overridable per-element)
+BlissSVGBuilder.defineGlyph('GHOST', {
+  codeString: 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14',
+  defaultOptions: { 'stroke-dasharray': '0.5 0.5', 'opacity': '0.6' }
+});
+
+new BlissSVGBuilder('GHOST').svgCode;               // dashed and translucent
+new BlissSVGBuilder('[opacity=1]>GHOST').svgCode;    // dashed but fully opaque
 ```
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `codeString` | `string` | yes | Composition using existing codes |
+| `defaultOptions` | `object` | no | Default options for this definition, overridable per-element |
 | `isIndicator` | `boolean` | no | Marks this glyph as an indicator |
 | `anchorOffsetX` | `number` | no | Horizontal anchor adjustment |
 | `anchorOffsetY` | `number` | no | Vertical anchor adjustment |
@@ -387,9 +397,10 @@ new BlissSVGBuilder('SMILEY').svgCode; // renders the smiley
 
 ### `defineShape(code, definition, options?)`
 
-Define a primitive shape with a path-generating function:
+Define a shape, either as a primitive with a path-generating function or as a composite using existing codes:
 
 ```js
+// Primitive shape with getPath
 BlissSVGBuilder.defineShape('DIAMOND', {
   getPath: (x, y) => {
     const cx = x + 4, cy = y + 4;
@@ -399,8 +410,21 @@ BlissSVGBuilder.defineShape('DIAMOND', {
   height: 8
 });
 
-new BlissSVGBuilder('[crop=auto-vertical]||DIAMOND:0,8').svgCode;
+// Composite shape with codeString
+BlissSVGBuilder.defineShape('CROSS', {
+  codeString: 'HL8:0,4;VL8:4,0'
+});
+
+// With default options
+BlissSVGBuilder.defineShape('REFCROSS', {
+  codeString: 'HL8:0,4;VL8:4,0',
+  defaultOptions: { 'stroke-dasharray': '0 0.999' }
+});
 ```
+
+Provide either `getPath` (primitive) or `codeString` (composite):
+
+**Primitive (getPath) properties:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -410,6 +434,14 @@ new BlissSVGBuilder('[crop=auto-vertical]||DIAMOND:0,8').svgCode;
 | `x` | `number` | no | Default x offset |
 | `y` | `number` | no | Default y offset |
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
+| `defaultOptions` | `object` | no | Default options for this definition, overridable per-element |
+
+**Composite (codeString) properties:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `codeString` | `string` | yes | Composition using existing codes |
+| `defaultOptions` | `object` | no | Default options for this definition, overridable per-element |
 
 ### `defineExternalGlyph(code, definition, options?)`
 

@@ -540,7 +540,8 @@ export class BlissParser {
                   ...(kerningRules && { kerningRules }),
                   ...(glyphCode && { glyphCode }),
                   ...(isBlissGlyph && { isBlissGlyph }),
-                  ...(expandedSubPart.isHeadGlyph && { isHeadGlyph: expandedSubPart.isHeadGlyph })
+                  ...(expandedSubPart.isHeadGlyph && { isHeadGlyph: expandedSubPart.isHeadGlyph }),
+                  ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions })
                 };
               });
 
@@ -575,6 +576,11 @@ export class BlissParser {
               if (fallbackIndex > 0) {
                 expandedParts[fallbackIndex].isHeadGlyph = true;
               }
+            }
+
+            // Carry defaultOptions from the definition as data on the first expanded part
+            if (definition.defaultOptions && expandedParts.length > 0) {
+              expandedParts[0].defaultOptions = definition.defaultOptions;
             }
 
             // Prepend options to the first expanded part
@@ -614,7 +620,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions } of expandedGlyphParts) {
         if (part === "") continue;
 
         const glyphObj = {
@@ -647,6 +653,11 @@ export class BlissParser {
           pendingAbsoluteKerning = undefined;
         }
 
+        // Merge defaultOptions carried from expand() (standalone/composition case)
+        if (defaultOptions) {
+          glyphObj.options = { ...defaultOptions, ...(glyphObj.options || {}) };
+        }
+
         let glyphCodeString = part;
         const glyphMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
         if (glyphMatch) {
@@ -666,6 +677,11 @@ export class BlissParser {
 
             const definition = blissElementDefinitions[part.code] || {};
             const codeString = definition.codeString;
+
+            // Merge defaultOptions from definition (user options override defaults)
+            if (definition.defaultOptions) {
+              part.options = { ...definition.defaultOptions, ...(part.options || {}) };
+            }
 
             if (codeString) {
               if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {

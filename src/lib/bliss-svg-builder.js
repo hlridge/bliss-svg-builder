@@ -862,29 +862,43 @@ class BlissSVGBuilder {
   static defineShape(code, definition, options = {}) {
     BlissSVGBuilder.#validateCode(code);
 
-    if (typeof definition?.getPath !== 'function') {
-      throw new Error(`defineShape("${code}"): "getPath" must be a function.`);
+    const hasGetPath = typeof definition?.getPath === 'function';
+    const hasCodeString = typeof definition?.codeString === 'string' && definition.codeString.length > 0;
+
+    if (!hasGetPath && !hasCodeString) {
+      throw new Error(`defineShape("${code}"): provide either "getPath" (function) or "codeString" (non-empty string).`);
     }
-    if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
-      throw new Error(`defineShape("${code}"): "width" must be a finite number.`);
-    }
-    if (typeof definition.height !== 'number' || !isFinite(definition.height)) {
-      throw new Error(`defineShape("${code}"): "height" must be a finite number.`);
+
+    if (hasGetPath) {
+      if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
+        throw new Error(`defineShape("${code}"): "width" must be a finite number.`);
+      }
+      if (typeof definition.height !== 'number' || !isFinite(definition.height)) {
+        throw new Error(`defineShape("${code}"): "height" must be a finite number.`);
+      }
     }
 
     if (blissElementDefinitions[code] && !options.overwrite) {
       throw new Error(`defineShape("${code}"): code already exists. Use { overwrite: true } to replace.`);
     }
 
-    const entry = {
-      getPath: definition.getPath,
-      width: definition.width,
-      height: definition.height,
-      isShape: true
-    };
-    if (definition.x !== undefined) entry.x = definition.x;
-    if (definition.y !== undefined) entry.y = definition.y;
-    if (definition.extraPathOptions) entry.extraPathOptions = definition.extraPathOptions;
+    const entry = { isShape: true };
+
+    if (hasGetPath) {
+      entry.getPath = definition.getPath;
+      entry.width = definition.width;
+      entry.height = definition.height;
+      if (definition.x !== undefined) entry.x = definition.x;
+      if (definition.y !== undefined) entry.y = definition.y;
+      if (definition.extraPathOptions) entry.extraPathOptions = definition.extraPathOptions;
+    } else {
+      entry.codeString = definition.codeString;
+    }
+
+    if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
+        && Object.keys(definition.defaultOptions).length > 0) {
+      entry.defaultOptions = { ...definition.defaultOptions };
+    }
 
     blissElementDefinitions[code] = entry;
   }
@@ -935,6 +949,10 @@ class BlissSVGBuilder {
     }
     if (definition.shrinksPrecedingWordSpace === true) {
       entry.shrinksPrecedingWordSpace = true;
+    }
+    if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
+        && Object.keys(definition.defaultOptions).length > 0) {
+      entry.defaultOptions = { ...definition.defaultOptions };
     }
 
     blissElementDefinitions[code] = entry;
