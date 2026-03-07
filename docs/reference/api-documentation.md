@@ -362,98 +362,60 @@ builder.group(0).addGlyph('[color=red]B431', {
 
 ## Definition API
 
-Static methods for registering custom codes. All definitions are global — once defined, any `BlissSVGBuilder` instance can use them.
+Static method for registering custom codes. All definitions are global — once defined, any `BlissSVGBuilder` instance can use them.
 
-### `defineGlyph(code, definition, options?)`
+### `define(definitions, options?)`
 
-Define a composite character built from existing codes:
+The single entry point for defining custom codes. Accepts an object mapping codes to definitions:
 
 ```js
-BlissSVGBuilder.defineGlyph('SMILEY', {
-  codeString: 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
+const result = BlissSVGBuilder.define({
+  'LOVE': { codeString: 'B431' },                              // word/alias (bare)
+  'SMILEY': { codeString: 'C8:0,8;DOT:2,11', type: 'glyph' }, // character
+  'CROSS': { codeString: 'HL8:0,4;VL8:4,0', type: 'shape' },  // composite shape
+  'DIAMOND': { type: 'shape', getPath: fn, width: 8, height: 8 }, // primitive shape
 });
 
-new BlissSVGBuilder('SMILEY').svgCode; // renders the smiley
-
-// With default SVG attributes (overridable per-element)
-BlissSVGBuilder.defineGlyph('GHOST', {
-  codeString: 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14',
-  defaultOptions: { 'stroke-dasharray': '0.5 0.5', 'opacity': '0.6' }
-});
-
-new BlissSVGBuilder('GHOST').svgCode;               // dashed and translucent
-new BlissSVGBuilder('[opacity=1]>GHOST').svgCode;    // dashed but fully opaque
+result.defined;  // codes that were registered
+result.skipped;  // codes that already existed
+result.errors;   // codes that failed validation
 ```
+
+The `type` field controls what kind of definition is created. When omitted, `codeString` definitions create bare codes (words, aliases), while `getPath` definitions are auto-detected as shapes or external glyphs.
+
+**Bare definition (no type) — words, aliases, general codes:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `codeString` | `string` | yes | Composition using existing codes |
-| `defaultOptions` | `object` | no | Default options for this definition, overridable per-element |
+| `defaultOptions` | `object` | no | Default options, overridable per-element |
+
+**type: 'glyph' — Bliss character with glyph metadata:**
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `codeString` | `string` | yes | Composition using existing codes |
+| `defaultOptions` | `object` | no | Default options, overridable per-element |
 | `isIndicator` | `boolean` | no | Marks this glyph as an indicator |
 | `anchorOffsetX` | `number` | no | Horizontal anchor adjustment |
 | `anchorOffsetY` | `number` | no | Vertical anchor adjustment |
 | `width` | `number` | no | Width override |
 | `shrinksPrecedingWordSpace` | `boolean` | no | Auto-shrink word space before this glyph (like punctuation) |
 
-### `defineShape(code, definition, options?)`
-
-Define a shape, either as a primitive with a path-generating function or as a composite using existing codes:
-
-```js
-// Primitive shape with getPath
-BlissSVGBuilder.defineShape('DIAMOND', {
-  getPath: (x, y) => {
-    const cx = x + 4, cy = y + 4;
-    return `M${cx},${y} L${x + 8},${cy} L${cx},${y + 8} L${x},${cy} Z`;
-  },
-  width: 8,
-  height: 8
-});
-
-// Composite shape with codeString
-BlissSVGBuilder.defineShape('CROSS', {
-  codeString: 'HL8:0,4;VL8:4,0'
-});
-
-// With default options
-BlissSVGBuilder.defineShape('REFCROSS', {
-  codeString: 'HL8:0,4;VL8:4,0',
-  defaultOptions: { 'stroke-dasharray': '0 0.999' }
-});
-```
-
-Provide either `getPath` (primitive) or `codeString` (composite):
-
-**Primitive (getPath) properties:**
+**type: 'shape' — primitive (getPath) or composite (codeString):**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `getPath` | `function(x, y, options)` | yes | Returns SVG path `d` string |
-| `width` | `number` | yes | Shape width in grid units |
-| `height` | `number` | yes | Shape height in grid units |
+| `getPath` | `function(x, y, options)` | if primitive | Returns SVG path `d` string |
+| `width` | `number` | if primitive | Shape width in grid units |
+| `height` | `number` | if primitive | Shape height in grid units |
+| `codeString` | `string` | if composite | Composition using existing codes |
 | `x` | `number` | no | Default x offset |
 | `y` | `number` | no | Default y offset |
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
-| `defaultOptions` | `object` | no | Default options for this definition, overridable per-element |
+| `defaultOptions` | `object` | no | Default options, overridable per-element |
 
-**Composite (codeString) properties:**
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `codeString` | `string` | yes | Composition using existing codes |
-| `defaultOptions` | `object` | no | Default options for this definition, overridable per-element |
-
-### `defineExternalGlyph(code, definition, options?)`
-
-Define an external glyph (e.g., a character from a custom font with SVG path data):
-
-```js
-BlissSVGBuilder.defineExternalGlyph('Xα', {
-  getPath: (x, y) => '...svg path data...',
-  width: 5.2,
-  glyph: 'α'
-});
-```
+**type: 'externalGlyph' — external font character:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -464,33 +426,17 @@ BlissSVGBuilder.defineExternalGlyph('Xα', {
 | `height` | `number` | no | Glyph height |
 | `kerningRules` | `object` | no | Kerning pair adjustments |
 
-### `define(definitions, options?)`
+**Auto-detection (no type, getPath-based):**
+- Has `getPath` + `glyph` → external glyph
+- Has `getPath` (no `glyph`) → shape
 
-Bulk-define multiple codes at once. The type is auto-detected from the definition shape:
-
-```js
-const result = BlissSVGBuilder.define({
-  'LOVE': { codeString: 'B431' },          // → defineGlyph (has codeString)
-  'STAR': { getPath: fn, width: 8, height: 8 }, // → defineShape (has getPath)
-});
-
-result.defined;  // ['LOVE', 'STAR']
-result.skipped;  // codes that already existed
-result.errors;   // codes that failed validation
-```
-
-**Detection rules:**
-- Has `getPath` + `glyph` → `defineExternalGlyph`
-- Has `getPath` (no `glyph`) → `defineShape`
-- Has `codeString` → `defineGlyph`
-
-### Options for all define methods
+### Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `overwrite` | `false` | Allow replacing an existing definition |
+| `overwrite` | `false` | Allow replacing existing definitions |
 
-Pass `{ overwrite: true }` to replace existing codes. Without it, defining an existing code throws an error (or is added to `skipped` in `define()`).
+Pass `{ overwrite: true }` as the second argument to replace existing codes. Without it, existing codes are added to `skipped`.
 
 ## Query API
 

@@ -49,7 +49,7 @@ export default defineConfig({
             { text: 'Words & Sentences', link: '/handbook/writing/words-sentences' },
             { text: 'Shapes', link: '/handbook/writing/shapes' },
             { text: 'Latin & Cyrillic', link: '/handbook/writing/latin-cyrillic', badge: 'Soon' },
-            { text: 'Custom Codes', link: '/handbook/writing/custom-codes', badge: 'Soon' }
+            { text: 'Custom Codes', link: '/handbook/writing/custom-codes' }
           ]
         },
         {
