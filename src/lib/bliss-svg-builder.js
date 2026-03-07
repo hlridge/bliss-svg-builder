@@ -697,23 +697,59 @@ class BlissSVGBuilder {
     return obj;
   }
 
-  toString() {
-    const obj = this.toJSON();
+  /**
+   * Returns a portable DSL string. Typeless aliases (word-level codes) are
+   * always expanded. Custom glyphs and shapes are decomposed to built-in
+   * codes by default; pass { preserve: true } to keep their names.
+   *
+   * @param {Object} [options]
+   * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
+   * @returns {string}
+   */
+  toString(options = {}) {
+    const obj = this.toJSON(options);
 
-    // Serialize a part (and its nested parts) with ; delimiter and :x,y positions
-    function serializeParts(parts) {
+    // Serialize a part with ; delimiter and :x,y positions.
+    // Recursively decomposes custom shapes and glyphs unless preserve is set.
+    function serializeParts(parts, offsetX = 0, offsetY = 0) {
       return parts.map(part => {
+        const x = (part.x ?? 0) + offsetX;
+        const y = (part.y ?? 0) + offsetY;
+        if (!options.preserve && part.code && !builtInCodes.has(part.code)) {
+          // Custom code with nested parts (e.g., positioned custom glyph)
+          if (part.parts) {
+            return serializeParts(part.parts, x, y);
+          }
+          // Custom composite shape (has codeString, no getPath)
+          const def = blissElementDefinitions[part.code];
+          if (def?.isShape && def.codeString && !def.getPath) {
+            return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
+          }
+        }
         let str = part.code;
-        if (part.x !== undefined || part.y !== undefined) {
-          str += `:${part.x ?? 0},${part.y ?? 0}`;
+        if (x !== 0 || y !== 0) {
+          str += `:${x},${y}`;
         }
         return str;
       }).join(';');
     }
 
-    // Serialize a glyph: B-codes emit their code, compositions emit parts
+    // Serialize a glyph: B-codes emit their code, compositions emit parts.
+    // Custom glyphs are decomposed to their codeString unless preserve is set.
     function serializeGlyph(glyph) {
       if (glyph.isBlissGlyph && glyph.code) {
+        // Decompose custom glyphs (non-built-in) to portable output
+        // Use the glyph's parts (which have correct positions) rather than
+        // re-decomposing from the definition (which would lose position offsets)
+        if (!options.preserve && !builtInCodes.has(glyph.code)) {
+          if (glyph.parts) {
+            return serializeParts(glyph.parts);
+          }
+          const def = blissElementDefinitions[glyph.code];
+          if (def?.codeString) {
+            return BlissSVGBuilder.#decomposeCodeString(def.codeString, 0, 0);
+          }
+        }
         return glyph.code;
       }
       if (glyph.parts) {
@@ -762,13 +798,17 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Returns the normalized parsed structure. Aliases are resolved to canonical
-   * codes, B-codes are preserved as character-level units.
-   * Feed this back into the constructor to recreate an identical builder.
+   * Returns the normalized parsed structure. Typeless aliases (word-level
+   * codes) are always expanded. Custom glyphs that resolve to a single
+   * built-in code are decomposed by default; complex composition glyphs
+   * keep their custom code (use toString() for full decomposition).
+   * Pass { preserve: true } to keep all custom names.
    *
+   * @param {Object} [options]
+   * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
    * @returns {Object} Plain object with groups/glyphs/options structure
    */
-  toJSON() {
+  toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
     // Normalize glyph-level objects: expose glyphCode as 'code' for public API
     if (obj.groups) {
@@ -776,7 +816,18 @@ class BlissSVGBuilder {
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
             if (glyph.glyphCode) {
-              glyph.code = glyph.glyphCode;
+              // Decompose custom glyphs to portable codes by default
+              if (!options.preserve && !builtInCodes.has(glyph.glyphCode)) {
+                const def = blissElementDefinitions[glyph.glyphCode];
+                if (def?.codeString) {
+                  // Resolve to the underlying built-in code
+                  glyph.code = BlissSVGBuilder.#resolveToBuiltInCode(glyph.glyphCode);
+                } else {
+                  glyph.code = glyph.glyphCode;
+                }
+              } else {
+                glyph.code = glyph.glyphCode;
+              }
               delete glyph.glyphCode;
             }
           }
@@ -845,6 +896,100 @@ class BlissSVGBuilder {
     }
   }
 
+  // ── Define validation helpers ───────────────────────────────────
+
+  // Extract referenced codes from a codeString (strips positions, options, etc.)
+  static #extractReferencedCodes(codeString) {
+    if (!codeString) return [];
+    return codeString
+      .split(/[;/]+/)
+      .map(part => part.replace(/\[.*?\]>?/g, '').split(':')[0].replace(/\^$/, ''))
+      .filter(code => code.length > 0);
+  }
+
+  // Recursively decompose a codeString to built-in codes, adjusting coordinates.
+  // Used by toString() for portable output of custom shapes and glyphs.
+  static #decomposeCodeString(codeString, offsetX, offsetY) {
+    const parts = codeString.split(';');
+    return parts.map(part => {
+      const posMatch = part.match(/^([^:]+)(?::(-?[\d.]+),(-?[\d.]+))?$/);
+      if (!posMatch) return part;
+
+      const [, code, xStr, yStr] = posMatch;
+      const x = (parseFloat(xStr) || 0) + offsetX;
+      const y = (parseFloat(yStr) || 0) + offsetY;
+
+      // Recursively decompose custom composite shapes
+      if (!builtInCodes.has(code)) {
+        const def = blissElementDefinitions[code];
+        if (def?.isShape && def.codeString && !def.getPath) {
+          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
+        }
+        if (def?.isBlissGlyph && def.codeString) {
+          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
+        }
+      }
+
+      if (x === 0 && y === 0) return code;
+      return `${code}:${x},${y}`;
+    }).join(';');
+  }
+
+  // Resolve a custom glyph code to its underlying built-in code (for toJSON).
+  // Follows the chain until a built-in code is found.
+  static #resolveToBuiltInCode(code, visited = new Set()) {
+    if (visited.has(code)) return code;
+    visited.add(code);
+    const def = blissElementDefinitions[code];
+    if (!def?.codeString) return code;
+    // If codeString is a single code reference (no ; or / or :), resolve further
+    if (!def.codeString.includes(';') && !def.codeString.includes('/') && !def.codeString.includes(':')) {
+      if (builtInCodes.has(def.codeString)) return def.codeString;
+      return BlissSVGBuilder.#resolveToBuiltInCode(def.codeString, visited);
+    }
+    return code; // Complex codeString — keep the custom code in toJSON
+  }
+
+  // Check if a codeString references only allowed types
+  static #validateReferences(code, codeString, allowedTypes) {
+    const refs = BlissSVGBuilder.#extractReferencedCodes(codeString);
+    for (const ref of refs) {
+      if (ref === code) {
+        return `"${code}": circular reference (references itself)`;
+      }
+      const def = blissElementDefinitions[ref];
+      if (!def) continue; // Unknown codes will fail at parse time
+      const type = def.isShape ? 'shape'
+        : def.isExternalGlyph ? 'externalGlyph'
+        : (def.isBlissGlyph || def.glyphCode) ? 'glyph'
+        : def.codeString !== undefined ? 'bare'
+        : 'space';
+      if (!allowedTypes.includes(type)) {
+        return `"${code}": cannot reference ${type} "${ref}". Allowed types: ${allowedTypes.join(', ')}`;
+      }
+    }
+    return null;
+  }
+
+  // Detect circular references via depth-first traversal
+  static #hasCircularReference(code, codeString) {
+    const visited = new Set();
+    const walk = (refs) => {
+      for (const ref of refs) {
+        if (ref === code) return true;
+        if (visited.has(ref)) continue;
+        visited.add(ref);
+        const def = blissElementDefinitions[ref];
+        if (def?.codeString) {
+          const subRefs = BlissSVGBuilder.#extractReferencedCodes(def.codeString);
+          if (walk(subRefs)) return true;
+        }
+      }
+      return false;
+    };
+    return walk(BlissSVGBuilder.#extractReferencedCodes(codeString));
+  }
+
   // ── Private define helpers ──────────────────────────────────────
 
   static #defineShape(code, definition, options = {}) {
@@ -863,6 +1008,15 @@ class BlissSVGBuilder {
       }
       if (typeof definition.height !== 'number' || !isFinite(definition.height)) {
         throw new Error(`define("${code}"): "height" must be a finite number.`);
+      }
+    }
+
+    // Shapes can only reference other shapes
+    if (hasCodeString) {
+      const refError = BlissSVGBuilder.#validateReferences(code, definition.codeString, ['shape']);
+      if (refError) throw new Error(`define(${refError})`);
+      if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
+        throw new Error(`define("${code}"): circular reference detected`);
       }
     }
 
@@ -896,6 +1050,13 @@ class BlissSVGBuilder {
 
     if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
       throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
+    }
+
+    // Glyphs can reference other glyphs and shapes, but not external glyphs or bare aliases
+    const refError = BlissSVGBuilder.#validateReferences(code, definition.codeString, ['glyph', 'shape']);
+    if (refError) throw new Error(`define(${refError})`);
+    if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
+      throw new Error(`define("${code}"): circular reference detected`);
     }
 
     if (blissElementDefinitions[code] && !options.overwrite) {
@@ -978,8 +1139,28 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
     }
 
+    // Resolve chained bare aliases at definition time.
+    // Split on DSL delimiters, replace any bare alias tokens with their codeString, repeat.
+    let resolved = definition.codeString;
+    for (let depth = 0; depth < 50; depth++) {
+      let changed = false;
+      // Split on / and ; boundaries, resolve each token
+      resolved = resolved.replace(
+        /(?<=^|[/;])([A-Za-z_][\w]*)(?=$|[/;:^])/g,
+        (match, token) => {
+          const def = blissElementDefinitions[token];
+          if (def && def.codeString && !def.isBlissGlyph && !def.isShape && !def.isExternalGlyph && !def.glyphCode) {
+            changed = true;
+            return def.codeString;
+          }
+          return match;
+        }
+      );
+      if (!changed) break;
+    }
+
     const entry = {
-      codeString: definition.codeString
+      codeString: resolved
     };
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'

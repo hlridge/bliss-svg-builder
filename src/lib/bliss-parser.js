@@ -510,6 +510,25 @@ export class BlissParser {
               }
             }
 
+            // Handle // in codeString: split into word segments with break markers
+            if (codeStringToExpand.includes('//')) {
+              const wordSegments = codeStringToExpand.split('//');
+              const allParts = [];
+              for (let i = 0; i < wordSegments.length; i++) {
+                if (i > 0) allParts.push({ part: '', _wordBreak: true });
+                const segmentParts = wordSegments[i].split('/')
+                  .flatMap(s => expand(s, definitions, false, depth + 1));
+                allParts.push(...segmentParts);
+              }
+              if (isHeadGlyph && allParts.length > 0) {
+                allParts[0].isHeadGlyph = true;
+              }
+              if (optionsPrefix && allParts.length > 0) {
+                allParts[0].part = optionsPrefix + allParts[0].part;
+              }
+              return allParts;
+            }
+
             // First expand to get all parts (including nested expansions)
             const rawExpandedParts = codeStringToExpand.split('/')
               .flatMap(subStr => expand(subStr, definitions, false, depth + 1));
@@ -525,11 +544,12 @@ export class BlissParser {
                 const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
                 const glyph = expandedSubPart.glyph;
                 const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
-                // Only inherit glyphCode for single-character composites (like B502)
-                // For multi-glyph words, each part keeps its own glyphCode
+                // For multi-glyph words, each part keeps its own glyphCode.
+                // For single-character composites: outer definition's glyphCode wins
+                // (preserves custom glyph identity, e.g., LOVE wrapping B431).
                 const glyphCode = isMultiGlyphWord
                   ? expandedSubPart.glyphCode
-                  : (expandedSubPart.glyphCode ?? definition.glyphCode);
+                  : (definition.glyphCode ?? expandedSubPart.glyphCode);
                 const isBlissGlyph = expandedSubPart.isBlissGlyph ?? definition.isBlissGlyph;
                 return {
                   part: expandedSubPart.part,
@@ -620,7 +640,18 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak } of expandedGlyphParts) {
+        // Word break marker from // in bare alias codeString:
+        // push current group, add a default space group, start a new group
+        if (_wordBreak) {
+          if (group.glyphs.length > 0) {
+            this.#extractPositionFromOptions(group);
+            parsedGroups.push(group);
+          }
+          parsedGroups.push({ glyphs: [{ parts: [{ code: 'SP', _fromSP: true }] }], _isSpaceGroup: true, _spaceIndex: parsedGroups.length });
+          group = { glyphs: [] };
+          continue;
+        }
         if (part === "") continue;
 
         const glyphObj = {

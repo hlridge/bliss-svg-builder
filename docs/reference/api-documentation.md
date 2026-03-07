@@ -95,7 +95,7 @@ Use for: compositing into larger SVG documents, extracting raw path data.
 
 ## Serialization
 
-### `toJSON()`
+### `toJSON(options?)`
 
 Returns a normalized plain object representing the parsed composition. Aliases are resolved to canonical codes. Feed this back into the constructor to recreate an identical builder:
 
@@ -112,11 +112,23 @@ const obj = builder.toJSON();
 // }
 ```
 
+Custom code behavior:
+- **Typeless aliases** (word-level codes) are always expanded to their underlying codes.
+- **Custom glyphs** that resolve to a single built-in code are decomposed by default (e.g., `LOVE` becomes `B431`). Complex composition glyphs keep their custom code in the JSON structure (use `toString()` for full decomposition).
+- Pass `{ preserve: true }` to keep all custom code names as-is.
+
+```js
+BlissSVGBuilder.define({ 'LOVE': { type: 'glyph', codeString: 'B431' } });
+
+new BlissSVGBuilder('LOVE').toJSON();                     // code: 'B431'
+new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // code: 'LOVE'
+```
+
 Use for: inspecting parsed structure, storing snapshots, server-side processing.
 
-### `toString()`
+### `toString(options?)`
 
-Returns a DSL string representation of the composition:
+Returns a portable DSL string representation of the composition:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103//B431;B81');
@@ -124,7 +136,24 @@ builder.toString();
 // 'B313/B1103//B431;B81'
 ```
 
-Use for: serializing back to DSL format, logging, debugging.
+Custom code behavior:
+- **Typeless aliases** (word-level codes) are always expanded, never preserved.
+- **Custom glyphs and shapes** are decomposed to built-in codes by default.
+- Pass `{ preserve: true }` to keep custom code names.
+
+```js
+BlissSVGBuilder.define({
+  'SMILEY': { type: 'glyph', codeString: 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14' }
+});
+
+new BlissSVGBuilder('SMILEY').toString();
+// 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
+
+new BlissSVGBuilder('SMILEY').toString({ preserve: true });
+// 'SMILEY'
+```
+
+Use for: serializing back to DSL format, portable exchange, logging.
 
 ## Navigation
 
