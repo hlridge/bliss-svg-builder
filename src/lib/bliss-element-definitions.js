@@ -29,7 +29,7 @@ const nonShapeDefinitions = {
 // Reference glyphs: visual aids for positioning and alignment
 const referenceGlyphDefinitions = {
   'REFSQUARE': { codeString: "S8:0,8", glyphCode: 'REFSQUARE', isBlissGlyph: true, defaultOptions: { 'stroke-dasharray': '0 0.999' } },
-  'ANCHORRING': { codeString: "C2:0,4", glyphCode: 'ANCHORRING', isBlissGlyph: true, defaultOptions: { 'stroke-dasharray': '0 0.777' } },
+  'ANCHORRING': { codeString: "C2:0,4", glyphCode: 'ANCHORRING', isBlissGlyph: true, isIndicator: true, defaultOptions: { 'stroke-dasharray': '0 0.777' } },
 };
 
 // Shape primitives
