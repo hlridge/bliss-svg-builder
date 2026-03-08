@@ -6,6 +6,10 @@ All primitive shapes available in Bliss SVG Builder, organized by category.
 
 <ShapeGallery category="special" />
 
+## Reference Glyphs
+
+<ShapeGallery category="referenceGlyphs" />
+
 ## Iconic
 
 <ShapeGallery category="iconic" />

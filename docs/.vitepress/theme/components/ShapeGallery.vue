@@ -12,7 +12,7 @@
       <strong>Error:</strong> {{ error }}
     </div>
 
-    <div v-else class="gallery-grid">
+    <div v-else class="gallery-grid" :class="{ 'gallery-grid--full-height': category?.fullHeight }">
       <div v-for="code in category?.codes || []" :key="code" class="shape-item">
         <div class="shape-svg" v-html="svgs[code]"></div>
         <div class="shape-code">{{ code }}</div>
@@ -74,7 +74,8 @@ onMounted(async () => {
           }
         }
 
-        const builder = new BlissSVGBuilder(`[crop=auto-vertical;grid=1;grid-sky-color=#c7c7c7]||${renderCode}`);
+        const crop = category.value.fullHeight ? '' : 'crop=auto-vertical;';
+        const builder = new BlissSVGBuilder(`[${crop}grid=1;grid-sky-color=#c7c7c7]||${renderCode}`);
         svgs.value[code] = builder.svgCode;
       } catch (e) {
         svgs.value[code] = `<div class="svg-error">Error: ${e.message}</div>`;
@@ -169,6 +170,15 @@ onMounted(async () => {
   max-width: 100%;
   max-height: 86px;
   height: auto;
+}
+
+.gallery-grid--full-height .shape-svg {
+  min-height: 195px;
+  max-height: 195px;
+}
+
+.gallery-grid--full-height .shape-svg :deep(svg) {
+  max-height: 195px;
 }
 
 .shape-code {

@@ -6,6 +6,12 @@ export const special = {
   description: "[Z]ero-[S]ized [A]nchor (invisible positioning element)"
 };
 
+export const referenceGlyphs = {
+  codes: ["REFSQUARE", "ANCHORRING"],
+  description: "[REF]erence [SQUARE] (dashed outline of the standard Bliss square), [ANCHOR] [RING] (dashed circle showing the anchor point)",
+  fullHeight: true
+};
+
 export const iconic = {
   codes: ["H", "E", "F"],
   description: "[H]eart, [E]ar, [F]iber"
