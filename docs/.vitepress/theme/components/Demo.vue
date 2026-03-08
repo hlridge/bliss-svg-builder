@@ -6,12 +6,16 @@
       <div v-if="error" class="demo-error">
         <strong>Error:</strong> {{ error }}
       </div>
-      <div v-else-if="svg" class="demo-svg" v-html="svg"></div>
+      <div v-else-if="svg" class="demo-svg" :class="{ 'demo-svg--layered': svgBefore || svgAfter }">
+        <div v-if="svgBefore" class="demo-layer demo-layer--before" v-html="svgBefore"></div>
+        <div class="demo-layer demo-layer--main" v-html="svg"></div>
+        <div v-if="svgAfter" class="demo-layer demo-layer--after" v-html="svgAfter"></div>
+      </div>
     </div>
 
     <div class="demo-code">
       <div class="code-label">Input:</div>
-      <code>{{ code }}</code>
+      <code>{{ displayCode || code }}</code>
     </div>
   </div>
 </template>
@@ -31,10 +35,24 @@ const props = defineProps({
   annotations: {
     type: String,
     default: ''
+  },
+  before: {
+    type: String,
+    default: ''
+  },
+  after: {
+    type: String,
+    default: ''
+  },
+  displayCode: {
+    type: String,
+    default: ''
   }
 });
 
 const svg = ref('');
+const svgBefore = ref('');
+const svgAfter = ref('');
 const error = ref('');
 
 function addAnnotationsToSVG(svgCode, annotationsJson) {
@@ -84,6 +102,10 @@ function addAnnotationsToSVG(svgCode, annotationsJson) {
   }
 }
 
+function replaceViewBox(svgCode, newViewBox) {
+  return svgCode.replace(/viewBox="[^"]*"/, `viewBox="${newViewBox}"`);
+}
+
 onMounted(async () => {
   try {
     const { BlissSVGBuilder } = await import('bliss-svg-builder');
@@ -96,6 +118,21 @@ onMounted(async () => {
     }
 
     svg.value = svgCode;
+
+    // Render before/after layers with the main SVG's viewBox
+    const vbMatch = svgCode.match(/viewBox="([^"]+)"/);
+    if (vbMatch) {
+      const mainViewBox = vbMatch[1];
+
+      if (props.before) {
+        const beforeBuilder = new BlissSVGBuilder(props.before);
+        svgBefore.value = replaceViewBox(beforeBuilder.svgCode, mainViewBox);
+      }
+      if (props.after) {
+        const afterBuilder = new BlissSVGBuilder(props.after);
+        svgAfter.value = replaceViewBox(afterBuilder.svgCode, mainViewBox);
+      }
+    }
   } catch (e) {
     error.value = e.message;
   }
@@ -163,6 +200,29 @@ onMounted(async () => {
   background: #f8f9fb;
   border-radius: 5px;
   box-shadow: inset 0 0 6px 4px rgba(0,0,0,0.65);
+}
+
+.demo-svg--layered {
+  position: relative;
+}
+
+.demo-layer {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.demo-layer--main {
+  position: relative;
+}
+
+.demo-layer--before {
+  pointer-events: none;
+}
+
+.demo-layer--after {
+  pointer-events: none;
 }
 
 .demo-svg :deep(svg) {
