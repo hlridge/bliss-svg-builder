@@ -116,6 +116,26 @@ Highlight the main content zone:
 
 <Demo code="[grid=1;grid-minor-color=#f5f5f5;grid-major-color=#cccccc]||B313" title="Major lines prominent" />
 
+## CSS Class Names
+
+Grid lines use `bliss-` prefixed CSS classes for custom styling:
+
+| Class | Applies to |
+|-------|-----------|
+| `bliss-grid-line` | All grid lines |
+| `bliss-grid-line--minor` | Minor lines (every 1 unit) |
+| `bliss-grid-line--medium` | Medium lines (every 2 units) |
+| `bliss-grid-line--major` | Major lines (every 4 units) |
+| `bliss-grid-line--sky` | Sky line (y=8) |
+| `bliss-grid-line--earth` | Earth line (y=16) |
+
+The grid is wrapped in a `<g class="bliss-grid">` group. You can target these classes in external CSS when embedding the SVG inline:
+
+```css
+.bliss-grid-line--sky { stroke: green; }
+.bliss-grid-line--earth { stroke: brown; }
+```
+
 ## Options Reference
 
 ### Color Options
@@ -135,5 +155,6 @@ Highlight the main content zone:
 |--------|---------|-------------|
 | `grid-stroke-width` | `0.5` | All grid lines |
 | `grid-major-stroke-width` | - | Major lines only |
+| `grid-medium-stroke-width` | - | Medium lines only |
 | `grid-minor-stroke-width` | - | Minor lines only |
 

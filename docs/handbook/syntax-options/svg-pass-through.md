@@ -6,7 +6,7 @@ Any option that Bliss SVG Builder doesn't recognize as a built-in option is pass
 
 The builder maintains a set of known option keys (`color`, `stroke-width`, `margin`, `grid`, etc.). When you set an option that isn't in this set, it passes through to the SVG output as-is.
 
-At the **global level**, pass-through attributes are added to the `<svg>` root element. At the **element level**, they are added to a wrapping `<g>` element around that character.
+At the **global level**, pass-through attributes are added to the `<g class="bliss-content">` wrapper. At the **element level**, they are added to a wrapping `<g>` element around that character.
 
 ```
 [opacity=0.5]||B313
@@ -92,6 +92,18 @@ Pass-through attributes are sanitized:
 - **String values** are HTML-escaped to prevent injection
 - **Event handlers** (`onclick`, `onload`, etc.) are blocked entirely
 - **Dangerous URLs** (`javascript:`, `data:`, `vbscript:`) are rejected in `href`
+
+## SVG Structure
+
+The SVG root element is purely structural (`xmlns`, `width`, `height`, `viewBox`) and includes a `data-generator` attribute identifying the library version. All styling and pass-through attributes live on the `<g class="bliss-content">` wrapper inside it:
+
+```html
+<svg xmlns="..." data-generator="bliss-svg-builder/..." width="..." height="..." viewBox="...">
+  <g class="bliss-content" fill="none" stroke="#000000" stroke-width="0.5" ...>
+    <!-- character paths -->
+  </g>
+</svg>
+```
 
 ## Common Pass-Through Attributes
 

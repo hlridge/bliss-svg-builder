@@ -133,6 +133,9 @@ Some options only make sense at global scope:
 | `char-space` | Global or word scope |
 | `grid` | Global only |
 | `background` | Global only |
+| `background-top` | Global only |
+| `background-mid` | Global only |
+| `background-bottom` | Global only |
 | `svg-height` | Global only |
 | `margin` | Global only |
 | `crop` | Global only |
@@ -157,5 +160,5 @@ Some options only make sense at global scope:
 
 ## Setting Options from JavaScript
 
-For setting options programmatically — app-wide defaults and enforced overrides — see [Programmatic Options](./programmatic-options).
+For setting options programmatically (app-wide defaults and enforced overrides), see [Programmatic Options](./programmatic-options).
 

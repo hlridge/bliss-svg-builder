@@ -4,7 +4,7 @@ Set default and override options from JavaScript, without encoding them in the D
 
 ## Why Use Programmatic Options?
 
-The [DSL string syntax](./options-system) is great for inline styling — but when an app consumes Bliss SVG Builder, it often needs to:
+The [DSL string syntax](./options-system) is great for inline styling, but when an app consumes Bliss SVG Builder, it often needs to:
 
 - Provide **app-wide defaults** that users can override in their strings
 - **Enforce settings** (like stroke width for accessibility) that user strings cannot change
@@ -38,7 +38,7 @@ defaults → DSL string → overrides
 
 ### Defaults Example
 
-The app sets `color` to red, but the user's string sets it to blue — blue wins:
+The app sets `color` to red, but the user's string sets it to blue. Blue wins:
 
 ```js
 const builder = new BlissSVGBuilder('[color=blue]||B313', {
@@ -62,7 +62,7 @@ const builder = new BlissSVGBuilder('B313', {
 
 ### Overrides Example
 
-The app enforces `color` as red — it wins even though the string says blue:
+The app enforces `color` as red. It wins even though the string says blue:
 
 ```js
 const builder = new BlissSVGBuilder('[color=blue]||B313', {
@@ -100,7 +100,7 @@ const builder = new BlissSVGBuilder('[color=blue]||B313', {
 
 ## Option Format
 
-Options use **camelCase** keys with native JavaScript types — not the kebab-case strings used in DSL syntax.
+Options use **camelCase** keys with native JavaScript types, not the kebab-case strings used in DSL syntax.
 
 ### Key Mapping
 
@@ -114,6 +114,9 @@ Options use **camelCase** keys with native JavaScript types — not the kebab-ca
 | `charSpace` | `char-space` | number | `4` |
 | `wordSpace` | `word-space` | number | `10` |
 | `background` | `background` | string | `'#fff'` |
+| `backgroundTop` | `background-top` | string | `'#fce4ec'` |
+| `backgroundMid` | `background-mid` | string | `'#e8f5e9'` |
+| `backgroundBottom` | `background-bottom` | string | `'#e3f2fd'` |
 | `center` | `center` | boolean | `false` |
 | `crop` | `crop` | number or string | `'auto'` |
 | `svgHeight` | `svg-height` | number | `100` |
@@ -125,7 +128,7 @@ All options from the [Options Quick Reference](/reference/options-quick-referenc
 
 - **Booleans**: Use `true`/`false` (not `"1"`/`"0"`)
 - **Numbers**: Use native numbers (not strings)
-- **Strings**: Use regular strings — they are HTML-escaped automatically
+- **Strings**: Use regular strings. They are HTML-escaped automatically
 - **Bulk options**: Work the same (`margin: 2` sets all four margins)
 
 ## Practical Patterns
@@ -200,8 +203,8 @@ Recall the constructor signature: `new BlissSVGBuilder(input, { defaults, overri
 
 | Scenario | Behavior |
 |----------|----------|
-| No second parameter | No effect — only the DSL string is used |
-| `null` second parameter | No effect — treated the same as omitting it |
+| No second parameter | No effect. Only the DSL string is used |
+| `null` second parameter | No effect. Treated the same as omitting it |
 | Empty `defaults: {}` | No effect |
 | Empty `overrides: {}` | No effect |
 | `null`/`undefined` values in objects | Silently skipped |
