@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync(resolve(import.meta.dirname, 'package.json'), 'utf-8'));
 
 const banner = `/*!
  * Contains glyph data derived from Liberation Sans Regular (Liberation Fonts Project)
@@ -41,6 +43,9 @@ function copyFontLicense() {
 }
 
 export default defineConfig(({ command }) => ({
+  define: {
+    __LIB_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: command === 'build' ? [addBanner(), copyFontLicense()] : [],
   build: {
     minify: 'esbuild',

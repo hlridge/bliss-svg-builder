@@ -4,6 +4,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+// Replaced at build time by Vite's define; falls back to package.json for dev/test
+export const LIB_VERSION = '__LIB_VERSION__';
+
 /**
  * Known option keys (kebab-case) that are explicitly processed in #processOptions().
  * Any option key NOT in this set will be passed through as-is (for unknown SVG attributes like stroke-dasharray).
