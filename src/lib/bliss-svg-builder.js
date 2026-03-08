@@ -402,7 +402,7 @@ class BlissSVGBuilder {
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (!INTERNAL_OPTIONS.has(key) && isSafeAttributeName(key)) {
-        this.globalSvgAttributes[attrMap[key] || key] = value;
+        this.globalSvgAttributes[attrMap[key] || camelToKebab(key)] = value;
       }
     }
 
@@ -1591,23 +1591,22 @@ class BlissSVGBuilder {
   `;
     }
 
-    // Build additional SVG attributes from global options (excluding explicitly handled ones)
-    const explicitlyHandled = ['fill', 'stroke', 'stroke-linejoin', 'stroke-linecap', 'stroke-width', 'strokeWidth', 'color', 'width', 'height', 'viewBox'];
-    const additionalAttrs = Object.entries(this.globalSvgAttributes)
-      .filter(([key]) => !explicitlyHandled.includes(key))
+    // Build content group attributes: defaults + all global SVG attributes
+    const contentDefaults = {
+      fill: 'none',
+      stroke: color,
+      'stroke-linejoin': 'round',
+      'stroke-linecap': 'round',
+      'stroke-width': strokeWidth,
+    };
+    const contentAttrs = { ...contentDefaults, ...this.globalSvgAttributes };
+    const contentAttrsStr = Object.entries(contentAttrs)
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
-    const attrsStr = additionalAttrs ? ' ' + additionalAttrs : '';
-
-    const fill = this.globalSvgAttributes.fill || 'none';
-    const stroke = this.globalSvgAttributes.stroke || color;
-    const strokeLinejoin = this.globalSvgAttributes['stroke-linejoin'] || 'round';
-    const strokeLinecap = this.globalSvgAttributes['stroke-linecap'] || 'round';
-    const strokeWidthAttr = this.globalSvgAttributes['stroke-width'] || strokeWidth;
 
     let svgStr =
-`<svg xmlns="http://www.w3.org/2000/svg" data-generator="bliss-svg-builder/${LIB_VERSION}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}" fill="${fill}" stroke="${stroke}" stroke-linejoin="${strokeLinejoin}" stroke-linecap="${strokeLinecap}" stroke-width="${strokeWidthAttr}"${attrsStr}>
-  ${title}${desc}${backgroundRect}${gridPath}${content}${svgText}
+`<svg xmlns="http://www.w3.org/2000/svg" data-generator="bliss-svg-builder/${LIB_VERSION}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}">
+  ${title}${desc}${backgroundRect}${gridPath}<g class="bliss-content" ${contentAttrsStr}>${content}${svgText}</g>
 </svg>`;
 
     // Clean up empty <path d=""></path> elements from DOT/COMMA/external glyphs
