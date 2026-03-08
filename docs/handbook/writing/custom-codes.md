@@ -1,106 +1,93 @@
 # Custom Codes
 
-Extend Bliss SVG Builder with your own codes. Custom codes work exactly like built-in codes once defined: use them in DSL strings, combine them in words, attach indicators, and apply options.
+Bliss SVG Builder comes with B-codes for individual Bliss characters. `define()` lets you register your own codes that work just like built-in ones: use them in DSL strings, combine them in words, attach indicators, and apply options.
 
-## Why Custom Codes?
-
-Bliss SVG Builder natively supports individual Bliss characters as B-codes (`B1` through `B1603`). It does not include codes for multi-character Bliss words. The primary use case for custom codes is extending the builder with word-level codes, typically using Blissary B-codes that map to compositions of built-in characters.
-
-Beyond word-level codes, you can also define:
+Custom codes cover a range of use cases:
 
 - **Readable aliases**: use `LOVE` instead of `B431`
-- **Custom characters**: define compositions that don't exist as B-codes
-- **Custom shapes**: add geometric primitives or composite shapes
-
-::: warning Portability
-Custom codes are local to your application. Other applications using Bliss SVG Builder will not recognize them, since the library only ships with B-codes for individual characters. However, `toString()` and `toJSON()` produce portable output by default, decomposing custom codes into built-in codes that any Bliss SVG Builder instance can understand.
-:::
+- **Word-level codes**: give a single code to a multi-character Bliss word
+- **Custom characters**: define characters that don't exist in the built-in set
+- **Custom shapes**: create new geometric building blocks from existing shapes or SVG paths
 
 All definitions are global. Once defined, any `BlissSVGBuilder` instance can use them.
 
-## The `define()` Method
+## Naming Things
 
-`define()` is the single method for registering custom codes. It accepts an object mapping codes to definitions:
+The simplest use case: give a readable name to a B-code.
 
 ```js
 import { BlissSVGBuilder } from 'bliss-svg-builder';
 
-const result = BlissSVGBuilder.define({
-  'LOVE': { codeString: 'B431' }
-});
-
-result.defined;  // ['LOVE']
-result.skipped;  // codes that already existed
-result.errors;   // codes that failed validation
-```
-
-The optional `type` field controls what kind of definition is created:
-
-| `type` | Purpose | Required fields |
-|--------|---------|-----------------|
-| *(omitted)* | Transparent alias or macro | `codeString` |
-| `'glyph'` | Bliss character with own identity | `codeString` |
-| `'shape'` | Geometric shape | `getPath` + `width` + `height`, or `codeString` |
-| `'externalGlyph'` | External font character | `getPath` + `width` + `glyph` |
-
-When no `type` is specified, `getPath`-based definitions are auto-detected as shapes (or external glyphs if `glyph` is present). Definitions with only `codeString` create transparent aliases.
-
-## Aliases (No Type)
-
-The most common use case. Provide a `codeString` with no `type`. The alias is a transparent macro: it expands to its codeString during parsing and does not appear in the element tree. The result is identical to typing the codeString directly.
-
-```js
 BlissSVGBuilder.define({
   'LOVE': { codeString: 'B431' }
 });
 
-new BlissSVGBuilder('LOVE').svgCode;     // renders B431
-new BlissSVGBuilder('LOVE').toString();  // 'B431'
+new BlissSVGBuilder('LOVE').svgCode;
 ```
 
-The `codeString` uses the same syntax as the DSL: `;` for parts within a character, `/` for multiple characters in a word, `//` for word separation.
+This creates an **alias**. `LOVE` expands to `B431` during parsing, as if you had typed `B431` directly. Once defined, use it anywhere you'd use a B-code.
 
-### Multi-Character Words
+## Defining Words
 
-Many Bliss words consist of multiple characters. For example, B2661 in the Blissary system represents "to understand", spelled as B1103 (understanding) with indicator B81 (action):
+Many Bliss words are built from multiple characters. You can define a word as a single code:
 
 ```js
 BlissSVGBuilder.define({
   'B2661': { codeString: 'B1103;B81' }
 });
 
-new BlissSVGBuilder('B2661').svgCode;            // "to understand"
-new BlissSVGBuilder('B2661').toString();          // 'B1103;B81'
-new BlissSVGBuilder('B2661//B2661//B4').svgCode;  // sentence with period
+new BlissSVGBuilder('B2661').svgCode;
 ```
 
-Words with multiple characters side by side use `/` in the codeString:
+<Demo code="B1103;B81" displayCode="B2661" title="B2661: B1103 (understanding) + B81 (action indicator) = to understand" />
+
+Words with side-by-side characters use `/` in the codeString, just like in the DSL:
 
 ```js
 BlissSVGBuilder.define({
   'MYWORD': { codeString: 'B335/B412' }
 });
-
-new BlissSVGBuilder('MYWORD').svgCode;     // two characters in a word group
-new BlissSVGBuilder('MYWORD').toString();  // 'B335/B412'
 ```
 
-### Alias Chaining
+<Demo code="B335/B412" displayCode="MYWORD" title="MYWORD: B335 (forward) / B412 (knowledge)" />
 
-Aliases can reference other aliases. All references are resolved during parsing:
+Aliases can also reference other aliases. All references are resolved during parsing:
 
 ```js
 BlissSVGBuilder.define({
   'UNDERSTAND': { codeString: 'B1103;B81' },
   'TOUNDERSTAND': { codeString: 'UNDERSTAND' }
 });
+```
 
-new BlissSVGBuilder('TOUNDERSTAND').toString();  // 'B1103;B81'
+## Portable Output
+
+Custom codes only exist in instances of the class where you defined them. If you serialize output with `toString()` or `toJSON()` and send it elsewhere, the receiving Bliss SVG Builder won't know what `LOVE` or `B2661` from the examples above means.
+
+That's why both methods **decompose** custom codes by default, expanding them back to built-in codes:
+
+```js
+new BlissSVGBuilder('B2661').toString();
+// 'B1103;B81' — anyone can read this
+
+new BlissSVGBuilder('B2661').toJSON();
+// groups[0].glyphs[0].code → 'B1103' — built-in codes, no custom names
+```
+
+The receiver doesn't need your definitions. The output is self-contained.
+
+If you're serializing for your own use (where the custom codes are defined), you can keep the names with `{ preserve: true }`:
+
+```js
+new BlissSVGBuilder('B2661').toString({ preserve: true });
+// 'B2661'
 ```
 
 ## Characters (Glyphs)
 
-Use `type: 'glyph'` when defining a proper Bliss character. Unlike aliases, glyphs have their own identity in the element tree. The custom code name is preserved when working with the tree (traversal, mutation), and only decomposed to portable output on export.
+So far we've created aliases: transparent macros that disappear during parsing. But sometimes you want a custom code that has its own **identity** in the element tree, so you can find it, inspect it, and mutate it by name.
+
+Use `type: 'glyph'` for this:
 
 ```js
 BlissSVGBuilder.define({
@@ -109,59 +96,34 @@ BlissSVGBuilder.define({
     codeString: 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
   }
 });
-
-new BlissSVGBuilder('SMILEY').svgCode;
-new BlissSVGBuilder('SMILEY;B81').svgCode;      // with indicator
-new BlissSVGBuilder('B313/SMILEY').svgCode;      // in a word
-
-// toString() decomposes to portable output by default
-new BlissSVGBuilder('SMILEY').toString();
-// 'C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
-
-// toJSON() also decomposes simple glyphs by default
-new BlissSVGBuilder('SMILEY').toJSON();
-// groups[0].glyphs[0].code → 'SMILEY' (complex compositions keep their name)
-
-// Use preserve option to keep custom code names in either method
-new BlissSVGBuilder('SMILEY').toString({ preserve: true });
-// 'SMILEY'
 ```
 
-### Aliases vs Glyphs
+A glyph appears as its own node in the element tree. Inside the tree, the name is preserved. On export, it decomposes to portable output, just like aliases:
 
-The key difference:
+```js
+const builder = new BlissSVGBuilder('B313/SMILEY');
 
-| | Alias (no type) | Glyph (`type: 'glyph'`) |
-|---|---|---|
-| **In the tree** | Fully expanded, alias name gone | Preserved as own glyph node |
-| **Mutation API** | Works with expanded codes | Works with custom code name |
-| **toString()** | Always expanded, never preserved | Portable by default, preservable |
-| **toJSON()** | Always expanded, never preserved | Simple glyphs decomposed, preservable |
-| **Best for** | Word-level mappings, shortcuts | Custom characters with identity |
+// Inside the tree: identity preserved
+builder.glyph(1).codeName;  // 'SMILEY'
+
+// On export: decomposed to built-in codes
+builder.toString();
+// 'B313/C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
+```
+
+### When to Use Which
+
+Use an **alias** (no type) when you just want a shortcut or a word-level mapping. The name is a convenience that disappears at parse time.
+
+Use a **glyph** (`type: 'glyph'`) when you're defining a proper Bliss character that should have its own identity: something you want to traverse, mutate, or treat as a first-class element.
 
 ### Character Properties
 
-Beyond `codeString`, glyphs accept properties that control their behavior in compositions:
-
-```js
-BlissSVGBuilder.define({
-  'MYCHAR': {
-    type: 'glyph',
-    codeString: 'C8:0,8;VL8:4,8',
-    isIndicator: true,          // marks as indicator (auto-positions above)
-    anchorOffsetX: 1.5,         // horizontal anchor adjustment
-    anchorOffsetY: -0.5,        // vertical anchor adjustment
-    width: 4,                   // width override
-    shrinksPrecedingWordSpace: true  // tighten word space before (like punctuation)
-  }
-});
-```
-
-See the [API Documentation](/reference/api-documentation#define-definitions-options) for all properties.
+Most glyphs only need `type` and `codeString`. Some characters use `anchorOffsetX` and `anchorOffsetY` to adjust their anchor point in compositions. Indicators need additional properties like `isIndicator` and `width`. See the [API Documentation](/reference/api-documentation#define-definitions-options) for all available properties.
 
 ## Shapes
 
-Use `type: 'shape'` to create reusable geometric primitives. Shapes can only reference other shapes; they cannot reference glyphs or external glyphs.
+Use `type: 'shape'` to create reusable geometric primitives that can be used as building blocks in characters. Shapes can only reference other shapes.
 
 ### Composite Shapes
 
@@ -180,7 +142,7 @@ new BlissSVGBuilder('CROSS:0,8').svgCode;
 
 ### Primitive Shapes
 
-Create a shape with a path-generating function for full control over the SVG path:
+For full control, provide a path-generating function:
 
 ```js
 BlissSVGBuilder.define({
@@ -198,60 +160,14 @@ BlissSVGBuilder.define({
 new BlissSVGBuilder('DIAMOND:0,8').svgCode;
 ```
 
-Primitive shapes require `width` and `height`. The `getPath` function receives `(x, y)` coordinates and must return an SVG path `d` string.
-
-## External Glyphs
-
-Use `type: 'externalGlyph'` to add characters from external font systems:
-
-```js
-BlissSVGBuilder.define({
-  'Xα': {
-    type: 'externalGlyph',
-    getPath: (x, y) => '...svg path data...',
-    width: 5.2,
-    glyph: 'α'
-  }
-});
-```
-
-External glyphs work like the built-in Latin and Cyrillic characters. See the [API Documentation](/reference/api-documentation#define-definitions-options) for details.
-
-## Type Restrictions
-
-Definitions are validated at registration time:
-
-- **Shapes** can only reference other shapes. Referencing a glyph, external glyph, or alias will produce an error.
-- **Glyphs** can reference other glyphs and shapes. Referencing external glyphs or aliases will produce an error.
-- **Circular references** are detected and rejected for both shapes and glyphs.
-
-```js
-// This will fail: shape referencing a B-code glyph
-BlissSVGBuilder.define({
-  'BADSHAPE': { type: 'shape', codeString: 'B431:0,8' }
-});
-// result.errors: ['BADSHAPE: shapes can only reference other shapes']
-```
-
 ## Mapping External ID Systems
 
-If your application uses an external ID system (such as BCI-AV-IDs or Blissary IDs), you can map those IDs to Bliss SVG Builder codes. The [bliss-blissary-bci-id-map](https://github.com/hlridge/bliss-blissary-bci-id-map) repository provides a public JSON mapping between these systems:
-
-```json
-[
-  { "blissaryId": 1, "bciAvId": 8483, "blissSvgBuilderCode": "B1" },
-  { "blissaryId": 2, "bciAvId": 8484, "blissSvgBuilderCode": "B2" },
-  ...
-]
-```
-
-For example, you could register BCI-AV-IDs as aliases:
+If your application uses an external ID system (like BCI-AV-IDs or Blissary IDs), you can register those IDs as aliases. The [bliss-blissary-bci-id-map](https://github.com/hlridge/bliss-blissary-bci-id-map) repository provides a public JSON mapping:
 
 ```js
 import { BlissSVGBuilder } from 'bliss-svg-builder';
 import mapping from './blissary_to_bci_mapping.json';
 
-// Register each BCI-AV-ID as an alias for its B-code
 const definitions = {};
 for (const { bciAvId, blissSvgBuilderCode } of mapping) {
   definitions[String(bciAvId)] = { codeString: blissSvgBuilderCode };
@@ -259,90 +175,42 @@ for (const { bciAvId, blissSvgBuilderCode } of mapping) {
 
 BlissSVGBuilder.define(definitions);
 
-// Now BCI-AV-IDs work as codes
-new BlissSVGBuilder('8493').svgCode;           // renders via B-code alias
-new BlissSVGBuilder('8493/8499').svgCode;      // combine in a word
+new BlissSVGBuilder('14164').svgCode;
+new BlissSVGBuilder('14164/14905').svgCode;
 ```
 
-The same approach works for any external system. Define a mapping from your IDs to compositions of existing codes:
+Since these are aliases, `toString()` produces portable output automatically:
 
 ```js
-// Word-level codes from an external dictionary
+new BlissSVGBuilder('14164//14905').toString();
+// 'B313//B392' — built-in codes, no external IDs
+```
+
+The same approach works for any external system:
+
+```js
 BlissSVGBuilder.define({
-  'W17973': { codeString: 'B1103;B81' },   // "to understand"
-  'W14895': { codeString: 'B431' },         // "love"
+  'W17973': { codeString: 'B1103;B81' },
+  'W14895': { codeString: 'B431' },
 });
-
-new BlissSVGBuilder('W17973//W14895').svgCode;
 ```
 
-Since these are typeless aliases, `toString()` will return portable output:
+## Managing Definitions
+
+Definitions can be overwritten, altered, removed, and inspected. See the [API Documentation](/reference/api-documentation#define-definitions-options) for `define()` options, [Query API](/reference/api-documentation#query-api) for `getDefinition()`, `listDefinitions()`, and `removeDefinition()`.
+
+Quick examples:
 
 ```js
-new BlissSVGBuilder('W17973//W14895').toString();
-// 'B1103;B81//B431'
-```
-
-Keep in mind that these mappings only exist within your application. See the [portability warning](#why-custom-codes) above.
-
-## Modifying Definitions
-
-### Overwriting
-
-By default, defining an existing code is skipped (or throws in single-method calls). Pass `{ overwrite: true }` as the second argument to replace:
-
-```js
-BlissSVGBuilder.define({ 'LOVE': { codeString: 'B431' } });
-
-// Later, replace completely
+// Overwrite an existing definition
 BlissSVGBuilder.define(
   { 'LOVE': { codeString: 'B313' } },
   { overwrite: true }
 );
+
+// Check if a code exists
+BlissSVGBuilder.isDefined('LOVE');  // true
+
+// Remove a custom definition
+BlissSVGBuilder.removeDefinition('LOVE');
 ```
-
-### Altering
-
-To change specific properties without rewriting everything, read the current definition with `getDefinition()`, then overwrite with your changes:
-
-```js
-const current = BlissSVGBuilder.getDefinition('MYCHAR');
-
-BlissSVGBuilder.define({
-  'MYCHAR': {
-    type: 'glyph',
-    codeString: current.codeString,       // keep the original composition
-    anchorOffsetX: 2.0                    // change just this property
-  }
-}, { overwrite: true });
-```
-
-Note that `getDefinition()` returns a metadata copy (functions like `getPath` are excluded). For primitive shapes, you'll need to provide the `getPath` function again when overwriting.
-
-### Removing
-
-To remove a custom definition entirely:
-
-```js
-BlissSVGBuilder.removeDefinition('LOVE'); // true
-```
-
-Built-in definitions cannot be removed.
-
-## Inspecting Definitions
-
-Check if a code exists, get its metadata, or list all codes:
-
-```js
-BlissSVGBuilder.isDefined('B313');   // true
-BlissSVGBuilder.isDefined('LOVE');   // true (after defining it)
-
-const def = BlissSVGBuilder.getDefinition('B313');
-// { type: 'glyph', isBuiltIn: true, codeString: 'H:0,8', ... }
-
-BlissSVGBuilder.listDefinitions();                   // all codes
-BlissSVGBuilder.listDefinitions({ type: 'shape' });  // only shapes
-BlissSVGBuilder.listDefinitions({ type: 'glyph' });  // only characters
-```
-
-See the [API Documentation](/reference/api-documentation#query-api) for full details.
