@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-// Replaced at build time by Vite's define; falls back to package.json for dev/test
+// Replaced at build time by Vite's define (also available in Vitest and VitePress)
 export const LIB_VERSION = __LIB_VERSION__;
 
 /**
