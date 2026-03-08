@@ -5,7 +5,7 @@
  */
 
 // Replaced at build time by Vite's define; falls back to package.json for dev/test
-export const LIB_VERSION = '__LIB_VERSION__';
+export const LIB_VERSION = __LIB_VERSION__;
 
 /**
  * Known option keys (kebab-case) that are explicitly processed in #processOptions().
