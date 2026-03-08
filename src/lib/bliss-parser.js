@@ -87,7 +87,7 @@ export class BlissParser {
 
       if (matched) {
         let [, code, x, y] = matched;
-        part.code = code;
+        part.codeName = code;
         x !== undefined && (part.x = Number(x));
         y !== undefined && (part.y = Number(y));
       } else {
@@ -192,7 +192,7 @@ export class BlissParser {
         // Mark whether each space was from SP (implicit) or user-specified
         const spaceGlyphs = codes.map(code => {
           const fromSP = code === 'SP';
-          return { parts: [{ code: fromSP ? 'TSP' : code, _fromSP: fromSP }] };
+          return { parts: [{ codeName: fromSP ? 'TSP' : code, _fromSP: fromSP }] };
         });
         parsedGroups.push({ glyphs: spaceGlyphs, _isSpaceGroup: true, _spaceIndex: gi });
         continue;
@@ -648,7 +648,7 @@ export class BlissParser {
             this.#extractPositionFromOptions(group);
             parsedGroups.push(group);
           }
-          parsedGroups.push({ glyphs: [{ parts: [{ code: 'SP', _fromSP: true }] }], _isSpaceGroup: true, _spaceIndex: parsedGroups.length });
+          parsedGroups.push({ glyphs: [{ parts: [{ codeName: 'SP', _fromSP: true }] }], _isSpaceGroup: true, _spaceIndex: parsedGroups.length });
           group = { glyphs: [] };
           continue;
         }
@@ -706,7 +706,7 @@ export class BlissParser {
           for (const twoPartPartString of twoPartPartStrings) {
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
 
-            const definition = blissElementDefinitions[part.code] || {};
+            const definition = blissElementDefinitions[part.codeName] || {};
             const codeString = definition.codeString;
 
             // Merge defaultOptions from definition (user options override defaults)
@@ -717,12 +717,12 @@ export class BlissParser {
             if (codeString) {
               if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {
                 part.parts = parseParts(definition.codeString, depth + 1);
-                // Keep part.code to preserve identifier alongside expansion
+                // Keep part.codeName to preserve identifier alongside expansion
               } else {
-                part.code = definition.codeString;
+                part.codeName = definition.codeString;
               }
             }
-            // Else keep part.code
+            // Else keep part.codeName
 
             if (definition.isIndicator) {
               part.isIndicator = true;
@@ -769,10 +769,10 @@ export class BlissParser {
           const part = glyph.parts[0];
           if (part._fromSP) {
             // Implicit space: resolve to default
-            part.code = defaultCode;
+            part.codeName = defaultCode;
           } else {
             // Explicit space: flag if it differs from default
-            if (part.code !== defaultCode) {
+            if (part.codeName !== defaultCode) {
               part._differsFromDefault = true;
             }
           }

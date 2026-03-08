@@ -386,7 +386,7 @@ export class BlissElement {
 
       // Check if this is a space group (all glyphs are space glyphs: TSP or QSP)
       const isSpaceGroup = this.#blissObj.glyphs?.every(g => {
-        const code = g.parts?.[0]?.code;
+        const code = g.parts?.[0]?.codeName;
         return code && isSpaceGlyph(code);
       }) ?? false;
 
@@ -414,7 +414,7 @@ export class BlissElement {
       if (isSpaceGroup) {
         // Sum dynamically-calculated widths for all space glyphs
         this.#advanceX = this.#blissObj.glyphs.reduce((sum, g) => {
-          const code = g.parts?.[0]?.code;
+          const code = g.parts?.[0]?.codeName;
           if (code === 'TSP') {
             return sum + (this.#sharedOptions.wordSpace - this.#sharedOptions.charSpace);
           } else if (code === 'QSP') {
@@ -443,7 +443,7 @@ export class BlissElement {
     } else {
       if (this.#level === 2) {
         // Character level
-        this.#codeName = this.#blissObj.glyphCode || this.#blissObj.code || "";
+        this.#codeName = this.#blissObj.glyphCode || this.#blissObj.codeName || "";
         this.#isBlissGlyph = !!this.#blissObj.isBlissGlyph;
         this.#isExternalGlyph = !!this.#blissObj.isExternalGlyph;
 
@@ -514,7 +514,7 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
         // Dynamic advanceX calculation for space glyphs (TSP, QSP)
-        const code = this.#blissObj.parts?.[0]?.code;
+        const code = this.#blissObj.parts?.[0]?.codeName;
         if (code && isSpaceGlyph(code)) {
           // Space glyphs have dynamic width based on word-space and char-space options
           if (code === 'TSP') {
@@ -543,14 +543,14 @@ export class BlissElement {
         };
       } else {
         // Part level (level >= 3)
-        const elementDefinition = blissElementDefinitions[this.#blissObj.code];
+        const elementDefinition = blissElementDefinitions[this.#blissObj.codeName];
         const isPredefinedElement = !!elementDefinition && !!elementDefinition.getPath;
         const isCompositeElement = !!this.#blissObj.parts && this.#blissObj.parts.length > 0;
   
         const isValidElement = isPredefinedElement || isCompositeElement;
         if (!isValidElement) {
           throw new Error(
-            `Unable to create Bliss element: "${this.#blissObj.code}" either lacks a ` +
+            `Unable to create Bliss element: "${this.#blissObj.codeName}" either lacks a ` +
             `rendering function (getPath()) or could not be parsed into component parts. ` + 
             `Check code or composition syntax.`
           );
@@ -1003,7 +1003,7 @@ export class BlissElement {
 
     function traverse(obj, level = 1) {
       if (!obj.elements) {
-          let str =  obj.code;
+          let str =  obj.codeName;
           if (obj.x !== 0 || obj.y !== 0) {
             str = `${str}:${obj.x},${obj.y}`;
           }
@@ -1032,7 +1032,7 @@ export class BlissElement {
     // Only unnamed composites (no codeName) recurse into children
     if (this.#codeName) {
         const element = {};
-        element.code = this.codeName;
+        element.codeName = this.codeName;
         element.width = this.width;
         element.x = this.#relativeToParentX;
         element.y = this.#relativeToParentY;
@@ -1051,7 +1051,7 @@ export class BlissElement {
   #handlePredefinedElement(definition) {
     if (typeof definition?.getPath !== 'function') throw new Error('An element is only predefined if has a proper getPath function.');
 
-    this.#codeName = this.#blissObj.code;                       //default: empty string
+    this.#codeName = this.#blissObj.codeName;                    //default: empty string
     this.#extraPathOptions = definition.extraPathOptions || {}; //default: empty object
     this.#isCharacter = !!definition.isCharacter;               //default: false
     this.#isShape = !!definition.isShape;                      //default: false

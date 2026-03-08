@@ -28,6 +28,10 @@ export class ElementHandle {
     return this.#level;
   }
 
+  get codeName() {
+    return this.#nodeRef?.glyphCode || this.#nodeRef?.codeName || '';
+  }
+
   // Resolve the current index of this node within its parent array
   #resolveIndex() {
     if (this.#level === 'group') {

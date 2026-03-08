@@ -329,15 +329,16 @@ class BlissSVGBuilder {
       ? BlissParser.parse(input)
       : structuredClone(input);
 
-    // Reverse toJSON() normalization: code → glyphCode (internal field name)
+    // Reverse toJSON() normalization: codeName → internal field names
     if (typeof input !== 'string' && blissObj.groups) {
       for (const group of blissObj.groups) {
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
-            if (glyph.code && !glyph.glyphCode) {
-              glyph.glyphCode = glyph.code;
-              delete glyph.code;
+            if (glyph.codeName && !glyph.glyphCode) {
+              glyph.glyphCode = glyph.codeName;
+              delete glyph.codeName;
             }
+            // Parts already use codeName internally, no restore needed
           }
         }
       }
@@ -668,13 +669,13 @@ class BlissSVGBuilder {
   static #isRawSpaceGroup(group) {
     if (!group.glyphs || group.glyphs.length === 0) return false;
     return group.glyphs.every(g =>
-      g.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(g.parts[0].code)
+      g.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(g.parts[0].codeName)
     );
   }
 
   /** Creates a default space group for insertion between words */
   static #makeSpaceGroup() {
-    return { glyphs: [{ parts: [{ code: 'TSP' }] }] };
+    return { glyphs: [{ parts: [{ codeName: 'TSP' }] }] };
   }
 
   /** Internal: removes a glyph group and its adjacent space from groups array */
@@ -715,18 +716,18 @@ class BlissSVGBuilder {
       return parts.map(part => {
         const x = (part.x ?? 0) + offsetX;
         const y = (part.y ?? 0) + offsetY;
-        if (!options.preserve && part.code && !builtInCodes.has(part.code)) {
+        if (!options.preserve && part.codeName && !builtInCodes.has(part.codeName)) {
           // Custom code with nested parts (e.g., positioned custom glyph)
           if (part.parts) {
             return serializeParts(part.parts, x, y);
           }
           // Custom composite shape (has codeString, no getPath)
-          const def = blissElementDefinitions[part.code];
+          const def = blissElementDefinitions[part.codeName];
           if (def?.isShape && def.codeString && !def.getPath) {
             return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
           }
         }
-        let str = part.code;
+        let str = part.codeName;
         if (x !== 0 || y !== 0) {
           str += `:${x},${y}`;
         }
@@ -737,25 +738,25 @@ class BlissSVGBuilder {
     // Serialize a glyph: B-codes emit their code, compositions emit parts.
     // Custom glyphs are decomposed to their codeString unless preserve is set.
     function serializeGlyph(glyph) {
-      if (glyph.isBlissGlyph && glyph.code) {
+      if (glyph.isBlissGlyph && glyph.codeName) {
         // Decompose custom glyphs (non-built-in) to portable output
         // Use the glyph's parts (which have correct positions) rather than
         // re-decomposing from the definition (which would lose position offsets)
-        if (!options.preserve && !builtInCodes.has(glyph.code)) {
+        if (!options.preserve && !builtInCodes.has(glyph.codeName)) {
           if (glyph.parts) {
             return serializeParts(glyph.parts);
           }
-          const def = blissElementDefinitions[glyph.code];
+          const def = blissElementDefinitions[glyph.codeName];
           if (def?.codeString) {
             return BlissSVGBuilder.#decomposeCodeString(def.codeString, 0, 0);
           }
         }
-        return glyph.code;
+        return glyph.codeName;
       }
       if (glyph.parts) {
         return serializeParts(glyph.parts);
       }
-      return glyph.code || '';
+      return glyph.codeName || '';
     }
 
     // Check if a group is a space (TSP, QSP, etc.)
@@ -763,7 +764,7 @@ class BlissSVGBuilder {
     function isSpaceGroup(group) {
       if (!group.glyphs || group.glyphs.length === 0) return false;
       return group.glyphs.every(g =>
-        g.parts?.length === 1 && SPACE_CODES.has(g.parts[0].code)
+        g.parts?.length === 1 && SPACE_CODES.has(g.parts[0].codeName)
       );
     }
 
@@ -776,7 +777,7 @@ class BlissSVGBuilder {
         );
         if (hasNonDefaultSpace) {
           // Explicit space codes that differ from default — keep them
-          const codes = group.glyphs.map(g => g.parts[0].code);
+          const codes = group.glyphs.map(g => g.parts[0].codeName);
           segments.push(codes.join('/'));
         } else {
           // Default spaces — use // shorthand, N spaces = N+1 slashes
@@ -799,9 +800,9 @@ class BlissSVGBuilder {
 
   /**
    * Returns the normalized parsed structure. Typeless aliases (word-level
-   * codes) are always expanded. Custom glyphs that resolve to a single
-   * built-in code are decomposed by default; complex composition glyphs
-   * keep their custom code (use toString() for full decomposition).
+   * codes) are always expanded. Custom glyphs are decomposed by default:
+   * simple aliases resolve to their built-in code, complex compositions
+   * drop the custom code (parts are already expanded).
    * Pass { preserve: true } to keep all custom names.
    *
    * @param {Object} [options]
@@ -810,32 +811,35 @@ class BlissSVGBuilder {
    */
   toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
-    // Normalize glyph-level objects: expose glyphCode as 'code' for public API
     if (obj.groups) {
       for (const group of obj.groups) {
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
+            // Normalize glyphCode → codeName for public API
             if (glyph.glyphCode) {
               // Decompose custom glyphs to portable codes by default
               if (!options.preserve && !builtInCodes.has(glyph.glyphCode)) {
                 const def = blissElementDefinitions[glyph.glyphCode];
                 if (def?.codeString) {
-                  // Resolve to the underlying built-in code
-                  glyph.code = BlissSVGBuilder.#resolveToBuiltInCode(glyph.glyphCode);
+                  // Resolve to the underlying built-in code (null for complex compositions)
+                  const resolved = BlissSVGBuilder.#resolveToBuiltInCode(glyph.glyphCode);
+                  if (resolved) glyph.codeName = resolved;
                 } else {
-                  glyph.code = glyph.glyphCode;
+                  glyph.codeName = glyph.glyphCode;
                 }
               } else {
-                glyph.code = glyph.glyphCode;
+                glyph.codeName = glyph.glyphCode;
               }
               delete glyph.glyphCode;
             }
+            // Parts already use codeName internally, no rename needed
           }
         }
       }
     }
     return obj;
   }
+
 
 
   /**
@@ -947,7 +951,7 @@ class BlissSVGBuilder {
       if (builtInCodes.has(def.codeString)) return def.codeString;
       return BlissSVGBuilder.#resolveToBuiltInCode(def.codeString, visited);
     }
-    return code; // Complex codeString — keep the custom code in toJSON
+    return null; // Complex codeString — parts already expanded, no single code
   }
 
   // Check if a codeString references only allowed types
