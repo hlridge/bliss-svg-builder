@@ -1583,11 +1583,11 @@ class BlissSVGBuilder {
       const gridEarthColor = this.#processedOptions.gridEarthColor ?? "#858585";
 
       gridPath =
-  `<path class="grid-line grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},1h${width}M${gridOffsetX},3h${width}M${gridOffsetX},5h${width}M${gridOffsetX},7h${width}M${gridOffsetX},9h${width}M${gridOffsetX},11h${width}M${gridOffsetX},13h${width}M${gridOffsetX},15h${width}M${gridOffsetX},17h${width}M${gridOffsetX},19h${width}${getVerticalLines("minor")}"/>
-  <path class="grid-line grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},2h${width}M${gridOffsetX},6h${width}M${gridOffsetX},10h${width}M${gridOffsetX},14h${width}M${gridOffsetX},18h${width}${getVerticalLines("medium")}"/>
-  <path class="grid-line grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},0h${width}M${gridOffsetX},4h${width}M${gridOffsetX},12h${width}M${gridOffsetX},20h${width}${getVerticalLines("major")}"/>
-  <path class="grid-line grid-line--major grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},8h${width}"/>
-  <path class="grid-line grid-line--major grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},16h${width}"/>
+  `<path class="bliss-grid-line bliss-grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},1h${width}M${gridOffsetX},3h${width}M${gridOffsetX},5h${width}M${gridOffsetX},7h${width}M${gridOffsetX},9h${width}M${gridOffsetX},11h${width}M${gridOffsetX},13h${width}M${gridOffsetX},15h${width}M${gridOffsetX},17h${width}M${gridOffsetX},19h${width}${getVerticalLines("minor")}"/>
+  <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},2h${width}M${gridOffsetX},6h${width}M${gridOffsetX},10h${width}M${gridOffsetX},14h${width}M${gridOffsetX},18h${width}${getVerticalLines("medium")}"/>
+  <path class="bliss-grid-line bliss-grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},0h${width}M${gridOffsetX},4h${width}M${gridOffsetX},12h${width}M${gridOffsetX},20h${width}${getVerticalLines("major")}"/>
+  <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},8h${width}"/>
+  <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="M${gridOffsetX},16h${width}"/>
   `;
     }
 
