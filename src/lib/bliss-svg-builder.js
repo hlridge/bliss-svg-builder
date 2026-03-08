@@ -265,6 +265,15 @@ class BlissSVGBuilder {
     if ('background' in rawOptions) {
       options.background = escapeHtml(rawOptions.background); // empty string => transparent background
     }
+    if ('background-top' in rawOptions) {
+      options.backgroundTop = escapeHtml(rawOptions['background-top']);
+    }
+    if ('background-mid' in rawOptions) {
+      options.backgroundMid = escapeHtml(rawOptions['background-mid']);
+    }
+    if ('background-bottom' in rawOptions) {
+      options.backgroundBottom = escapeHtml(rawOptions['background-bottom']);
+    }
     if ('text' in rawOptions) {
       options.text = escapeHtml(rawOptions.text);
     }
@@ -1532,12 +1541,33 @@ class BlissSVGBuilder {
     const svgTitle = this.#processedOptions.svgTitle ?? "";
     const svgDesc = this.#processedOptions.svgDesc ?? "";
     const background = this.#processedOptions.background ?? "";
+    const backgroundTop = this.#processedOptions.backgroundTop;
+    const backgroundMid = this.#processedOptions.backgroundMid;
+    const backgroundBottom = this.#processedOptions.backgroundBottom;
+    const hasZones = backgroundTop || backgroundMid || backgroundBottom;
 
     let title = svgTitle ? `<title>${svgTitle}</title>` : "";
     let desc = svgDesc ? `<desc>${svgDesc}</desc>` : "";
     let gridPath = "";
     let svgText = "";//this._getSvgText();
-    let backgroundRect = (background === "" ? "" : `<rect x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`);
+
+    let backgroundContent;
+    if (hasZones) {
+      const bulkBg = background;
+      const topColor = backgroundTop || bulkBg;
+      const midColor = backgroundMid || bulkBg;
+      const bottomColor = backgroundBottom || bulkBg;
+
+      const zoneRects = [
+        topColor ? `<rect class="bliss-zone bliss-zone--top" x="${viewBoxX}" y="0" width="${round(viewBoxWidth)}" height="8" stroke="none" fill="${topColor}"/>` : '',
+        midColor ? `<rect class="bliss-zone bliss-zone--mid" x="${viewBoxX}" y="8" width="${round(viewBoxWidth)}" height="8" stroke="none" fill="${midColor}"/>` : '',
+        bottomColor ? `<rect class="bliss-zone bliss-zone--bottom" x="${viewBoxX}" y="16" width="${round(viewBoxWidth)}" height="4" stroke="none" fill="${bottomColor}"/>` : '',
+      ].filter(Boolean).join('\n  ');
+
+      backgroundContent = `<g class="bliss-background">\n  ${zoneRects}\n</g>`;
+    } else {
+      backgroundContent = background === "" ? "" : `<rect x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`;
+    }
 
     let getVerticalLines = (type) => {
       let pathData = "";
@@ -1613,7 +1643,7 @@ class BlissSVGBuilder {
 
     let svgStr =
 `<svg xmlns="http://www.w3.org/2000/svg" data-generator="bliss-svg-builder/${LIB_VERSION}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}">
-  ${title}${desc}${backgroundRect}${gridPath}<g class="bliss-content" ${contentAttrsStr}>${content}${svgText}</g>
+  ${title}${desc}${backgroundContent}${gridPath}<g class="bliss-content" ${contentAttrsStr}>${content}${svgText}</g>
 </svg>`;
 
     // Clean up empty <path d=""></path> elements from DOT/COMMA/external glyphs
