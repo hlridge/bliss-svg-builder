@@ -954,6 +954,17 @@ class BlissSVGBuilder {
     return null; // Complex codeString — parts already expanded, no single code
   }
 
+  // Determine the type of a definition entry.
+  // Single source of truth used by getDefinition, listDefinitions,
+  // patchDefinition, and #validateReferences.
+  static #detectType(def) {
+    if (def.isShape) return 'shape';
+    if (def.isExternalGlyph) return 'externalGlyph';
+    if (def.isBlissGlyph || def.glyphCode) return 'glyph';
+    if (def.codeString !== undefined) return 'bare';
+    return 'space';
+  }
+
   // Check if a codeString references only allowed types
   static #validateReferences(code, codeString, allowedTypes) {
     const refs = BlissSVGBuilder.#extractReferencedCodes(codeString);
@@ -963,11 +974,7 @@ class BlissSVGBuilder {
       }
       const def = blissElementDefinitions[ref];
       if (!def) continue; // Unknown codes will fail at parse time
-      const type = def.isShape ? 'shape'
-        : def.isExternalGlyph ? 'externalGlyph'
-        : (def.isBlissGlyph || def.glyphCode) ? 'glyph'
-        : def.codeString !== undefined ? 'bare'
-        : 'space';
+      const type = BlissSVGBuilder.#detectType(def);
       if (!allowedTypes.includes(type)) {
         return `"${code}": cannot reference ${type} "${ref}". Allowed types: ${allowedTypes.join(', ')}`;
       }
@@ -1132,23 +1139,13 @@ class BlissSVGBuilder {
     blissElementDefinitions[code] = entry;
   }
 
-  static #defineBare(code, definition, options = {}) {
-    BlissSVGBuilder.#validateCode(code);
-
-    if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
-      throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
-    }
-
-    if (blissElementDefinitions[code] && !options.overwrite) {
-      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
-    }
-
-    // Resolve chained bare aliases at definition time.
-    // Split on DSL delimiters, replace any bare alias tokens with their codeString, repeat.
-    let resolved = definition.codeString;
+  // Resolve chained bare aliases in a codeString.
+  // Replaces bare alias tokens with their resolved codeString, repeating
+  // until no more aliases remain (up to depth 50).
+  static #resolveBareAliases(codeString) {
+    let resolved = codeString;
     for (let depth = 0; depth < 50; depth++) {
       let changed = false;
-      // Split on / and ; boundaries, resolve each token
       resolved = resolved.replace(
         /(?<=^|[/;])([A-Za-z_][\w]*)(?=$|[/;:^])/g,
         (match, token) => {
@@ -1162,9 +1159,22 @@ class BlissSVGBuilder {
       );
       if (!changed) break;
     }
+    return resolved;
+  }
+
+  static #defineBare(code, definition, options = {}) {
+    BlissSVGBuilder.#validateCode(code);
+
+    if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
+      throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
+    }
+
+    if (blissElementDefinitions[code] && !options.overwrite) {
+      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
+    }
 
     const entry = {
-      codeString: resolved
+      codeString: BlissSVGBuilder.#resolveBareAliases(definition.codeString)
     };
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
@@ -1250,7 +1260,6 @@ class BlissSVGBuilder {
 
   /**
    * Get definition metadata for a code (frozen copy, not the live object).
-   * Functions (like getPath) are excluded from the copy.
    *
    * @param {string} code
    * @returns {Object|null} Frozen metadata object, or null if not found
@@ -1261,7 +1270,6 @@ class BlissSVGBuilder {
 
     const copy = {};
     for (const [key, value] of Object.entries(def)) {
-      if (typeof value === 'function') continue;
       if (typeof value === 'object' && value !== null) {
         copy[key] = Object.freeze({ ...value });
       } else {
@@ -1269,17 +1277,9 @@ class BlissSVGBuilder {
       }
     }
 
-    // Add computed type.
-    // Two glyph detection paths: isBlissGlyph (set on B-code definitions loaded from glyph data)
-    // and codeString fallback (for custom glyphs added via defineGlyph or old extendData).
-    if (def.isShape) copy.type = 'shape';
-    else if (def.isExternalGlyph) copy.type = 'externalGlyph';
-    else if (def.isBlissGlyph) copy.type = 'glyph';
-    else if (def.codeString) copy.type = 'glyph';
-    else copy.type = 'space';
+    copy.type = BlissSVGBuilder.#detectType(def);
 
     copy.isBuiltIn = builtInCodes.has(code);
-    if (typeof def.getPath === 'function') copy.hasGetPath = true;
 
     return Object.freeze(copy);
   }
@@ -1288,7 +1288,7 @@ class BlissSVGBuilder {
    * List all defined codes, optionally filtered by type.
    *
    * @param {Object} [filter]
-   * @param {'shape'|'glyph'|'externalGlyph'|'space'} [filter.type]
+   * @param {'shape'|'glyph'|'externalGlyph'|'bare'|'space'} [filter.type]
    * @returns {string[]}
    */
   static listDefinitions(filter = {}) {
@@ -1297,13 +1297,7 @@ class BlissSVGBuilder {
     if (!filter.type) return codes;
 
     return codes.filter(code => {
-      const def = blissElementDefinitions[code];
-      // Uses same type detection logic as getDefinition() to ensure consistency
-      const type = def.isShape ? 'shape'
-        : def.isExternalGlyph ? 'externalGlyph'
-        : (def.isBlissGlyph || def.codeString) ? 'glyph'
-        : 'space';
-      return type === filter.type;
+      return BlissSVGBuilder.#detectType(blissElementDefinitions[code]) === filter.type;
     });
   }
 
@@ -1323,6 +1317,103 @@ class BlissSVGBuilder {
     }
     delete blissElementDefinitions[code];
     return true;
+  }
+
+  /**
+   * Patch one or more properties on an existing custom definition.
+   * Only allowed keys for the definition's type are accepted.
+   * Built-in definitions cannot be patched.
+   *
+   * @param {string} code - The code to patch
+   * @param {Object} changes - Properties to update
+   * @returns {{ patched: true }}
+   * @throws {Error} If code is not defined, is built-in, or changes are invalid
+   */
+  static patchDefinition(code, changes) {
+    if (!(code in blissElementDefinitions)) {
+      throw new Error(`patchDefinition("${code}"): code is not defined.`);
+    }
+    if (builtInCodes.has(code)) {
+      throw new Error(`patchDefinition("${code}"): cannot patch built-in definitions.`);
+    }
+    if (!changes || typeof changes !== 'object') {
+      throw new Error(`patchDefinition("${code}"): changes must be an object.`);
+    }
+
+    const def = blissElementDefinitions[code];
+
+    const type = BlissSVGBuilder.#detectType(def);
+
+    // Reject type changes and internal flags
+    const internalKeys = new Set(['type', 'isShape', 'isExternalGlyph', 'isBlissGlyph', 'glyphCode', 'isBuiltIn']);
+    for (const key of Object.keys(changes)) {
+      if (internalKeys.has(key)) {
+        throw new Error(`patchDefinition("${code}"): cannot change "${key}" via patch.`);
+      }
+    }
+
+    // Allowed keys per type
+    const allowedByType = {
+      glyph: ['codeString', 'anchorOffsetX', 'anchorOffsetY', 'width', 'isIndicator', 'shrinksPrecedingWordSpace', 'kerningRules', 'defaultOptions'],
+      shape: ['getPath', 'codeString', 'width', 'height', 'x', 'y', 'extraPathOptions', 'defaultOptions'],
+      externalGlyph: ['getPath', 'width', 'glyph', 'y', 'height', 'kerningRules', 'defaultOptions'],
+      bare: ['codeString', 'defaultOptions'],
+      space: ['defaultOptions']
+    };
+
+    const allowed = new Set(allowedByType[type] || []);
+    for (const key of Object.keys(changes)) {
+      if (!allowed.has(key)) {
+        throw new Error(`patchDefinition("${code}"): "${key}" is not a valid property for type "${type}".`);
+      }
+    }
+
+    // Validate getPath is a function if provided
+    if ('getPath' in changes && typeof changes.getPath !== 'function') {
+      throw new Error(`patchDefinition("${code}"): "getPath" must be a function.`);
+    }
+
+    // If codeString is being patched, validate references and circular refs
+    if ('codeString' in changes) {
+      const newCodeString = changes.codeString;
+      if (typeof newCodeString !== 'string' || newCodeString.length === 0) {
+        throw new Error(`patchDefinition("${code}"): "codeString" must be a non-empty string.`);
+      }
+      const allowedRefTypes = type === 'glyph' ? ['glyph', 'shape']
+        : type === 'shape' ? ['shape']
+        : ['glyph', 'shape', 'bare', 'externalGlyph'];
+      const refError = BlissSVGBuilder.#validateReferences(code, newCodeString, allowedRefTypes);
+      if (refError) throw new Error(`patchDefinition(${refError})`);
+      if (BlissSVGBuilder.#hasCircularReference(code, newCodeString)) {
+        throw new Error(`patchDefinition("${code}"): circular reference detected`);
+      }
+    }
+
+    // For bare definitions, resolve chained aliases in codeString
+    if ('codeString' in changes && type === 'bare') {
+      changes = { ...changes, codeString: BlissSVGBuilder.#resolveBareAliases(changes.codeString) };
+    }
+
+    // Apply changes
+    for (const [key, value] of Object.entries(changes)) {
+      if (key === 'defaultOptions') {
+        if (value && typeof value === 'object' && Object.keys(value).length > 0) {
+          def.defaultOptions = { ...value };
+        } else {
+          delete def.defaultOptions;
+        }
+      } else if (key === 'kerningRules') {
+        if (value && typeof value === 'object') {
+          def.kerningRules = { ...value };
+        } else {
+          delete def.kerningRules;
+        }
+      } else {
+        def[key] = value;
+      }
+    }
+
+    return { patched: true };
   }
 
   // Compute how many grid units to crop from top in compact mode.

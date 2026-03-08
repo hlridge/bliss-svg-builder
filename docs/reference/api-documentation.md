@@ -114,7 +114,7 @@ const obj = builder.toJSON();
 
 Custom code behavior:
 - **Typeless aliases** (word-level codes) are always expanded to their underlying codes.
-- **Custom glyphs** that resolve to a single built-in code are decomposed by default (e.g., `LOVE` becomes `B431`). Complex composition glyphs keep their custom code in the JSON structure (use `toString()` for full decomposition).
+- **Custom glyphs** are decomposed by default. Simple aliases resolve to their built-in code (e.g., `LOVE` becomes `B431`). Complex compositions drop the custom code entirely (parts are already expanded).
 - Pass `{ preserve: true }` to keep all custom code names as-is.
 
 ```js
@@ -410,9 +410,9 @@ result.skipped;  // codes that already existed
 result.errors;   // codes that failed validation
 ```
 
-The `type` field controls what kind of definition is created. When omitted, `codeString` definitions create bare codes (words, aliases), while `getPath` definitions are auto-detected as shapes or external glyphs.
+The `type` field controls what kind of definition is created: `'glyph'`, `'shape'`, or `'externalGlyph'`. When omitted, `codeString` definitions create bare codes (words, aliases), while `getPath` definitions are auto-detected as shapes or external glyphs. Note: `'bare'` and `'space'` are read-only types reported by `getDefinition()` and `listDefinitions()`, not valid inputs to `define()`.
 
-**Bare definition (no type) — words, aliases, general codes:**
+**Bare definition (omit type) — words, aliases, general codes:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -444,7 +444,9 @@ The `type` field controls what kind of definition is created. When omitted, `cod
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
 | `defaultOptions` | `object` | no | Default options, overridable per-element |
 
-**type: 'externalGlyph' — external font character:**
+**type: 'externalGlyph' — external font character:** <Badge type="warning" text="Experimental" />
+
+For adding characters from external font systems. Requires providing your own SVG path data.
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -482,19 +484,41 @@ BlissSVGBuilder.isDefined('CUSTOM'); // false (unless you defined it)
 
 ### `getDefinition(code)`
 
-Get a frozen metadata object for a code. Functions (like `getPath`) are excluded:
+Get a frozen metadata object for a code:
 
 ```js
 const def = BlissSVGBuilder.getDefinition('B313');
 // {
-//   type: 'glyph',        // 'shape' | 'glyph' | 'externalGlyph' | 'space'
+//   type: 'glyph',        // 'shape' | 'glyph' | 'externalGlyph' | 'bare' | 'space'
 //   isBuiltIn: true,
 //   codeString: 'H:0,8',
 //   ...
 // }
 ```
 
-Returns `null` if the code is not defined. The returned object is frozen — you cannot modify it.
+Returns `null` if the code is not defined. The returned object is frozen.
+
+Functions like `getPath` are included in the returned object (as the same function reference), so the result can be used for read-modify-write patterns.
+
+### `patchDefinition(code, changes)`
+
+Patch one or more properties on an existing custom definition without fully replacing it:
+
+```js
+BlissSVGBuilder.patchDefinition('MYCHAR', {
+  anchorOffsetX: 2.0
+});
+```
+
+Returns `{ patched: true }` on success. Only properties valid for the definition's type are accepted. Built-in definitions cannot be patched.
+
+Allowed properties by type:
+- **glyph**: `codeString`, `anchorOffsetX`, `anchorOffsetY`, `width`, `isIndicator`, `shrinksPrecedingWordSpace`, `kerningRules`, `defaultOptions`
+- **shape**: `getPath`, `codeString`, `width`, `height`, `x`, `y`, `extraPathOptions`, `defaultOptions`
+- **externalGlyph**: `getPath`, `width`, `glyph`, `y`, `height`, `kerningRules`, `defaultOptions`
+- **bare**: `codeString`, `defaultOptions`
+
+Patching `defaultOptions` replaces the entire sub-object (not a deep merge). Patching `codeString` validates references and checks for circular dependencies.
 
 ### `listDefinitions(filter?)`
 
@@ -504,17 +528,19 @@ List all defined codes, optionally filtered by type:
 BlissSVGBuilder.listDefinitions();                    // all codes
 BlissSVGBuilder.listDefinitions({ type: 'shape' });   // only shapes
 BlissSVGBuilder.listDefinitions({ type: 'glyph' });   // only glyphs
+BlissSVGBuilder.listDefinitions({ type: 'bare' });    // only bare definitions
 ```
 
-Filter types: `'shape'`, `'glyph'`, `'externalGlyph'`, `'space'`
+Filter types: `'shape'`, `'glyph'`, `'externalGlyph'`, `'bare'`, `'space'`
 
 ### `removeDefinition(code)`
 
-Remove a custom definition. Built-in definitions cannot be removed:
+Remove a custom definition. Returns `true` if removed, `false` if the code doesn't exist. Throws an error for built-in definitions (removing a built-in is a programming error):
 
 ```js
-BlissSVGBuilder.defineGlyph('TEMP', { codeString: 'H:0,8' });
+BlissSVGBuilder.define({ TEMP: { codeString: 'H:0,8' } });
 BlissSVGBuilder.removeDefinition('TEMP'); // true
+BlissSVGBuilder.removeDefinition('TEMP'); // false (already removed)
 
 BlissSVGBuilder.removeDefinition('B313');
 // Error: cannot remove built-in definitions
