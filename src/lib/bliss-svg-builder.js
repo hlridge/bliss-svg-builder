@@ -1526,14 +1526,14 @@ class BlissSVGBuilder {
       const bottomHeight = round(viewBoxY + viewBoxHeight - 16);
 
       const zoneRects = [
-        topColor ? `<rect class="bliss-zone bliss-zone--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
-        midColor ? `<rect class="bliss-zone bliss-zone--mid" x="${zoneX}" y="8" width="${zoneWidth}" height="8" stroke="none" fill="${midColor}"/>` : '',
-        bottomColor ? `<rect class="bliss-zone bliss-zone--bottom" x="${zoneX}" y="16" width="${zoneWidth}" height="${bottomHeight}" stroke="none" fill="${bottomColor}"/>` : '',
+        topColor ? `<rect class="bliss-background--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
+        midColor ? `<rect class="bliss-background--mid" x="${zoneX}" y="8" width="${zoneWidth}" height="8" stroke="none" fill="${midColor}"/>` : '',
+        bottomColor ? `<rect class="bliss-background--bottom" x="${zoneX}" y="16" width="${zoneWidth}" height="${bottomHeight}" stroke="none" fill="${bottomColor}"/>` : '',
       ].filter(Boolean).join('\n  ');
 
       backgroundContent = `<g class="bliss-background">\n  ${zoneRects}\n</g>`;
     } else {
-      backgroundContent = background === "" ? "" : `<rect x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`;
+      backgroundContent = background === "" ? "" : `<rect class="bliss-background" x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`;
     }
 
     // Grid boundaries adjusted for cropping
