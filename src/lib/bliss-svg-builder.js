@@ -1557,11 +1557,16 @@ class BlissSVGBuilder {
       const topColor = backgroundTop || bulkBg;
       const midColor = backgroundMid || bulkBg;
       const bottomColor = backgroundBottom || bulkBg;
+      const zoneX = round(viewBoxX);
+      const zoneWidth = round(viewBoxWidth);
+      const topY = round(viewBoxY);
+      const topHeight = round(8 - viewBoxY);
+      const bottomHeight = round(viewBoxY + viewBoxHeight - 16);
 
       const zoneRects = [
-        topColor ? `<rect class="bliss-zone bliss-zone--top" x="${viewBoxX}" y="0" width="${round(viewBoxWidth)}" height="8" stroke="none" fill="${topColor}"/>` : '',
-        midColor ? `<rect class="bliss-zone bliss-zone--mid" x="${viewBoxX}" y="8" width="${round(viewBoxWidth)}" height="8" stroke="none" fill="${midColor}"/>` : '',
-        bottomColor ? `<rect class="bliss-zone bliss-zone--bottom" x="${viewBoxX}" y="16" width="${round(viewBoxWidth)}" height="4" stroke="none" fill="${bottomColor}"/>` : '',
+        topColor ? `<rect class="bliss-zone bliss-zone--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
+        midColor ? `<rect class="bliss-zone bliss-zone--mid" x="${zoneX}" y="8" width="${zoneWidth}" height="8" stroke="none" fill="${midColor}"/>` : '',
+        bottomColor ? `<rect class="bliss-zone bliss-zone--bottom" x="${zoneX}" y="16" width="${zoneWidth}" height="${bottomHeight}" stroke="none" fill="${bottomColor}"/>` : '',
       ].filter(Boolean).join('\n  ');
 
       backgroundContent = `<g class="bliss-background">\n  ${zoneRects}\n</g>`;
