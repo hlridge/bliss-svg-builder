@@ -1,124 +1,103 @@
 # Grid Customization
 
-Customize the grid's appearance for better visibility during design.
+The default grid is designed to be subtle: light gray lines that reveal the coordinate system without competing with the symbols. Most of the time, the default works well. Customization is for when your specific context needs something different.
 
-## Enabling the Grid
+<Demo code="[grid=1]||B313" title="Default grid: subtle, readable" />
 
-Use `grid=1` to show the grid overlay:
+For a thorough introduction to the grid and its reference lines, see [Understanding the Grid](/handbook/coordinate-system/understanding-the-grid).
 
-<Demo code="[grid=1]||B313" title="Grid enabled" />
+## Adapting the Grid
 
-<Demo code="B313" title="Grid disabled (default)" />
+### On Colored Backgrounds
 
-| Option | Default | Values |
-|--------|---------|--------|
-| `grid` | `0` | `0` or `1` |
+Colored backgrounds are common in Bliss, especially where backgrounds categorize Bliss words by part-of-speech through color coding. The default light gray grid can lose contrast or clash with these backgrounds. You can adapt the grid colors so the line hierarchy stays readable:
 
-## Grid Colors
+<Demo code="[grid=1;background=#cee9f6]||B513" title="Default grid on a blue background: lines fade into the color and looks a bit odd" />
 
-### All Grid Lines
+<Demo code="[grid=1;background=#cee9f6;grid-color=#bed6e2;grid-major-color=#a1b6c0;grid-sky-color=#6b7980;grid-earth-color=#6b7980]||B513" title="Adapted: grid lines tuned to the background" />
 
-Set all grid lines to a single color with `grid-color`:
+Light backgrounds give a good contrast for symbols and grid. Here is one example, using values from the Blissary.com default color scheme. You can adjust them to suit your preferences. For example, print might require more saturated colors.
 
-<Demo code="[grid=1;grid-color=#ff0000]||B313" title="Red grid" />
+| Background | Hex | Sky / Earth | Major | Minor / Medium |
+|---|---|---|---|---|
+| White | `#ffffff` | `#858585` | `#c7c7c7` | `#ebebeb` |
+| Yellow | `#f5eb82` | `#7f7a44` | `#bfb765` | `#e1d878` |
+| Green | `#dcf0aa` | `#727d58` | `#acbb85` | `#cadd9c` |
+| Red | `#fbcac4` | `#836966` | `#c49e99` | `#e7bab4` |
+| Blue | `#cee9f6` | `#6b7980` | `#a1b6c0` | `#bed6e2` |
+| Orange | `#ffdeaa` | `#857358` | `#c7ad85` | `#ebcc9c` |
+| Gray | `#e2e2e2` | `#767676` | `#b0b0b0` | `#d0d0d0` |
 
-<Demo code="[grid=1;grid-color=#0066cc]||B313" title="Blue grid" />
+Each background with adapted grid:
 
-<Demo code="[grid=1;grid-color=#888888]||B313" title="Gray grid" />
+<Demo code="[grid=1;background=#ffffff;grid-color=#ebebeb;grid-major-color=#c7c7c7;grid-sky-color=#858585;grid-earth-color=#858585]||B313" title="White" />
 
-### Category Colors
+<Demo code="[grid=1;background=#f5eb82;grid-color=#e1d878;grid-major-color=#bfb765;grid-sky-color=#7f7a44;grid-earth-color=#7f7a44]||B313" title="Yellow" />
 
-Control colors by grid line category:
+<Demo code="[grid=1;background=#dcf0aa;grid-color=#cadd9c;grid-major-color=#acbb85;grid-sky-color=#727d58;grid-earth-color=#727d58]||B313" title="Green" />
 
-| Option | Description |
-|--------|-------------|
-| `grid-major-color` | Major lines (every 4 units) |
-| `grid-medium-color` | Medium lines (every 2 units) |
-| `grid-minor-color` | Minor lines (every 1 unit) |
+<Demo code="[grid=1;background=#fbcac4;grid-color=#e7bab4;grid-major-color=#c49e99;grid-sky-color=#836966;grid-earth-color=#836966]||B313" title="Red / Pink" />
 
-<Demo code="[grid=1;grid-major-color=#0000ff;grid-minor-color=#ccccff]||B313" title="Blue major, light blue minor" />
+<Demo code="[grid=1;background=#cee9f6;grid-color=#bed6e2;grid-major-color=#a1b6c0;grid-sky-color=#6b7980;grid-earth-color=#6b7980]||B313" title="Blue" />
 
-<Demo code="[grid=1;grid-major-color=#cc0000;grid-medium-color=#ff6666;grid-minor-color=#ffcccc]||B313" title="Red gradient" />
+<Demo code="[grid=1;background=#ffdeaa;grid-color=#ebcc9c;grid-major-color=#c7ad85;grid-sky-color=#857358;grid-earth-color=#857358]||B313" title="Orange" />
 
-### Reference Line Colors
+<Demo code="[grid=1;background=#e2e2e2;grid-color=#d0d0d0;grid-major-color=#b0b0b0;grid-sky-color=#767676;grid-earth-color=#767676]||B313" title="Gray" />
 
-Customize the sky and earth reference lines:
+### Dark Backgrounds
 
-| Option | Description |
-|--------|-------------|
-| `grid-sky-color` | Sky line (y=8) |
-| `grid-earth-color` | Earth line (y=16) |
+On dark backgrounds, the default grid becomes dominant. Use darker grid colors so the grid stays subordinate:
 
-<Demo code="[grid=1;grid-sky-color=#00cc00;grid-earth-color=#cc6600]||B313" title="Green sky, orange earth" />
+<Demo code="[grid=1;background=#111;color=#eee]||B313" title="Default grid on a dark background: grid dominates and looks odd" />
 
-## Grid Stroke Width
+<Demo code="[grid=1;background=#111;color=#eee;grid-color=#888;grid-major-color=#aaa]||B313" title="Adjusted: grid visible but not dominant" />
 
-Control the thickness of grid lines:
+### Highlighting the Skyline and Earthline
 
-### All Lines
+The skyline (y=8) and earthline (y=16) are the most important reference lines. They define where the base characters sit. You can use them in text as help lines, by applying them subtly:
 
-<Demo code="[grid=1;grid-stroke-width=0.3]||B313" title="Thin grid lines" />
+<Demo code="[grid=1;grid-color=none;grid-sky-color=blue;grid-earth-color=blue]||B313" title="Skyline and earthline marked with suble lines" />
 
-<Demo code="[grid=1;grid-stroke-width=1]||B313" title="Thick grid lines" />
+### Switch the Grid for Zone Colors
 
-### By Category
+Another way to visualize the common base character area, is by using backround colors for zones to mark the skyline and earthline. The grid is divided in three background zones: above y=8, between y=8 and y=16 and below y=16:
 
-| Option | Description |
-|--------|-------------|
-| `grid-stroke-width` | All grid lines |
-| `grid-major-stroke-width` | Major lines only |
-| `grid-minor-stroke-width` | Minor lines only |
+<Demo code="[grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313;B81" title="Skyline and earthline marked with zoned background colors" />
 
-<Demo code="[grid=1;grid-major-stroke-width=1;grid-minor-stroke-width=0.2]||B313" title="Bold major, subtle minor" />
 
-## Color Hierarchy
+### Use Zone Colors with <code>crop=compact</code>
 
-Grid options follow a hierarchy from general to specific:
+The full vertical space for any characters is always 20 grid unit, but all vertical space is rarely used, leaving the Blissymbols tiny on the display in many AAC devices. With <code>crop=compact</code>, 20% of the grid is automatically cropped from the top, or bottom, if there is room to do so. Together with the grid, or marking skyline and earthline in one way or another, this can enlarge Bliss symbols a bit that would otherwise be quite tiny. With 4 units cropped, the symbol has room to grow.
 
-1. `grid-color` (most general) - Sets all lines
-2. `grid-major-color`, `grid-minor-color` (category) - Override for category
-3. `grid-sky-color`, `grid-earth-color` (specific) - Override for specific lines
+<Demo code="[grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313" title="Normal, without cropping" />
 
-Example:
+<Demo code="[crop=compact;grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313" fullHeight title="Larger with 4 units automatically cropped from top, by default" />
+
+<Demo code="[crop=compact;grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B355;B86" fullHeight title="Larger with 4 units automatically cropped from bottom when there is no space to crop from top" />
+
+<Demo code="[crop=compact;grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313;B81/B367/B355;B86" fullHeight title="If there is no room to crop anything, nothing will get cropped" />
+
+## Option Hierarchy
+
+Grid color and stroke-width options follow a hierarchy from general to specific. A bulk option sets the default; more specific options override it:
+
+1. `grid-color` / `grid-stroke-width` set all lines
+2. `grid-major-color`, `grid-medium-color`, `grid-minor-color` override by category
+3. `grid-sky-color`, `grid-earth-color` override specific reference lines
 
 ```
-[grid=1;grid-color=#cccccc;grid-major-color=#666666;grid-sky-color=#00aa00]||B313
+[grid=1;grid-color=#cccccc;grid-major-color=#999999;grid-sky-color=#4488ff]||B313
 ```
 
-This sets:
-- All lines to light gray (`#cccccc`)
-- Major lines override to dark gray (`#666666`)
-- Sky line overrides to green (`#00aa00`)
+This sets all lines to light gray, major lines to medium gray, and the skyline to blue:
 
-<Demo code="[grid=1;grid-color=#cccccc;grid-major-color=#666666;grid-sky-color=#00aa00]||B313" title="Color hierarchy example" />
+<Demo code="[grid=1;grid-color=#cccccc;grid-major-color=#999999;grid-sky-color=#4488ff]||B313" title="Hierarchy: bulk, category, specific" />
 
-## Practical Examples
-
-### High Contrast Grid
-
-For precise positioning work:
-
-<Demo code="[grid=1;grid-color=#000000;grid-stroke-width=0.5]||B313" title="High contrast for precision" />
-
-### Subtle Background Grid
-
-For screenshots or documentation:
-
-<Demo code="[grid=1;grid-color=#e0e0e0;grid-stroke-width=0.3]||B313" title="Subtle grid" />
-
-### Content Area Emphasis
-
-Highlight the main content zone:
-
-<Demo code="[grid=1;grid-color=#dddddd;grid-sky-color=#4488ff;grid-earth-color=#4488ff]||B313" title="Emphasized content area" />
-
-### Minimal Major Lines Only
-
-<Demo code="[grid=1;grid-minor-color=#f5f5f5;grid-major-color=#cccccc]||B313" title="Major lines prominent" />
+The same pattern applies to stroke widths: `grid-stroke-width` sets the default, and `grid-major-stroke-width`, `grid-medium-stroke-width`, `grid-minor-stroke-width` override by category.
 
 ## CSS Class Names
 
-Grid lines use `bliss-` prefixed CSS classes for custom styling:
+When embedding SVGs inline in a web page, you can target grid elements with CSS. Grid lines use `bliss-` prefixed class names:
 
 | Class | Applies to |
 |-------|-----------|
@@ -129,32 +108,8 @@ Grid lines use `bliss-` prefixed CSS classes for custom styling:
 | `bliss-grid-line--sky` | Sky line (y=8) |
 | `bliss-grid-line--earth` | Earth line (y=16) |
 
-The grid is wrapped in a `<g class="bliss-grid">` group. You can target these classes in external CSS when embedding the SVG inline:
-
-```css
-.bliss-grid-line--sky { stroke: green; }
-.bliss-grid-line--earth { stroke: brown; }
-```
+The entire grid is wrapped in `<g class="bliss-grid">`.
 
 ## Options Reference
 
-### Color Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `grid-color` | `#ccc` | All grid lines |
-| `grid-major-color` | - | Major lines (every 4 units) |
-| `grid-medium-color` | - | Medium lines (every 2 units) |
-| `grid-minor-color` | - | Minor lines (every 1 unit) |
-| `grid-sky-color` | - | Sky line (y=8) |
-| `grid-earth-color` | - | Earth line (y=16) |
-
-### Stroke Width Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `grid-stroke-width` | `0.5` | All grid lines |
-| `grid-major-stroke-width` | - | Major lines only |
-| `grid-medium-stroke-width` | - | Medium lines only |
-| `grid-minor-stroke-width` | - | Minor lines only |
-
+See [Options Quick Reference](/reference/options-quick-reference) for the complete list of grid color and stroke-width options with defaults and value ranges.

@@ -47,6 +47,10 @@ const props = defineProps({
   displayCode: {
     type: String,
     default: ''
+  },
+  fullHeight: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -111,6 +115,19 @@ onMounted(async () => {
     const { BlissSVGBuilder } = await import('bliss-svg-builder');
     const builder = new BlissSVGBuilder(props.code);
     let svgCode = builder.svgCode;
+
+    // Override height with uncropped height when fullHeight is set
+    if (props.fullHeight) {
+      const uncropped = props.code.replace(/;?crop=[^;\]]*;?/g, match => {
+        if (match.startsWith(';') && match.endsWith(';')) return ';';
+        return '';
+      });
+      const uncroppedBuilder = new BlissSVGBuilder(uncropped);
+      const heightMatch = uncroppedBuilder.svgCode.match(/height="([^"]*)"/);
+      if (heightMatch) {
+        svgCode = svgCode.replace(/<svg /, `<svg style="height: ${heightMatch[1]}px; width: auto" `);
+      }
+    }
 
     // Add annotations if provided
     if (props.annotations) {
