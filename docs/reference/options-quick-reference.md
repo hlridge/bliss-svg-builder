@@ -102,9 +102,9 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | `svg-title` | - | String | Accessible title |
 | `svg-desc` | - | String | Accessible description |
 | `background` | - | Color | Background color (or bulk default for zones) |
-| `background-top` | - | Color | Top zone background (y=0 to y=8) |
+| `background-top` | - | Color | Top zone background (above y=8) |
 | `background-mid` | - | Color | Mid zone background (y=8 to y=16) |
-| `background-bottom` | - | Color | Bottom zone background (y=16 to y=20) |
+| `background-bottom` | - | Color | Bottom zone background (below y=16) |
 
 ---
 
