@@ -4,8 +4,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-// Replaced at build time by Vite's define (also available in Vitest and VitePress)
-export const LIB_VERSION = __LIB_VERSION__;
+// Replaced at build time by Vite's define (also available in Vitest and VitePress).
+// Falls back to empty string when imported outside Vite (e.g. bare Node).
+export const LIB_VERSION = typeof __LIB_VERSION__ !== 'undefined' ? __LIB_VERSION__ : '';
 
 /**
  * Known option keys (kebab-case) that are explicitly processed in #processOptions().
