@@ -14,17 +14,9 @@ How to express meaning: compound characters, the indicator system, shape primiti
 
 How to control appearance: colors, stroke widths, backgrounds, accessibility metadata, the grid system, and customizing the grid's visual presentation.
 
-### [Spacing & Layout](/handbook/spacing-layout/spacing)
-
-How to control spatial arrangement: word and character spacing, kerning, SVG sizing modes, margins, cropping modes, and element positioning.
-
 ### [Syntax & Options](/handbook/syntax-options/syntax-overview)
 
 The complete syntax reference: full grammar specification, the options cascade system, programmatic options via JavaScript, and SVG pass-through attributes.
-
-### [Programmatic](/handbook/programmatic/mutation)
-
-How to build and modify compositions from JavaScript: adding glyphs, rearranging parts, and changing options programmatically.
 
 ## How to Use the Handbook
 

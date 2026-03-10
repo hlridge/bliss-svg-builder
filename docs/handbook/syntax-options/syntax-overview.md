@@ -57,14 +57,14 @@ CODE:x      → y defaults to 0
 CODE:,y     → x defaults to 0
 ```
 
-See [Positioning](/handbook/spacing-layout/positioning) for full details.
+See [Positioning](/handbook/appearance/positioning) for full details.
 
 ## Kerning
 
 | Code | Effect | Covered in |
 |------|--------|------------|
-| `RK:value` | Adjust spacing relative to default | [Spacing](/handbook/spacing-layout/spacing) |
-| `AK:value` | Set exact spacing | [Spacing](/handbook/spacing-layout/spacing) |
+| `RK:value` | Adjust spacing relative to default | [Spacing](/handbook/writing/spacing) |
+| `AK:value` | Set exact spacing | [Spacing](/handbook/writing/spacing) |
 
 ## Formal Grammar
 

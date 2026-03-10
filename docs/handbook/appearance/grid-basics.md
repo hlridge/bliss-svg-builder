@@ -63,5 +63,5 @@ Bliss characters occupy a standard 20-unit tall grid. The grid is divided by nam
 Most base glyphs are positioned between the skyline and earthline. This creates consistent baseline alignment when characters are combined into sentences.
 
 
-See the [Positioning guide](/handbook/spacing-layout/positioning) for full details on the `:x,y` coordinate syntax and the [Grid Customization guide](/handbook/appearance/grid-customization) for styling the grid's appearance.
+See the [Positioning guide](/handbook/appearance/positioning) for full details on the `:x,y` coordinate syntax and the [Grid Customization guide](/handbook/appearance/grid-customization) for styling the grid's appearance.
 

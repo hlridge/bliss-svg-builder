@@ -556,7 +556,7 @@ import { BlissSVGBuilder } from 'bliss-svg-builder';
 const { BlissSVGBuilder } = require('bliss-svg-builder');
 ```
 
-For browser usage (ES module and UMD), see [Installation](/get-started/installation).
+For browser usage (ES module and UMD), see [Installation](/get-started/installation-setup).
 
 ## Error Handling
 

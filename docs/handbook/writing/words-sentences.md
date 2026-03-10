@@ -23,7 +23,7 @@ Use `/` to combine characters into a word:
 
 <Demo code="B313/B678" title="feeling + up = happiness" />
 
-Each character maintains standard spacing within the word. This spacing can be customized. See the [Spacing guide](/handbook/spacing-layout/spacing).
+Each character maintains standard spacing within the word. This spacing can be customized. See the [Spacing guide](/handbook/writing/spacing).
 
 ## Sentences: The `//` Separator
 
@@ -47,7 +47,7 @@ Use `///` to insert an additional word space. Each extra `/` adds another space:
 
 <Demo code="B313//B431///B1103" title="Extra space before the last word" />
 
-This is useful for visual grouping or creating deliberate pauses in a sentence. See the [Spacing guide](/handbook/spacing-layout/spacing) for the exact unit values.
+This is useful for visual grouping or creating deliberate pauses in a sentence. See the [Spacing guide](/handbook/writing/spacing) for the exact unit values.
 
 ## Indicators and the Head Glyph
 
@@ -146,4 +146,4 @@ Certain punctuation characters automatically receive tighter spacing. The librar
 
 Similarly, digits are automatically kerned to sit closer together, halving the normal character spacing between them.
 
-See the [Spacing guide](/handbook/spacing-layout/spacing) for full details on automatic and manual spacing control.
+See the [Spacing guide](/handbook/writing/spacing) for full details on automatic and manual spacing control.

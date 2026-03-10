@@ -47,7 +47,7 @@ Indicators position themselves automatically above the character. Each glyph def
 
 <Demo code="[grid=1]||B391;B81" title="Indicator automatically shifted left" />
 
-For details on how anchor points work and how to override positioning manually, see [Positioning](/handbook/spacing-layout/positioning).
+For details on how anchor points work and how to override positioning manually, see [Positioning](/handbook/appearance/positioning).
 
 ### Combined Indicators
 
@@ -74,7 +74,7 @@ You can also combine indicators yourself by separating them with `;`. The indica
 
 ### Manual Indicator Positioning
 
-You can override automatic indicator positioning with `:x,y` coordinates. See the [Positioning guide](/handbook/spacing-layout/positioning) for how this works within the character's coordinate space.
+You can override automatic indicator positioning with `:x,y` coordinates. See the [Positioning guide](/handbook/appearance/positioning) for how this works within the character's coordinate space.
 
 ## When Indicators Meet Words
 
