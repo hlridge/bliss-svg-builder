@@ -91,8 +91,7 @@
       "esbuild"
     ],
     "overrides": {
-      "tar-fs": ">=2.1.4",
-      "esbuild": ">=0.25.0"
+      "rollup": ">=4.59.0"
     }
   }
 }
