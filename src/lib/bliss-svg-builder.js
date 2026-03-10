@@ -1529,7 +1529,7 @@ class BlissSVGBuilder {
     let title = svgTitle ? `<title>${svgTitle}</title>` : "";
     let desc = svgDesc ? `<desc>${svgDesc}</desc>` : "";
     let gridPath = "";
-    let svgText = "";//this._getSvgText();
+    let svgText = "";
 
     let backgroundContent;
     if (hasZones) {

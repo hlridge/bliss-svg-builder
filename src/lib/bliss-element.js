@@ -571,10 +571,6 @@ export class BlissElement {
     }
   }
 
-  //get codeString() {
-  //  return this.#codeString;
- // }
-
   get parentElement() {
     return this.#parentElement;
   }
@@ -911,90 +907,6 @@ export class BlissElement {
     };
   }
 
-  toStringOldNotWorking() {
-    //return this.toJSON().elements.map(({ code, x = 0, y = 0 }) => (x === 0 && y === 0) ? code : `${code}:${x},${y}`).join(';')
-    const obj = this.toJSON();
-    if (obj.atomicElements) {
-      return obj.atomicElements.map(({ code, x = 0, y = 0 }) => (x === 0 && y === 0) ? code : `${code}:${x},${y}`).join(';')
-    } else {
-      //return obj.elements.map(({ code, x = 0, y = 0 }) => (x === 0 && y === 0) ? code : `${code}:${x},${y}`).join('/')
-      return (obj.elements || [])
-      .filter(e => e !== undefined && e !== null)
-      .map(({ code, x = 0, y = 0 }) => (x === 0 && y === 0) ? code : `${code}:${x},${y}`)
-      .join('/');
-    }
-  }
-
-  toStringOld2() {
-    const obj = this.toJSON();
-
-    const joinWith = this.#level === 0 ? "//" : this.#level === 1 ? "/" : ";";
-    
-    return (obj.elements || [])
-    .filter(e => e !== undefined && e !== null)
-    .map(({ code, x = 0, y = 0 }) => (x === 0 && y === 0) ? code : `${code}:${x},${y}`)
-    .join(joinWith);
-  }
-  
-  toStringOld3() {
-    const obj = this.toJSON();
-
-    let joinWith = "";
-    switch (this.#level) {
-        case 0: joinWith = "//"; break;  // Sentence level
-        case 1: joinWith = "/"; break;   // Word level
-        case 2:                         // Character level and beyond
-        default: joinWith = ";"; break;
-    }
-
-    return (obj.elements || [])
-        .filter(e => e !== undefined && e !== null)
-        .map(({ code, x = 0, y = 0 }) => (x === 0 && y === 0) ? code : `${code}:${x},${y}`)
-        .join(joinWith);
-  }
-
-  toStringDDD() {
-    const obj = this.toJSON();
-    return (obj.elements || [])
-        .filter(e => e !== undefined && e !== null)
-        .map(({ code, x = 0, y = 0, level }) => {  // use the level of the child element
-            let joinWith = "";
-            switch (level) {
-                case 2: joinWith = "//"; break;  // Sentence level
-                case 3: joinWith = "/"; break;   // Word level
-                case 4:                          // Character level and beyond
-                default: joinWith = ";"; break;
-            }
-            return (x === 0 && y === 0) ? code : `${code}:${x},${y}${joinWith}`;  // use joinWith here
-        })
-        .join('');
-  }
-  
-  toStringj() {
-    const obj = this.toJSON();
-
-  }
-  toStringO() {
-    const obj = this.toJSON();
-
-    const processElement = ({ code, x = 0, y = 0, level, elements = [] }) => {
-        let joinWith = "";
-        switch (level) {
-            case 2: joinWith = "//"; break;  // Sentence level
-            case 3: joinWith = "/"; break;   // Word level
-            case 4:                          // Character level and beyond
-            default: joinWith = ";"; break;
-        }
-
-        const elementString = (x === 0 && y === 0) ? code : `${code}:${x},${y}`;
-        const childStrings = elements.map(processElement).join('');
-
-        return `${elementString}${joinWith}${childStrings}`;
-    };
-
-    return (obj.elements || []).map(processElement).join('');
-  }
-
   toString() {
     const obj = this.toJSON();
     //const obj = {"elements":[{"elements":[{"elements":[{"code":"Xa","width":2.999438202247191,"x":null,"y":0,"level":3},{"code":"Xa","width":2.999438202247191,"x":null,"y":0,"level":3}]},{"elements":[{"code":"Xb","width":2.999438202247191,"x":null,"y":0,"level":3}]},{"elements":[{"code":"Xc","width":2.676404494382022,"x":null,"y":0,"level":3}]}]}]};
@@ -1139,20 +1051,3 @@ export class BlissElement {
   }
 }
 
-export class BlissCharacter extends BlissElement {
-  calculatePosition() {
-    // logic for calculating position of Character
-  }
-}
-
-export class BlissWord extends BlissElement {
-  calculatePosition() {
-    // logic for calculating position of Word
-  }
-}
-
-export class BlissShape extends BlissElement {
-  calculatePosition() {
-    // logic for calculating position of Shape
-  }
-}

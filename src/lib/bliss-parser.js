@@ -63,12 +63,6 @@ export class BlissParser {
     return parsedObject;
   }
 
-    // Helper function to encode string and parse global options
-  static encodeString(inputString, unescapeMap) {
-    // ... existing encoding and global option parsing code here ...
-    return { encodedString, globalOptions };
-  }
-
   static parsePartString(str, restoreFunction = (s) => s) {
     const part = {};
 
@@ -97,13 +91,6 @@ export class BlissParser {
 
     return part;
   }
-  // Helper function to parse character parts
-  static parseCharacterParts(encodedString, escapeMap, unescapeMap) {
-    let parts = [];
-    // ... existing character parts parsing code here ...
-    return parts;
-  }
-
   static fromString(inputString) {
     if (typeof inputString === 'string' && inputString.length > 10_000) {
       throw new Error('Input string exceeds maximum length of 10,000 characters');
@@ -790,19 +777,4 @@ export class BlissParser {
     return result;
   }
 
-  static #fromStream(blissStream) {
-    // Parse a Blissymbolics stream and convert it to an internal representation (BlissComposition)
-  }
-
-  static #toString(blissComposition) {
-    // Convert the internal representation to a Blissymbolics string
-  }
-
-  static #toObject(blissComposition) {
-    // Convert the internal representation to a Blissymbolics object (JSON)
-  }
-
-  static #toStream(blissComposition) {
-    // Convert the internal representation to a Blissymbolics stream
-  }
 }
