@@ -8,8 +8,8 @@ import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitio
 import { INTERNAL_OPTIONS, isSafeAttributeName } from "./bliss-constants.js";
 
 // Simple counter-based ID generator (works in all environments).
-// IDs are ephemeral — they reset with each builder instance and are not
-// stable across re-renders. Future work: propagate IDs through round-trips
+// IDs are ephemeral, incrementing from a shared module-level counter. They are
+// not stable across re-renders. Future work: propagate IDs through round-trips
 // so that elements retain identity after manipulation (needed for Bliss Maker).
 let nextId = 0;
 function generateId() {
