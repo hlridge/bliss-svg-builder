@@ -580,3 +580,30 @@ The library enforces limits to prevent runaway processing:
 | Recursion depth | 50 levels | Maximum nesting depth for code expansion |
 
 These limits protect against accidental infinite recursion in custom definitions (e.g., a glyph whose `codeString` references itself).
+
+## Server-Side Usage
+
+The library uses a **shared module-level singleton** for definitions. In browser contexts this is rarely an issue, but in server environments (Node.js, Deno, edge runtimes) there are important implications:
+
+### Shared definitions across requests
+
+All `BlissSVGBuilder` instances share the same definition registry. If one request calls `define()`, those definitions are visible to every subsequent request in the same process:
+
+```js
+// Request A
+BlissSVGBuilder.define({ CUSTOM: { codeString: 'B313' } });
+
+// Request B (later, same process) can use CUSTOM
+new BlissSVGBuilder('CUSTOM'); // works
+```
+
+### Cleaning up custom definitions
+
+Custom definitions persist for the lifetime of the process. If you register per-request definitions, clean them up afterwards with `removeDefinition()`:
+
+```js
+BlissSVGBuilder.define({ TEMP: { codeString: 'B431' } });
+// ... use TEMP ...
+BlissSVGBuilder.removeDefinition('TEMP');
+```
+
