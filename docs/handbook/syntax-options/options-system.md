@@ -24,8 +24,8 @@ Options can be applied at four levels, from broadest to most specific:
 
 | Scope | Syntax | Separator | Priority |
 |-------|--------|-----------|----------|
-| Global | `[opts]||` | `\|\|` | Lowest |
-| Word | `[opts]|` | `\|` | ↓ |
+| Global | <code>[opts]&#124;&#124;</code> | <code>&#124;&#124;</code> | Lowest |
+| Word | <code>[opts]&#124;</code> | <code>&#124;</code> | ↓ |
 | Character | `[opts]` | (none) | ↓ |
 | Part | `[opts]>` | `>` | Highest |
 
@@ -129,8 +129,8 @@ Some options only make sense at global scope:
 
 | Option | Notes |
 |--------|-------|
-| `word-space` | Global or word scope |
-| `char-space` | Global or word scope |
+| `word-space` | Global only |
+| `char-space` | Global only |
 | `grid` | Global only |
 | `background` | Global only |
 | `background-top` | Global only |
