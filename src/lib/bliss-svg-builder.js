@@ -1464,8 +1464,26 @@ class BlissSVGBuilder {
 
     const cropTop = rawCropTop === 'auto' ? bounds.minY : rawCropTop;
     const cropBottom = rawCropBottom === 'auto' ? (height - bounds.maxY) : rawCropBottom;
-    const cropLeft = rawCropLeft === 'auto' ? bounds.minX : rawCropLeft;
-    const cropRight = rawCropRight === 'auto' ? (width - bounds.maxX) : rawCropRight;
+    let cropLeft = rawCropLeft === 'auto' ? bounds.minX : rawCropLeft;
+    let cropRight = rawCropRight === 'auto' ? (width - bounds.maxX) : rawCropRight;
+
+    // Ensure min-width is respected after auto horizontal cropping.
+    // Numeric crops are deliberate, so only limit auto-computed crops.
+    const minW = this.#processedOptions.minWidth ?? 0;
+    if (minW > 0 && (rawCropLeft === 'auto' || rawCropRight === 'auto')) {
+      const croppedWidth = width - cropLeft - cropRight;
+      if (croppedWidth < minW) {
+        const deficit = minW - croppedWidth;
+        const autoLeft = rawCropLeft === 'auto' ? cropLeft : 0;
+        const autoRight = rawCropRight === 'auto' ? cropRight : 0;
+        const autoTotal = autoLeft + autoRight;
+        if (autoTotal > 0) {
+          const reduce = Math.min(deficit, autoTotal);
+          if (rawCropLeft === 'auto') cropLeft -= reduce * (autoLeft / autoTotal);
+          if (rawCropRight === 'auto') cropRight -= reduce * (autoRight / autoTotal);
+        }
+      }
+    }
 
     let viewBoxX = -marginLeft + cropLeft;
     const viewBoxY = -marginTop + cropTop;
