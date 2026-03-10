@@ -106,10 +106,8 @@ export class BlissElement {
     let hasPointerEvents = false;
 
     const isSafeHref = (value) => {
-      const trimmed = String(value).trim().toLowerCase();
-      return !trimmed.startsWith('javascript:') &&
-             !trimmed.startsWith('data:') &&
-             !trimmed.startsWith('vbscript:');
+      const cleaned = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim();
+      return /^(https?:|mailto:|tel:|\/|#)/i.test(cleaned);
     };
 
     // Values are already escaped by #processOptions at the input boundary

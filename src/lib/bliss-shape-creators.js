@@ -5,6 +5,7 @@
  */
 
 import { alphabetData } from "../external-font-data/liberation-sans-svg-path-data.js";
+import { escapeHtml } from "./bliss-constants.js";
 
 /**
  * Checks if a character has hardcoded path data available.
@@ -41,13 +42,14 @@ export function createTextFallbackGlyph(str) {
 
   return {
     getPath: (x, y, options = {}) => {
-      const fill = options.color || '#000000';
+      const fill = escapeHtml(options.color || '#000000');
+      const safeStr = escapeHtml(str);
       const closePath = `"></path>`;
       const openPath = `<path d="`;
       const baseline = 16;
       const textX = x - 0.3;
       const textY = y + baseline;
-      return `${closePath}<text x="${textX}" y="${textY}" font-family="Liberation Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${str}</text>${openPath}`;
+      return `${closePath}<text x="${textX}" y="${textY}" font-family="Liberation Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${safeStr}</text>${openPath}`;
     },
     width,
     y: approxMinY,
