@@ -545,19 +545,30 @@ export class BlissElement {
         const isPredefinedElement = !!elementDefinition && !!elementDefinition.getPath;
         const isCompositeElement = !!this.#blissObj.parts && this.#blissObj.parts.length > 0;
   
-        const isValidElement = isPredefinedElement || isCompositeElement;
-        if (!isValidElement) {
-          throw new Error(
-            `Unable to create Bliss element: "${this.#blissObj.codeName}" either lacks a ` +
-            `rendering function (getPath()) or could not be parsed into component parts. ` + 
-            `Check code or composition syntax.`
-          );
-        }
-
         this.#relativeToParentX = this.#blissObj.x ?? 0;
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
-        if (isPredefinedElement) {
+        if (!isPredefinedElement && !isCompositeElement) {
+          const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
+
+          // When constructed via BlissSVGBuilder, sharedOptions carries pre-parsed
+          // error placeholder parts. Clone them so each placeholder is independent.
+          // When constructed directly (no builder), no placeholder is available, so
+          // throw the original error to preserve existing behaviour.
+          if (!this.#sharedOptions?.errorPlaceholderParts) {
+            throw new Error(`Unable to create Bliss element: ${failedCode}`);
+          }
+
+          if (this.#sharedOptions.warnings) {
+            this.#sharedOptions.warnings.push({
+              code: 'UNKNOWN_CODE',
+              message: `Unknown or invalid code: "${failedCode}"`,
+              source: failedCode,
+            });
+          }
+          this.#blissObj.parts = structuredClone(this.#sharedOptions.errorPlaceholderParts);
+          this.#handleCompositeElement(this.#blissObj.parts);
+        } else if (isPredefinedElement) {
           this.#handlePredefinedElement(elementDefinition);
 
           // For predefined (leaf) elements with explicit coordinates, use them directly

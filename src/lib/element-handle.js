@@ -10,18 +10,36 @@ import { camelToKebab } from "./bliss-constants.js";
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
  * Survives `#rebuild()` because it holds a direct reference to the raw node,
  * and resolves its current index dynamically when needed.
+ *
+ * Handles track a generation counter to detect staleness: any mutation on
+ * the builder (by any handle) invalidates all other handles. The handle
+ * that performed the mutation stays valid for chaining.
  */
 export class ElementHandle {
   #ctx;
   #level;
   #nodeRef;
   #parentRef;
+  #generation;
 
   constructor(ctx, level, nodeRef, parentRef) {
     this.#ctx = ctx;
     this.#level = level;
     this.#nodeRef = nodeRef;
     this.#parentRef = parentRef;
+    this.#generation = ctx.getGeneration();
+  }
+
+  #assertAlive() {
+    if (this.#generation !== this.#ctx.getGeneration()) {
+      throw new Error('ElementHandle is stale. Handles are invalidated when any mutation occurs on the builder.');
+    }
+  }
+
+  // Update this handle's generation after a mutation it initiated,
+  // so chaining (e.g. handle.setOptions(...).addPart(...)) keeps working.
+  #syncGeneration() {
+    this.#generation = this.#ctx.getGeneration();
   }
 
   get level() {
@@ -29,6 +47,7 @@ export class ElementHandle {
   }
 
   get codeName() {
+    this.#assertAlive();
     return this.#nodeRef?.glyphCode || this.#nodeRef?.codeName || '';
   }
 
@@ -105,6 +124,7 @@ export class ElementHandle {
    * @returns {ElementHandle|null}
    */
   headGlyph() {
+    this.#assertAlive();
     if (this.#level !== 'group') return null;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
@@ -126,6 +146,7 @@ export class ElementHandle {
   }
 
   glyph(index) {
+    this.#assertAlive();
     if (this.#level !== 'group') return null;
     const group = this.#nodeRef;
     if (!group?.glyphs || index < 0 || index >= group.glyphs.length) return null;
@@ -133,6 +154,7 @@ export class ElementHandle {
   }
 
   part(index) {
+    this.#assertAlive();
     if (this.#level === 'glyph') {
       const glyph = this.#nodeRef;
       if (!glyph?.parts || index < 0 || index >= glyph.parts.length) return null;
@@ -152,6 +174,7 @@ export class ElementHandle {
   // --- Mutation: add/insert ---
 
   addGlyph(code, opts) {
+    this.#assertAlive();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group) return this;
@@ -160,10 +183,12 @@ export class ElementHandle {
     if (!group.glyphs) group.glyphs = [];
     group.glyphs.push(newGlyph);
     this.#ctx.rebuild();
+    this.#syncGeneration();
     return this;
   }
 
   insertGlyph(index, code, opts) {
+    this.#assertAlive();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group) return this;
@@ -172,10 +197,12 @@ export class ElementHandle {
     if (!group.glyphs) group.glyphs = [];
     group.glyphs.splice(index, 0, newGlyph);
     this.#ctx.rebuild();
+    this.#syncGeneration();
     return this;
   }
 
   addPart(code, opts) {
+    this.#assertAlive();
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
@@ -184,10 +211,12 @@ export class ElementHandle {
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.push(newPart);
     this.#ctx.rebuild();
+    this.#syncGeneration();
     return this;
   }
 
   insertPart(index, code, opts) {
+    this.#assertAlive();
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
@@ -196,12 +225,14 @@ export class ElementHandle {
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.splice(index, 0, newPart);
     this.#ctx.rebuild();
+    this.#syncGeneration();
     return this;
   }
 
   // --- Mutation: remove ---
 
   remove() {
+    this.#assertAlive();
     const raw = this.#ctx.getRaw();
     const groups = raw.groups;
 
@@ -257,6 +288,7 @@ export class ElementHandle {
   // --- Mutation: replace ---
 
   replace(code, opts) {
+    this.#assertAlive();
     if (this.#level === 'glyph') {
       const group = this.#parentRef;
       if (!group?.glyphs) return this;
@@ -267,6 +299,7 @@ export class ElementHandle {
       group.glyphs[glyphIndex] = newGlyph;
       this.#nodeRef = newGlyph;
       this.#ctx.rebuild();
+      this.#syncGeneration();
       return this;
     }
 
@@ -280,6 +313,7 @@ export class ElementHandle {
       glyph.parts[partIndex] = newPart;
       this.#nodeRef = newPart;
       this.#ctx.rebuild();
+      this.#syncGeneration();
       return this;
     }
 
@@ -289,15 +323,18 @@ export class ElementHandle {
   // --- Mutation: options ---
 
   setOptions(options) {
+    this.#assertAlive();
     const node = this.#nodeRef;
     if (!node) return this;
     const rawOpts = this.#ctx.toRaw(options);
     node.options = { ...(node.options ?? {}), ...rawOpts };
     this.#ctx.rebuild();
+    this.#syncGeneration();
     return this;
   }
 
   removeOptions(...keys) {
+    this.#assertAlive();
     const node = this.#nodeRef;
     if (!node?.options) return this;
     for (const key of keys) {
@@ -310,6 +347,7 @@ export class ElementHandle {
       delete node.options;
     }
     this.#ctx.rebuild();
+    this.#syncGeneration();
     return this;
   }
 }

@@ -274,7 +274,24 @@ builder.toJSON().groups; // []
 
 ## ElementHandle
 
-A live reference to a group, glyph, or part in the element tree. Handles survive rebuilds and reflect the current state. Obtained via `group()`, `glyph()`, `part()`, or `getElementById()`.
+A live reference to a group, glyph, or part in the element tree. Obtained via `group()`, `glyph()`, `part()`, or `getElementById()`.
+
+### Handle Staleness
+
+Handles track a generation counter. Any mutation on the builder (by any handle) invalidates all **other** handles. The handle that performed the mutation stays valid for chaining:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103//B431');
+const h1 = builder.group(0);
+const h2 = builder.group(1);
+
+h1.addGlyph('B291');     // h1 stays valid (it performed the mutation)
+h1.glyph(0);             // works fine
+
+h2.glyph(0);             // throws: "ElementHandle is stale"
+```
+
+After a mutation, re-acquire handles via `group()`, `glyph()`, or `part()`.
 
 ### Navigation
 
@@ -558,17 +575,47 @@ const { BlissSVGBuilder } = require('bliss-svg-builder');
 
 For browser usage (ES module and UMD), see [Installation](/get-started/installation-setup).
 
-## Error Handling
+## Warnings
 
-Invalid input throws an error:
+### `warnings`
+
+When the builder encounters an unknown or invalid code, it renders a placeholder glyph (a question mark symbol) and records a warning instead of throwing. This keeps the rest of the composition intact:
 
 ```js
-try {
-  new BlissSVGBuilder('INVALID_CODE');
-} catch (error) {
-  console.error(error.message);
-}
+const builder = new BlissSVGBuilder('B313/BADCODE/B431');
+builder.svgCode;       // renders B313, placeholder, B431
+
+builder.warnings;
+// [{ code: 'UNKNOWN_CODE', message: 'Unknown or invalid code: "BADCODE"', source: 'BADCODE' }]
 ```
+
+Each warning object has:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `code` | `string` | Warning type identifier (e.g., `'UNKNOWN_CODE'`) |
+| `message` | `string` | Human-readable description |
+| `source` | `string` | The problematic DSL code |
+
+Valid input produces an empty array:
+
+```js
+new BlissSVGBuilder('B313').warnings; // []
+```
+
+Warnings are recalculated on each rebuild, so fixing an issue via a handle mutation clears the corresponding warning.
+
+## Error Handling
+
+The builder throws for structural problems that prevent any rendering:
+
+```js
+// Non-string, non-object input
+new BlissSVGBuilder(42);
+// Error: Input must be a DSL string or a plain object from toJSON()
+```
+
+Unknown codes do **not** throw. They render a placeholder and appear in `warnings` (see above).
 
 ### Safety Limits
 

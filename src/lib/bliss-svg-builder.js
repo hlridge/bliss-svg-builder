@@ -10,10 +10,16 @@ import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
 
+// Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
+// load so BlissElement can clone it without importing BlissParser itself.
+const ERROR_PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].glyphs[0].parts;
+
 class BlissSVGBuilder {
   #processedOptions;
   #sharedOptions;
   #mutationCtx;
+  #warnings = [];
+  #generation = 0;
 
   // Processes raw options (kebab-case) into internal options (camelCase).
   // Bulk options expanded here (not in output): 'margin', 'crop', 'grid-color', 'grid-stroke-width'.
@@ -374,6 +380,7 @@ class BlissSVGBuilder {
       makeSpaceGroup: () => BlissSVGBuilder.#makeSpaceGroup(),
       removeGlyphGroup: (obj, gi) => this.#removeGlyphGroup(obj, gi),
       getSnapshot: () => this.snapshot(),
+      getGeneration: () => this.#generation,
     };
   }
 
@@ -393,8 +400,10 @@ class BlissSVGBuilder {
   }
 
   #rebuild() {
+    this.#generation++;
     this.#elementsCache = undefined;
     this.#wordsCache = undefined;
+    this.#warnings = [];
 
     const blissObj = structuredClone(this.#rawBlissObj);
     this.#processAllOptions(blissObj, true);
@@ -403,7 +412,9 @@ class BlissSVGBuilder {
     this.#sharedOptions = {
       charSpace: charSpace ?? 2,
       wordSpace: wordSpace ?? 8,
-      externalGlyphSpace: externalGlyphSpace ?? 0.8
+      externalGlyphSpace: externalGlyphSpace ?? 0.8,
+      warnings: this.#warnings,
+      errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
     };
     blissObj.options = remainingOptions;
     this.#processedOptions = blissObj.options;
@@ -417,6 +428,15 @@ class BlissSVGBuilder {
     }
 
     this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });
+  }
+
+  /**
+   * Returns warnings generated during parsing/rendering.
+   * Each warning has { code, message, source } describing the issue.
+   * @returns {Array<{ code: string, message: string, source: string }>}
+   */
+  get warnings() {
+    return this.#warnings;
   }
 
   #elementsCache;

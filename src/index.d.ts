@@ -276,6 +276,18 @@ export interface BlissJSON {
   }>;
 }
 
+// --- Warnings ---
+
+/** A warning generated when the builder encounters an unknown or invalid code. */
+export interface Warning {
+  /** Warning type identifier (e.g., 'UNKNOWN_CODE'). */
+  readonly code: string;
+  /** Human-readable description of the issue. */
+  readonly message: string;
+  /** The problematic DSL code that triggered the warning. */
+  readonly source: string;
+}
+
 // --- Builder stats ---
 
 export interface BuilderStats {
@@ -310,6 +322,11 @@ export declare class BlissSVGBuilder {
 
   /** Complete SVG markup with XML declaration. */
   readonly standaloneSvg: string;
+
+  // --- Warnings ---
+
+  /** Warnings generated during parsing/rendering (unknown codes, invalid syntax, etc.). */
+  readonly warnings: readonly Warning[];
 
   // --- Element tree (getters) ---
 
