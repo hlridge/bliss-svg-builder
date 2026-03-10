@@ -12,7 +12,7 @@ For a thorough introduction to the grid and its reference lines, see [Grid Basic
 
 Colored backgrounds are common in Bliss, especially where backgrounds categorize Bliss words by part-of-speech through color coding. The default light gray grid can lose contrast or clash with these backgrounds. You can adapt the grid colors so the line hierarchy stays readable:
 
-<Demo code="[grid=1;background=#cee9f6]||B513" title="Default grid on a blue background: lines fade into the color and looks a bit odd" />
+<Demo code="[grid=1;background=#cee9f6]||B513" title="Default grid on a blue background: lines fade into the color and look a bit odd" />
 
 <Demo code="[grid=1;background=#cee9f6;grid-color=#bed6e2;grid-major-color=#a1b6c0;grid-sky-color=#6b7980;grid-earth-color=#6b7980]||B513" title="Adapted: grid lines tuned to the background" />
 
@@ -56,18 +56,18 @@ On dark backgrounds, the default grid becomes dominant. Use darker grid colors s
 
 The skyline (y=8) and earthline (y=16) are the most important reference lines. They define where the base characters sit. You can use them in text as help lines, by applying them subtly:
 
-<Demo code="[grid=1;grid-color=none;grid-sky-color=blue;grid-earth-color=blue]||B313" title="Skyline and earthline marked with suble lines" />
+<Demo code="[grid=1;grid-color=none;grid-sky-color=blue;grid-earth-color=blue]||B313" title="Skyline and earthline marked with subtle lines" />
 
 ### Switch the Grid for Zone Colors
 
-Another way to visualize the common base character area, is by using backround colors for zones to mark the skyline and earthline. The grid is divided in three background zones: above y=8, between y=8 and y=16 and below y=16:
+Another way to visualize the common base character area is by using background colors for zones to mark the skyline and earthline. The grid is divided into three background zones: above y=8, between y=8 and y=16, and below y=16:
 
 <Demo code="[grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313;B81" title="Skyline and earthline marked with zoned background colors" />
 
 
 ### Use Zone Colors with <code>crop=compact</code>
 
-The full vertical space for any characters is always 20 grid unit, but all vertical space is rarely used, leaving the Blissymbols tiny on the display in many AAC devices. With <code>crop=compact</code>, 20% of the grid is automatically cropped from the top, or bottom, if there is room to do so. Together with the grid, or marking skyline and earthline in one way or another, this can enlarge Bliss symbols a bit that would otherwise be quite tiny. With 4 units cropped, the symbol has room to grow.
+The full vertical space for any characters is always 20 grid units, but all vertical space is rarely used, leaving the Blissymbols tiny on the display in many AAC devices. With <code>crop=compact</code>, 20% of the grid is automatically cropped from the top, or bottom, if there is room to do so. Together with the grid, or marking skyline and earthline in one way or another, this can enlarge Bliss symbols a bit that would otherwise be quite tiny. With 4 units cropped, the symbol has room to grow.
 
 <Demo code="[grid=1;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313" title="Normal, without cropping" />
 

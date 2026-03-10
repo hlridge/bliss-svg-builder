@@ -37,7 +37,7 @@ The constructor also accepts the plain object returned by `toJSON()`, recreating
 const original = new BlissSVGBuilder('B313/B1103//B431');
 const snapshot = original.toJSON();
 
-// Later — rebuild from the snapshot
+// Later: rebuild from the snapshot
 const rebuilt = new BlissSVGBuilder(snapshot);
 rebuilt.svgCode; // identical output
 ```
@@ -48,7 +48,7 @@ Four properties for getting the rendered SVG in different formats:
 
 ### `svgCode`
 
-Returns the SVG as a string — the most common output for embedding in HTML:
+Returns the SVG as a string, the most common output for embedding in HTML:
 
 ```js
 const builder = new BlissSVGBuilder('B313');
@@ -71,7 +71,7 @@ Use for: direct DOM insertion, event handling on SVG elements.
 
 ### `standaloneSvg`
 
-Returns the SVG with an XML declaration — suitable for saving as `.svg` files:
+Returns the SVG with an XML declaration, suitable for saving as `.svg` files:
 
 ```js
 const builder = new BlissSVGBuilder('B313');
@@ -380,7 +380,7 @@ builder.glyph(0).removeOptions('color', 'strokeWidth');
 
 ### Defaults and Overrides
 
-All mutation methods that accept a `code` parameter also accept an optional second parameter `{ defaults, overrides }` — the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
+All mutation methods that accept a `code` parameter also accept an optional second parameter `{ defaults, overrides }`, following the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
 
 ```js
 builder.group(0).addGlyph('[color=red]B431', {
@@ -391,7 +391,7 @@ builder.group(0).addGlyph('[color=red]B431', {
 
 ## Definition API
 
-Static method for registering custom codes. All definitions are global — once defined, any `BlissSVGBuilder` instance can use them.
+Static method for registering custom codes. All definitions are global. Once defined, any `BlissSVGBuilder` instance can use them.
 
 ### `define(definitions, options?)`
 
@@ -412,14 +412,14 @@ result.errors;   // codes that failed validation
 
 The `type` field controls what kind of definition is created: `'glyph'`, `'shape'`, or `'externalGlyph'`. When omitted, `codeString` definitions create bare codes (words, aliases), while `getPath` definitions are auto-detected as shapes or external glyphs. Note: `'bare'` and `'space'` are read-only types reported by `getDefinition()` and `listDefinitions()`, not valid inputs to `define()`.
 
-**Bare definition (omit type) — words, aliases, general codes:**
+**Bare definition (omit type): words, aliases, general codes:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `codeString` | `string` | yes | Composition using existing codes |
 | `defaultOptions` | `object` | no | Default options, overridable per-element |
 
-**type: 'glyph' — Bliss character with glyph metadata:**
+**type: 'glyph': Bliss character with glyph metadata:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -431,7 +431,7 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | `width` | `number` | no | Width override |
 | `shrinksPrecedingWordSpace` | `boolean` | no | Auto-shrink word space before this glyph (like punctuation) |
 
-**type: 'shape' — primitive (getPath) or composite (codeString):**
+**type: 'shape': primitive (getPath) or composite (codeString):**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
@@ -444,7 +444,7 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
 | `defaultOptions` | `object` | no | Default options, overridable per-element |
 
-**type: 'externalGlyph' — external font character:** <Badge type="warning" text="Experimental" />
+**type: 'externalGlyph': external font character:** <Badge type="warning" text="Experimental" />
 
 For adding characters from external font systems. Requires providing your own SVG path data.
 

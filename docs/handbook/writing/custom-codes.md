@@ -62,16 +62,16 @@ BlissSVGBuilder.define({
 
 ## Portable Output
 
-Custom codes only exist in instances of the class where you defined them. If you serialize output with `toString()` or `toJSON()` and send it elsewhere, the receiving Bliss SVG Builder won't know what `LOVE` or `B2661` from the examples above means.
+Custom codes are global within the runtime environment, but they only exist in memory. If you serialize output with `toString()` or `toJSON()` and send it to a different environment, the receiving Bliss SVG Builder won't know what `LOVE` or `B2661` from the examples above means.
 
 That's why both methods **decompose** custom codes by default, expanding them back to built-in codes:
 
 ```js
 new BlissSVGBuilder('B2661').toString();
-// 'B1103;B81' — anyone can read this
+// 'B1103;B81' (anyone can read this)
 
 new BlissSVGBuilder('B2661').toJSON();
-// groups[0].glyphs[0].code → 'B1103' — built-in codes, no custom names
+// groups[0].glyphs[0].code → 'B1103' (built-in codes, no custom names)
 ```
 
 The receiver doesn't need your definitions. The output is self-contained.
@@ -183,7 +183,7 @@ Since these are aliases, `toString()` produces portable output automatically:
 
 ```js
 new BlissSVGBuilder('14164//14905').toString();
-// 'B313//B392' — built-in codes, no external IDs
+// 'B313//B392' (built-in codes, no external IDs)
 ```
 
 The same approach works for any external system:

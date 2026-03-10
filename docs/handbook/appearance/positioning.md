@@ -29,13 +29,13 @@ CODE:,y     → x defaults to 0
 
 ## Shape Box vs Character Box
 
-Every element has a bounding box. For shapes, the box tightly wraps the ink — a shape placed at `:x,y` has its ink starting exactly at that position:
+Every element has a bounding box. For shapes, the box tightly wraps the ink. A shape placed at `:x,y` has its ink starting exactly at that position:
 
-<Demo code="H:0,8" display-code="[grid=1]||H:0,8" title="Shape box — ink fills the entire box" before="[grid=1]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|VL8:0,8;HL8:0,8;HL8:0,16;VL8:8,8" />
+<Demo code="H:0,8" display-code="[grid=1]||H:0,8" title="Shape box: ink fills the entire box" before="[grid=1]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|VL8:0,8;HL8:0,8;HL8:0,16;VL8:8,8" />
 
-Characters work differently. Every character occupies a 20-unit tall box, with the ink sitting at a specific position within it — most character content appears between y=8 and y=16, while indicator ink sits around y=4. The space above and below the ink is not empty padding; it's part of the character's coordinate space, reserved for indicators and descenders:
+Characters work differently. Every character occupies a 20-unit tall box, with the ink sitting at a specific position within it. Most character content appears between y=8 and y=16, while indicator ink sits around y=4. The space above and below the ink is not empty padding; it's part of the character's coordinate space, reserved for indicators and descenders:
 
-<Demo code="B313" display-code="[grid=1]||B313" title="Character box — spans the full 20 units" before="[grid=1]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|VL10;VL10:0,10;HL8;HL8:0,20;VL10:8,0;VL10:8,10" />
+<Demo code="B313" display-code="[grid=1]||B313" title="Character box: spans the full 20 units" before="[grid=1]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|VL10;VL10:0,10;HL8;HL8:0,20;VL10:8,0;VL10:8,10" />
 
 When you position a character with `:x,y`, you're positioning the entire character box, not just the ink. Shapes have their ink at the top of the box, so `:x,y` places the ink exactly where you'd expect. Characters have their ink offset within the box, so the visible result is shifted accordingly.
 
@@ -49,11 +49,11 @@ Indicators (like `B81` for action) position themselves automatically:
 
 Each glyph has an anchor point defined in its glyph data. The indicator attaches to this anchor point, which defaults to the top-center of the character but can be offset horizontally or vertically per glyph, so indicators aren't always mathematically centered:
 
-<Demo code="[grid=1]||B313;B81" title="Heart — centered anchor" />
+<Demo code="[grid=1]||B313;B81" title="Heart, centered anchor" />
 
-<Demo code="[grid=1]||B355;B86" title="Vertical offset — indicator sits higher" />
+<Demo code="[grid=1]||B355;B86" title="Vertical offset, indicator sits higher" />
 
-<Demo code="[grid=1]||B419;B81" title="Both offsets — shifted left and up" />
+<Demo code="[grid=1]||B419;B81" title="Both offsets, shifted left and up" />
 
 ### Manual Indicator Positioning
 

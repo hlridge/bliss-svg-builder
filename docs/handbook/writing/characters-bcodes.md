@@ -60,9 +60,9 @@ Many grammatical meanings require multiple indicators together. Bliss provides p
 | Definite thing | `B5997` | `B904` + `B97` |
 | Past passive | `B95` | `B92` + `B91` |
 
-<Demo code="B513;B5996" title="the persons — combined definite plural indicator" />
+<Demo code="B513;B5996" title="the persons, combined definite plural indicator" />
 
-<Demo code="B431;B95" title="was loved — combined past passive indicator" />
+<Demo code="B431;B95" title="was loved, combined past passive indicator" />
 
 See the [Indicators Reference](/reference/indicators-reference) for all combined indicators.
 
@@ -70,7 +70,7 @@ See the [Indicators Reference](/reference/indicators-reference) for all combined
 
 You can also combine indicators yourself by separating them with `;`. The indicators are spaced apart and centered as a group:
 
-<Demo code="B431;B81;B99" title="to love (plural) — two separate indicators" />
+<Demo code="B431;B81;B99" title="to love (plural), two separate indicators" />
 
 ### Manual Indicator Positioning
 
