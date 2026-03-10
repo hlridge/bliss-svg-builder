@@ -381,6 +381,7 @@ class BlissSVGBuilder {
     const raw = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value === null || value === undefined) continue;
+      if (typeof value === 'object') continue;
       const kebabKey = camelToKebab(key);
       if (typeof value === 'boolean') {
         raw[kebabKey] = value ? '1' : '0';
