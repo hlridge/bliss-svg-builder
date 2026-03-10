@@ -75,7 +75,7 @@
   "bugs": {
     "url": "https://github.com/hlridge/bliss-svg-builder/issues"
   },
-  "homepage": "https://github.com/hlridge/bliss-svg-builder#readme",
+  "homepage": "https://hlridge.github.io/bliss-svg-builder/",
   "devDependencies": {
     "@vitest/ui": "^4.0.16",
     "canvas": "^3.2.0",
