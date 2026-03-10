@@ -61,7 +61,7 @@ Override anchor-based positioning with explicit coordinates. Since indicators ar
 
 <Demo code="B431;B81" display-code="[grid=1]||B431;B81" title="Anchor-positioned" before="[grid=1;min-width=16]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:7,0;VL10:7,0;VL10:7,10;HL2:7,20;VL10:9,0;VL10:9,10" />
 
-<Demo code="[margin-bottom=2.75]||B431;B81:2,2" display-code="[grid=1]||B431;B81:2,2" title="B81:2,2 — box at y=2, ink appears at y=6" before="[grid=1;min-width=16;margin-bottom=2.75]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:2,2;VL10:2,2;VL10:2,12;HL2:2,22;VL10:4,2;VL10:4,12;[stroke-width=0.5]>DOT:2,2;[stroke-dasharray=none]>DL4-1N:3,1;[stroke-dasharray=none]>DL4-1N:3,5" annotations='[{"x":0,"y":1.2,"text":"(2,2)","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":1.2,"text":"y=2","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":5.2,"text":"y=6","style":{"fill":"red","fontSize":"1.5"}}]' />
+<Demo code="[margin-bottom=2.75]||B431;B81:2,2" display-code="[grid=1]||B431;B81:2,2" title="B81:2,2 (box at y=2, ink appears at y=6)" before="[grid=1;min-width=16;margin-bottom=2.75]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:2,2;VL10:2,2;VL10:2,12;HL2:2,22;VL10:4,2;VL10:4,12;[stroke-width=0.5]>DOT:2,2;[stroke-dasharray=none]>DL4-1N:3,1;[stroke-dasharray=none]>DL4-1N:3,5" annotations='[{"x":0,"y":1.2,"text":"(2,2)","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":1.2,"text":"y=2","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":5.2,"text":"y=6","style":{"fill":"red","fontSize":"1.5"}}]' />
 
 Use manual positioning when:
 - The anchor point doesn't produce the desired result

@@ -909,7 +909,6 @@ export class BlissElement {
 
   toString() {
     const obj = this.toJSON();
-    //const obj = {"elements":[{"elements":[{"elements":[{"code":"Xa","width":2.999438202247191,"x":null,"y":0,"level":3},{"code":"Xa","width":2.999438202247191,"x":null,"y":0,"level":3}]},{"elements":[{"code":"Xb","width":2.999438202247191,"x":null,"y":0,"level":3}]},{"elements":[{"code":"Xc","width":2.676404494382022,"x":null,"y":0,"level":3}]}]}]};
 
     function traverse(obj, level = 1) {
       if (!obj.elements) {
