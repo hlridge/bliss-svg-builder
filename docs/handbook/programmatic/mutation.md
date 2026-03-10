@@ -1,6 +1,6 @@
 # Programmatic Mutation
 
-Build and modify Bliss compositions programmatically — add glyphs, rearrange parts, change options, all from JavaScript.
+Build and modify Bliss compositions programmatically: add glyphs, rearrange parts, change options, all from JavaScript.
 
 ## Why Mutate?
 
@@ -137,7 +137,7 @@ builder.glyph(0).setOptions({ color: 'red' });
 builder.group(0).setOptions({ strokeWidth: 0.6 });
 ```
 
-Options use camelCase keys — the same keys as [programmatic options](/handbook/syntax-options/programmatic-options).
+Options use camelCase keys, the same keys as [programmatic options](/handbook/syntax-options/programmatic-options).
 
 ### Removing Options
 
@@ -213,7 +213,7 @@ snap.children; // still has the original structure
 
 ## Defaults and Overrides
 
-All mutation methods that accept a code string also accept `{ defaults, overrides }` — the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
+All mutation methods that accept a code string also accept `{ defaults, overrides }`, the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
 
 ```js
 builder.addGroup('[color=red]B431', {

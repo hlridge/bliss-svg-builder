@@ -57,29 +57,19 @@ export default defineConfig({
             { text: 'Words & Sentences', link: '/handbook/writing/words-sentences' },
             { text: 'Shapes', link: '/handbook/writing/shapes' },
             { text: 'Latin & Cyrillic', link: '/handbook/writing/latin-cyrillic', badge: 'Soon' },
-            { text: 'Custom Codes', link: '/handbook/writing/custom-codes' }
+            { text: 'Custom Codes', link: '/handbook/writing/custom-codes' },
+            { text: 'Spacing', link: '/handbook/writing/spacing' }
           ]
         },
         {
-          text: 'Coordinate System',
+          text: 'Appearance',
           items: [
-            { text: 'Understanding the Grid', link: '/handbook/coordinate-system/understanding-the-grid' },
-            { text: 'Grid Customization', link: '/handbook/coordinate-system/grid-customization' }
-          ]
-        },
-        {
-          text: 'Styling',
-          items: [
-            { text: 'Color & Stroke', link: '/handbook/styling/color-stroke' },
-            { text: 'Backgrounds & Accessibility', link: '/handbook/styling/backgrounds-accessibility' }
-          ]
-        },
-        {
-          text: 'Spacing & Layout',
-          items: [
-            { text: 'Spacing', link: '/handbook/spacing-layout/spacing' },
-            { text: 'Sizing', link: '/handbook/spacing-layout/sizing' },
-            { text: 'Margins & Cropping', link: '/handbook/spacing-layout/margins-cropping' },
+            { text: 'Color & Stroke', link: '/handbook/appearance/color-stroke' },
+            { text: 'Backgrounds & Accessibility', link: '/handbook/appearance/backgrounds-accessibility' },
+            { text: 'Sizing', link: '/handbook/appearance/sizing' },
+            { text: 'Margins & Cropping', link: '/handbook/appearance/margins-cropping' },
+            { text: 'Grid Basics', link: '/handbook/appearance/grid-basics' },
+            { text: 'Grid Customization', link: '/handbook/appearance/grid-customization' },
             { text: 'Positioning', link: '/handbook/spacing-layout/positioning' }
           ]
         },

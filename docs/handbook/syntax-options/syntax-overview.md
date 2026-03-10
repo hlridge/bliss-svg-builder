@@ -1,6 +1,6 @@
 # DSL Syntax Overview
 
-The Bliss SVG Builder uses a Domain-Specific Language (DSL) to describe characters, words, and sentences. This page is the complete syntax reference — each element links to the page that explains it in depth.
+The Bliss SVG Builder uses a Domain-Specific Language (DSL) to describe characters, words, and sentences. This page is the complete syntax reference. Each element links to the page that explains it in depth.
 
 ## Full Syntax Pattern
 

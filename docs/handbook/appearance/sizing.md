@@ -18,7 +18,7 @@ The `crop` option controls how the SVG canvas is sized. Beyond numeric values an
 
 ### `crop=auto`
 
-Crops all sides to the actual content pixel bounds — the tightest possible fit:
+Crops all sides to the actual content pixel bounds, the tightest possible fit:
 
 <Demo code="B313" title="Standard" />
 

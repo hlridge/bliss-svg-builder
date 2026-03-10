@@ -10,7 +10,7 @@ Characters are made of positioned shapes. For example, `B313` ("feeling") is def
 
 <Demo code="[grid=1]||H:0,8" title="H:0,8 - its underlying definition" />
 
-Characters have standard dimensions (20 units height) designed for consistent alignment in words and sentences. The grid shows the coordinate system. See [Understanding the Grid](/handbook/coordinate-system/understanding-the-grid) for details.
+Characters have standard dimensions (20 units height) designed for consistent alignment in words and sentences. The grid shows the coordinate system. See [Grid Basics](/handbook/appearance/grid-basics) for details.
 
 ## Compound Characters
 

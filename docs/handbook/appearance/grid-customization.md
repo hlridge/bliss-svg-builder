@@ -4,7 +4,7 @@ The default grid is designed to be subtle: light gray lines that reveal the coor
 
 <Demo code="[grid=1]||B313" title="Default grid: subtle, readable" />
 
-For a thorough introduction to the grid and its reference lines, see [Understanding the Grid](/handbook/coordinate-system/understanding-the-grid).
+For a thorough introduction to the grid and its reference lines, see [Grid Basics](/handbook/appearance/grid-basics).
 
 ## Adapting the Grid
 

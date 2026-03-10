@@ -140,14 +140,23 @@ onMounted(async () => {
     const vbMatch = svgCode.match(/viewBox="([^"]+)"/);
     if (vbMatch) {
       const mainViewBox = vbMatch[1];
+      const heightMatch = props.fullHeight && svgCode.match(/style="height: ([^"]*?)px/);
 
       if (props.before) {
         const beforeBuilder = new BlissSVGBuilder(props.before);
-        svgBefore.value = replaceViewBox(beforeBuilder.svgCode, mainViewBox);
+        let beforeSvg = replaceViewBox(beforeBuilder.svgCode, mainViewBox);
+        if (heightMatch) {
+          beforeSvg = beforeSvg.replace(/<svg /, `<svg style="height: ${heightMatch[1]}px; width: auto" `);
+        }
+        svgBefore.value = beforeSvg;
       }
       if (props.after) {
         const afterBuilder = new BlissSVGBuilder(props.after);
-        svgAfter.value = replaceViewBox(afterBuilder.svgCode, mainViewBox);
+        let afterSvg = replaceViewBox(afterBuilder.svgCode, mainViewBox);
+        if (heightMatch) {
+          afterSvg = afterSvg.replace(/<svg /, `<svg style="height: ${heightMatch[1]}px; width: auto" `);
+        }
+        svgAfter.value = afterSvg;
       }
     }
   } catch (e) {

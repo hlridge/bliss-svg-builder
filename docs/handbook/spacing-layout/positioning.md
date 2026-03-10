@@ -12,7 +12,7 @@ Position shapes using `:x,y` after the code:
 
 <Demo code="[grid=1]||DOT:8,16" title="DOT at (8,16)" />
 
-Coordinates are in grid units. See [Understanding the Grid](/handbook/coordinate-system/understanding-the-grid) for coordinate system details.
+Coordinates are in grid units. See [Grid Basics](/handbook/appearance/grid-basics) for coordinate system details.
 
 ### Coordinate Variations
 
@@ -27,6 +27,18 @@ CODE:,y     → x defaults to 0
 
 <Demo code="[grid=1]||C8:4,8" title="C8:4,8 (explicit)" />
 
+## Shape Box vs Character Box
+
+Every element has a bounding box. For shapes, the box tightly wraps the ink — a shape placed at `:x,y` has its ink starting exactly at that position:
+
+<Demo code="H:0,8" display-code="[grid=1]||H:0,8" title="Shape box — ink fills the entire box" before="[grid=1]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|VL8:0,8;HL8:0,8;HL8:0,16;VL8:8,8" />
+
+Characters work differently. Every character occupies a 20-unit tall box, with the ink sitting at a specific position within it — most character content appears between y=8 and y=16, while indicator ink sits around y=4. The space above and below the ink is not empty padding; it's part of the character's coordinate space, reserved for indicators and descenders:
+
+<Demo code="B313" display-code="[grid=1]||B313" title="Character box — spans the full 20 units" before="[grid=1]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|VL10;VL10:0,10;HL8;HL8:0,20;VL10:8,0;VL10:8,10" />
+
+When you position a character with `:x,y`, you're positioning the entire character box, not just the ink. Shapes have their ink at the top of the box, so `:x,y` places the ink exactly where you'd expect. Characters have their ink offset within the box, so the visible result is shifted accordingly.
+
 ## Indicator Positioning
 
 Indicators (like `B81` for action) position themselves automatically:
@@ -35,34 +47,24 @@ Indicators (like `B81` for action) position themselves automatically:
 
 <Demo code="[grid=1]||B431;B81" title="With indicator (auto-positioned)" />
 
-The indicator finds the character's anchor point and positions itself above the content area.
+Each glyph has an anchor point defined in its glyph data. The indicator attaches to this anchor point, which defaults to the top-center of the character but can be offset horizontally or vertically per glyph, so indicators aren't always mathematically centered:
 
-### How Auto-Positioning Works
+<Demo code="[grid=1]||B313;B81" title="Heart — centered anchor" />
 
-1. The library calculates the character's bounding box
-2. It finds the anchor point (typically top-center of the content)
-3. The indicator is placed above this point
+<Demo code="[grid=1]||B355;B86" title="Vertical offset — indicator sits higher" />
 
-Different characters have different anchor points:
-
-<Demo code="[grid=1]||B313;B81" title="Heart with indicator" />
-
-<Demo code="[grid=1]||B1103;B81" title="Understanding with indicator" />
-
-<Demo code="[grid=1]||B335;B81" title="Knowledge with indicator" />
+<Demo code="[grid=1]||B419;B81" title="Both offsets — shifted left and up" />
 
 ### Manual Indicator Positioning
 
-Override automatic positioning with explicit coordinates:
+Override anchor-based positioning with explicit coordinates. Since indicators are characters, `:x,y` positions the entire 20-unit character box. The indicator's ink sits at y=4 within its box, so placing the box at a given y-position shifts the ink accordingly:
 
-<Demo code="[grid=1]||B431;B81" title="Auto-positioned" />
+<Demo code="B431;B81" display-code="[grid=1]||B431;B81" title="Anchor-positioned" before="[grid=1;min-width=16]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:7,0;VL10:7,0;VL10:7,10;HL2:7,20;VL10:9,0;VL10:9,10" />
 
-<Demo code="[grid=1]||B431;B81:0,2" title="Manual: B81:0,2" />
-
-<Demo code="[grid=1]||B431;B81:6,4" title="Manual: B81:6,4" />
+<Demo code="[margin-bottom=2.75]||B431;B81:2,2" display-code="[grid=1]||B431;B81:2,2" title="B81:2,2 — box at y=2, ink appears at y=6" before="[grid=1;min-width=16;margin-bottom=2.75]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:2,2;VL10:2,2;VL10:2,12;HL2:2,22;VL10:4,2;VL10:4,12;[stroke-width=0.5]>DOT:2,2;[stroke-dasharray=none]>DL4-1N:3,1;[stroke-dasharray=none]>DL4-1N:3,5" annotations='[{"x":0,"y":1.2,"text":"(2,2)","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":1.2,"text":"y=2","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":5.2,"text":"y=6","style":{"fill":"red","fontSize":"1.5"}}]' />
 
 Use manual positioning when:
-- Auto-positioning doesn't look right
+- The anchor point doesn't produce the desired result
 - You want non-standard indicator placement
 - Creating custom compound characters
 
@@ -85,8 +87,8 @@ Compound characters use positioning to combine base characters:
 <Demo code="[grid=1]||B1103" title="B1103 (understanding)" />
 
 The definition `B335;B412:4,0` shows:
-- `B335` at default position (knowledge)
-- `B412:4,0` shifted right by 4 units (into)
+- `B335` at default position (forward)
+- `B412:4,0` shifted right by 4 units (knowledge)
 
 Understanding these compositions helps when creating custom compounds.
 
@@ -98,9 +100,9 @@ Narrow glyphs can be given a minimum width with `min-width`, and centered within
 
 <Demo code="[grid=1]||C4:0,10" title="4-unit circle, no min-width" />
 
-<Demo code="[grid=1;min-width=8;center=0]||C4:0,10" title="min-width=8, center=0 (space added to the right)" />
+<Demo code="[grid=1;min-width=8]||C4:0,10" title="min-width=8 (default, space added to the right)" />
 
-<Demo code="[grid=1;min-width=8]||C4:0,10" title="min-width=8, center=1 (centered)" />
+<Demo code="[grid=1;min-width=8;center=1]||C4:0,10" title="min-width=8, center=1 (centered)" />
 
 ### Vertical Alignment
 
