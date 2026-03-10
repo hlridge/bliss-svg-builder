@@ -67,10 +67,9 @@ export default defineConfig({
             { text: 'Color & Stroke', link: '/handbook/appearance/color-stroke' },
             { text: 'Backgrounds & Accessibility', link: '/handbook/appearance/backgrounds-accessibility' },
             { text: 'Sizing', link: '/handbook/appearance/sizing' },
-            { text: 'Margins & Cropping', link: '/handbook/appearance/margins-cropping' },
             { text: 'Grid Basics', link: '/handbook/appearance/grid-basics' },
             { text: 'Grid Customization', link: '/handbook/appearance/grid-customization' },
-            { text: 'Positioning', link: '/handbook/spacing-layout/positioning' }
+            { text: 'Positioning', link: '/handbook/appearance/positioning' }
           ]
         },
         {
@@ -79,13 +78,8 @@ export default defineConfig({
             { text: 'DSL Syntax Overview', link: '/handbook/syntax-options/syntax-overview' },
             { text: 'Options System', link: '/handbook/syntax-options/options-system' },
             { text: 'SVG Pass-Through Attributes', link: '/handbook/syntax-options/svg-pass-through' },
-            { text: 'Programmatic Options', link: '/handbook/syntax-options/programmatic-options' }
-          ]
-        },
-        {
-          text: 'Programmatic',
-          items: [
-            { text: 'Programmatic Mutation', link: '/handbook/programmatic/mutation' }
+            { text: 'Programmatic Options', link: '/handbook/syntax-options/programmatic-options' },
+            { text: 'Programmatic Mutation', link: '/handbook/syntax-options/programmatic-mutation' }
           ]
         }
       ],

@@ -127,9 +127,7 @@ This is useful when combining position with other part-level options like color:
 
 ## Zero-Sized Anchor (ZSA)
 
-`ZSA` is an invisible element that occupies no space. It prevents the automatic normalization that shifts elements to start at x=0:
+`ZSA` is an invisible element that occupies no space, but occupies a position respected by auto-cropping behavior.
 
-<Demo code="[grid=1]||ZSA;C4:4,10" title="ZSA keeps circle at x=4 (not shifted to 0)" />
-
-Without `ZSA`, the circle would be normalized to x=0. This is useful when you need absolute positioning within the coordinate system.
+<Demo code="[grid=1;crop=auto]||ZSA:12,0;C4:4,10" title="ZSA prevents cropping from the top-right" />
 
