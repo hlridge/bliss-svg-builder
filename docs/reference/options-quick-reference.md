@@ -1,4 +1,4 @@
-# Options Table
+# Options Quick Reference
 
 Quick reference for all available options.
 
