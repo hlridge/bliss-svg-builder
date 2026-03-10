@@ -449,10 +449,34 @@ export class BlissElement {
           this.#blissObj = { parts: [this.#blissObj] };
         }
 
+        const warningCountBefore = this.#sharedOptions?.warnings?.length ?? 0;
+
         for (const part of this.#blissObj.parts) {
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
           child.type = "characterPart";
           this.#children.push(child);
+        }
+
+        // If any part failed (unknown code), replace the entire character
+        const hasFailedParts = (this.#sharedOptions?.warnings?.length ?? 0) > warningCountBefore;
+        if (hasFailedParts) {
+          if (this.#sharedOptions?.errorPlaceholder) {
+            // Replace all children with a single placeholder character
+            this.#children = [];
+            for (const part of structuredClone(this.#sharedOptions.errorPlaceholderParts)) {
+              const child = new BlissElement(part, {
+                parentElement: this,
+                previousElement: this.#children[this.#children.length - 1],
+                level: this.#level + 1,
+                sharedOptions: this.#sharedOptions,
+              });
+              child.type = "characterPart";
+              this.#children.push(child);
+            }
+          } else {
+            // Zero-width invisible character
+            this.#children = [];
+          }
         }
 
         // Classify parts into glyph parts and indicator parts (cache for reuse by getters)
@@ -511,34 +535,38 @@ export class BlissElement {
 
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
-        // Dynamic advanceX calculation for space glyphs (TSP, QSP)
-        const code = this.#blissObj.parts?.[0]?.codeName;
-        if (code && isSpaceGlyph(code)) {
-          // Space glyphs have dynamic width based on word-space and char-space options
-          if (code === 'TSP') {
-            this.#advanceX = this.#sharedOptions.wordSpace - this.#sharedOptions.charSpace;
-          } else if (code === 'QSP') {
-            this.#advanceX = this.#sharedOptions.wordSpace / 2 - this.#sharedOptions.charSpace;
-          }
+        if (hasFailedParts && !this.#sharedOptions?.errorPlaceholder) {
+          // Invisible failed character takes zero space
+          this.#advanceX = 0;
+          this.getSvgContent = () => '';
         } else {
-          // Regular glyphs use baseWidth + charSpace
-          this.#advanceX = this.baseGlyphWidth + this.#sharedOptions.charSpace;
+          // Dynamic advanceX calculation for space glyphs (TSP, QSP)
+          const code = this.#blissObj.parts?.[0]?.codeName;
+          if (code && isSpaceGlyph(code)) {
+            if (code === 'TSP') {
+              this.#advanceX = this.#sharedOptions.wordSpace - this.#sharedOptions.charSpace;
+            } else if (code === 'QSP') {
+              this.#advanceX = this.#sharedOptions.wordSpace / 2 - this.#sharedOptions.charSpace;
+            }
+          } else {
+            this.#advanceX = this.baseGlyphWidth + this.#sharedOptions.charSpace;
+          }
+
+          this.getSvgContent = (x = 0, y = 0) => {
+            const childContents = this.#children.map(child =>
+              child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
+            );
+
+            const hasTaggedContent = childContents.some(c => c.startsWith('<'));
+            const hasRawContent = childContents.some(c => !c.startsWith('<'));
+
+            const content = hasTaggedContent && hasRawContent
+              ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+              : childContents.join('');
+
+            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+          };
         }
-
-        this.getSvgContent = (x = 0, y = 0) => {
-          const childContents = this.#children.map(child =>
-            child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-          );
-
-          const hasTaggedContent = childContents.some(c => c.startsWith('<'));
-          const hasRawContent = childContents.some(c => !c.startsWith('<'));
-
-          const content = hasTaggedContent && hasRawContent
-            ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
-            : childContents.join('');
-
-          return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
-        };
       } else {
         // Part level (level >= 3)
         const elementDefinition = blissElementDefinitions[this.#blissObj.codeName];
@@ -551,23 +579,22 @@ export class BlissElement {
         if (!isPredefinedElement && !isCompositeElement) {
           const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
 
-          // When constructed via BlissSVGBuilder, sharedOptions carries pre-parsed
-          // error placeholder parts. Clone them so each placeholder is independent.
-          // When constructed directly (no builder), no placeholder is available, so
-          // throw the original error to preserve existing behaviour.
-          if (!this.#sharedOptions?.errorPlaceholderParts) {
+          // When constructed directly (no builder), throw to preserve existing behaviour
+          if (!this.#sharedOptions?.warnings) {
             throw new Error(`Unable to create Bliss element: ${failedCode}`);
           }
 
-          if (this.#sharedOptions.warnings) {
-            this.#sharedOptions.warnings.push({
-              code: 'UNKNOWN_CODE',
-              message: `Unknown or invalid code: "${failedCode}"`,
-              source: failedCode,
-            });
-          }
-          this.#blissObj.parts = structuredClone(this.#sharedOptions.errorPlaceholderParts);
-          this.#handleCompositeElement(this.#blissObj.parts);
+          this.#sharedOptions.warnings.push({
+            code: 'UNKNOWN_CODE',
+            message: `Unknown or invalid code: "${failedCode}"`,
+            source: failedCode,
+          });
+
+          // Render as zero-width invisible. Character level (level 2) handles
+          // placeholder display for the entire character when any part fails.
+          this.#leafWidth = 0;
+          this.#leafHeight = 0;
+          this.getSvgContent = () => '';
         } else if (isPredefinedElement) {
           this.#handlePredefinedElement(elementDefinition);
 

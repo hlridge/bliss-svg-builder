@@ -18,6 +18,14 @@ Multiple options are separated by semicolons:
 
 <Demo code="[color=red;stroke-width=0.8]||B313" title="Multiple options" />
 
+Boolean options use a bare key (no `=value`). The option is enabled when present and disabled when absent:
+
+```
+[grid]||B313
+```
+
+<Demo code="[grid]||B313" title="Boolean option" />
+
 ## Scope Levels
 
 Options can be applied at four levels, from broadest to most specific:

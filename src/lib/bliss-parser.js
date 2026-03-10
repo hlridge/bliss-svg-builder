@@ -43,21 +43,27 @@ export class BlissParser {
 
     const parsedObject = Object.create(null);
 
-    const regex = /([\w-]+)\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^;]+)/g;
+    const regex = /([\w-]+)(?:\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^;]*))?/g;
     let match;
 
     while ((match = regex.exec(extractedContent)) !== null) {
       const key = match[1].trim();
-      let value = match[2].trim();
 
-      // Remove quotes and handle escapes for both double and single quotes
-      if (value.startsWith('"') && value.endsWith('"')) {
-        value = value.slice(1, -1).replace(/\\"/g, '"');
-      } else if (value.startsWith("'") && value.endsWith("'")) {
-        value = value.slice(1, -1).replace(/\\'/g, "'");
+      if (match[2] === undefined) {
+        // Bare key (e.g., [grid]) — treat as boolean true
+        parsedObject[key] = "1";
+      } else {
+        let value = match[2].trim();
+
+        // Remove quotes and handle escapes for both double and single quotes
+        if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.slice(1, -1).replace(/\\"/g, '"');
+        } else if (value.startsWith("'") && value.endsWith("'")) {
+          value = value.slice(1, -1).replace(/\\'/g, "'");
+        }
+
+        parsedObject[key] = value;
       }
-
-      parsedObject[key] = value;
     }
 
     return parsedObject;

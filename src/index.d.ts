@@ -24,7 +24,7 @@ export interface BlissOptions {
 
   // Sizing
   'min-width'?: number;
-  center?: 0 | 1;
+  center?: boolean;
 
   // Cropping (builder-level)
   crop?: number | 'auto' | 'auto-vertical' | 'compact';
@@ -34,7 +34,7 @@ export interface BlissOptions {
   'crop-right'?: number | 'auto';
 
   // Grid (builder-level)
-  grid?: '1' | '0';
+  grid?: boolean;
   'grid-color'?: string;
   'grid-major-color'?: string;
   'grid-medium-color'?: string;
@@ -60,6 +60,9 @@ export interface BlissOptions {
   'svg-desc'?: string;
   'svg-title'?: string;
   'svg-height'?: number;
+
+  // Error handling
+  'error-placeholder'?: boolean;
 
   // SVG pass-through attributes (any key not in the known set)
   [key: string]: string | number | undefined;

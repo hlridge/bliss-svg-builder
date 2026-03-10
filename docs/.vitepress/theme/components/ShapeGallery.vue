@@ -75,7 +75,7 @@ onMounted(async () => {
         }
 
         const crop = category.value.fullHeight ? '' : 'crop=auto-vertical;';
-        const builder = new BlissSVGBuilder(`[${crop}grid=1;grid-sky-color=#c7c7c7]||${renderCode}`);
+        const builder = new BlissSVGBuilder(`[${crop}grid;grid-sky-color=#c7c7c7]||${renderCode}`);
         svgs.value[code] = builder.svgCode;
       } catch (e) {
         svgs.value[code] = `<div class="svg-error">Error: ${e.message}</div>`;

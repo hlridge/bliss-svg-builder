@@ -6,7 +6,7 @@ The grid system in Bliss SVG Builder provides a visual reference and coordinate 
 
 The grid is a visual overlay showing the coordinate system. Enable it to see exactly where elements are positioned:
 
-<Demo code="[grid=1]||B313" title="Character with grid visible" />
+<Demo code="[grid]||B313" title="Character with grid visible" />
 
 The grid shows:
 - **Minor grid lines**, every 1 unit
@@ -15,7 +15,7 @@ The grid shows:
 - **Skyline** (y=8), top of the base glyph area
 - **Earthline** (y=16), bottom of the base glyph area
 
-Enable the grid with the global option `grid=1`.
+Enable the grid with the global option `grid`.
 
 ## Grid Units
 
@@ -41,7 +41,7 @@ The origin `(0,0)` is at the **top-left corner**:
 - **X-axis** increases going **right** (horizontal)
 - **Y-axis** increases going **down** (vertical)
 
-<Demo code="[grid=1]||DOT:0,0;DOT:8,20" title="(0,0) top-left, (8,20) bottom-right" annotations='[{"x":0.5,"y":1.5,"text":"(0,0)","style":{"fill":"red","fontSize":"1.5"}},{"x":2.5,"y":19.2,"text":"(8,20)","style":{"fill":"red","fontSize":"1.5"}}]' />
+<Demo code="[grid]||DOT:0,0;DOT:8,20" title="(0,0) top-left, (8,20) bottom-right" annotations='[{"x":0.5,"y":1.5,"text":"(0,0)","style":{"fill":"red","fontSize":"1.5"}},{"x":2.5,"y":19.2,"text":"(8,20)","style":{"fill":"red","fontSize":"1.5"}}]' />
 
 This follows the standard SVG/web coordinate system.
 
@@ -58,7 +58,7 @@ Bliss characters occupy a standard 20-unit tall grid. The grid is divided by nam
 | 16 | Earthline | Bottom of the base glyph area |
 | 20 | Descender limit | The lowest point base glyphs reach |
 
-<Demo code="[grid=1;margin-right=43]||REFSQUARE;ANCHORRING" after="[color=red;stroke-width=0.16;margin-right=43]||HL2:8,0;HL2:8,4;HL2:8,8;HL2:8,12;HL2:8,16;HL2:8,20" title="Reference lines" annotations='[{"x":10.5,"y":0.8,"text":"Tall indicator line (y=0)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":4.8,"text":"Indicator line / Ascender limit (y=4)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":8.8,"text":"Skyline (y=8)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":12.8,"text":"Midline (y=12)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":16.8,"text":"Earthline (y=16)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":20,"text":"Descender limit (y=20)","style":{"fill":"red","fontSize":"1.8"}}]' />
+<Demo code="[grid;margin-right=43]||REFSQUARE;ANCHORRING" after="[color=red;stroke-width=0.16;margin-right=43]||HL2:8,0;HL2:8,4;HL2:8,8;HL2:8,12;HL2:8,16;HL2:8,20" title="Reference lines" annotations='[{"x":10.5,"y":0.8,"text":"Tall indicator line (y=0)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":4.8,"text":"Indicator line / Ascender limit (y=4)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":8.8,"text":"Skyline (y=8)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":12.8,"text":"Midline (y=12)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":16.8,"text":"Earthline (y=16)","style":{"fill":"red","fontSize":"1.8"}},{"x":10.5,"y":20,"text":"Descender limit (y=20)","style":{"fill":"red","fontSize":"1.8"}}]' />
 
 Most base glyphs are positioned between the skyline and earthline. This creates consistent baseline alignment when characters are combined into sentences.
 

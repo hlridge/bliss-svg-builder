@@ -114,19 +114,15 @@ class BlissSVGBuilder {
       options.minWidth = minWidth;
     }
 
-    // center: Number, 0 (left-aligned, default) or 1 (centered)
-    if ('center' in rawOptions && !isNaN(rawOptions['center'])) {
-      const center = Number(rawOptions['center']);
-      options.center = (center === 0) ? 0 : 1;
+    // Boolean options: [option] = true, absence = false
+    if (rawOptions.center === '1') {
+      options.center = true;
     }
-
-    // grid: Boolean ("1" -> true, "0" -> false)
-    if ('grid' in rawOptions) {
-      if (rawOptions.grid === "1") {
-        options.grid = true;
-      } else if (rawOptions.grid === "0") {
-        options.grid = false;
-      }
+    if (rawOptions.grid === '1') {
+      options.grid = true;
+    }
+    if (rawOptions['error-placeholder'] === '1') {
+      options.errorPlaceholder = true;
     }
 
     // Grid colors - hierarchy: bulk → category → specific
@@ -408,12 +404,13 @@ class BlissSVGBuilder {
     const blissObj = structuredClone(this.#rawBlissObj);
     this.#processAllOptions(blissObj, true);
 
-    const { charSpace, wordSpace, externalGlyphSpace, ...remainingOptions } = blissObj.options ?? {};
+    const { charSpace, wordSpace, externalGlyphSpace, errorPlaceholder, ...remainingOptions } = blissObj.options ?? {};
     this.#sharedOptions = {
       charSpace: charSpace ?? 2,
       wordSpace: wordSpace ?? 8,
       externalGlyphSpace: externalGlyphSpace ?? 0.8,
       warnings: this.#warnings,
+      errorPlaceholder: errorPlaceholder === true,
       errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
     };
     blissObj.options = remainingOptions;
@@ -1510,7 +1507,7 @@ class BlissSVGBuilder {
     const viewBoxY = -marginTop + cropTop;
     let gridOffsetX = 0;
 
-    if ((this.#processedOptions.center ?? 0) === 1 && width > this.composition.width) {
+    if (this.#processedOptions.center === true && width > this.composition.width) {
       const leftOverhang = -this.composition.x;
       const rightOverhang = (this.composition.x + this.composition.width) - this.composition.baseWidth;
       const maxOverhang = Math.max(leftOverhang, rightOverhang);

@@ -6,9 +6,9 @@ In [Get Started](/get-started/characters-bcodes) you learned that every Bliss ch
 
 Characters are made of positioned shapes. For example, `B313` ("feeling") is defined as `H:0,8`, a heart shape at position (0,8):
 
-<Demo code="[grid=1]||B313" title="B313 - the character" />
+<Demo code="[grid]||B313" title="B313 - the character" />
 
-<Demo code="[grid=1]||H:0,8" title="H:0,8 - its underlying definition" />
+<Demo code="[grid]||H:0,8" title="H:0,8 - its underlying definition" />
 
 Characters have standard dimensions (20 units height) designed for consistent alignment in words and sentences. The grid shows the coordinate system. See [Grid Basics](/handbook/appearance/grid-basics) for details.
 
@@ -18,7 +18,7 @@ Many characters are compounds, built from other characters positioned together. 
 
 <Demo code="B931" title="B931 - observation" />
 
-<Demo code="[grid=1]||B447;B303:2,0" title="Defined as B447;B303:2,0 (mind + eye)" />
+<Demo code="[grid]||B447;B303:2,0" title="Defined as B447;B303:2,0 (mind + eye)" />
 
 The definition `B447;B303:2,0` uses `;` (the part separator) to overlay two elements, with `:2,0` positioning the eye relative to the mind. These internal definitions use the same syntax you'd use when [building custom characters from shapes](/handbook/writing/shapes).
 
@@ -43,9 +43,9 @@ See the [Indicators Reference](/reference/indicators-reference) for the complete
 
 Indicators position themselves automatically above the character. Each glyph defines its own anchor point, so the indicator is placed correctly even when that means it's not mathematically centered:
 
-<Demo code="[grid=1]||B431;B81" title="Centered indicator" />
+<Demo code="[grid]||B431;B81" title="Centered indicator" />
 
-<Demo code="[grid=1]||B391;B81" title="Indicator automatically shifted left" />
+<Demo code="[grid]||B391;B81" title="Indicator automatically shifted left" />
 
 For details on how anchor points work and how to override positioning manually, see [Positioning](/handbook/appearance/positioning).
 

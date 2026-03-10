@@ -579,15 +579,25 @@ For browser usage (ES module and UMD), see [Installation](/get-started/installat
 
 ### `warnings`
 
-When the builder encounters an unknown or invalid code, it renders a placeholder glyph (a question mark symbol) and records a warning instead of throwing. This keeps the rest of the composition intact:
+When the builder encounters an unknown or invalid code, it records a warning instead of throwing. This keeps the rest of the composition intact:
 
 ```js
 const builder = new BlissSVGBuilder('B313/BADCODE/B431');
-builder.svgCode;       // renders B313, placeholder, B431
 
 builder.warnings;
 // [{ code: 'UNKNOWN_CODE', message: 'Unknown or invalid code: "BADCODE"', source: 'BADCODE' }]
 ```
+
+By default, unknown codes produce a warning and render as invisible zero-width elements. To show a visual placeholder (a question mark symbol), enable the `error-placeholder` option:
+
+```js
+const builder = new BlissSVGBuilder('[error-placeholder]||B313/BADCODE/B431');
+builder.svgCode; // renders B313, ?-square placeholder, B431
+```
+
+The placeholder applies at the character level: if any part of a character is unknown (e.g., `H;BADCODE`), the entire character is replaced by a single placeholder rather than mixing valid shapes with error markers.
+
+This is useful for displaying feedback on blur or validation, while keeping the output clean during typing.
 
 Each warning object has:
 
@@ -615,7 +625,7 @@ new BlissSVGBuilder(42);
 // Error: Input must be a DSL string or a plain object from toJSON()
 ```
 
-Unknown codes do **not** throw. They render a placeholder and appear in `warnings` (see above).
+Unknown codes do **not** throw. They appear in `warnings` (see above).
 
 ### Safety Limits
 

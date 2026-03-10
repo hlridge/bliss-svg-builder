@@ -43,7 +43,7 @@ document.getElementById('container').appendChild(svgElement);
 **Bliss character** - B313 (FEELING)
 
 ```
-[grid=1;background=#fafafa]||B313
+[grid;background=#fafafa]||B313
 ```
 
 ![B313 FEELING](assets/b313-feeling.svg)
@@ -51,7 +51,7 @@ document.getElementById('container').appendChild(svgElement);
 **Bliss sentence** - "I love Blissymbolics!"
 
 ```
-[grid=1;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1
+[grid;background=#fafafa]||B513/B10//B431;B81//B414/B167//B1
 ```
 
 ![I love Blissymbolics](assets/i-love-blissymbolics.svg)

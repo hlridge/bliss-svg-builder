@@ -16,11 +16,11 @@ Customize colors, line thickness, and spacing between characters and words.
 
 Bliss characters are often arranged on a grid for consistent spacing and alignment.
 
-<Demo code="[grid=1]||B206;B81/RK:-2/B516/B894;B97/B956" title="A Bliss word on a default grid" />
+<Demo code="[grid]||B206;B81/RK:-2/B516/B894;B97/B956" title="A Bliss word on a default grid" />
 
 And sometimes on colored background to indicate part of speech.
 
-<Demo code="[grid=1;background=rgb(251, 202, 196);grid-sky-color=red;grid-earth-color=red;grid-major-color=rgb(196, 158, 153);grid-medium-color=rgb(231, 186, 180);grid-minor-color=rgb(231, 186, 180)]||B206;B81/RK:-2/B516/B894;B97/B956" title="A Bliss word on a colored grid" />
+<Demo code="[grid;background=rgb(251, 202, 196);grid-sky-color=red;grid-earth-color=red;grid-major-color=rgb(196, 158, 153);grid-medium-color=rgb(231, 186, 180);grid-minor-color=rgb(231, 186, 180)]||B206;B81/RK:-2/B516/B894;B97/B956" title="A Bliss word on a colored grid" />
 
 ## Advanced Styling
 

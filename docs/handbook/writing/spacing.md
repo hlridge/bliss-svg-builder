@@ -6,15 +6,15 @@ Control distances between characters and words, and fine-tune specific gaps with
 
 Characters within a word are separated by `char-space`, which defaults to **2 grid units**:
 
-<Demo code="[grid=1]||B392/B666" title="Default character spacing (2 units)" />
+<Demo code="[grid]||B392/B666" title="Default character spacing (2 units)" />
 
-<Demo code="[grid=1;crop=7;margin=0.25]||B392/B666" after="[color=red;stroke-width=0.05;crop=6;margin=0.25]||[stroke-width=0.16]>B392;VL2:8,10;HL2:8,10;DL.5S:8,10;DL.5N:8,9.5;DL.5N:9.5,10;DL.5S:9.5,9.5/AK:0/[stroke-width=0.16]>B666;VL2:0,10" fullHeight title="char-space annotated: 2 units between endline and startline" annotations='[{"x":8.9,"y":9,"text":"space=2","style":{"fontSize":"0.8","fill":"#c00","textAnchor":"middle"}}]' />
+<Demo code="[grid;crop=7;margin=0.25]||B392/B666" after="[color=red;stroke-width=0.05;crop=6;margin=0.25]||[stroke-width=0.16]>B392;VL2:8,10;HL2:8,10;DL.5S:8,10;DL.5N:8,9.5;DL.5N:9.5,10;DL.5S:9.5,9.5/AK:0/[stroke-width=0.16]>B666;VL2:0,10" fullHeight title="char-space annotated: 2 units between endline and startline" annotations='[{"x":8.9,"y":9,"text":"space=2","style":{"fontSize":"0.8","fill":"#c00","textAnchor":"middle"}}]' />
 
 Spacing is measured between stroke centers, not between ink edges. This means changing `stroke-width` affects how spacious or tight characters appear without changing the actual spacing. Thicker strokes may benefit from a wider `char-space`:
 
-<Demo code="[grid=1;stroke-width=1]||B392/B666" title="Thicker strokes, default spacing looks tight" />
+<Demo code="[grid;stroke-width=1]||B392/B666" title="Thicker strokes, default spacing looks tight" />
 
-<Demo code="[grid=1;stroke-width=1;char-space=2.5]||B392/B666" title="Compensating with char-space=2.5" />
+<Demo code="[grid;stroke-width=1;char-space=2.5]||B392/B666" title="Compensating with char-space=2.5" />
 
 | Option | Default | Range |
 |--------|---------|-------|
@@ -24,11 +24,11 @@ Spacing is measured between stroke centers, not between ink edges. This means ch
 
 The visible gap between words is **8 grid units** by default, but it is made up of two parts: a **2-unit advance width** that naturally follows every character (the same as `char-space`), plus **6 units of actual word spacing**:
 
-<Demo code="[grid=1]||B392/B666//B431//B4" title="Default word gap (8 units: 2 advance + 6 spacing)" />
+<Demo code="[grid]||B392/B666//B431//B4" title="Default word gap (8 units: 2 advance + 6 spacing)" />
 
 The `word-space` option controls the full gap. Each extra <code>/</code> (`///`, `////`) adds **6 units** (the gap minus the advance width that is already there):
 
-<Demo code="[grid=1]||B392/B666///B431//B4" title="/// adds 6 more before the second word" />
+<Demo code="[grid]||B392/B666///B431//B4" title="/// adds 6 more before the second word" />
 
 Like `char-space`, `word-space` may benefit from adjustment when using a thicker `stroke-width`.
 
@@ -40,11 +40,11 @@ Like `char-space`, `word-space` may benefit from adjustment when using a thicker
 
 Some characters have built-in spacing adjustments. Punctuation marks like period (`B4`) and comma (`B5`) are placed with half the normal word spacing before them, so they sit closer to the preceding word:
 
-<Demo code="[grid=1]||B392/B666//B431//B4" title="Period with half word-space before it" />
+<Demo code="[grid]||B392/B666//B431//B4" title="Period with half word-space before it" />
 
 Digits also have default kerning that reduces the space between them by 1 unit, so sequences of digits appear grouped:
 
-<Demo code="[grid=1]||B452/B10/B11" title="December: Digits with automatic kerning" />
+<Demo code="[grid]||B452/B10/B11" title="December: Digits with automatic kerning" />
 
 These adjustments happen automatically and respond to changes in `word-space` and `char-space`.
 

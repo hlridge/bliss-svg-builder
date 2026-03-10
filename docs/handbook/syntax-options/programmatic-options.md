@@ -86,7 +86,7 @@ const builder = new BlissSVGBuilder('[color=blue]||B313', {
 //         stroke-width 0.8 (from override)
 ```
 
-<Demo code="[color=blue;grid=1;stroke-width=0.8]||B313" title="Keys from all three layers" />
+<Demo code="[color=blue;grid;stroke-width=0.8]||B313" title="Keys from all three layers" />
 
 When the same key appears in all three layers, the override wins:
 
@@ -118,6 +118,7 @@ Options use **camelCase** keys with native JavaScript types, not the kebab-case 
 | `backgroundMid` | `background-mid` | string | `'#e8f5e9'` |
 | `backgroundBottom` | `background-bottom` | string | `'#e3f2fd'` |
 | `center` | `center` | boolean | `false` |
+| `errorPlaceholder` | `error-placeholder` | boolean | `true` |
 | `crop` | `crop` | number or string | `'auto'` |
 | `svgHeight` | `svg-height` | number | `100` |
 | `gridColor` | `grid-color` | string | `'#ccc'` |

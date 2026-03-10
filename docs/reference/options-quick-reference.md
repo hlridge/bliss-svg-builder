@@ -32,7 +32,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | Option | Default | Values | Description |
 |--------|---------|--------|-------------|
 | `min-width` | `0` | ≥0 | Minimum composition width |
-| `center` | `0` | 0, 1 | Center content in available width |
+| `center` | off | boolean | Center content in available width |
 
 ---
 
@@ -64,7 +64,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 
 | Option | Default | Values | Description |
 |--------|---------|--------|-------------|
-| `grid` | `0` | 0, 1 | Show alignment grid |
+| `grid` | off | boolean | Show alignment grid |
 
 ---
 
@@ -105,6 +105,14 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | `background-top` | - | Color | Top zone background (above y=8) |
 | `background-mid` | - | Color | Mid zone background (y=8 to y=16) |
 | `background-bottom` | - | Color | Bottom zone background (below y=16) |
+
+---
+
+## Error Handling
+
+| Option | Default | Type | Description |
+|--------|---------|------|-------------|
+| `error-placeholder` | off | boolean | Show visual placeholder for unknown codes |
 
 ---
 

@@ -10,7 +10,7 @@ Add a background with the `background` option:
 
 Color the three vertical zones of the Bliss coordinate system independently with `background-top`, `background-mid`, and `background-bottom`. This is especially useful in educational materials to help learners see where symbols sit and why position matters:
 
-<Demo code="[background-top=#fce4ec;background-mid=#e8f5e9;background-bottom=#e3f2fd;grid=1;grid-color=rgba(0,0,0,0.08);grid-major-color=rgba(0,0,0,0.22);grid-earth-color=rgba(0,0,0,0.22);grid-sky-color=rgba(0,0,0,0.44);]||B313" title="Three zones colored with grid overlay" />
+<Demo code="[background-top=#fce4ec;background-mid=#e8f5e9;background-bottom=#e3f2fd;grid;grid-color=rgba(0,0,0,0.08);grid-major-color=rgba(0,0,0,0.22);grid-earth-color=rgba(0,0,0,0.22);grid-sky-color=rgba(0,0,0,0.44);]||B313" title="Three zones colored with grid overlay" />
 
 Each zone maps to a region in the 20-unit Bliss coordinate space:
 

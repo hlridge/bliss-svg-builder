@@ -47,31 +47,31 @@ All shape codes are semantically named, following predictable patterns:
 
 `8`, `4`, `2`, `1` indicate size in grid units:
 
-<Demo code="[grid=1;crop=auto-vertical]||C8:0,8" title="C8 - [C]ircle with diameter [8]" />
+<Demo code="[grid;crop=auto-vertical]||C8:0,8" title="C8 - [C]ircle with diameter [8]" />
 
-<Demo code="[grid=1;crop=auto-vertical]||C4:0,8" title="C4 - [C]ircle with diameter [4]" />
+<Demo code="[grid;crop=auto-vertical]||C4:0,8" title="C4 - [C]ircle with diameter [4]" />
 
-<Demo code="[grid=1;crop=auto-vertical]||C2:0,8" title="C2 - [C]ircle with diameter [2]" />
+<Demo code="[grid;crop=auto-vertical]||C2:0,8" title="C2 - [C]ircle with diameter [2]" />
 
 ### Direction Suffixes
 
 `N`, `S`, `E`, `W`, `NE`, `SE`, `SW`, `NW` indicate orientation:
 
-<Demo code="[grid=1;crop=auto-vertical]||HC8N:0,8" title="HC8N - [H]alf [C]ircle with diameter [8] towards [N]orth" />
+<Demo code="[grid;crop=auto-vertical]||HC8N:0,8" title="HC8N - [H]alf [C]ircle with diameter [8] towards [N]orth" />
 
-<Demo code="[grid=1;crop=auto-vertical]||HC8S:0,8" title="HC8S - [H]alf [C]ircle with diameter [8] towards [S]outh" />
+<Demo code="[grid;crop=auto-vertical]||HC8S:0,8" title="HC8S - [H]alf [C]ircle with diameter [8] towards [S]outh" />
 
-<Demo code="[grid=1;crop=auto-vertical]||LARR8N:0,8" title="LARR8N - [L]arge [ARR]ow with length [8] pointing towards [N]orth" />
+<Demo code="[grid;crop=auto-vertical]||LARR8N:0,8" title="LARR8N - [L]arge [ARR]ow with length [8] pointing towards [N]orth" />
 
-<Demo code="[grid=1;crop=auto-vertical]||DL8N:0,8" title="DL8N - [D]iagonal [L]ine with size [8] towards [N]orth" />
+<Demo code="[grid;crop=auto-vertical]||DL8N:0,8" title="DL8N - [D]iagonal [L]ine with size [8] towards [N]orth" />
 
 ### Combined Patterns
 
 Some shapes use both size and direction:
 
-<Demo code="[grid=1;crop=auto-vertical]||QC4NE:0,8" title="QC4NE - [Q]uarter [C]ircle with radius [4] towards [NE]" />
+<Demo code="[grid;crop=auto-vertical]||QC4NE:0,8" title="QC4NE - [Q]uarter [C]ircle with radius [4] towards [NE]" />
 
-<Demo code="[grid=1;crop=auto-vertical]||QC4SW:0,8" title="QC4SW - [Q]uarter [C]ircle with radius [4] towards [SW]" />
+<Demo code="[grid;crop=auto-vertical]||QC4SW:0,8" title="QC4SW - [Q]uarter [C]ircle with radius [4] towards [SW]" />
 
 ## Building Custom Characters
 
@@ -79,19 +79,19 @@ Some shapes use both size and direction:
 
 Use `:x,y` to place shapes on the grid:
 
-<Demo code="[grid=1]||C8:0,8" title="Circle at (0,8)" />
+<Demo code="[grid]||C8:0,8" title="Circle at (0,8)" />
 
-<Demo code="[grid=1]||C8:4,8" title="Circle at (4,8) - shifted right" />
+<Demo code="[grid]||C8:4,8" title="Circle at (4,8) - shifted right" />
 
-<Demo code="[grid=1]||C8:0,12" title="Circle at (0,12) - shifted down" />
+<Demo code="[grid]||C8:0,12" title="Circle at (0,12) - shifted down" />
 
 ### Combining Shapes
 
 Use `;` to combine shapes into a single character:
 
-<Demo code="[grid=1]||C8:0,8;DOT:4,12" title="Circle + centered dot" />
+<Demo code="[grid]||C8:0,8;DOT:4,12" title="Circle + centered dot" />
 
-<Demo code="[grid=1]||VL8:0,8;VL8:8,8;HL8:0,8;HL8:0,16" title="Square from lines" />
+<Demo code="[grid]||VL8:0,8;VL8:8,8;HL8:0,8;HL8:0,16" title="Square from lines" />
 
 ## How B-Codes Use Shapes
 
@@ -99,13 +99,13 @@ B-codes are defined using shapes internally:
 
 <Demo code="B313" title="B313 - feeling" />
 
-<Demo code="[grid=1]||H:0,8" title="Defined as H:0,8 (heart at 0,8)" />
+<Demo code="[grid]||H:0,8" title="Defined as H:0,8 (heart at 0,8)" />
 
 Compound characters combine multiple elements:
 
 <Demo code="B1103" title="B1103 - understanding" />
 
-<Demo code="[grid=1]||B335;B412:4,0" title="Defined as B335;B412:4,0 (forward + knowledge)" />
+<Demo code="[grid]||B335;B412:4,0" title="Defined as B335;B412:4,0 (forward + knowledge)" />
 
 ## Registering Custom Characters
 
