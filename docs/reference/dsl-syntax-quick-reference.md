@@ -31,6 +31,10 @@ Pattern: Single = character level, Double = word level
 | `CODE:x` | Position (x,0) |
 | `CODE:,y` | Position (0,y) |
 
+## Word Separator Internals
+
+`//` is shorthand for `/SP/`, an explicit space character. During processing, `SP` is translated to `TSP` (three-quarter space) or `QSP` (quarter space, used before punctuation marks). Each extra `/` in `///` or `////` adds another `TSP`.
+
 ## Kerning
 
 | Code | Syntax | Effect |
