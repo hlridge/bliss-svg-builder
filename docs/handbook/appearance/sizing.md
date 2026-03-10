@@ -4,127 +4,93 @@ Control the dimensions and fitting of your Bliss SVG output.
 
 ## Standard Dimensions
 
-Bliss characters use a standard 20-unit grid height. This ensures consistent sizing across all characters:
+Bliss characters use a standard 20-unit grid height. This keeps characters aligned in words and sentences:
 
 <Demo code="[grid=1]||B313" title="Standard 20-unit height" />
 
-<Demo code="[grid=1]||B1103" title="Same height, different character" />
+Most glyph content sits between y=8 and y=16, with space above reserved for indicators.
 
-Most glyph content appears within y=8 to y=16 (the main content area), with space above for indicators.
+## Why Shapes Need Cropping
 
-## Crop Modes
+When shapes are used in a DSL string, they are treated like parts of characters and get the full 20-unit canvas, even when the shape itself is much smaller. A heart shape is only 8 units tall, but the canvas is 20 units:
 
-The `crop` option controls how the SVG canvas is sized. Beyond numeric values and per-side cropping (see [Margins & Cropping](/handbook/spacing-layout/margins-cropping)), it accepts several named modes:
+<Demo code="[grid=1]||H" title="Heart shape on a 20-unit canvas: 12 units of empty space" />
+
+For characters, the 20-unit height is by design: it keeps them aligned in sentences. But when you're building with shapes, you typically want to remove that empty space.
 
 ### `crop=auto`
 
-Crops all sides to the actual content pixel bounds, the tightest possible fit:
+Crops all sides to the actual content bounds, the tightest possible fit:
 
-<Demo code="B313" title="Standard" />
+<Demo code="[grid=1;crop=auto]||H" title="crop=auto: tight to content on all sides" />
 
-<Demo code="[crop=auto]||B313" title="crop=auto (tight to content)" />
-
-You can also auto-crop individual sides with `crop-top=auto`, `crop-bottom=auto`, etc. See [Margins & Cropping](/handbook/spacing-layout/margins-cropping) for details.
+This removes all available space from every direction.
 
 ### `crop=auto-vertical`
 
-Fits the SVG height to the actual content without affecting horizontal layout. This removes the fixed 20-unit height and is intended for building shapes on a freeform canvas:
+Crops only the vertical empty space, without affecting horizontal layout:
 
-<Demo code="[grid=1]||H:0,8" title="Standard: full 20-unit height" />
+<Demo code="[grid=1]||H:4,8" title="Heart at x=4: intentional space on the left" />
 
-<Demo code="[grid=1;crop=auto-vertical]||H:0,8" title="crop=auto-vertical: fits to content height" />
+<Demo code="[grid=1;crop=auto-vertical]||H:4,8" title="crop=auto-vertical: vertical space gone, left space preserved" />
 
-**Use `crop=auto-vertical`** when:
-- Building custom shapes from primitives
-- Creating icons or decorative elements
-- Content doesn't need to align with standard Bliss text
+Use `crop=auto-vertical` when you want to remove the empty grid above and below, but keep your horizontal positioning intact.
 
-**Don't use it** when:
-- Working with B-codes (they have proper dimensions)
-- Characters need to align in sentences
+### Cropping Characters
 
-<Demo code="[crop=auto-vertical]||C8:0,8;DOT:4,12" title="Custom shape with auto-vertical" />
+For Bliss characters (B-codes), the 20-unit grid is intentional. If you need to reduce vertical space around characters, use numeric crop values or `crop=compact`:
 
-### `crop=compact`
+<Demo code="[grid=1;crop-top=8;crop-bottom=4]||B313" title="Numeric: crop-top=8, crop-bottom=4" />
 
-Removes 4 units of unused vertical space, making characters appear larger in fixed-size containers. Ideal for communication boards and AAC applications:
+<Demo code="[grid=1;crop=compact]||B313" fullHeight title="Compact: 4 units auto-cropped" />
 
-<Demo code="B313" title="Standard (20 units)" />
+Compact mode is covered in detail in [Grid Customization](/handbook/appearance/grid-customization#use-zone-colors-with-crop-compact).
 
-<Demo code="[crop=compact]||B313" title="Compact (16 units)" />
+## Margins & Cropping
 
-Compact mode is smart about where it crops. Characters never use both the top 4 and bottom 4 grid units simultaneously, so there are always 4 units to reclaim. The library crops as much as possible from the top (where indicator space is typically empty) and the remainder from the bottom:
+`margin` expands the SVG canvas outward, `crop` cuts into it from the edges. Both support uniform values and per-side overrides (`margin-top`, `crop-left`, etc.). Per-side values override the uniform value.
 
-<Demo code="[crop=compact]||B431" title="Compact heart" />
+The default margin is **0.75 units** on all sides. Crop defaults to **0**.
 
-<Demo code="[crop=compact]||B431;B81" title="Compact with indicator (still fits)" />
+Background color extends with the margin, while cropping cuts into the grid:
 
-This makes Bliss symbols noticeably larger at any given display size without clipping any content.
+<Demo code="[grid=1;margin=4;background=#f5eb82;grid-color=#e1d878;grid-major-color=#bfb765;grid-sky-color=#7f7a44;grid-earth-color=#7f7a44]||B313" title="Background fills the margin area" />
+
+<Demo code="[grid=1;crop-top=4;crop-bottom=4]||B313" title="Cropping cuts into the grid" />
+
+**Per-side auto cropping.** Each crop direction also accepts `auto` to crop to the content bounds on that side. You can mix auto with numeric values:
+
+<Demo code="[grid=1;crop-top=auto;crop-bottom=4]||B313" title="Auto top, manual bottom" />
 
 ## Minimum Width
 
-Set a minimum width for the composition with `min-width`:
+Set a minimum width for the composition with `min-width`. This could be useful if you want a consistent width of the grid even if the Bliss composition is narrower:
 
-<Demo code="B313" title="Natural width" />
+<Demo code="[grid=1;min-width=16]||B313" title="min-width=16" />
 
-<Demo code="[min-width=16]||B313" title="min-width=16" />
-
-<Demo code="[min-width=24]||B313" title="min-width=24" />
-
-This is useful when you need consistent widths across different characters:
-
-<Demo code="[min-width=12]||B313" title="Wide character, min-width=12" />
-
-<Demo code="[min-width=12]||B4" title="Narrow character, same min-width" />
-
-| Option | Default | Range |
-|--------|---------|-------|
-| `min-width` | none | Any positive number |
+<Demo code="[grid=1;crop=auto;min-width=16]||B313" title="crop=auto respects the min-width" />
 
 ## Centering
 
+<Demo code="[grid=1;min-width=16]||B313" title="Left-aligned (default)" />
+
 By default, content is left-aligned within its width. Enable centering with `center=1`:
 
-<Demo code="[min-width=20]||B313" title="Left-aligned (default)" />
-
-<Demo code="[min-width=20;center=1]||B313" title="Centered (center=1)" />
-
-Centering is most visible when using `min-width` or with asymmetric indicators:
-
-<Demo code="B431;B81" title="With indicator: centered" />
-
-<Demo code="[center=0]||B431;B81" title="With indicator: left-aligned" />
-
-| Option | Default | Values |
-|--------|---------|--------|
-| `center` | `0` | `0` or `1` |
-
-## Combined Examples
-
-### Consistent Icon Sizing
-
-For icon-like usage with consistent dimensions:
-
-<Demo code="[crop=auto-vertical;min-width=12]||H:0,8" title="Heart icon" />
-
-<Demo code="[crop=auto-vertical;min-width=12]||C8:0,8" title="Circle icon" />
-
-### Compact Board Cells
-
-For AAC communication boards:
-
-<Demo code="[crop=compact;background=#f0f0f0]||B313" title="Compact with background" />
-
-<Demo code="[crop=compact;background=#f0f0f0]||B431;B81" title="Compact with indicator" />
-
-### Tight Cropping for Inline Use
-
-<Demo code="[crop=auto;background=#f0f0f0]||B313" title="Tight for inline embedding" />
+<Demo code="[grid=1;min-width=16;center=1]||B313" title="Centered (center=1)" />
 
 ## Options Reference
 
 | Option | Default | Values | Description |
 |--------|---------|--------|-------------|
+| `margin` | `0.75` | Number | Margin on all sides |
+| `margin-top` | `0.75` | Number | Top margin |
+| `margin-bottom` | `0.75` | Number | Bottom margin |
+| `margin-left` | `0.75` | Number | Left margin |
+| `margin-right` | `0.75` | Number | Right margin |
 | `crop` | `0` | Number, `auto`, `auto-vertical`, `compact` | Cropping mode |
+| `crop-top` | `0` | Number or `auto` | Top crop |
+| `crop-bottom` | `0` | Number or `auto` | Bottom crop |
+| `crop-left` | `0` | Number or `auto` | Left crop |
+| `crop-right` | `0` | Number or `auto` | Right crop |
 | `min-width` | none | Number | Minimum composition width |
 | `center` | `0` | `0`, `1` | Center content within width |
