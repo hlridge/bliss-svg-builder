@@ -83,7 +83,7 @@ export class BlissParser {
     }
 
     if (codeString) {
-      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\-._]+):?(\-?\d*(?:\.\d*)?)?,?(\-?\d*(?:\.\d*)?)?$/);
+      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\-._]+)(?::(\-?(?:\d+(?:\.\d*)?|\.\d+))?(?:,(\-?(?:\d+(?:\.\d*)?|\.\d+))?)?)?$/);
 
       if (matched) {
         let [, code, x, y] = matched;
@@ -394,11 +394,10 @@ export class BlissParser {
             if (targetIndex > 0 && !expandedParts.some(p => p.isHeadGlyph)) {
               expandedParts[targetIndex].isHeadGlyph = true;
             }
-          } else if (expandedParts.length === 1 && indicators) {
-            // Single glyph: ;; behaves like ; (attach indicator to the single glyph)
-            // Use glyphCode if available to match B291;B86 behavior (preserves character code)
+          } else if (expandedParts.length === 1) {
+            // Single glyph: ;; behaves like ; (attach or strip indicator on the single glyph)
             const baseCode = getBaseCode(expandedParts[0]);
-            expandedParts[0].part = baseCode + ';' + indicators;
+            expandedParts[0].part = indicators ? baseCode + ';' + indicators : baseCode;
           }
 
           return expandedParts;
@@ -465,9 +464,12 @@ export class BlissParser {
           const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement && !baseIsCompoundIndicator;
           const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
           const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
+          // Bare empty strip: trailing ; with no indicator, on any code (even without a known indicator in its definition).
+          // The user has no way to know if a B-code has a baked-in indicator, so empty ; must never warn.
+          const isBareEmptyStrip = !shouldRemove && hasInputIndicators && filteredIndicators.length === 0;
 
           // Use base code lookup for words, or when replacing/removing indicators
-          const useBaseCodeLookup = isWordDefinition || shouldReplace || shouldRemove;
+          const useBaseCodeLookup = isWordDefinition || shouldReplace || shouldRemove || isBareEmptyStrip;
           const definition = useBaseCodeLookup
             ? (definitions[potentialBaseCode] || {})
             : codeForLookup.startsWith('XTXT_')
@@ -554,7 +556,9 @@ export class BlissParser {
               expandedParts[targetIndex].part = baseCode + ';' + filteredIndicators.join(';');
             }
 
-            // Handle WORD; (empty indicators) - removal for multi-glyph words only
+            // Handle WORD; (empty indicators) - strip from head glyph of multi-glyph words
+            // Single-char cases are handled by: shouldRemove (if definition has real indicators)
+            // or isBareEmptyStrip (if no real indicator in definition, via base case return)
             if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
               const targetIndex = findHeadGlyphIndex(expandedParts);
               const baseCode = getBaseCode(expandedParts[targetIndex]);
@@ -596,7 +600,7 @@ export class BlissParser {
           const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
           return [{
-            part: str,
+            part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode : str.replace(/;$/, ''),
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph && { isExternalGlyph }),
