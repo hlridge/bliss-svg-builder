@@ -22,7 +22,8 @@ export const KNOWN_OPTION_KEYS = new Set([
   'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
   'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
   'color', 'background', 'background-top', 'background-mid', 'background-bottom',
-  'text', 'svg-desc', 'svg-title', 'svg-height', 'error-placeholder'
+  'text', 'svg-desc', 'svg-title', 'svg-height', 'error-placeholder',
+  'key'
 ]);
 
 /**

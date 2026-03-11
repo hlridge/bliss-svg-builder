@@ -192,15 +192,15 @@ builder.part(1); // B431 (first part of second glyph)
 builder.part(2); // B81 (second part of second glyph)
 ```
 
-### `getElementById(id)`
+### `getElementByKey(key)`
 
-Returns a live handle for the element matching a snapshot ID:
+Returns a live handle for the element matching a snapshot key:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103');
 const snap = builder.snapshot();
-const id = snap.children[0].children[0].id;
-builder.getElementById(id); // live handle for B313
+const key = snap.children[0].children[0].key;
+builder.getElementByKey(key); // live handle for B313
 ```
 
 ### `snapshot()`
@@ -274,7 +274,7 @@ builder.toJSON().groups; // []
 
 ## ElementHandle
 
-A live reference to a group, glyph, or part in the element tree. Obtained via `group()`, `glyph()`, `part()`, or `getElementById()`.
+A live reference to a group, glyph, or part in the element tree. Obtained via `group()`, `glyph()`, `part()`, or `getElementByKey()`.
 
 ### Handle Staleness
 

@@ -6,19 +6,15 @@
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { INTERNAL_OPTIONS, isSafeAttributeName } from "./bliss-constants.js";
+import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 
-// Simple counter-based ID generator (works in all environments).
-// IDs are ephemeral, incrementing from a shared module-level counter. They are
-// not stable across re-renders. Future work: propagate IDs through round-trips
-// so that elements retain identity after manipulation (needed for Bliss Maker).
-let nextId = 0;
-function generateId() {
-  return `el_${++nextId}`;
+function generateKey() {
+  return Math.random().toString(36).slice(2, 10);
 }
 
 export class BlissElement {
   //#region Private Properties
-  #id
+  #key
   #level
   #blissObj
   #extraPathOptions
@@ -299,12 +295,24 @@ export class BlissElement {
   }
 
   constructor(blissObj = {}, { parentElement = null, previousElement = null, level = 0, sharedOptions = null } = {}) {
-    this.#id = generateId();
     this.#blissObj = blissObj;
     this.#parentElement = parentElement;
     this.#previousElement = previousElement;
     this.#level = level;
     this.#sharedOptions = sharedOptions || { charSpace: 2, wordSpace: 8, externalGlyphSpace: 0.8 };
+
+    // Assign key: user-provided key takes precedence, otherwise auto-generate
+    this.#key = this.#blissObj.key || generateKey();
+
+    // Duplicate key detection (only when builder provides sharedOptions with key tracking).
+    // The `this.#blissObj.key` guard limits warnings to user-assigned keys only;
+    // auto-generated 8-char random keys have negligible collision probability (~2.8T combinations).
+    if (this.#sharedOptions.keys) {
+      if (this.#blissObj.key && this.#sharedOptions.keys.has(this.#key)) {
+        console.warn(`Duplicate element key: "${this.#key}"`);
+      }
+      this.#sharedOptions.keys.add(this.#key);
+    }
 
     this.#codeName = "";
     this.#relativeToParentX = 0;
@@ -463,8 +471,9 @@ export class BlissElement {
           if (this.#sharedOptions?.errorPlaceholder) {
             // Replace all children with a single placeholder character
             this.#children = [];
-            for (const part of structuredClone(this.#sharedOptions.errorPlaceholderParts)) {
-              const child = new BlissElement(part, {
+            const placeholderParts = structuredClone(this.#sharedOptions.errorPlaceholderParts);
+            for (const placeholderPart of placeholderParts) {
+              const child = new BlissElement(placeholderPart, {
                 parentElement: this,
                 previousElement: this.#children[this.#children.length - 1],
                 level: this.#level + 1,
@@ -569,7 +578,9 @@ export class BlissElement {
         }
       } else {
         // Part level (level >= 3)
-        const elementDefinition = blissElementDefinitions[this.#blissObj.codeName];
+        const elementDefinition = this.#blissObj.codeName?.startsWith('XTXT_')
+          ? (() => { const g = createTextFallbackGlyph(this.#blissObj.codeName.slice(5)); g.isShape = true; return g; })()
+          : blissElementDefinitions[this.#blissObj.codeName];
         const isPredefinedElement = !!elementDefinition && !!elementDefinition.getPath;
         const isCompositeElement = !!this.#blissObj.parts && this.#blissObj.parts.length > 0;
   
@@ -814,8 +825,8 @@ export class BlissElement {
     return this.#isBlissGlyph || this.#isExternalGlyph;
   }
 
-  get id() {
-    return this.#id;
+  get key() {
+    return this.#key;
   }
 
   /**
@@ -858,7 +869,7 @@ export class BlissElement {
     else type = 'part';
 
     return Object.freeze({
-      id: this.#id,
+      key: this.#key,
       type,
       codeName: this.#codeName || '',
       x: absX,
@@ -876,7 +887,7 @@ export class BlissElement {
       isExternalGlyph: !!this.#isExternalGlyph,
       isHeadGlyph: !!this.#blissObj.isHeadGlyph,
       index,
-      parentId: this.#parentElement?.#id ?? null,
+      parentKey: this.#parentElement?.#key ?? null,
       children
     });
   }
@@ -1045,7 +1056,7 @@ export class BlissElement {
         parentElement: this,
         previousElement: this.#children[this.#children.length - 1],
         level: this.#level + 1,
-        sharedOptions: this.#sharedOptions
+        sharedOptions: this.#sharedOptions,
       });
       this.#children.push(child);
     }

@@ -56,14 +56,14 @@ builder.group(99);  // null
 builder.glyph(-1);  // null
 ```
 
-### Finding Elements by ID
+### Finding Elements by Key
 
-Use `getElementById()` with IDs from a snapshot:
+Use `getElementByKey()` with keys from a snapshot:
 
 ```js
 const snap = builder.snapshot();
-const id = snap.children[0].children[0].id;
-const handle = builder.getElementById(id);
+const key = snap.children[0].children[0].key;
+const handle = builder.getElementByKey(key);
 ```
 
 ## Adding Content

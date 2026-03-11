@@ -307,6 +307,11 @@ class BlissSVGBuilder {
   // Recursively process options at all levels (groups, glyphs, parts)
   #processAllOptions(obj, isTopLevel = false) {
     if (obj.options) {
+      // Extract key from options (key is element identity, not an SVG option)
+      if (obj.options.key !== undefined) {
+        obj.key = obj.options.key;
+        delete obj.options.key;
+      }
       obj.options = this.#processOptions(obj.options, isTopLevel);
     }
     if (obj.groups) {
@@ -412,6 +417,7 @@ class BlissSVGBuilder {
       warnings: this.#warnings,
       errorPlaceholder: errorPlaceholder === true,
       errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
+      keys: new Set(),
     };
     blissObj.options = remainingOptions;
     this.#processedOptions = blissObj.options;
@@ -480,12 +486,12 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Look up an element by its snapshot ID, returning a live ElementHandle.
+   * Look up an element by its snapshot key, returning a live ElementHandle.
    *
-   * @param {string} id
+   * @param {string} key
    * @returns {ElementHandle|null}
    */
-  getElementById(id) {
+  getElementByKey(key) {
     const snap = this.snapshot();
     const groups = snap.children;
     const rawGroups = this.#rawBlissObj.groups;
@@ -496,19 +502,19 @@ class BlissSVGBuilder {
       const rawGroup = rawGroups[rawGi];
       if (BlissSVGBuilder.#isRawSpaceGroup(rawGroup)) continue;
 
-      if (groupSnap.id === id) {
+      if (groupSnap.key === key) {
         return new ElementHandle(this.#mutationCtx, 'group', rawGroup);
       }
 
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
       for (let gi = 0; gi < glyphs.length; gi++) {
         const rawGlyph = rawGroup.glyphs[gi];
-        if (glyphs[gi].id === id) {
+        if (glyphs[gi].key === key) {
           return new ElementHandle(this.#mutationCtx, 'glyph', rawGlyph, rawGroup);
         }
         const parts = glyphs[gi].children;
         for (let pi = 0; pi < parts.length; pi++) {
-          if (parts[pi].id === id) {
+          if (parts[pi].key === key) {
             return new ElementHandle(this.#mutationCtx, 'part', rawGlyph.parts[pi], { group: rawGroup, glyph: rawGlyph });
           }
         }
@@ -838,10 +844,29 @@ class BlissSVGBuilder {
    */
   toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
+
+    // Strip keys from all levels (keys are runtime identity, not composition data)
+    delete obj.key;
+    if (obj.options) delete obj.options.key;
+
     if (obj.groups) {
+      const stripKeyFromParts = (parts) => {
+        for (const part of parts) {
+          delete part.key;
+          if (part.options) delete part.options.key;
+          if (part.parts) stripKeyFromParts(part.parts);
+        }
+      };
+
       for (const group of obj.groups) {
+        delete group.key;
+        if (group.options) delete group.options.key;
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
+            delete glyph.key;
+            if (glyph.options) delete glyph.options.key;
+            if (glyph.parts) stripKeyFromParts(glyph.parts);
+
             // Normalize glyphCode → codeName for public API
             if (glyph.glyphCode) {
               // Decompose custom glyphs to portable codes by default

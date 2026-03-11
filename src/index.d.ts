@@ -97,7 +97,7 @@ export type ElementType =
 
 /** A frozen, read-only snapshot of an element in the composition tree. */
 export interface ElementSnapshot {
-  readonly id: string;
+  readonly key: string;
   readonly type: ElementType;
   readonly codeName: string;
   readonly x: number;
@@ -115,7 +115,7 @@ export interface ElementSnapshot {
   readonly isExternalGlyph: boolean;
   readonly isHeadGlyph: boolean;
   readonly index: number;
-  readonly parentId: string | null;
+  readonly parentKey: string | null;
   readonly children: readonly ElementSnapshot[];
 }
 
@@ -126,7 +126,7 @@ export type HandleLevel = 'group' | 'glyph' | 'part';
 
 /**
  * A live handle referencing a node in the raw composition object.
- * Returned by `getElementById()`, `group()`, `glyph()`, and `part()`.
+ * Returned by `getElementByKey()`, `group()`, `glyph()`, and `part()`.
  * Mutations through a handle trigger a rebuild of the composition.
  */
 export declare class ElementHandle {
@@ -350,8 +350,8 @@ export declare class BlissSVGBuilder {
   /** Returns all element snapshots matching the predicate. */
   query(predicate: (el: ElementSnapshot) => boolean): ElementSnapshot[];
 
-  /** Looks up an element handle by its snapshot ID. */
-  getElementById(id: string): ElementHandle | null;
+  /** Looks up an element handle by its snapshot key. */
+  getElementByKey(key: string): ElementHandle | null;
 
   /** Returns a handle to the non-space group at the given index. */
   group(index: number): ElementHandle | null;
