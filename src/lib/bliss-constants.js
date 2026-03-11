@@ -51,6 +51,17 @@ export const escapeHtml = (str) => String(str)
 export const camelToKebab = (str) => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
 
 /**
+ * Generates a random 8-character key for element identity.
+ * ~2.8 trillion combinations — negligible collision probability.
+ */
+export function generateKey() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  for (let i = 0; i < 8; i++) key += chars[Math.floor(Math.random() * 36)];
+  return key;
+}
+
+/**
  * Options that should NOT be rendered as SVG attributes.
  *
  * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)
@@ -105,6 +116,9 @@ export const INTERNAL_OPTIONS = new Set([
   'svgTitle',
   'svgHeight',
   'errorPlaceholder',
+
+  // Element identity (extracted to node.key before option processing)
+  'key',
 
   // Element positioning (handled by positioning logic, not SVG attributes)
   'x',

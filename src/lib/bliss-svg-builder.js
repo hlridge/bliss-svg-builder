@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, LIB_VERSION } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -400,12 +400,37 @@ class BlissSVGBuilder {
     return raw;
   }
 
+  // Assigns stable keys to the three DSL-visible levels in #rawBlissObj:
+  // groups (//), glyphs (/), and immediate parts (;).
+  // Called before structuredClone so keys persist across rebuilds.
+  // Deeper nested parts (definition expansions) are intentionally skipped —
+  // they are not user-addressable and receive ephemeral keys from BlissElement.
+  static #assignKeys(rawObj) {
+    if (!rawObj.key) rawObj.key = generateKey();
+    if (rawObj.groups) {
+      for (const group of rawObj.groups) {
+        if (!group.key) group.key = generateKey();
+        if (group.glyphs) {
+          for (const glyph of group.glyphs) {
+            if (!glyph.key) glyph.key = generateKey();
+            if (glyph.parts) {
+              for (const part of glyph.parts) {
+                if (!part.key) part.key = generateKey();
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   #rebuild() {
     this.#generation++;
     this.#elementsCache = undefined;
     this.#wordsCache = undefined;
     this.#warnings = [];
 
+    BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
     const blissObj = structuredClone(this.#rawBlissObj);
     this.#processAllOptions(blissObj, true);
 

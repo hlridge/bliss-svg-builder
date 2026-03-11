@@ -5,12 +5,8 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, isSafeAttributeName } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, isSafeAttributeName, generateKey } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
-
-function generateKey() {
-  return Math.random().toString(36).slice(2, 10);
-}
 
 export class BlissElement {
   //#region Private Properties
