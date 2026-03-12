@@ -77,33 +77,94 @@ export class ElementHandle {
     return null;
   }
 
-  // Parse a DSL code string and extract the first glyph from the result.
-  // Validates that the code represents exactly one glyph (no / or // separators).
-  #parseGlyph(code) {
+  // Parse a DSL code string and extract glyphs from a single group.
+  // Accepts multi-glyph codes (e.g. "H/C8" or word definitions).
+  // Rejects multi-group input (e.g. "H//C8").
+  #parseGlyphs(code) {
     const parsed = this.#ctx.parse(code);
     if (!parsed.groups || parsed.groups.length !== 1) {
-      throw new Error(`Expected a single glyph, but code "${code}" produced ${parsed.groups?.length ?? 0} groups`);
+      throw new Error(`Expected glyphs within a single group, but code "${code}" produced ${parsed.groups?.length ?? 0} groups`);
     }
     const group = parsed.groups[0];
-    if (!group.glyphs || group.glyphs.length !== 1) {
-      throw new Error(`Expected a single glyph, but code "${code}" produced ${group.glyphs?.length ?? 0} glyphs`);
+    if (!group.glyphs || group.glyphs.length === 0) {
+      throw new Error(`Code "${code}" produced no glyphs`);
     }
-    return group.glyphs[0];
+    return group.glyphs;
   }
 
-  // Parse a DSL code string in part context by embedding it in a helper glyph.
-  // This ensures composite codes like B303 get proper nested parts expansion.
-  // Validates that the code represents exactly one part (no ;, / or // separators).
+  // Parse a DSL code string and extract exactly one glyph.
+  // Used by replace() which must swap a single glyph.
+  #parseGlyph(code) {
+    const glyphs = this.#parseGlyphs(code);
+    if (glyphs.length !== 1) {
+      throw new Error(`Expected a single glyph, but code "${code}" produced ${glyphs.length} glyphs`);
+    }
+    return glyphs[0];
+  }
+
+  // Parse a DSL code string in part context.
+  // For single-glyph codes: embeds in helper glyph for proper part-level expansion.
+  // For multi-glyph codes (words): uses layout engine to compute glyph positions,
+  // then creates glyph-level parts via the helper approach with position offsets.
+  #parseParts(code) {
+    // Check if the code parses to multiple glyphs (word) vs single glyph (part)
+    const rawParsed = this.#ctx.parse(code);
+    if (!rawParsed.groups || rawParsed.groups.length !== 1) {
+      throw new Error(`Expected parts within a single group, but code "${code}" produced ${rawParsed.groups?.length ?? 0} groups`);
+    }
+    const rawGroup = rawParsed.groups[0];
+    if (!rawGroup.glyphs || rawGroup.glyphs.length === 0) {
+      throw new Error(`Code "${code}" produced no glyphs`);
+    }
+
+    if (rawGroup.glyphs.length === 1) {
+      // Single glyph — use helper approach for proper part-level expansion
+      const parsed = this.#ctx.parse(`H;${code}`);
+      const glyph = parsed.groups?.[0]?.glyphs?.[0];
+      if (glyph?.parts?.length >= 2) {
+        return glyph.parts.slice(1);
+      }
+      // Fallback: return the single glyph's parts directly
+      return rawGroup.glyphs[0].parts || [];
+    }
+
+    // Multi-glyph code — use layout engine for glyph positions,
+    // then parse each glyph as a proper part via the helper approach
+    const snapshot = this.#ctx.computeLayout(code);
+    const groupSnap = snapshot.children[0];
+    const snapGlyphs = groupSnap.children.filter(c => c.type === 'glyph');
+
+    const parts = [];
+    for (let gi = 0; gi < snapGlyphs.length; gi++) {
+      const glyphSnap = snapGlyphs[gi];
+      const glyphCode = glyphSnap.codeName;
+      if (!glyphCode) continue;
+
+      const glyphX = glyphSnap?.x ?? 0;
+      const glyphY = glyphSnap?.y ?? 0;
+      const posStr = (glyphX !== 0 || glyphY !== 0) ? `:${glyphX},${glyphY}` : '';
+
+      // Parse as a proper part via helper glyph
+      const helperParsed = this.#ctx.parse(`H;${glyphCode}${posStr}`);
+      const helperGlyph = helperParsed.groups?.[0]?.glyphs?.[0];
+      if (helperGlyph?.parts?.length >= 2) {
+        parts.push(helperGlyph.parts[1]);
+      }
+    }
+
+    if (parts.length === 0) {
+      throw new Error(`Code "${code}" produced no parts`);
+    }
+    return parts;
+  }
+
+  // Parse a single part (strict). Used by replace() which must swap exactly one part.
   #parsePart(code) {
-    const parsed = this.#ctx.parse(`H;${code}`);
-    if (!parsed.groups || parsed.groups.length !== 1) {
-      throw new Error(`Expected a single part, but code "${code}" produced multiple groups`);
+    const parts = this.#parseParts(code);
+    if (parts.length !== 1) {
+      throw new Error(`Expected a single part, but code "${code}" produced ${parts.length} parts`);
     }
-    const glyph = parsed.groups[0]?.glyphs?.[0];
-    if (!glyph?.parts || glyph.parts.length !== 2) {
-      throw new Error(`Expected a single part, but code "${code}" produced ${(glyph?.parts?.length ?? 1) - 1} parts`);
-    }
-    return glyph.parts[1];
+    return parts[0];
   }
 
   // Apply defaults/overrides merge to a node's options
@@ -178,13 +239,7 @@ export class ElementHandle {
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group) return this;
-    const newGlyph = this.#parseGlyph(code);
-    this.#applyDefaultsOverrides(newGlyph, opts);
-    if (!group.glyphs) group.glyphs = [];
-    group.glyphs.push(newGlyph);
-    this.#ctx.rebuild();
-    this.#syncGeneration();
-    return this;
+    return this.insertGlyph(group.glyphs?.length ?? 0, code, opts);
   }
 
   insertGlyph(index, code, opts) {
@@ -192,10 +247,12 @@ export class ElementHandle {
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group) return this;
-    const newGlyph = this.#parseGlyph(code);
-    this.#applyDefaultsOverrides(newGlyph, opts);
+    const newGlyphs = this.#parseGlyphs(code);
+    for (const g of newGlyphs) {
+      this.#applyDefaultsOverrides(g, opts);
+    }
     if (!group.glyphs) group.glyphs = [];
-    group.glyphs.splice(index, 0, newGlyph);
+    group.glyphs.splice(index, 0, ...newGlyphs);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
@@ -203,27 +260,43 @@ export class ElementHandle {
 
   addPart(code, opts) {
     this.#assertAlive();
+    // Group level: delegate to last glyph
+    if (this.#level === 'group') {
+      const group = this.#nodeRef;
+      if (!group?.glyphs?.length) return this;
+      const lastGlyph = group.glyphs[group.glyphs.length - 1];
+      const glyphHandle = new ElementHandle(this.#ctx, 'glyph', lastGlyph, group);
+      glyphHandle.addPart(code, opts);
+      this.#syncGeneration();
+      return this;
+    }
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
-    const newPart = this.#parsePart(code);
-    this.#applyDefaultsOverrides(newPart, opts);
-    if (!glyph.parts) glyph.parts = [];
-    glyph.parts.push(newPart);
-    this.#ctx.rebuild();
-    this.#syncGeneration();
-    return this;
+    return this.insertPart(glyph.parts?.length ?? 0, code, opts);
   }
 
   insertPart(index, code, opts) {
     this.#assertAlive();
+    // Group level: delegate to last glyph
+    if (this.#level === 'group') {
+      const group = this.#nodeRef;
+      if (!group?.glyphs?.length) return this;
+      const lastGlyph = group.glyphs[group.glyphs.length - 1];
+      const glyphHandle = new ElementHandle(this.#ctx, 'glyph', lastGlyph, group);
+      glyphHandle.insertPart(index, code, opts);
+      this.#syncGeneration();
+      return this;
+    }
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
-    const newPart = this.#parsePart(code);
-    this.#applyDefaultsOverrides(newPart, opts);
+    const newParts = this.#parseParts(code);
+    for (const p of newParts) {
+      this.#applyDefaultsOverrides(p, opts);
+    }
     if (!glyph.parts) glyph.parts = [];
-    glyph.parts.splice(index, 0, newPart);
+    glyph.parts.splice(index, 0, ...newParts);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;

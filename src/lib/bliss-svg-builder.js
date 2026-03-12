@@ -367,6 +367,24 @@ class BlissSVGBuilder {
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
 
+    // Decompose word-as-part references (e.g. H;TW where TW = B291/B291)
+    // into properly positioned sub-parts using the layout engine.
+    // Uses quick-extracted spacing options since full #sharedOptions aren't ready yet.
+    BlissSVGBuilder.#decomposeWordParts(blissObj, (code) => {
+      const rawOpts = blissObj.options ?? {};
+      const quickSharedOptions = {
+        charSpace: rawOpts['char-space'] !== undefined ? Math.max(0, Math.min(10, Number(rawOpts['char-space']))) : 2,
+        wordSpace: rawOpts['word-space'] !== undefined ? Math.max(0, Math.min(20, Number(rawOpts['word-space']))) : 8,
+        externalGlyphSpace: rawOpts['external-glyph-space'] !== undefined ? Math.max(0, Math.min(3, Number(rawOpts['external-glyph-space']))) : 0.8,
+        warnings: [],
+        errorPlaceholder: false,
+        errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
+        keys: new Set(),
+      };
+      const parsed = BlissParser.parse(code);
+      return new BlissElement(parsed, { sharedOptions: quickSharedOptions }).snapshot();
+    });
+
     // Store a clean copy after option merging but before processing mutates it
     this.#rawBlissObj = structuredClone(blissObj);
 
@@ -375,13 +393,26 @@ class BlissSVGBuilder {
     this.#mutationCtx = {
       getRaw: () => this.#rawBlissObj,
       rebuild: () => this.#rebuild(),
-      parse: (code) => BlissParser.parse(code),
+      parse: (code) => {
+        const parsed = BlissParser.parse(code);
+        BlissSVGBuilder.#decomposeWordParts(parsed, (c) => {
+          const p = BlissParser.parse(c);
+          return new BlissElement(p, { sharedOptions: this.#sharedOptions }).snapshot();
+        });
+        return parsed;
+      },
       toRaw: (obj) => BlissSVGBuilder.#toRaw(obj),
       isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
       makeSpaceGroup: () => BlissSVGBuilder.#makeSpaceGroup(),
       removeGlyphGroup: (obj, gi) => this.#removeGlyphGroup(obj, gi),
       getSnapshot: () => this.snapshot(),
       getGeneration: () => this.#generation,
+      // Build a temporary element tree for layout computation (word-as-part decomposition)
+      computeLayout: (code) => {
+        const parsed = BlissParser.parse(code);
+        const tempElement = new BlissElement(parsed, { sharedOptions: this.#sharedOptions });
+        return tempElement.snapshot();
+      },
     };
   }
 
@@ -634,6 +665,19 @@ class BlissSVGBuilder {
    * @returns {this}
    */
   addGroup(code, opts) {
+    const nonSpaceCount = this.#getNonSpaceGroupIndices().length;
+    return this.insertGroup(nonSpaceCount, code, opts);
+  }
+
+  /**
+   * Inserts a new glyph group at the given semantic (non-space) index
+   * with automatic space management.
+   * @param {number} index - Semantic non-space group index
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  insertGroup(index, code, opts) {
     const parsed = BlissParser.parse(code);
     const newGroup = parsed.groups?.[0];
     if (!newGroup) return this;
@@ -646,10 +690,24 @@ class BlissSVGBuilder {
       }
     }
     const groups = this.#rawBlissObj.groups;
-    if (groups.length > 0) {
+    const indices = this.#getNonSpaceGroupIndices();
+
+    if (groups.length === 0 || indices.length === 0) {
+      // Empty — just push, no spaces needed
+      groups.push(newGroup);
+    } else if (index <= 0) {
+      // Insert at start: [newGroup, space, ...existing]
+      groups.splice(0, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
+    } else if (index >= indices.length) {
+      // Insert at end: [...existing, space, newGroup]
       groups.push(BlissSVGBuilder.#makeSpaceGroup());
+      groups.push(newGroup);
+    } else {
+      // Insert in middle: before the target raw index, add [space, newGroup]
+      const rawIndex = indices[index];
+      groups.splice(rawIndex, 0, BlissSVGBuilder.#makeSpaceGroup(), newGroup);
     }
-    groups.push(newGroup);
+
     this.#rebuild();
     return this;
   }
@@ -719,6 +777,98 @@ class BlissSVGBuilder {
   }
 
   // --- Manipulation helpers ---
+
+  // --- Word-as-part decomposition ---
+  // When a word definition (codeString with /) appears at the part level,
+  // the parser keeps it as a single codeName. This post-parse step resolves
+  // those references into properly positioned parts using the layout engine.
+
+  /**
+   * Walk a raw parsed structure and decompose any word-as-part references.
+   * @param {Object} rawObj - Raw parsed blissObj with groups/glyphs/parts
+   * @param {Function} computeLayout - (code) => snapshot for position calculation
+   */
+  static #decomposeWordParts(rawObj, computeLayout) {
+    if (!rawObj.groups) return;
+    for (const group of rawObj.groups) {
+      if (!group.glyphs) continue;
+      for (const glyph of group.glyphs) {
+        if (!glyph.parts) continue;
+        glyph.parts = BlissSVGBuilder.#decomposePartsArray(glyph.parts, computeLayout);
+      }
+    }
+  }
+
+  /**
+   * Process a parts array, decomposing any word-definition parts into
+   * properly positioned sub-parts. Recurses into nested parts.
+   */
+  static #decomposePartsArray(parts, computeLayout) {
+    const result = [];
+    for (const part of parts) {
+      const def = blissElementDefinitions[part.codeName];
+      if (def?.codeString?.includes('/')) {
+        result.push(...BlissSVGBuilder.#decomposeWordPart(part, def, computeLayout));
+      } else {
+        if (part.parts) {
+          part.parts = BlissSVGBuilder.#decomposePartsArray(part.parts, computeLayout);
+        }
+        result.push(part);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Decompose a single word-definition part into positioned sub-parts.
+   * Each glyph in the word becomes one part at the glyph code level (e.g. B291),
+   * with position offsets from the layout engine. Internal expansion of each
+   * glyph code happens naturally through parseParts.
+   */
+  static #decomposeWordPart(part, definition, computeLayout) {
+    const code = definition.codeString;
+
+    // Get layout positions via temporary element tree
+    const snapshot = computeLayout(code);
+    const groupSnap = snapshot.children[0];
+    if (!groupSnap) return [part]; // fallback
+
+    const snapGlyphs = groupSnap.children.filter(c => c.type === 'glyph');
+
+    // Position offset from the original part (e.g. TW:2,3 → offset all sub-parts)
+    const offsetX = part.x ?? 0;
+    const offsetY = part.y ?? 0;
+
+    const decomposed = [];
+    for (let gi = 0; gi < snapGlyphs.length; gi++) {
+      const glyphSnap = snapGlyphs[gi];
+      const glyphX = (glyphSnap?.x ?? 0) + offsetX;
+      const glyphY = (glyphSnap?.y ?? 0) + offsetY;
+
+      // Get the glyph's code name from the snapshot
+      const glyphCode = glyphSnap.codeName;
+      if (!glyphCode) continue;
+
+      // Build position suffix
+      const posStr = (glyphX !== 0 || glyphY !== 0) ? `:${glyphX},${glyphY}` : '';
+
+      // Parse as a proper part via helper glyph — this gives full parseParts expansion
+      const helperParsed = BlissParser.parse(`H;${glyphCode}${posStr}`);
+      const helperGlyph = helperParsed.groups?.[0]?.glyphs?.[0];
+      if (helperGlyph?.parts?.length >= 2) {
+        const newPart = helperGlyph.parts[1];
+
+        // Propagate options from the original part
+        if (part.options && Object.keys(part.options).length > 0) {
+          newPart.options = { ...part.options, ...(newPart.options ?? {}) };
+        }
+
+        decomposed.push(newPart);
+      }
+    }
+
+    return decomposed.length > 0 ? decomposed : [part];
+  }
 
   // Space codes used in space groups
   static #SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA', 'SP']);
@@ -1250,9 +1400,19 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
     }
 
-    const entry = {
-      codeString: BlissSVGBuilder.#resolveBareAliases(definition.codeString)
-    };
+    const resolved = BlissSVGBuilder.#resolveBareAliases(definition.codeString);
+
+    // Word definitions (containing /) must not have internal position modifiers.
+    // Position should be applied at the usage site, e.g. WORD:2,0
+    if (resolved.includes('/')) {
+      const segments = resolved.split(/[/;]/).filter(Boolean);
+      const hasCoords = segments.some(seg => /:-?[\d.]/.test(seg));
+      if (hasCoords) {
+        throw new Error(`define("${code}"): word definitions (containing /) cannot have internal coordinates. Move coordinates to the usage site.`);
+      }
+    }
+
+    const entry = { codeString: resolved };
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
         && Object.keys(definition.defaultOptions).length > 0) {

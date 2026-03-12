@@ -437,9 +437,17 @@ export class BlissParser {
           const optionsPrefix = optionsMatch ? optionsMatch[1] : '';
           const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
 
-          const [potentialBaseCode, ...rawIndicators] = codeForLookup.split(';');
+          const [potentialBaseCodeRaw, ...rawIndicators] = codeForLookup.split(';');
           const filteredIndicators = rawIndicators.filter(ind => ind !== '');
           const hasInputIndicators = rawIndicators.length > 0;
+
+          // Strip position modifier (e.g. ":2,0" or ":-1.5,3") from base code
+          // so definition lookup works for codes like "WORD:2,0"
+          const posMatch = potentialBaseCodeRaw.match(
+            /^(.+?)(:-?(?:\d+(?:\.\d*)?|\.\d+)(?:,-?(?:\d+(?:\.\d*)?|\.\d+))?)$/
+          );
+          const potentialBaseCode = posMatch ? posMatch[1] : potentialBaseCodeRaw;
+          const positionSuffix = posMatch ? posMatch[2] : '';
 
           const resolvedCodeString = resolveToFinalCodeString(potentialBaseCode);
           const isWordDefinition = resolvedCodeString?.includes('/') ?? false;
@@ -498,6 +506,17 @@ export class BlissParser {
                 const segmentParts = wordSegments[i].split('/')
                   .flatMap(s => expand(s, definitions, false, depth + 1));
                 allParts.push(...segmentParts);
+              }
+              // Apply position suffix to first non-break part
+              if (positionSuffix && allParts.length > 0) {
+                const firstReal = allParts.find(p => !p._wordBreak);
+                if (firstReal) {
+                  const semiParts = firstReal.part.split(';');
+                  if (!/:-?[\d.]/.test(semiParts[0])) {
+                    semiParts[0] += positionSuffix;
+                  }
+                  firstReal.part = semiParts.join(';');
+                }
               }
               if (isHeadGlyph && allParts.length > 0) {
                 allParts[0].isHeadGlyph = true;
@@ -579,6 +598,17 @@ export class BlissParser {
               }
             }
 
+            // Apply position suffix from outer code (e.g. WORD:2,0) to first glyph's first part
+            if (positionSuffix && expandedParts.length > 0) {
+              const firstPart = expandedParts[0].part;
+              const semiParts = firstPart.split(';');
+              // Only add position if the first sub-part doesn't already have coordinates
+              if (!/:-?[\d.]/.test(semiParts[0])) {
+                semiParts[0] += positionSuffix;
+              }
+              expandedParts[0].part = semiParts.join(';');
+            }
+
             // Carry defaultOptions from the definition as data on the first expanded part
             if (definition.defaultOptions && expandedParts.length > 0) {
               expandedParts[0].defaultOptions = definition.defaultOptions;
@@ -600,7 +630,7 @@ export class BlissParser {
           const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
           return [{
-            part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode : str.replace(/;$/, ''),
+            part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode + positionSuffix : str.replace(/;$/, ''),
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph && { isExternalGlyph }),
@@ -698,7 +728,10 @@ export class BlissParser {
             }
 
             if (codeString) {
-              if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {
+              if (codeString.includes('/')) {
+                // Word codeString at part level — cannot be expanded here.
+                // Keep original codeName; post-parse decomposition resolves it.
+              } else if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {
                 part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {
