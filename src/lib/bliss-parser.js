@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import {
   blissHeadGlyphExclusions,
@@ -760,6 +760,22 @@ export class BlissParser {
         };
 
         glyphObj.parts = parseParts(glyphCodeString);
+
+        // When a built-in glyph code (like B291) expanded to a single part with a
+        // different codeName (like S8), wrap so the top-level PART preserves the
+        // user-level code. Does not apply to custom/user-defined codes (they must
+        // decompose for portability) or multi-part glyphs (handled in toJSON).
+        if (glyphCode && builtInCodes.has(glyphCode) && glyphObj.parts.length === 1) {
+          const part = glyphObj.parts[0];
+          if (part.codeName !== glyphCode) {
+            const innerCodeName = part.codeName;
+            const innerParts = part.parts;
+            part.codeName = glyphCode;
+            part.parts = innerParts
+              ? [{ codeName: innerCodeName, parts: innerParts }]
+              : [{ codeName: innerCodeName }];
+          }
+        }
 
         this.#extractPositionFromOptions(glyphObj);
         group.glyphs.push(glyphObj);
