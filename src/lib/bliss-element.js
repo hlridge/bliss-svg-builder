@@ -610,6 +610,7 @@ export class BlissElement {
             this.#relativeToParentY = this.#blissObj.y;
           }
         } else if (isCompositeElement) {
+          this.#codeName = this.#blissObj.codeName || "";
           this.#handleCompositeElement(this.#blissObj.parts);
         }
       }
