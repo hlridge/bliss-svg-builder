@@ -388,7 +388,7 @@ export declare class BlissSVGBuilder {
    * Returns a normalized parsed structure (plain object). Custom glyph codes
    * are resolved to built-in codes by default; pass `{ preserve: true }` to keep them.
    */
-  toJSON(options?: { preserve?: boolean }): BlissJSON;
+  toJSON(options?: { preserve?: boolean; deep?: boolean }): BlissJSON;
 
   // --- Static: definition management ---
 

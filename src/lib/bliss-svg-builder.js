@@ -921,10 +921,9 @@ class BlissSVGBuilder {
    * @returns {string}
    */
   toString(options = {}) {
-    // deep: true keeps nested parts so serializeParts can decompose custom
-    // codes. The string format itself stays flat (parts are serialized with
-    // ; delimiters, not nested).
-    const obj = this.toJSON({ ...options, deep: true });
+    // toString always needs nested parts so serializeParts can decompose
+    // custom codes. The string output itself stays flat (;-delimited).
+    const obj = this.toJSON({ preserve: options.preserve, deep: true });
 
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.

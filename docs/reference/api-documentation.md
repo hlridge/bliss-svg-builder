@@ -104,12 +104,30 @@ const builder = new BlissSVGBuilder('B313/B1103//B431;B81');
 const obj = builder.toJSON();
 // {
 //   groups: [
-//     { glyphs: [{ code: 'B313', ... }, { code: 'B1103', ... }] },
-//     { glyphs: [{ code: 'TSP' }] },
-//     { glyphs: [{ parts: [{ code: 'B431' }, { code: 'B81' }] }] }
+//     { glyphs: [
+//       { codeName: 'B313', parts: [{ codeName: 'B313' }], ... },
+//       { codeName: 'B1103', parts: [{ codeName: 'B335' }, { codeName: 'B412', x: 4, y: 0 }], ... }
+//     ]},
+//     { glyphs: [{ parts: [{ codeName: 'TSP' }] }] },
+//     { glyphs: [{ parts: [{ codeName: 'B431' }, { codeName: 'B81', isIndicator: true, width: 2 }] }] }
 //   ],
-//   options: { ... }
+//   options: {}
 // }
+```
+
+By default, nested sub-parts are stripped for a cleaner structure. Each part keeps its `codeName`, position (`x`, `y`), and metadata (`isIndicator`, `width`) but no internal rendering tree. The constructor re-expands parts automatically when given an object, so round-trips work without `deep`:
+
+```js
+const snapshot = builder.toJSON();
+const rebuilt = new BlissSVGBuilder(snapshot);
+rebuilt.svgCode === builder.svgCode; // true
+```
+
+Pass `{ deep: true }` to preserve the full nested parts tree (useful for inspection or debugging):
+
+```js
+builder.toJSON({ deep: true });
+// Parts include nested sub-parts all the way down to primitives
 ```
 
 Custom code behavior:
@@ -120,8 +138,8 @@ Custom code behavior:
 ```js
 BlissSVGBuilder.define({ 'LOVE': { type: 'glyph', codeString: 'B431' } });
 
-new BlissSVGBuilder('LOVE').toJSON();                     // code: 'B431'
-new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // code: 'LOVE'
+new BlissSVGBuilder('LOVE').toJSON();                     // codeName: 'B431'
+new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // codeName: 'LOVE'
 ```
 
 Use for: inspecting parsed structure, storing snapshots, server-side processing.

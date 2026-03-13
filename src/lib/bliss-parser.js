@@ -722,11 +722,6 @@ export class BlissParser {
               : (blissElementDefinitions[part.codeName] || {});
             const codeString = definition.codeString;
 
-            // Merge defaultOptions from definition (user options override defaults)
-            if (definition.defaultOptions) {
-              part.options = { ...definition.defaultOptions, ...(part.options || {}) };
-            }
-
             if (codeString) {
               if (codeString.includes('/')) {
                 // Word codeString at part level — cannot be expanded here.
@@ -738,20 +733,8 @@ export class BlissParser {
                 part.codeName = definition.codeString;
               }
             }
-            // Else keep part.codeName
 
-            if (definition.isIndicator) {
-              part.isIndicator = true;
-              part.width = definition.width ?? 2;
-            } else {
-              if (definition.anchorOffsetY !== undefined) {
-                part.anchorOffsetY = definition.anchorOffsetY;
-              }
-            }
-
-            if (definition.anchorOffsetX !== undefined) {
-              part.anchorOffsetX = definition.anchorOffsetX
-            }
+            BlissParser.#applyDefinitionMetadata(part, definition);
 
             this.#extractPositionFromOptions(part);
             parts.push(part);
@@ -843,6 +826,26 @@ export class BlissParser {
   }
 
   /**
+   * Copy definition metadata (defaultOptions, indicator, anchor offsets)
+   * onto a part object. Shared by parseParts, #expandPartRecursive, and
+   * #parseCodeStringToParts to keep the logic in one place.
+   */
+  static #applyDefinitionMetadata(part, definition) {
+    if (definition.defaultOptions) {
+      part.options = { ...definition.defaultOptions, ...(part.options || {}) };
+    }
+    if (definition.isIndicator) {
+      part.isIndicator = true;
+      part.width = definition.width ?? 2;
+    } else if (definition.anchorOffsetY !== undefined) {
+      part.anchorOffsetY = definition.anchorOffsetY;
+    }
+    if (definition.anchorOffsetX !== undefined) {
+      part.anchorOffsetX = definition.anchorOffsetX;
+    }
+  }
+
+  /**
    * Recursively expand a single part from its definition's codeString.
    * Only expands if the part has a codeName, a matching definition with
    * codeString, and no existing sub-parts.
@@ -858,32 +861,21 @@ export class BlissParser {
     // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
     if (codeString.includes('/')) return;
 
-    // Expand: split codeString on ';', parse each segment
     if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString) {
       part.parts = BlissParser.#parseCodeStringToParts(codeString);
+    } else {
+      part.codeName = codeString;
     }
 
-    // Copy definition metadata that parseParts normally adds
-    if (definition.defaultOptions) {
-      part.options = { ...definition.defaultOptions, ...(part.options || {}) };
-    }
-    if (definition.isIndicator) {
-      part.isIndicator = true;
-      part.width = definition.width ?? 2;
-    }
-    if (definition.anchorOffsetY !== undefined) {
-      part.anchorOffsetY = definition.anchorOffsetY;
-    }
-    if (definition.anchorOffsetX !== undefined) {
-      part.anchorOffsetX = definition.anchorOffsetX;
-    }
+    BlissParser.#applyDefinitionMetadata(part, definition);
   }
 
   /**
    * Parse a codeString like "HL8;HL8:0,8;VL8;VL8:8,0" into an array
    * of part objects, recursively expanding nested definitions.
    */
-  static #parseCodeStringToParts(codeString) {
+  static #parseCodeStringToParts(codeString, depth = 0) {
+    if (depth > 50) throw new Error('Maximum recursion depth exceeded');
     const segments = codeString.split(';');
     const parts = [];
 
@@ -897,25 +889,13 @@ export class BlissParser {
         if (innerCodeString.includes('/')) {
           // Word codeString — skip expansion at part level
         } else if (innerCodeString.includes(';') || innerCodeString.includes(':') || blissElementDefinitions[innerCodeString]?.codeString) {
-          part.parts = BlissParser.#parseCodeStringToParts(innerCodeString);
+          part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, depth + 1);
         } else {
           part.codeName = innerCodeString;
         }
       }
 
-      if (definition.defaultOptions) {
-        part.options = { ...definition.defaultOptions, ...(part.options || {}) };
-      }
-      if (definition.isIndicator) {
-        part.isIndicator = true;
-        part.width = definition.width ?? 2;
-      } else if (definition.anchorOffsetY !== undefined) {
-        part.anchorOffsetY = definition.anchorOffsetY;
-      }
-      if (definition.anchorOffsetX !== undefined) {
-        part.anchorOffsetX = definition.anchorOffsetX;
-      }
-
+      BlissParser.#applyDefinitionMetadata(part, definition);
       parts.push(part);
     }
 
