@@ -552,4 +552,28 @@ Object.assign(blissElementDefinitions, glyphData);
 // Track built-in codes so removeDefinition can prevent deleting them
 const builtInCodes = new Set(Object.keys(blissElementDefinitions));
 
+// Letter aliases: B-codes that map to external glyph X-codes.
+// Registered after builtInCodes so they're treated as aliases, not built-in Bliss glyphs.
+const letterAliases = {
+  B29: { codeString: "Xa" },  B30: { codeString: "Xb" },  B31: { codeString: "Xc" },
+  B32: { codeString: "Xd" },  B33: { codeString: "Xe" },  B34: { codeString: "Xf" },
+  B35: { codeString: "Xg" },  B36: { codeString: "Xh" },  B37: { codeString: "Xi" },
+  B38: { codeString: "Xj" },  B39: { codeString: "Xk" },  B40: { codeString: "Xl" },
+  B41: { codeString: "Xm" },  B42: { codeString: "Xn" },  B43: { codeString: "Xo" },
+  B44: { codeString: "Xp" },  B45: { codeString: "Xq" },  B46: { codeString: "Xr" },
+  B47: { codeString: "Xs" },  B48: { codeString: "Xt" },  B49: { codeString: "Xu" },
+  B50: { codeString: "Xv" },  B51: { codeString: "Xw" },  B52: { codeString: "Xx" },
+  B53: { codeString: "Xy" },  B54: { codeString: "Xz" },
+  B55: { codeString: "XA" },  B56: { codeString: "XB" },  B57: { codeString: "XC" },
+  B58: { codeString: "XD" },  B59: { codeString: "XE" },  B60: { codeString: "XF" },
+  B61: { codeString: "XG" },  B62: { codeString: "XH" },  B63: { codeString: "XI" },
+  B64: { codeString: "XJ" },  B65: { codeString: "XK" },  B66: { codeString: "XL" },
+  B67: { codeString: "XM" },  B68: { codeString: "XN" },  B69: { codeString: "XO" },
+  B70: { codeString: "XP" },  B71: { codeString: "XQ" },  B72: { codeString: "XR" },
+  B73: { codeString: "XS" },  B74: { codeString: "XT" },  B75: { codeString: "XU" },
+  B76: { codeString: "XV" },  B77: { codeString: "XW" },  B78: { codeString: "XX" },
+  B79: { codeString: "XY" },  B80: { codeString: "XZ" },
+};
+Object.assign(blissElementDefinitions, letterAliases);
+
 export { blissElementDefinitions, builtInCodes };
