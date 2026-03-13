@@ -497,6 +497,32 @@ export class BlissParser {
               }
             }
 
+            // Built-in single-character codes: skip expansion, let parseParts handle it.
+            // This eliminates the flatten-then-unflatten pattern where expand() substitutes
+            // a B-code's codeString (e.g. B291 → "S8:0,8") only for a later wrapping patch
+            // to reconstruct the nesting. Word codes (codeString with /) must still be
+            // expanded here because word decomposition produces multiple glyphs.
+            // Indicator modification (shouldReplace/shouldRemove) must still expand because
+            // the codeString is being modified, not just passed through.
+            if (builtInCodes.has(potentialBaseCode)
+                && !codeStringToExpand.includes('/')
+                && !shouldReplace && !shouldRemove) {
+              return [{
+                part: isBareEmptyStrip
+                  ? optionsPrefix + potentialBaseCode + positionSuffix
+                  : str.replace(/;$/, ''),
+                ...(definition.shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace: true }),
+                ...(definition.isIndicator === true && { isIndicator: true }),
+                ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
+                ...(definition.glyph && { glyph: definition.glyph }),
+                ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
+                ...(definition.glyphCode && { glyphCode: definition.glyphCode }),
+                ...(definition.isBlissGlyph && { isBlissGlyph: definition.isBlissGlyph }),
+                ...(isHeadGlyph && { isHeadGlyph }),
+                ...(definition.defaultOptions && { defaultOptions: definition.defaultOptions }),
+              }];
+            }
+
             // Handle // in codeString: split into word segments with break markers
             if (codeStringToExpand.includes('//')) {
               const wordSegments = codeStringToExpand.split('//');
@@ -730,7 +756,12 @@ export class BlissParser {
                 part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {
-                part.codeName = definition.codeString;
+                // Built-in codes preserve identity; non-built-in resolve to target
+                if (builtInCodes.has(part.codeName)) {
+                  part.parts = [{ codeName: definition.codeString }];
+                } else {
+                  part.codeName = definition.codeString;
+                }
               }
             }
 
@@ -743,20 +774,6 @@ export class BlissParser {
         };
 
         glyphObj.parts = parseParts(glyphCodeString);
-
-        // When a built-in glyph code (like B291) expanded to a single part with a
-        // different codeName (like S8), wrap so the top-level PART preserves the
-        // user-level code. Does not apply to custom/user-defined codes (they must
-        // decompose for portability) or multi-part glyphs (handled in toJSON).
-        if (glyphCode && builtInCodes.has(glyphCode) && glyphObj.parts.length === 1) {
-          const part = glyphObj.parts[0];
-          if (part.codeName !== glyphCode) {
-            // Create a new wrapper with the user-level code. The original part
-            // (with its x/y from the definition's codeString) becomes the child,
-            // keeping all coordinates at the level they originated from.
-            glyphObj.parts = [{ codeName: glyphCode, parts: [part] }];
-          }
-        }
 
         this.#extractPositionFromOptions(glyphObj);
         group.glyphs.push(glyphObj);
@@ -864,7 +881,11 @@ export class BlissParser {
     if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString) {
       part.parts = BlissParser.#parseCodeStringToParts(codeString);
     } else {
-      part.codeName = codeString;
+      if (builtInCodes.has(part.codeName)) {
+        part.parts = [{ codeName: codeString }];
+      } else {
+        part.codeName = codeString;
+      }
     }
 
     BlissParser.#applyDefinitionMetadata(part, definition);
@@ -891,7 +912,11 @@ export class BlissParser {
         } else if (innerCodeString.includes(';') || innerCodeString.includes(':') || blissElementDefinitions[innerCodeString]?.codeString) {
           part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, depth + 1);
         } else {
-          part.codeName = innerCodeString;
+          if (builtInCodes.has(part.codeName)) {
+            part.parts = [{ codeName: innerCodeString }];
+          } else {
+            part.codeName = innerCodeString;
+          }
         }
       }
 
