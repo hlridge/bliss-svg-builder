@@ -345,6 +345,11 @@ class BlissSVGBuilder {
       ? BlissParser.parse(input)
       : structuredClone(input);
 
+    // For object input (from toJSON), re-expand any parts that were stripped
+    if (typeof input !== 'string') {
+      BlissParser.expandParts(blissObj);
+    }
+
     // Reverse toJSON() normalization: codeName → internal field names
     if (typeof input !== 'string' && blissObj.groups) {
       for (const group of blissObj.groups) {
@@ -916,7 +921,10 @@ class BlissSVGBuilder {
    * @returns {string}
    */
   toString(options = {}) {
-    const obj = this.toJSON(options);
+    // deep: true keeps nested parts so serializeParts can decompose custom
+    // codes. The string format itself stays flat (parts are serialized with
+    // ; delimiters, not nested).
+    const obj = this.toJSON({ ...options, deep: true });
 
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
@@ -1025,11 +1033,18 @@ class BlissSVGBuilder {
     if (obj.options) delete obj.options.key;
 
     if (obj.groups) {
-      const stripKeyFromParts = (parts) => {
+      // Strip keys from parts. Unless deep: true, also strip nested sub-parts
+      // (internal expansion detail). The constructor re-expands from codeName
+      // via BlissParser.expandParts().
+      const stripParts = (parts) => {
         for (const part of parts) {
           delete part.key;
           if (part.options) delete part.options.key;
-          if (part.parts) stripKeyFromParts(part.parts);
+          if (options.deep && part.parts) {
+            stripParts(part.parts);
+          } else {
+            delete part.parts;
+          }
         }
       };
 
@@ -1040,7 +1055,7 @@ class BlissSVGBuilder {
           for (const glyph of group.glyphs) {
             delete glyph.key;
             if (glyph.options) delete glyph.options.key;
-            if (glyph.parts) stripKeyFromParts(glyph.parts);
+            if (glyph.parts) stripParts(glyph.parts);
 
             // Normalize glyphCode → codeName for public API
             if (glyph.glyphCode) {

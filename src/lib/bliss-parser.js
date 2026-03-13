@@ -768,12 +768,10 @@ export class BlissParser {
         if (glyphCode && builtInCodes.has(glyphCode) && glyphObj.parts.length === 1) {
           const part = glyphObj.parts[0];
           if (part.codeName !== glyphCode) {
-            const innerCodeName = part.codeName;
-            const innerParts = part.parts;
-            part.codeName = glyphCode;
-            part.parts = innerParts
-              ? [{ codeName: innerCodeName, parts: innerParts }]
-              : [{ codeName: innerCodeName }];
+            // Create a new wrapper with the user-level code. The original part
+            // (with its x/y from the definition's codeString) becomes the child,
+            // keeping all coordinates at the level they originated from.
+            glyphObj.parts = [{ codeName: glyphCode, parts: [part] }];
           }
         }
 
@@ -820,6 +818,108 @@ export class BlissParser {
 
     this.#extractPositionFromOptions(result);
     return result;
+  }
+
+  /**
+   * Walk a blissObj structure and expand any PARTs that have a codeName
+   * but no sub-parts. This supports toJSON round-trips where nested
+   * parts were stripped.
+   *
+   * @param {Object} blissObj - Raw parsed structure with groups/glyphs/parts
+   * @returns {Object} The same object, mutated with expanded parts
+   */
+  static expandParts(blissObj) {
+    if (!blissObj?.groups) return blissObj;
+    for (const group of blissObj.groups) {
+      if (!group.glyphs) continue;
+      for (const glyph of group.glyphs) {
+        if (!glyph.parts) continue;
+        for (const part of glyph.parts) {
+          BlissParser.#expandPartRecursive(part);
+        }
+      }
+    }
+    return blissObj;
+  }
+
+  /**
+   * Recursively expand a single part from its definition's codeString.
+   * Only expands if the part has a codeName, a matching definition with
+   * codeString, and no existing sub-parts.
+   */
+  static #expandPartRecursive(part) {
+    if (!part.codeName || part.parts?.length > 0) return;
+
+    const definition = blissElementDefinitions[part.codeName];
+    if (!definition?.codeString) return;
+
+    const codeString = definition.codeString;
+
+    // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
+    if (codeString.includes('/')) return;
+
+    // Expand: split codeString on ';', parse each segment
+    if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString) {
+      part.parts = BlissParser.#parseCodeStringToParts(codeString);
+    }
+
+    // Copy definition metadata that parseParts normally adds
+    if (definition.defaultOptions) {
+      part.options = { ...definition.defaultOptions, ...(part.options || {}) };
+    }
+    if (definition.isIndicator) {
+      part.isIndicator = true;
+      part.width = definition.width ?? 2;
+    }
+    if (definition.anchorOffsetY !== undefined) {
+      part.anchorOffsetY = definition.anchorOffsetY;
+    }
+    if (definition.anchorOffsetX !== undefined) {
+      part.anchorOffsetX = definition.anchorOffsetX;
+    }
+  }
+
+  /**
+   * Parse a codeString like "HL8;HL8:0,8;VL8;VL8:8,0" into an array
+   * of part objects, recursively expanding nested definitions.
+   */
+  static #parseCodeStringToParts(codeString) {
+    const segments = codeString.split(';');
+    const parts = [];
+
+    for (const segment of segments) {
+      const part = BlissParser.parsePartString(segment);
+
+      const definition = blissElementDefinitions[part.codeName] || {};
+      const innerCodeString = definition.codeString;
+
+      if (innerCodeString) {
+        if (innerCodeString.includes('/')) {
+          // Word codeString — skip expansion at part level
+        } else if (innerCodeString.includes(';') || innerCodeString.includes(':') || blissElementDefinitions[innerCodeString]?.codeString) {
+          part.parts = BlissParser.#parseCodeStringToParts(innerCodeString);
+        } else {
+          part.codeName = innerCodeString;
+        }
+      }
+
+      if (definition.defaultOptions) {
+        part.options = { ...definition.defaultOptions, ...(part.options || {}) };
+      }
+      if (definition.isIndicator) {
+        part.isIndicator = true;
+        part.width = definition.width ?? 2;
+      } else if (definition.anchorOffsetY !== undefined) {
+        part.anchorOffsetY = definition.anchorOffsetY;
+      }
+      if (definition.anchorOffsetX !== undefined) {
+        part.anchorOffsetX = definition.anchorOffsetX;
+      }
+
+      parts.push(part);
+    }
+
+    return parts;
   }
 
 }
