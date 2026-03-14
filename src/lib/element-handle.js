@@ -210,7 +210,9 @@ export class ElementHandle {
     this.#assertAlive();
     if (this.#level !== 'group') return null;
     const group = this.#nodeRef;
-    if (!group?.glyphs || index < 0 || index >= group.glyphs.length) return null;
+    if (!group?.glyphs?.length) return null;
+    if (index < 0) index = group.glyphs.length + index;
+    if (index < 0 || index >= group.glyphs.length) return null;
     return new ElementHandle(this.#ctx, 'glyph', group.glyphs[index], group);
   }
 
@@ -218,7 +220,9 @@ export class ElementHandle {
     this.#assertAlive();
     if (this.#level === 'glyph') {
       const glyph = this.#nodeRef;
-      if (!glyph?.parts || index < 0 || index >= glyph.parts.length) return null;
+      if (!glyph?.parts?.length) return null;
+      if (index < 0) index = glyph.parts.length + index;
+      if (index < 0 || index >= glyph.parts.length) return null;
       return new ElementHandle(this.#ctx, 'part', glyph.parts[index], {
         group: this.#parentRef,
         glyph
@@ -226,7 +230,9 @@ export class ElementHandle {
     }
     if (this.#level === 'part') {
       const part = this.#nodeRef;
-      if (!part?.parts || index < 0 || index >= part.parts.length) return null;
+      if (!part?.parts?.length) return null;
+      if (index < 0) index = part.parts.length + index;
+      if (index < 0 || index >= part.parts.length) return null;
       return new ElementHandle(this.#ctx, 'part', part.parts[index], this.#parentRef);
     }
     return null;

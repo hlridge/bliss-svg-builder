@@ -603,9 +603,9 @@ class BlissSVGBuilder {
    * @returns {ElementHandle|null}
    */
   group(index) {
-    if (index < 0) return null;
     const indices = this.#getNonSpaceGroupIndices();
-    if (index >= indices.length) return null;
+    if (index < 0) index = indices.length + index;
+    if (index < 0 || index >= indices.length) return null;
     const rawGroup = this.#rawBlissObj.groups[indices[index]];
     return new ElementHandle(this.#mutationCtx, 'group', rawGroup);
   }
@@ -616,8 +616,15 @@ class BlissSVGBuilder {
    * @returns {ElementHandle|null}
    */
   glyph(flatIndex) {
-    if (flatIndex < 0) return null;
     const indices = this.#getNonSpaceGroupIndices();
+    if (flatIndex < 0) {
+      let total = 0;
+      for (const gi of indices) {
+        total += (this.#rawBlissObj.groups[gi].glyphs || []).length;
+      }
+      flatIndex = total + flatIndex;
+    }
+    if (flatIndex < 0) return null;
     let count = 0;
     for (const gi of indices) {
       const group = this.#rawBlissObj.groups[gi];
@@ -636,8 +643,17 @@ class BlissSVGBuilder {
    * @returns {ElementHandle|null}
    */
   part(flatIndex) {
-    if (flatIndex < 0) return null;
     const indices = this.#getNonSpaceGroupIndices();
+    if (flatIndex < 0) {
+      let total = 0;
+      for (const gi of indices) {
+        for (const glyph of (this.#rawBlissObj.groups[gi].glyphs || [])) {
+          total += (glyph.parts || []).length;
+        }
+      }
+      flatIndex = total + flatIndex;
+    }
+    if (flatIndex < 0) return null;
     let count = 0;
     for (const gi of indices) {
       const group = this.#rawBlissObj.groups[gi];
