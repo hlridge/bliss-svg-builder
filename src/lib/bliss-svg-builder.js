@@ -774,6 +774,49 @@ class BlissSVGBuilder {
   }
 
   /**
+   * Removes the non-space group at the given semantic index.
+   * @param {number} index - Semantic index (supports negative)
+   * @returns {this}
+   */
+  removeGroup(index) {
+    const indices = this.#getNonSpaceGroupIndices();
+    if (index < 0) index = indices.length + index;
+    if (index < 0 || index >= indices.length) return this;
+    const rawIndex = indices[index];
+    this.#removeGlyphGroup(this.#rawBlissObj, rawIndex);
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Replaces the non-space group at the given semantic index.
+   * @param {number} index - Semantic index (supports negative)
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  replaceGroup(index, code, opts) {
+    const indices = this.#getNonSpaceGroupIndices();
+    if (index < 0) index = indices.length + index;
+    if (index < 0 || index >= indices.length) return this;
+    const parsed = BlissParser.parse(code);
+    const newGroup = parsed.groups?.[0];
+    if (!newGroup) return this;
+    if (opts) {
+      const { defaults, overrides } = opts;
+      if (defaults || overrides) {
+        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
+        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
+        newGroup.options = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
+      }
+    }
+    const rawIndex = indices[index];
+    this.#rawBlissObj.groups[rawIndex] = newGroup;
+    this.#rebuild();
+    return this;
+  }
+
+  /**
    * Removes all content from the builder.
    * @returns {this}
    */
