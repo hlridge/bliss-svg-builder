@@ -404,7 +404,39 @@ export class ElementHandle {
     return undefined;
   }
 
-  // --- Mutation: replace ---
+  // --- Mutation: parent-centric replace ---
+
+  replaceGlyph(index, code, opts) {
+    this.#assertAlive();
+    if (this.#level !== 'group') return this;
+    const group = this.#nodeRef;
+    if (!group?.glyphs?.length) return this;
+    if (index < 0) index = group.glyphs.length + index;
+    if (index < 0 || index >= group.glyphs.length) return this;
+    const newGlyph = this.#parseGlyph(code);
+    this.#applyDefaultsOverrides(newGlyph, opts);
+    group.glyphs[index] = newGlyph;
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  replacePart(index, code, opts) {
+    this.#assertAlive();
+    if (this.#level !== 'glyph') return this;
+    const glyph = this.#nodeRef;
+    if (!glyph?.parts?.length) return this;
+    if (index < 0) index = glyph.parts.length + index;
+    if (index < 0 || index >= glyph.parts.length) return this;
+    const newPart = this.#parsePart(code);
+    this.#applyDefaultsOverrides(newPart, opts);
+    glyph.parts[index] = newPart;
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  // --- Mutation: self-centric replace ---
 
   replace(code, opts) {
     this.#assertAlive();
