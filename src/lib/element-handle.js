@@ -473,12 +473,11 @@ export class ElementHandle {
 
   // --- Mutation: options ---
 
-  setOptions(options) {
+  setOptions(opts) {
     this.#assertAlive();
     const node = this.#nodeRef;
     if (!node) return this;
-    const rawOpts = this.#ctx.toRaw(options);
-    node.options = { ...(node.options ?? {}), ...rawOpts };
+    this.#applyDefaultsOverrides(node, opts);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
