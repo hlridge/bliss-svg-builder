@@ -334,7 +334,7 @@ class BlissSVGBuilder {
   #rawBlissObj; // Stored for toJSON() round-trip
 
   constructor(input, options = {}) {
-    const { defaults, overrides } = options ?? {};
+    const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(options);
 
     // Allow empty constructor for building from scratch
     if (input === undefined || input === '') {
@@ -422,6 +422,15 @@ class BlissSVGBuilder {
         return tempElement.snapshot();
       },
     };
+  }
+
+  // Resolve opts: accepts { defaults, overrides } or flat options (treated as overrides).
+  static #resolveOpts(opts) {
+    if (!opts) return { defaults: undefined, overrides: undefined };
+    if ('defaults' in opts || 'overrides' in opts) {
+      return { defaults: opts.defaults, overrides: opts.overrides };
+    }
+    return { defaults: undefined, overrides: opts };
   }
 
   static #toRaw(obj) {
@@ -706,7 +715,7 @@ class BlissSVGBuilder {
     const newGroup = parsed.groups?.[0];
     if (!newGroup) return this;
     if (opts) {
-      const { defaults, overrides } = opts;
+      const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
       if (defaults || overrides) {
         const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
         const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
@@ -803,7 +812,7 @@ class BlissSVGBuilder {
     const newGroup = parsed.groups?.[0];
     if (!newGroup) return this;
     if (opts) {
-      const { defaults, overrides } = opts;
+      const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
       if (defaults || overrides) {
         const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
         const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};

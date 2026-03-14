@@ -167,10 +167,16 @@ export class ElementHandle {
     return parts[0];
   }
 
-  // Apply defaults/overrides merge to a node's options
+  // Apply defaults/overrides merge to a node's options.
+  // Accepts { defaults, overrides } or flat options (treated as overrides).
   #applyDefaultsOverrides(node, opts) {
     if (!opts) return;
-    const { defaults, overrides } = opts;
+    let defaults, overrides;
+    if ('defaults' in opts || 'overrides' in opts) {
+      ({ defaults, overrides } = opts);
+    } else {
+      overrides = opts;
+    }
     if (!defaults && !overrides) return;
     const rawDefaults = defaults ? this.#ctx.toRaw(defaults) : {};
     const rawOverrides = overrides ? this.#ctx.toRaw(overrides) : {};
