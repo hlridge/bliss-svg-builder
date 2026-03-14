@@ -347,6 +347,46 @@ export class ElementHandle {
     return undefined;
   }
 
+  removeGlyph(index) {
+    this.#assertAlive();
+    if (this.#level !== 'group') return this;
+    const group = this.#nodeRef;
+    if (!group?.glyphs?.length) return this;
+    if (index < 0) index = group.glyphs.length + index;
+    if (index < 0 || index >= group.glyphs.length) return this;
+    group.glyphs.splice(index, 1);
+    if (group.glyphs.length === 0) {
+      const raw = this.#ctx.getRaw();
+      const groupIndex = raw.groups.indexOf(group);
+      if (groupIndex >= 0) {
+        this.#ctx.removeGlyphGroup(raw, groupIndex);
+      }
+    }
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  removePart(index) {
+    this.#assertAlive();
+    if (this.#level !== 'glyph') return this;
+    const glyph = this.#nodeRef;
+    if (!glyph?.parts?.length) return this;
+    if (index < 0) index = glyph.parts.length + index;
+    if (index < 0 || index >= glyph.parts.length) return this;
+    glyph.parts.splice(index, 1);
+    if (glyph.parts.length === 0) {
+      this.#removeGlyphFromGroup(
+        this.#ctx.getRaw().groups, this.#parentRef, glyph
+      );
+      this.#syncGeneration();
+      return this;
+    }
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
   #removeGlyphFromGroup(groups, group, glyph) {
     const raw = this.#ctx.getRaw();
     if (!group?.glyphs) return undefined;
