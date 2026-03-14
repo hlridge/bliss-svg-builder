@@ -336,7 +336,10 @@ class BlissSVGBuilder {
   constructor(input, options = {}) {
     const { defaults, overrides } = options ?? {};
 
-    if (typeof input !== 'string' && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+    // Allow empty constructor for building from scratch
+    if (input === undefined || input === '') {
+      input = '';
+    } else if (typeof input !== 'string' && (typeof input !== 'object' || input === null || Array.isArray(input))) {
       throw new Error('Input must be a DSL string or a plain object from toJSON()');
     }
 
@@ -749,6 +752,24 @@ class BlissSVGBuilder {
     const rawGroup = this.#rawBlissObj.groups[lastGi];
     const handle = new ElementHandle(this.#mutationCtx, 'group', rawGroup);
     handle.addGlyph(code, opts);
+    return this;
+  }
+
+  /**
+   * Appends a part to the last non-space group's last glyph (creates group if empty).
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  addPart(code, opts) {
+    const indices = this.#getNonSpaceGroupIndices();
+    if (indices.length === 0) {
+      return this.addGroup(code, opts);
+    }
+    const lastGi = indices[indices.length - 1];
+    const rawGroup = this.#rawBlissObj.groups[lastGi];
+    const handle = new ElementHandle(this.#mutationCtx, 'group', rawGroup);
+    handle.addPart(code, opts);
     return this;
   }
 
