@@ -668,7 +668,17 @@ export class BlissParser {
           }];
         }
 
-        return str.split('/').flatMap(strPart => expand(strPart, definitions));
+        const expandedParts = str.split('/').flatMap(strPart => expand(strPart, definitions));
+
+        // Run head glyph detection on top-level multi-glyph words
+        if (expandedParts.length > 1 && !expandedParts.some(p => p.isHeadGlyph)) {
+          const fallbackIndex = findHeadGlyphIndex(expandedParts);
+          if (fallbackIndex > 0) {
+            expandedParts[fallbackIndex].isHeadGlyph = true;
+          }
+        }
+
+        return expandedParts;
       }
 
       const processedGroupCodeString = processXCodes(groupCodeString);
