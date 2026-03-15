@@ -227,6 +227,89 @@ Clear everything:
 builder.clear();
 ```
 
+## Indicator Operations
+
+Indicators mark a glyph's grammatical role (action, description, thing). The mutation API provides dedicated methods for managing indicators with the same semantic preservation behavior as the DSL's `;;` syntax.
+
+### Applying Indicators
+
+Replace all indicators on a glyph with `applyIndicators()`:
+
+```js
+const builder = new BlissSVGBuilder('B291');
+builder.glyph(0).applyIndicators('B86');
+// now equivalent to 'B291;B86'
+```
+
+Multiple indicators use semicolon-separated codes:
+
+```js
+builder.glyph(0).applyIndicators('B81;B86');
+```
+
+Non-indicator codes in the argument are silently filtered out, matching DSL behavior.
+
+### Semantic Preservation
+
+Semantic indicators (thing, abstract) are automatically preserved when you replace indicators, unless the new indicators already include one:
+
+```js
+const builder = new BlissSVGBuilder('B291;B97'); // B97 = thing indicator
+builder.glyph(0).applyIndicators('B81');
+// B97 preserved: now 'B291;B81;B97'
+```
+
+To strip the semantic indicator, pass `{ stripSemantic: true }`:
+
+```js
+builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
+// B97 removed: now 'B291;B86'
+```
+
+### Clearing Indicators
+
+Remove all grammatical indicators with `clearIndicators()`. Semantic indicators are preserved by default:
+
+```js
+const builder = new BlissSVGBuilder('B291;B86;B97');
+builder.glyph(0).clearIndicators();
+// B86 removed, B97 preserved: now 'B291;B97'
+```
+
+To clear everything including semantic:
+
+```js
+builder.glyph(0).clearIndicators({ stripSemantic: true });
+// now 'B291'
+```
+
+### Word-Level Indicators
+
+Apply indicators to a group's head glyph with `applyHeadIndicators()` and `clearHeadIndicators()`. These are the mutation API equivalent of the `;;` DSL syntax:
+
+```js
+const builder = new BlissSVGBuilder('B291/B303');
+builder.group(0).applyHeadIndicators('B86');
+// equivalent to 'B291/B303;;B86'
+```
+
+```js
+builder.group(0).clearHeadIndicators();
+// equivalent to 'B291/B303;;'
+```
+
+Both accept `{ stripSemantic: true }` (equivalent to `;;!`).
+
+### Inspecting Indicators
+
+The `isIndicator` getter on part handles returns whether a part is an indicator:
+
+```js
+const builder = new BlissSVGBuilder('B291;B86');
+builder.glyph(0).part(0).isIndicator; // false (B291 is base)
+builder.glyph(0).part(1).isIndicator; // true  (B86 is indicator)
+```
+
 ## Chaining
 
 Builder methods return the builder, so you can chain into builder properties:
