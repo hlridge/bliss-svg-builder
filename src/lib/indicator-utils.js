@@ -7,12 +7,24 @@
 import { SEMANTIC_INDICATOR_ROOTS } from './bliss-constants.js';
 
 /**
+ * Extract the bare B-code from a code string that may include
+ * option prefixes (e.g. '[color=red]>B81') and position suffixes (':0,4').
+ */
+function getBareCode(str) {
+  const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
+  if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
+  const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
+  const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
+  return code.split(':')[0].split(';')[0];
+}
+
+/**
  * Get semantic indicator root from a list of indicator codes.
  * Returns the root B-code (e.g. 'B97') or null.
  */
 export function getSemanticRoot(indicatorCodes, definitions) {
   for (const ind of indicatorCodes) {
-    const bareInd = ind.split(':')[0];
+    const bareInd = getBareCode(ind);
     const indDef = definitions[bareInd];
     if (indDef?.semanticIndicator) {
       return SEMANTIC_INDICATOR_ROOTS[indDef.semanticIndicator];
@@ -25,7 +37,7 @@ export function getSemanticRoot(indicatorCodes, definitions) {
  * Check if any indicator in the list carries a semanticIndicator flag.
  */
 export function hasSemantic(indicatorCodes, definitions) {
-  return indicatorCodes.some(ind => definitions[ind.split(':')[0]]?.semanticIndicator);
+  return indicatorCodes.some(ind => definitions[getBareCode(ind)]?.semanticIndicator);
 }
 
 /**
@@ -33,7 +45,7 @@ export function hasSemantic(indicatorCodes, definitions) {
  * Non-indicator codes passed in indicator position are silently dropped.
  */
 export function filterToIndicators(codes, definitions) {
-  return codes.filter(code => definitions[code.split(':')[0]]?.isIndicator === true);
+  return codes.filter(code => definitions[getBareCode(code)]?.isIndicator === true);
 }
 
 /**
@@ -43,10 +55,10 @@ export function filterToIndicators(codes, definitions) {
  */
 export function semanticGoesLast(newIndicatorCodes, definitions) {
   const nonSemantic = newIndicatorCodes.filter(ind =>
-    !definitions[ind.split(':')[0]]?.semanticIndicator);
+    !definitions[getBareCode(ind)]?.semanticIndicator);
   return nonSemantic.length > 0 &&
     nonSemantic.every(ind => {
-      const role = definitions[ind.split(':')[0]]?.indicatorRole;
+      const role = definitions[getBareCode(ind)]?.indicatorRole;
       return role === 'verbal' || role === 'adjectival';
     });
 }

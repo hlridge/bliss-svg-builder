@@ -12,7 +12,12 @@ import {
   lowPriorityExclusions,
   conditionalExceptions
 } from "./bliss-head-glyph-exclusions.js";
-import { SEMANTIC_INDICATOR_ROOTS } from "./bliss-constants.js";
+import {
+  getSemanticRoot,
+  hasSemantic,
+  filterToIndicators,
+  buildWithSemantic
+} from "./indicator-utils.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -373,49 +378,6 @@ export class BlissParser {
           return code.split(':')[0].split(';')[0];
         };
 
-        // Get semantic indicator root from a list of indicator codes.
-        // Returns the root B-code (e.g. 'B97') or null.
-        const getSemanticRoot = (indicatorCodes) => {
-          for (const ind of indicatorCodes) {
-            const bareInd = ind.split(':')[0];
-            const indDef = definitions[bareInd];
-            if (indDef?.semanticIndicator) {
-              return SEMANTIC_INDICATOR_ROOTS[indDef.semanticIndicator];
-            }
-          }
-          return null;
-        };
-
-        // Check if any indicator in the list carries a semanticIndicator flag
-        const hasSemantic = (indicatorCodes) =>
-          indicatorCodes.some(ind => definitions[getBareCode(ind)]?.semanticIndicator);
-
-        // Filter codes to only include real indicators (isIndicator: true).
-        // Non-indicator codes passed in indicator position (;;H, ;;B, etc.) are silently dropped.
-        const filterToIndicators = (codes) =>
-          codes.filter(code => definitions[code.split(':')[0]]?.isIndicator === true);
-
-        // Determine whether auto-preserved semantic root goes before or after new indicators.
-        // Default: semantic first (nominal). If ALL non-semantic new indicators are verbal or
-        // adjectival, semantic goes last (the word is being used as a verb/adjective).
-        const semanticGoesLast = (newIndicatorCodes) => {
-          const nonSemantic = newIndicatorCodes.filter(ind =>
-            !definitions[getBareCode(ind)]?.semanticIndicator);
-          return nonSemantic.length > 0 &&
-            nonSemantic.every(ind => {
-              const role = definitions[getBareCode(ind)]?.indicatorRole;
-              return role === 'verbal' || role === 'adjectival';
-            });
-        };
-
-        // Build the indicator string with semantic root in the correct position.
-        const buildWithSemantic = (semanticRoot, newInds) => {
-          const joined = newInds.join(';');
-          return semanticGoesLast(newInds)
-            ? joined + ';' + semanticRoot
-            : semanticRoot + ';' + joined;
-        };
-
         // After ;; modifies a glyph's .part, update its identity (isBlissGlyph/glyphCode).
         // If the new part is a bare known glyph, restore identity; otherwise clear it.
         const updateGlyphIdentity = (expandedPart) => {
@@ -457,14 +419,14 @@ export class BlissParser {
             // Multiple glyphs: Apply indicators to head glyph
             const targetIndex = findHeadGlyphIndex(expandedParts);
             const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-            const semanticRoot = !forceStrip ? getSemanticRoot(existingInds) : null;
+            const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
             const bareCode = getBaseCode(expandedParts[targetIndex]);
 
             if (indicators) {
-              const newInds = filterToIndicators(indicators.split(';'));
+              const newInds = filterToIndicators(indicators.split(';'), definitions);
               if (newInds.length > 0) {
-                if (semanticRoot && !hasSemantic(newInds)) {
-                  expandedParts[targetIndex].part = bareCode + ';' + buildWithSemantic(semanticRoot, newInds);
+                if (semanticRoot && !hasSemantic(newInds, definitions)) {
+                  expandedParts[targetIndex].part = bareCode + ';' + buildWithSemantic(semanticRoot, newInds, definitions).join(';');
                 } else {
                   expandedParts[targetIndex].part = bareCode + ';' + newInds.join(';');
                 }
@@ -491,14 +453,14 @@ export class BlissParser {
           } else if (expandedParts.length === 1) {
             // Single glyph: ;; behaves like ; (attach or strip indicator on the single glyph)
             const existingInds = getIndicatorParts(expandedParts[0]);
-            const semanticRoot = !forceStrip ? getSemanticRoot(existingInds) : null;
+            const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
             const baseCode = getBaseCode(expandedParts[0]);
 
             if (indicators) {
-              const newInds = filterToIndicators(indicators.split(';'));
+              const newInds = filterToIndicators(indicators.split(';'), definitions);
               if (newInds.length > 0) {
-                if (semanticRoot && !hasSemantic(newInds)) {
-                  expandedParts[0].part = baseCode + ';' + buildWithSemantic(semanticRoot, newInds);
+                if (semanticRoot && !hasSemantic(newInds, definitions)) {
+                  expandedParts[0].part = baseCode + ';' + buildWithSemantic(semanticRoot, newInds, definitions).join(';');
                 } else {
                   expandedParts[0].part = baseCode + ';' + newInds.join(';');
                 }
@@ -612,12 +574,12 @@ export class BlissParser {
             if (shouldReplace || shouldRemove) {
               const codeStringParts = definition.codeString.split(';');
               const existingIndicatorCodes = codeStringParts.slice(1).map(p => p.split(':')[0]);
-              const semanticRoot = !forceStrip ? getSemanticRoot(existingIndicatorCodes) : null;
+              const semanticRoot = !forceStrip ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
 
               codeStringToExpand = codeStringParts[0];
               if (filteredIndicators.length > 0) {
-                if (semanticRoot && !hasSemantic(filteredIndicators)) {
-                  codeStringToExpand += ';' + buildWithSemantic(semanticRoot, filteredIndicators);
+                if (semanticRoot && !hasSemantic(filteredIndicators, definitions)) {
+                  codeStringToExpand += ';' + buildWithSemantic(semanticRoot, filteredIndicators, definitions).join(';');
                 } else {
                   codeStringToExpand += ';' + filteredIndicators.join(';');
                 }
@@ -725,16 +687,16 @@ export class BlissParser {
             if (expandedParts.length > 1 && filteredIndicators.length > 0) {
               // It's a word (multiple glyphs) - strip and replace indicators on head glyph
               // Only use codes that are real indicators
-              const validInds = filterToIndicators(filteredIndicators);
+              const validInds = filterToIndicators(filteredIndicators, definitions);
               if (validInds.length > 0) {
                 const targetIndex = findHeadGlyphIndex(expandedParts);
                 const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-                const semanticRoot = !forceStrip ? getSemanticRoot(existingInds) : null;
+                const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
                 const baseCode = getBaseCode(expandedParts[targetIndex]);
 
                 // Reattach with new indicators, preserving semantic root when appropriate
-                if (semanticRoot && !hasSemantic(validInds)) {
-                  expandedParts[targetIndex].part = baseCode + ';' + buildWithSemantic(semanticRoot, validInds);
+                if (semanticRoot && !hasSemantic(validInds, definitions)) {
+                  expandedParts[targetIndex].part = baseCode + ';' + buildWithSemantic(semanticRoot, validInds, definitions).join(';');
                 } else {
                   expandedParts[targetIndex].part = baseCode + ';' + validInds.join(';');
                 }
@@ -748,7 +710,7 @@ export class BlissParser {
             if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
               const targetIndex = findHeadGlyphIndex(expandedParts);
               const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-              const semanticRoot = !forceStrip ? getSemanticRoot(existingInds) : null;
+              const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
               const baseCode = getBaseCode(expandedParts[targetIndex]);
 
               expandedParts[targetIndex].part = semanticRoot
