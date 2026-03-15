@@ -418,6 +418,18 @@ On a group handle, returns the head glyph (the main glyph in a composition):
 builder.group(0).headGlyph();
 ```
 
+#### `.codeName`
+
+Returns the code name of this element (e.g., `'B291'`).
+
+#### `.isIndicator`
+
+On a part handle, returns `true` if this part is an indicator. Returns `false` on glyph and group handles:
+
+```js
+builder.glyph(0).part(1).isIndicator; // true for indicator parts
+```
+
 ### Structural Mutation
 
 All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed). Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
@@ -538,6 +550,48 @@ Removes specific option keys:
 
 ```js
 builder.glyph(0).removeOptions('color', 'strokeWidth');
+```
+
+### Indicator Mutation
+
+Indicator methods manage the grammatical indicator parts on a glyph. Unlike other mutation methods, the `opts` parameter accepts `{ stripSemantic?: boolean }`, not `BlissOptions`.
+
+#### `.applyIndicators(codes, opts?)`
+
+On a glyph handle, replaces all existing indicators with the given codes. `codes` is required (throws if missing; use `clearIndicators()` to remove). Semantic indicators are preserved unless the new codes include one or `{ stripSemantic: true }` is passed:
+
+```js
+builder.glyph(0).applyIndicators('B86');
+builder.glyph(0).applyIndicators('B81;B86');
+builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
+```
+
+Non-indicator codes are silently filtered out.
+
+#### `.clearIndicators(opts?)`
+
+On a glyph handle, removes all grammatical indicators. Semantic indicators are preserved by default:
+
+```js
+builder.glyph(0).clearIndicators();
+builder.glyph(0).clearIndicators({ stripSemantic: true });
+```
+
+#### `.applyHeadIndicators(codes, opts?)`
+
+On a group handle, applies indicators to the head glyph. Equivalent to the `;;` DSL syntax:
+
+```js
+builder.group(0).applyHeadIndicators('B86');
+```
+
+#### `.clearHeadIndicators(opts?)`
+
+On a group handle, clears indicators from the head glyph:
+
+```js
+builder.group(0).clearHeadIndicators();
+builder.group(0).clearHeadIndicators({ stripSemantic: true });
 ```
 
 ### Options
