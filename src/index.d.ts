@@ -68,8 +68,8 @@ export interface BlissOptions {
   [key: string]: string | number | undefined;
 }
 
-/** Options for defaults/overrides merging. */
-export interface MergeOptions {
+/** Cascading option layers: defaults (lowest priority) and overrides (highest priority). */
+export interface OptionLayers {
   defaults?: BlissOptions;
   overrides?: BlissOptions;
 }
@@ -141,11 +141,11 @@ export declare class ElementHandle {
   /** Returns the head glyph handle within this group. Only valid on group handles. */
   headGlyph(): ElementHandle | null;
 
-  /** Returns the glyph at the given index within this group. Only valid on group handles. */
+  /** Returns the glyph at the given index within this group. Negative indices count from the end (-1 = last). Only valid on group handles. */
   glyph(index: number): ElementHandle | null;
 
   /**
-   * Returns the part at the given index.
+   * Returns the part at the given index. Negative indices count from the end (-1 = last).
    * Valid on glyph handles (returns a part of the glyph) and
    * part handles (returns a nested sub-part).
    */
@@ -154,29 +154,43 @@ export declare class ElementHandle {
   // --- Mutation: add/insert ---
 
   /** Appends a glyph to this group. Only valid on group handles. */
-  addGlyph(code: string, opts?: MergeOptions): this;
+  addGlyph(code: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Inserts a glyph at the given index in this group. Only valid on group handles. */
-  insertGlyph(index: number, code: string, opts?: MergeOptions): this;
+  insertGlyph(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Appends a part to this glyph. Only valid on glyph handles. */
-  addPart(code: string, opts?: MergeOptions): this;
+  /** Appends a part to this glyph. On group handles, delegates to the last glyph. */
+  addPart(code: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Inserts a part at the given index in this glyph. Only valid on glyph handles. */
-  insertPart(index: number, code: string, opts?: MergeOptions): this;
+  insertPart(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
-  // --- Mutation: remove/replace ---
+  // --- Mutation: remove/replace (self) ---
 
   /** Removes this element. Cascades: removing the last part removes its glyph, etc. */
   remove(): undefined;
 
   /** Replaces this element with a new one. Valid on glyph and part handles. */
-  replace(code: string, opts?: MergeOptions): this;
+  replace(code: string, opts?: BlissOptions | OptionLayers): this;
+
+  // --- Mutation: remove/replace (parent-centric, by index) ---
+
+  /** Removes the glyph at the given index in this group. Only valid on group handles. */
+  removeGlyph(index: number): this;
+
+  /** Replaces the glyph at the given index in this group. Only valid on group handles. */
+  replaceGlyph(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Removes the part at the given index in this glyph. Only valid on glyph handles. */
+  removePart(index: number): this;
+
+  /** Replaces the part at the given index in this glyph. Only valid on glyph handles. */
+  replacePart(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
   // --- Mutation: options ---
 
-  /** Sets or merges options on this element. */
-  setOptions(options: BlissOptions): this;
+  /** Sets or merges options on this element. Accepts flat options (treated as overrides) or { defaults, overrides }. */
+  setOptions(opts: BlissOptions | OptionLayers): this;
 
   /** Removes specific option keys from this element. */
   removeOptions(...keys: string[]): this;
@@ -307,10 +321,10 @@ export interface BuilderStats {
 export declare class BlissSVGBuilder {
   /**
    * Creates an instance of BlissSVGBuilder.
-   * @param input - A DSL string or a plain object from `toJSON()`
-   * @param options - Defaults and overrides to merge into the parsed options
+   * @param input - A DSL string, a plain object from `toJSON()`, or omitted for an empty builder
+   * @param options - Defaults/overrides to merge, or flat options treated as overrides
    */
-  constructor(input: string | BlissJSON, options?: MergeOptions);
+  constructor(input?: string | BlissJSON, options?: BlissOptions | OptionLayers);
 
   // --- SVG output (getters) ---
 
@@ -353,13 +367,13 @@ export declare class BlissSVGBuilder {
   /** Looks up an element handle by its snapshot key. */
   getElementByKey(key: string): ElementHandle | null;
 
-  /** Returns a handle to the non-space group at the given index. */
+  /** Returns a handle to the non-space group at the given index. Negative indices count from the end (-1 = last). */
   group(index: number): ElementHandle | null;
 
-  /** Returns a handle to the glyph at the given flat index across all groups. */
+  /** Returns a handle to the glyph at the given flat index across all groups. Negative indices count from the end (-1 = last). */
   glyph(flatIndex: number): ElementHandle | null;
 
-  /** Returns a handle to the part at the given flat index across all glyphs. */
+  /** Returns a handle to the part at the given flat index across all glyphs. Negative indices count from the end (-1 = last). */
   part(flatIndex: number): ElementHandle | null;
 
   /** Returns the root element snapshot (alias for `elements`). */
@@ -368,10 +382,22 @@ export declare class BlissSVGBuilder {
   // --- Building and manipulation ---
 
   /** Appends a new glyph group with automatic space management. */
-  addGroup(code: string, opts?: MergeOptions): this;
+  addGroup(code: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Appends a glyph to the last non-space group (creates one if empty). */
-  addGlyph(code: string, opts?: MergeOptions): this;
+  addGlyph(code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Appends a part to the last glyph of the last group. */
+  addPart(code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Inserts a group at the given index. Negative indices count from the end. */
+  insertGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Removes the group at the given index. Negative indices count from the end. */
+  removeGroup(index: number): this;
+
+  /** Replaces the group at the given index with new content. Negative indices count from the end. */
+  replaceGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Removes all content from the builder. */
   clear(): this;

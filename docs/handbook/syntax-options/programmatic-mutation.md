@@ -49,11 +49,18 @@ builder.group(0).glyph(1);  // B1103 within first group
 builder.glyph(0).part(0);   // first part of B313
 ```
 
+Negative indices count from the end:
+
+```js
+builder.group(-1);   // last group
+builder.glyph(-1);   // last glyph
+builder.glyph(-2);   // second-to-last glyph
+```
+
 Out-of-range indices return `null`:
 
 ```js
 builder.group(99);  // null
-builder.glyph(-1);  // null
 ```
 
 ### Finding Elements by Key
@@ -67,6 +74,17 @@ const handle = builder.getElementByKey(key);
 ```
 
 ## Adding Content
+
+### Starting from an Empty Builder
+
+The constructor accepts no arguments, creating an empty builder you can populate programmatically:
+
+```js
+const builder = new BlissSVGBuilder();
+builder.addGlyph('B313');
+builder.addGlyph('B1103');
+// equivalent to new BlissSVGBuilder('B313/B1103')
+```
 
 ### Adding Glyph Groups
 
@@ -108,6 +126,14 @@ Add parts to compose characters inline:
 const builder = new BlissSVGBuilder('H');
 builder.glyph(0).addPart('C8');
 // now equivalent to 'H;C8'
+```
+
+The builder also has a shorthand that appends to the last glyph of the last group:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+builder.addPart('B81');
+// appends B81 to B313, equivalent to 'B313;B81'
 ```
 
 Insert at a specific position:
@@ -167,6 +193,32 @@ builder.glyph(1).remove(); // B431 was the only glyph in group 1
 // now equivalent to 'B313' (group and space removed)
 ```
 
+### Parent-Centric Remove and Replace
+
+Instead of getting a handle and calling `remove()` on it, you can operate by index from the parent:
+
+```js
+// Remove/replace glyphs within a group
+builder.group(0).removeGlyph(-1);           // remove last glyph
+builder.group(0).replaceGlyph(0, 'B431');   // replace first glyph
+
+// Remove/replace parts within a glyph
+builder.glyph(0).removePart(-1);            // remove last part
+builder.glyph(0).replacePart(0, 'B81');     // replace first part
+```
+
+The parent-centric methods return the parent handle (not `undefined`), so they can be chained.
+
+### Builder Group Operations
+
+The builder provides direct methods for removing and replacing groups:
+
+```js
+builder.removeGroup(-1);                          // remove last group
+builder.replaceGroup(0, 'B431', { color: 'red' }); // replace first group
+builder.insertGroup(1, 'B291');                    // insert at position 1
+```
+
 Clear everything:
 
 ```js
@@ -175,19 +227,28 @@ builder.clear();
 
 ## Chaining
 
-Builder methods and most handle methods return `this`, enabling fluent chains:
+Builder methods return the builder, so you can chain into builder properties:
 
 ```js
-// Builder chaining
 const svg = new BlissSVGBuilder('B313')
   .addGroup('B1103')
   .addGroup('B431')
   .svgCode;
+```
 
-// Handle chaining
+Handle methods return the handle, so you can chain further handle operations:
+
+```js
 builder.group(0)
   .setOptions({ color: 'blue' })
   .addGlyph('B291');
+```
+
+Handle chains stay on the handle. To access builder properties after handle mutations, use a separate statement:
+
+```js
+builder.group(0).addGlyph('B291');
+builder.svgCode; // back on the builder
 ```
 
 Note: `remove()` returns `undefined` and cannot be chained.
@@ -211,19 +272,27 @@ builder.glyph(0).remove();
 snap.children; // still has the original structure
 ```
 
-## Defaults and Overrides
+## Options
 
-All mutation methods that accept a code string also accept `{ defaults, overrides }`, the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
+All mutation methods that accept a code string also accept an options parameter. Pass flat options to apply them as overrides:
+
+```js
+builder.addGroup('B431', { color: 'red' });
+builder.glyph(0).replace('B313', { color: 'green' });
+builder.glyph(0).setOptions({ color: 'red', strokeWidth: 0.6 });
+```
+
+### Defaults and Overrides
+
+When you need separate defaults and overrides, use the structured format with the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
 
 ```js
 builder.addGroup('[color=red]B431', {
   defaults: { strokeWidth: 0.6 },  // applied if not set in DSL
   overrides: { fill: 'blue' }       // always applied
 });
-
-builder.glyph(0).replace('B313', {
-  overrides: { color: 'green' }
-});
 ```
 
 Precedence: `defaults` → DSL string → `overrides`.
+
+Flat options `{ color: 'red' }` are equivalent to `{ overrides: { color: 'red' } }`. The structured format is only needed when you want to set defaults that the DSL string can override.

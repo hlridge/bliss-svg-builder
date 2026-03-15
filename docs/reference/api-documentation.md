@@ -5,29 +5,40 @@ JavaScript API reference for Bliss SVG Builder.
 ## Constructor
 
 ```js
+new BlissSVGBuilder()
 new BlissSVGBuilder(input)
-new BlissSVGBuilder(input, { defaults, overrides })
+new BlissSVGBuilder(input, options)
 ```
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `input` | `string` or `object` | DSL input string, or a plain object from `toJSON()` |
-| `defaults` | `object` | Options applied when the DSL string doesn't set them (optional) |
-| `overrides` | `object` | Options that always win, even over the DSL string (optional) |
+| `input` | `string`, `object`, or omitted | DSL input string, a plain object from `toJSON()`, or omitted for an empty builder |
+| `options` | `object` | Flat options (applied as overrides), or `{ defaults, overrides }` for full control (optional) |
 
 ```js
 import { BlissSVGBuilder } from 'bliss-svg-builder';
 
-const builder = new BlissSVGBuilder('B313');
+// Empty builder
+const builder = new BlissSVGBuilder();
+builder.addGlyph('B313');
 
-// With defaults and overrides
+// From a DSL string
+const fromDSL = new BlissSVGBuilder('B313');
+
+// With options
+const styled = new BlissSVGBuilder('B313', { color: 'red', strokeWidth: 0.6 });
+```
+
+When you need separate defaults and overrides, use the structured format:
+
+```js
 const styled = new BlissSVGBuilder('B313', {
-  defaults: { color: 'red', grid: true },
-  overrides: { strokeWidth: 0.6 }
+  defaults: { color: 'red', grid: true },  // applied if not set in DSL
+  overrides: { strokeWidth: 0.6 }           // always applied
 });
 ```
 
-The second parameter uses camelCase keys and native JS types. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules.
+Options use camelCase keys and native JS types. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules.
 
 ### Round-trip from toJSON()
 
@@ -179,35 +190,36 @@ Methods for traversing the element tree. All navigation returns live `ElementHan
 
 ### `group(index)`
 
-Returns a live handle for the glyph group at the given index, skipping space groups:
+Returns a live handle for the glyph group at the given index, skipping space groups. Negative indices count from the end (`-1` = last):
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103//B431');
-const first = builder.group(0);  // B313/B1103
-const second = builder.group(1); // B431
-builder.group(99);               // null
+const first = builder.group(0);   // B313/B1103
+const second = builder.group(1);  // B431
+builder.group(-1);                // last group (B431)
+builder.group(99);                // null
 ```
 
 ### `glyph(flatIndex)`
 
-Returns a live handle for the glyph at a flat index across all groups:
+Returns a live handle for the glyph at a flat index across all groups. Negative indices count from the end:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103//B431');
-builder.glyph(0); // B313
-builder.glyph(1); // B1103
-builder.glyph(2); // B431
+builder.glyph(0);  // B313
+builder.glyph(1);  // B1103
+builder.glyph(-1); // last glyph (B431)
 ```
 
 ### `part(flatIndex)`
 
-Returns a live handle for the part at a flat index across all glyphs in all groups:
+Returns a live handle for the part at a flat index across all glyphs in all groups. Negative indices count from the end:
 
 ```js
 const builder = new BlissSVGBuilder('B313//B431;B81');
-builder.part(0); // B313's single part
-builder.part(1); // B431 (first part of second glyph)
-builder.part(2); // B81 (second part of second glyph)
+builder.part(0);  // B313's single part
+builder.part(1);  // B431 (first part of second glyph)
+builder.part(-1); // last part (B81)
 ```
 
 ### `getElementByKey(key)`
@@ -259,7 +271,16 @@ const glyphs = builder.query(el => el.type === 'glyph');
 
 ## Builder Mutation
 
-Methods on the builder instance for modifying content. All return `this` for chaining.
+Methods on the builder instance for modifying content. All return `this` for chaining. Out-of-range indices are silently ignored (no error thrown, no mutation performed).
+
+```js
+// Builder methods return the builder, so you can chain into properties
+const svg = new BlissSVGBuilder()
+  .addGlyph('B313')
+  .addGlyph('B1103')
+  .addGroup('B431')
+  .svgCode;
+```
 
 ### `addGroup(code, opts?)`
 
@@ -279,6 +300,42 @@ Appends a glyph to the last glyph group. Creates a group if the builder is empty
 const builder = new BlissSVGBuilder('B313');
 builder.addGlyph('B1103');
 // equivalent to new BlissSVGBuilder('B313/B1103')
+```
+
+### `addPart(code, opts?)`
+
+Appends a part to the last glyph of the last group:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+builder.addPart('B81');
+// appends B81 to B313, equivalent to 'B313;B81'
+```
+
+### `insertGroup(index, code, opts?)`
+
+Inserts a group at the given position. Negative indices count from the end:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.insertGroup(1, 'B291');
+// now equivalent to 'B313//B291//B431'
+```
+
+### `removeGroup(index)`
+
+Removes the group at the given index. Negative indices count from the end:
+
+```js
+builder.removeGroup(-1); // remove last group
+```
+
+### `replaceGroup(index, code, opts?)`
+
+Replaces the group at the given index with new content:
+
+```js
+builder.replaceGroup(0, 'B431', { color: 'red' });
 ```
 
 ### `clear()`
@@ -319,18 +376,20 @@ Returns `'group'`, `'glyph'`, or `'part'`.
 
 #### `.glyph(index)`
 
-On a group handle, returns a handle for the glyph at the given index within that group:
+On a group handle, returns a handle for the glyph at the given index within that group. Negative indices count from the end (`-1` = last):
 
 ```js
-builder.group(0).glyph(1); // second glyph in first group
+builder.group(0).glyph(1);  // second glyph in first group
+builder.group(0).glyph(-1); // last glyph in first group
 ```
 
 #### `.part(index)`
 
-On a glyph handle, returns a handle for the part at the given index:
+On a glyph handle, returns a handle for the part at the given index. Negative indices count from the end:
 
 ```js
-builder.glyph(0).part(0); // first part of first glyph
+builder.glyph(0).part(0);  // first part of first glyph
+builder.glyph(0).part(-1); // last part of first glyph
 ```
 
 On a part handle, returns a handle for a nested sub-part.
@@ -345,7 +404,19 @@ builder.group(0).headGlyph();
 
 ### Structural Mutation
 
-All structural methods trigger a rebuild and return `this` (except `remove()` which returns `undefined`).
+All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed). Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
+
+```js
+// Handle methods return the handle, not the builder
+builder.group(0)
+  .addGlyph('B291')
+  .setOptions({ color: 'blue' })
+  .replaceGlyph(0, 'B431');
+
+// To access builder properties after handle mutations, use a separate statement
+builder.group(0).addGlyph('B291');
+builder.svgCode; // back on the builder
+```
 
 #### `.addGlyph(code, opts?)`
 
@@ -365,10 +436,11 @@ builder.group(0).insertGlyph(0, 'B431'); // prepend
 
 #### `.addPart(code, opts?)`
 
-Appends a part to this glyph:
+On a glyph handle, appends a part to that glyph. On a group handle, delegates to the last glyph in the group:
 
 ```js
 builder.glyph(0).addPart('B81');
+builder.group(0).addPart('B81'); // appends to last glyph in group
 ```
 
 #### `.insertPart(index, code, opts?)`
@@ -395,14 +467,53 @@ Replaces the element with new content:
 builder.glyph(0).replace('B431');
 ```
 
-### Options Mutation
+#### `.removeGlyph(index)`
 
-#### `.setOptions(options)`
-
-Merges options onto the element (camelCase keys):
+On a group handle, removes the glyph at the given index. Negative indices count from the end. Returns the group handle for chaining:
 
 ```js
-builder.glyph(0).setOptions({ color: 'red', strokeWidth: 0.6 });
+builder.group(0).removeGlyph(-1); // remove last glyph
+```
+
+#### `.replaceGlyph(index, code, opts?)`
+
+On a group handle, replaces the glyph at the given index:
+
+```js
+builder.group(0).replaceGlyph(0, 'B431');
+```
+
+#### `.removePart(index)`
+
+On a glyph handle, removes the part at the given index. Negative indices count from the end. Returns the glyph handle for chaining:
+
+```js
+builder.glyph(0).removePart(-1); // remove last part
+```
+
+#### `.replacePart(index, code, opts?)`
+
+On a glyph handle, replaces the part at the given index:
+
+```js
+builder.glyph(0).replacePart(0, 'B81');
+```
+
+### Options Mutation
+
+#### `.setOptions(opts)`
+
+Merges options onto the element. Accepts flat options (treated as overrides) or the structured `{ defaults, overrides }` format:
+
+```js
+// Flat options (treated as overrides):
+builder.glyph(0).setOptions({ color: 'red' });
+
+// Structured format (defaults and overrides):
+builder.glyph(0).setOptions({
+  defaults: { strokeWidth: 0.6 },
+  overrides: { color: 'red' }
+});
 ```
 
 #### `.removeOptions(...keys)`
@@ -413,9 +524,15 @@ Removes specific option keys:
 builder.glyph(0).removeOptions('color', 'strokeWidth');
 ```
 
-### Defaults and Overrides
+### Options
 
-All mutation methods that accept a `code` parameter also accept an optional second parameter `{ defaults, overrides }`, following the same precedence as the [constructor](/handbook/syntax-options/programmatic-options):
+All mutation methods that accept a `code` parameter also accept an optional options parameter. Pass flat options to apply them as overrides:
+
+```js
+builder.group(0).addGlyph('B431', { color: 'red' });
+```
+
+When you need separate defaults and overrides, use the structured format:
 
 ```js
 builder.group(0).addGlyph('[color=red]B431', {
@@ -423,6 +540,8 @@ builder.group(0).addGlyph('[color=red]B431', {
   overrides: { fill: 'blue' }       // always applied
 });
 ```
+
+Flat options `{ color: 'red' }` are equivalent to `{ overrides: { color: 'red' } }`.
 
 ## Definition API
 
