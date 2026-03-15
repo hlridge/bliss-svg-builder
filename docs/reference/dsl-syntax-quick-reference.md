@@ -10,8 +10,10 @@ Pattern: Single = character level, Double = word level
 |-----------|-------|---------|---------|
 | `//` | Word separator | `B313//B431` | Two words |
 | `/` | Character separator | `B313/B1103` | Two characters in one word |
-| `;;` | Word-level indicators | `B313/B1103;;B81` | Indicator on head glyph |
-| `;` | Character-level indicators | `B431;B81` | Indicator on specific character |
+| `;;` | Word-level indicators | `B313/B1103;;B81` | Indicator on head glyph, keeps thing/abstract |
+| `;;!` | Force-strip indicators | `B313/B1103;;!B81` | Strips all indicators, then adds B81 |
+| `;` | Character-level indicators | `B431;B81` | Indicator on character, keeps thing/abstract |
+| `;!` | Force-strip indicators | `B431;!B81` | Strips all indicators, then adds B81 |
 
 ## Option Scope Separators
 

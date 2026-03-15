@@ -126,3 +126,13 @@ export const INTERNAL_OPTIONS = new Set([
   'relativeKerning',
   'absoluteKerning'
 ]);
+
+/**
+ * Maps semantic indicator types to their root B-codes.
+ * When overriding indicators, the semantic root is preserved by default
+ * unless the new indicators include a semantic indicator or force-strip (!) is used.
+ */
+export const SEMANTIC_INDICATOR_ROOTS = {
+  thing: 'B97',
+  abstract: 'B6436'
+};

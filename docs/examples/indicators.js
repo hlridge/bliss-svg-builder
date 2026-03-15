@@ -41,7 +41,7 @@ export const indicators = {
 
   // Other Indicators (not in Unicode proposal)
   B910: { name: "INDICATOR DIRECT OBJECT", purpose: "Marks direct object role" },
-  TBD_INDIRECT_OBJECT: { name: "INDICATOR INDIRECT OBJECT", purpose: "Marks indirect object role", isTbd: true },
+  B6439: { name: "INDICATOR INDIRECT OBJECT", purpose: "Marks indirect object role" },
   B905: { name: "INDICATOR FEMININE", purpose: "Marks feminine gender" },
   B909: { name: "INDICATOR NEUTER", purpose: "Marks neuter gender" },
   B906: { name: "INDICATOR FIRST PERSON", purpose: "Marks first person" },
@@ -67,6 +67,6 @@ export const indicatorGroups = [
   },
   {
     name: "Indicators Not Planned for Unicode",
-    codes: ['B908', 'B910', 'TBD_INDIRECT_OBJECT', 'B905', 'B909', 'B906', 'B915', 'B916', 'B913', 'B992']
+    codes: ['B908', 'B910', 'B6439', 'B905', 'B909', 'B906', 'B915', 'B916', 'B913', 'B992']
   }
 ];
