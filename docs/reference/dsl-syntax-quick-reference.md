@@ -15,6 +15,17 @@ Pattern: Single = character level, Double = word level
 | `;` | Character-level indicators | `B431;B81` | Indicator on character, keeps thing/abstract |
 | `;!` | Force-strip indicators | `B431;!B81` | Strips all indicators, then adds B81 |
 
+### Indicator Resolution
+
+The `;;` separator is an input convenience for attaching indicators to a word's head glyph. During parsing, the indicator resolves to character-level `;` syntax on the head glyph. This resolved form is what `toString()` returns:
+
+```
+Input:      B313/B1103;;B81    (indicator targets head glyph)
+toString(): B313;B81/B1103     (indicator attached to B313)
+```
+
+The visual output is identical. The difference only matters when inspecting `toString()` output or the element tree.
+
 ## Option Scope Separators
 
 | Separator | Scope | Example |

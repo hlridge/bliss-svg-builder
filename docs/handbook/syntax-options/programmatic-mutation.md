@@ -29,6 +29,8 @@ For example, `B313/B1103//B431;B81` creates:
 - **Group 0**: B313, B1103
 - **Group 1**: one glyph with parts B431 and B81
 
+Indicators are parts within a glyph, marked with `isIndicator: true`. Word-level indicator syntax (`;;`) resolves so indicators are always attached to a specific glyph in the tree. See [DSL Syntax Quick Reference](/reference/dsl-syntax-quick-reference#indicator-resolution) for details.
+
 ## Navigating the Tree
 
 The builder provides methods to get live handles into this tree:

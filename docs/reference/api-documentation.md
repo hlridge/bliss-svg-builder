@@ -153,6 +153,10 @@ new BlissSVGBuilder('LOVE').toJSON();                     // codeName: 'B431'
 new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // codeName: 'LOVE'
 ```
 
+### Indicators in the tree
+
+Indicators always appear as parts within their parent glyph, marked with `isIndicator: true`. Word-level indicator syntax (`;;`) is resolved during parsing, so the tree always shows indicators attached to a specific glyph, never to a group.
+
 Use for: inspecting parsed structure, storing snapshots, server-side processing.
 
 ### `toString(options?)`
@@ -181,6 +185,18 @@ new BlissSVGBuilder('SMILEY').toString();
 new BlissSVGBuilder('SMILEY').toString({ preserve: true });
 // 'SMILEY'
 ```
+
+### Indicator Resolution
+
+`toString()` returns the resolved form of the composition. Word-level indicator syntax (`;;`) resolves to character-level syntax (`;`), with indicators attached directly to the head glyph:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103;;B81');
+builder.toString();
+// 'B313;B81/B1103' — indicator moved to head glyph
+```
+
+Passing the resolved output back into the constructor produces an identical result.
 
 Use for: serializing back to DSL format, portable exchange, logging.
 
