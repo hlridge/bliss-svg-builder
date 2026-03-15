@@ -415,6 +415,7 @@ class BlissSVGBuilder {
       removeGlyphGroup: (obj, gi) => this.#removeGlyphGroup(obj, gi),
       getSnapshot: () => this.snapshot(),
       getGeneration: () => this.#generation,
+      getDefinitions: () => blissElementDefinitions,
       // Build a temporary element tree for layout computation (word-as-part decomposition)
       computeLayout: (code) => {
         const parsed = BlissParser.parse(code);

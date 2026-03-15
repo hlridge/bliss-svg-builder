@@ -136,6 +136,9 @@ export declare class ElementHandle {
   /** The code name of this element. */
   readonly codeName: string;
 
+  /** Whether this part is an indicator. Only true on part-level handles. */
+  readonly isIndicator: boolean;
+
   // --- Navigation ---
 
   /** Returns the head glyph handle within this group. Only valid on group handles. */

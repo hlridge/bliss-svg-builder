@@ -51,6 +51,12 @@ export class ElementHandle {
     return this.#nodeRef?.glyphCode || this.#nodeRef?.codeName || '';
   }
 
+  get isIndicator() {
+    this.#assertAlive();
+    if (this.#level !== 'part') return false;
+    return this.#nodeRef?.isIndicator === true;
+  }
+
   // Resolve the current index of this node within its parent array
   #resolveIndex() {
     if (this.#level === 'group') {
