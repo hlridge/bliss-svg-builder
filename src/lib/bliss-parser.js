@@ -416,6 +416,20 @@ export class BlissParser {
             : semanticRoot + ';' + joined;
         };
 
+        // After ;; modifies a glyph's .part, update its identity (isBlissGlyph/glyphCode).
+        // If the new part is a bare known glyph, restore identity; otherwise clear it.
+        const updateGlyphIdentity = (expandedPart) => {
+          const bareCode = expandedPart.part.split(';')[0].split(':')[0];
+          const def = definitions[bareCode];
+          if (!expandedPart.part.includes(';') && def?.isBlissGlyph) {
+            expandedPart.isBlissGlyph = true;
+            if (def.glyphCode) expandedPart.glyphCode = def.glyphCode;
+          } else {
+            delete expandedPart.isBlissGlyph;
+            delete expandedPart.glyphCode;
+          }
+        };
+
         // Helper: resolve codeString through aliases to check if it's a word
         const resolveToFinalCodeString = (code, visited = new Set()) => {
           if (visited.has(code)) return null;
@@ -467,6 +481,9 @@ export class BlissParser {
                 : bareCode;
             }
 
+            // ;; modified the indicator — update glyph identity to match the new part
+            updateGlyphIdentity(expandedParts[targetIndex]);
+
             // Mark as head glyph if not default (index > 0) and not already marked
             if (targetIndex > 0 && !expandedParts.some(p => p.isHeadGlyph)) {
               expandedParts[targetIndex].isHeadGlyph = true;
@@ -495,6 +512,9 @@ export class BlissParser {
                 ? baseCode + ';' + semanticRoot
                 : baseCode;
             }
+
+            // ;; modified the indicator — update glyph identity to match the new part
+            updateGlyphIdentity(expandedParts[0]);
           }
 
           return expandedParts;
