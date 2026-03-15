@@ -5,6 +5,12 @@
  */
 
 import { camelToKebab } from "./bliss-constants.js";
+import {
+  getSemanticRoot,
+  hasSemantic,
+  filterToIndicators,
+  buildWithSemantic
+} from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -481,6 +487,124 @@ export class ElementHandle {
     }
 
     return this;
+  }
+
+  // --- Mutation: indicators ---
+
+  applyIndicators(codes, opts) {
+    this.#assertAlive();
+    if (codes === undefined || codes === null || codes === '') {
+      throw new Error('applyIndicators() requires a codes argument. Use clearIndicators() to remove indicators.');
+    }
+    return this.#applyOrClearIndicators(codes, opts);
+  }
+
+  clearIndicators(opts) {
+    this.#assertAlive();
+    return this.#applyOrClearIndicators(null, opts);
+  }
+
+  #applyOrClearIndicators(codes, opts) {
+    if (this.#level !== 'glyph') return this;
+    const glyph = this.#nodeRef;
+    if (!glyph?.parts?.length) return this;
+
+    const definitions = this.#ctx.getDefinitions();
+    const stripSemantic = opts?.stripSemantic === true;
+
+    // Classify parts: separate base parts from trailing indicator parts
+    const firstIndicatorIndex = glyph.parts.findIndex(p => p.isIndicator === true);
+
+    let baseParts, indicatorParts;
+    if (firstIndicatorIndex === -1) {
+      baseParts = glyph.parts;
+      indicatorParts = [];
+    } else {
+      baseParts = glyph.parts.slice(0, firstIndicatorIndex);
+      indicatorParts = glyph.parts.slice(firstIndicatorIndex);
+    }
+
+    // Must have base parts (indicators without a base are just normal combined parts)
+    if (baseParts.length === 0) return this;
+
+    // Validate pattern: no non-indicators after the first indicator
+    const isValidPattern = indicatorParts.every(p => p.isIndicator === true);
+    if (!isValidPattern) return this;
+
+    // Extract existing indicator codes for semantic analysis
+    const existingIndCodes = indicatorParts.map(p => p.codeName);
+    const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndCodes, definitions) : null;
+
+    // Determine new indicator codes
+    let newIndicatorParts = [];
+    if (codes !== null) {
+      const requestedCodes = codes.split(';').map(s => s.trim()).filter(Boolean);
+      const validCodes = filterToIndicators(requestedCodes, definitions);
+
+      if (validCodes.length > 0) {
+        // Build final indicator list with semantic preservation
+        let finalCodes;
+        if (semanticRoot && !hasSemantic(validCodes, definitions)) {
+          finalCodes = buildWithSemantic(semanticRoot, validCodes, definitions);
+        } else {
+          finalCodes = validCodes;
+        }
+
+        // Parse each indicator code to create proper part nodes with metadata
+        for (const indCode of finalCodes) {
+          const parsed = this.#ctx.parse(indCode);
+          const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
+          if (partNode) {
+            newIndicatorParts.push(partNode);
+          }
+        }
+      } else {
+        // All provided codes were non-indicators — preserve semantic if present
+        if (semanticRoot) {
+          const parsed = this.#ctx.parse(semanticRoot);
+          const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
+          if (partNode) newIndicatorParts.push(partNode);
+        }
+      }
+    } else {
+      // clearIndicators: no new codes, just preserve semantic if applicable
+      if (semanticRoot) {
+        const parsed = this.#ctx.parse(semanticRoot);
+        const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
+        if (partNode) newIndicatorParts.push(partNode);
+      }
+    }
+
+    // Reassemble glyph parts
+    glyph.parts = [...baseParts, ...newIndicatorParts];
+
+    // Update glyph identity
+    this.#updateGlyphIdentityAfterIndicatorChange(glyph, definitions);
+
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  #updateGlyphIdentityAfterIndicatorChange(glyph, definitions) {
+    const hasIndicators = glyph.parts.some(p => p.isIndicator === true);
+    if (!hasIndicators && glyph.parts.length === 1) {
+      const baseCode = glyph.parts[0].codeName;
+      const def = definitions[baseCode];
+      if (def?.isBlissGlyph) {
+        glyph.isBlissGlyph = true;
+        glyph.codeName = baseCode;
+        if (def.glyphCode) glyph.glyphCode = def.glyphCode;
+      } else {
+        delete glyph.isBlissGlyph;
+        delete glyph.codeName;
+        delete glyph.glyphCode;
+      }
+    } else {
+      delete glyph.isBlissGlyph;
+      delete glyph.codeName;
+      delete glyph.glyphCode;
+    }
   }
 
   // --- Mutation: options ---

@@ -190,6 +190,14 @@ export declare class ElementHandle {
   /** Replaces the part at the given index in this glyph. Only valid on glyph handles. */
   replacePart(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
+  // --- Mutation: indicators ---
+
+  /** Replaces all indicators on this glyph with the given indicator codes. Preserves semantic indicators by default. Only valid on glyph handles. */
+  applyIndicators(codes: string, opts?: { stripSemantic?: boolean }): this;
+
+  /** Removes all grammatical indicators from this glyph. Preserves semantic indicators by default. Only valid on glyph handles. */
+  clearIndicators(opts?: { stripSemantic?: boolean }): this;
+
   // --- Mutation: options ---
 
   /** Sets or merges options on this element. Accepts flat options (treated as overrides) or { defaults, overrides }. */
