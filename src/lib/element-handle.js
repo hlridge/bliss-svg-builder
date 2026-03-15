@@ -504,6 +504,26 @@ export class ElementHandle {
     return this.#applyOrClearIndicators(null, opts);
   }
 
+  applyHeadIndicators(codes, opts) {
+    this.#assertAlive();
+    if (this.#level !== 'group') return this;
+    const head = this.headGlyph();
+    if (!head) return this;
+    head.applyIndicators(codes, opts);
+    this.#syncGeneration();
+    return this;
+  }
+
+  clearHeadIndicators(opts) {
+    this.#assertAlive();
+    if (this.#level !== 'group') return this;
+    const head = this.headGlyph();
+    if (!head) return this;
+    head.clearIndicators(opts);
+    this.#syncGeneration();
+    return this;
+  }
+
   #applyOrClearIndicators(codes, opts) {
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;

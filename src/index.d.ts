@@ -198,6 +198,12 @@ export declare class ElementHandle {
   /** Removes all grammatical indicators from this glyph. Preserves semantic indicators by default. Only valid on glyph handles. */
   clearIndicators(opts?: { stripSemantic?: boolean }): this;
 
+  /** Applies indicators to the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
+  applyHeadIndicators(codes: string, opts?: { stripSemantic?: boolean }): this;
+
+  /** Removes grammatical indicators from the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
+  clearHeadIndicators(opts?: { stripSemantic?: boolean }): this;
+
   // --- Mutation: options ---
 
   /** Sets or merges options on this element. Accepts flat options (treated as overrides) or { defaults, overrides }. */
