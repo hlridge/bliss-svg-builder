@@ -1972,7 +1972,9 @@ ${gridLines}
 
     let svgStr =
 `<svg xmlns="http://www.w3.org/2000/svg" data-generator="${generator}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}">
-  ${title}${desc}${backgroundContent}${gridPath}<g class="bliss-content" ${contentAttrsStr}>${content}${svgText}</g>
+  ${title}${desc}${backgroundContent}${gridPath}<g class="bliss-content" ${contentAttrsStr}>
+    ${content}
+  </g>${svgText}
 </svg>`;
 
     // Clean up empty <path d=""></path> elements from DOT/COMMA/external glyphs
