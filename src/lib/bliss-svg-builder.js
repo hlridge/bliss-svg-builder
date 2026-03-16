@@ -947,6 +947,20 @@ class BlissSVGBuilder {
     // custom codes. The string output itself stays flat (;-delimited).
     const obj = this.toJSON({ preserve: options.preserve, deep: true });
 
+    const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
+
+    // Serialize an options object to [key=val;key2=val2] DSL format.
+    function serializeOptions(opts, skipKeys) {
+      if (!opts) return '';
+      const entries = Object.entries(opts);
+      const filtered = entries.filter(([k, v]) =>
+        v !== false && !(skipKeys?.has(k))
+      );
+      if (filtered.length === 0) return '';
+      const parts = filtered.map(([k, v]) => v === true ? k : `${k}=${v}`);
+      return `[${parts.join(';')}]`;
+    }
+
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
     function serializeParts(parts, offsetX = 0, offsetY = 0) {
@@ -968,32 +982,54 @@ class BlissSVGBuilder {
         if (x !== 0 || y !== 0) {
           str += `:${x},${y}`;
         }
+        // Prefix part-level options with [opts]> syntax
+        const optPrefix = serializeOptions(part.options);
+        if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
       }).join(';');
     }
 
     // Serialize a glyph: B-codes emit their code, compositions emit parts.
     // Custom glyphs are decomposed to their codeString unless preserve is set.
+    // Returns an array (kerning codes are emitted as separate entries).
     function serializeGlyph(glyph) {
+      const result = [];
+
+      // Emit kerning as separate RK/AK codes before the glyph
+      if (glyph.options?.relativeKerning !== undefined) {
+        result.push(`RK:${glyph.options.relativeKerning}`);
+      }
+      if (glyph.options?.absoluteKerning !== undefined) {
+        result.push(`AK:${glyph.options.absoluteKerning}`);
+      }
+
+      // Build the glyph code string
+      let code;
       if (glyph.isBlissGlyph && glyph.codeName) {
         // Decompose custom glyphs (non-built-in) to portable output
         // Use the glyph's parts (which have correct positions) rather than
         // re-decomposing from the definition (which would lose position offsets)
         if (!options.preserve && !builtInCodes.has(glyph.codeName)) {
           if (glyph.parts) {
-            return serializeParts(glyph.parts);
-          }
-          const def = blissElementDefinitions[glyph.codeName];
-          if (def?.codeString) {
-            return BlissSVGBuilder.#decomposeCodeString(def.codeString, 0, 0);
+            code = serializeParts(glyph.parts);
+          } else {
+            const def = blissElementDefinitions[glyph.codeName];
+            if (def?.codeString) {
+              code = BlissSVGBuilder.#decomposeCodeString(def.codeString, 0, 0);
+            }
           }
         }
-        return glyph.codeName;
+        if (!code) code = glyph.codeName;
+      } else if (glyph.parts) {
+        code = serializeParts(glyph.parts);
+      } else {
+        code = glyph.codeName || '';
       }
-      if (glyph.parts) {
-        return serializeParts(glyph.parts);
-      }
-      return glyph.codeName || '';
+
+      // Prefix glyph-level options (skip internal kerning keys)
+      const optPrefix = serializeOptions(glyph.options, GLYPH_INTERNAL_KEYS);
+      result.push(optPrefix + code);
+      return result;
     }
 
     // Check if a group is a space (TSP, QSP, etc.)
@@ -1023,16 +1059,26 @@ class BlissSVGBuilder {
         }
         continue;
       }
-      const glyphStrs = group.glyphs.map(serializeGlyph).filter(Boolean);
-      segments.push(glyphStrs.join('/'));
+      const glyphStrs = group.glyphs.flatMap(serializeGlyph).filter(Boolean);
+      let groupStr = glyphStrs.join('/');
+      // Prefix group-level options with [opts]| syntax
+      const groupOptPrefix = serializeOptions(group.options);
+      if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
+      segments.push(groupStr);
     }
     // Join: slash-only segments already include separators, others need /
-    return segments.reduce((acc, seg) => {
+    let result = segments.reduce((acc, seg) => {
       if (acc === '') return seg;
       if (seg.startsWith('/')) return acc + seg;
       if (acc.endsWith('/')) return acc + seg;
       return acc + '/' + seg;
     }, '');
+
+    // Prefix global options with [opts]|| syntax
+    const globalOptPrefix = serializeOptions(obj.options);
+    if (globalOptPrefix) result = `${globalOptPrefix}||${result}`;
+
+    return result;
   }
 
   /**
