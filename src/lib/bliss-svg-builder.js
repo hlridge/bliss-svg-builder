@@ -115,13 +115,13 @@ class BlissSVGBuilder {
     }
 
     // Boolean options: [option] = true, absence = false
-    if (rawOptions.center === '1') {
+    if (rawOptions.center === true) {
       options.center = true;
     }
-    if (rawOptions.grid === '1') {
+    if (rawOptions.grid === true) {
       options.grid = true;
     }
-    if (rawOptions['error-placeholder'] === '1') {
+    if (rawOptions['error-placeholder'] === true) {
       options.errorPlaceholder = true;
     }
 
@@ -424,7 +424,7 @@ class BlissSVGBuilder {
       if (typeof value === 'object') continue;
       const kebabKey = camelToKebab(key);
       if (typeof value === 'boolean') {
-        raw[kebabKey] = value ? '1' : '0';
+        raw[kebabKey] = value;
       } else {
         raw[kebabKey] = String(value);
       }

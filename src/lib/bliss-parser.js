@@ -57,7 +57,7 @@ export class BlissParser {
 
       if (match[2] === undefined) {
         // Bare key (e.g., [grid]) — treat as boolean true
-        parsedObject[key] = "1";
+        parsedObject[key] = true;
       } else {
         let value = match[2].trim();
 
