@@ -299,6 +299,43 @@ export class ElementHandle {
     return this;
   }
 
+  // --- Mutation: detach (plain splice, no cascade) ---
+
+  detach() {
+    this.#assertAlive();
+
+    if (this.#level === 'part') {
+      const glyph = this.#parentRef.glyph;
+      if (!glyph?.parts) return undefined;
+      const partIndex = glyph.parts.indexOf(this.#nodeRef);
+      if (partIndex < 0) return undefined;
+      glyph.parts.splice(partIndex, 1);
+      this.#ctx.rebuild();
+      return undefined;
+    }
+
+    if (this.#level === 'glyph') {
+      const group = this.#parentRef;
+      if (!group?.glyphs) return undefined;
+      const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
+      if (glyphIndex < 0) return undefined;
+      group.glyphs.splice(glyphIndex, 1);
+      this.#ctx.rebuild();
+      return undefined;
+    }
+
+    if (this.#level === 'group') {
+      const groups = this.#ctx.getRaw().groups;
+      const groupIndex = groups.indexOf(this.#nodeRef);
+      if (groupIndex < 0) return undefined;
+      groups.splice(groupIndex, 1);
+      this.#ctx.rebuild();
+      return undefined;
+    }
+
+    return undefined;
+  }
+
   // --- Mutation: remove ---
 
   remove() {
