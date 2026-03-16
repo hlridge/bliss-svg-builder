@@ -715,17 +715,8 @@ class BlissSVGBuilder {
    * @returns {this}
    */
   insertGroup(index, code, opts) {
-    const parsed = BlissParser.parse(code);
-    const newGroup = parsed.groups?.[0];
+    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
     if (!newGroup) return this;
-    if (opts) {
-      const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
-      if (defaults || overrides) {
-        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
-        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
-        newGroup.options = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
-      }
-    }
     const groups = this.#rawBlissObj.groups;
     const indices = this.#getNonSpaceGroupIndices();
 
@@ -812,9 +803,24 @@ class BlissSVGBuilder {
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
     if (index < 0 || index >= indices.length) return this;
+    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    if (!newGroup) return this;
+    const rawIndex = indices[index];
+    this.#rawBlissObj.groups[rawIndex] = newGroup;
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Parses a code string and applies option layers to the first parsed group.
+   * @param {string} code
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {object|null} parsed group or null
+   */
+  static #parseGroupWithOpts(code, opts) {
     const parsed = BlissParser.parse(code);
     const newGroup = parsed.groups?.[0];
-    if (!newGroup) return this;
+    if (!newGroup) return null;
     if (opts) {
       const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
       if (defaults || overrides) {
@@ -823,8 +829,75 @@ class BlissSVGBuilder {
         newGroup.options = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
       }
     }
-    const rawIndex = indices[index];
-    this.#rawBlissObj.groups[rawIndex] = newGroup;
+    return newGroup;
+  }
+
+  // --- Raw Element CRUD (no automatic space management) ---
+
+  /**
+   * Appends a raw group with no automatic space management.
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  addElement(code, opts) {
+    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    if (!newGroup) return this;
+    this.#rawBlissObj.groups.push(newGroup);
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Inserts a raw group at the given index with no automatic space management.
+   * @param {number} index - Raw index (supports negative: -1 = before last)
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  insertElement(index, code, opts) {
+    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    if (!newGroup) return this;
+    const groups = this.#rawBlissObj.groups;
+    if (index < 0) index = groups.length + index;
+    if (index < 0) index = 0;
+    if (index >= groups.length) {
+      groups.push(newGroup);
+    } else {
+      groups.splice(index, 0, newGroup);
+    }
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Removes the raw group at the given index (plain splice, no space cleanup).
+   * @param {number} index - Raw index (supports negative: -1 = last)
+   * @returns {this}
+   */
+  removeElement(index) {
+    const groups = this.#rawBlissObj.groups;
+    if (index < 0) index = groups.length + index;
+    if (index < 0 || index >= groups.length) return this;
+    groups.splice(index, 1);
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Replaces the raw group at the given index with new content.
+   * @param {number} index - Raw index (supports negative: -1 = last)
+   * @param {string} code - DSL code string
+   * @param {{ defaults?, overrides? }} [opts]
+   * @returns {this}
+   */
+  replaceElement(index, code, opts) {
+    const groups = this.#rawBlissObj.groups;
+    if (index < 0) index = groups.length + index;
+    if (index < 0 || index >= groups.length) return this;
+    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    if (!newGroup) return this;
+    groups[index] = newGroup;
     this.#rebuild();
     return this;
   }
