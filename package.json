@@ -23,6 +23,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "prepare": "vite build",
     "build": "vite build",
     "test": "vitest run --project unit --project integration",
     "test:ui": "vitest --ui --project unit --project integration",
