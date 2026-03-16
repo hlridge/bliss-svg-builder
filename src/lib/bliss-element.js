@@ -590,7 +590,7 @@ export class BlissElement {
             throw new Error(`Unable to create Bliss element: ${failedCode}`);
           }
 
-          if (this.#blissObj.error) {
+          if (this.#blissObj.errorCode === 'WORD_AS_PART') {
             this.#sharedOptions.warnings.push({
               code: 'WORD_AS_PART',
               message: this.#blissObj.error,

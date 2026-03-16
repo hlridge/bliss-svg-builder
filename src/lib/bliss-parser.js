@@ -891,6 +891,7 @@ export class BlissParser {
             // Detect unexpanded multi-char X-codes (word text used as ; part)
             if (/^X[a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,}$/.test(part.codeName)) {
               part.error = `Multi-character text "${part.codeName.slice(1)}" is a word and cannot be composed with ;`;
+              part.errorCode = 'WORD_AS_PART';
             }
 
             BlissParser.#applyDefinitionMetadata(part, definition);

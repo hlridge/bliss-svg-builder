@@ -116,8 +116,7 @@ export class ElementHandle {
 
   // Parse a DSL code string in part context.
   // For single-glyph codes: embeds in helper glyph for proper part-level expansion.
-  // For multi-glyph codes (words): uses layout engine to compute glyph positions,
-  // then creates glyph-level parts via the helper approach with position offsets.
+  // For multi-glyph codes (words): returns an error part (words cannot be parts).
   #parseParts(code) {
     // Check if the code parses to multiple glyphs (word) vs single glyph (part)
     const rawParsed = this.#ctx.parse(code);
@@ -141,7 +140,7 @@ export class ElementHandle {
     }
 
     // Multi-glyph code is a word — words cannot be composed with ;
-    return [{ codeName: code, error: `"${code}" is a word and cannot be composed with ;` }];
+    return [{ codeName: code, error: `"${code}" is a word and cannot be composed with ;`, errorCode: 'WORD_AS_PART' }];
   }
 
   // Parse a single part (strict). Used by replace() which must swap exactly one part.

@@ -375,23 +375,9 @@ class BlissSVGBuilder {
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
 
-    // Decompose word-as-part references (e.g. H;TW where TW = B291/B291)
-    // into properly positioned sub-parts using the layout engine.
-    // Uses quick-extracted spacing options since full #sharedOptions aren't ready yet.
-    BlissSVGBuilder.#decomposeWordParts(blissObj, (code) => {
-      const rawOpts = blissObj.options ?? {};
-      const quickSharedOptions = {
-        charSpace: rawOpts['char-space'] !== undefined ? Math.max(0, Math.min(10, Number(rawOpts['char-space']))) : 2,
-        wordSpace: rawOpts['word-space'] !== undefined ? Math.max(0, Math.min(20, Number(rawOpts['word-space']))) : 8,
-        externalGlyphSpace: rawOpts['external-glyph-space'] !== undefined ? Math.max(0, Math.min(3, Number(rawOpts['external-glyph-space']))) : 0.8,
-        warnings: [],
-        errorPlaceholder: false,
-        errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
-        keys: new Set(),
-      };
-      const parsed = BlissParser.parse(code);
-      return new BlissElement(parsed, { sharedOptions: quickSharedOptions }).snapshot();
-    });
+    // Flag word-as-part references (e.g. H;TW where TW = B291/B291) with
+    // error so BlissElement emits a WORD_AS_PART warning instead of rendering.
+    BlissSVGBuilder.#flagWordParts(blissObj);
 
     // Store a clean copy after option merging but before processing mutates it
     this.#rawBlissObj = structuredClone(blissObj);
@@ -403,10 +389,7 @@ class BlissSVGBuilder {
       rebuild: () => this.#rebuild(),
       parse: (code) => {
         const parsed = BlissParser.parse(code);
-        BlissSVGBuilder.#decomposeWordParts(parsed, (c) => {
-          const p = BlissParser.parse(c);
-          return new BlissElement(p, { sharedOptions: this.#sharedOptions }).snapshot();
-        });
+        BlissSVGBuilder.#flagWordParts(parsed);
         return parsed;
       },
       toRaw: (obj) => BlissSVGBuilder.#toRaw(obj),
@@ -416,7 +399,7 @@ class BlissSVGBuilder {
       getSnapshot: () => this.snapshot(),
       getGeneration: () => this.#generation,
       getDefinitions: () => blissElementDefinitions,
-      // Build a temporary element tree for layout computation (word-as-part decomposition)
+      // Build a temporary element tree for layout computation (e.g. addGlyph word expansion)
       computeLayout: (code) => {
         const parsed = BlissParser.parse(code);
         const tempElement = new BlissElement(parsed, { sharedOptions: this.#sharedOptions });
@@ -873,41 +856,40 @@ class BlissSVGBuilder {
 
   // --- Manipulation helpers ---
 
-  // --- Word-as-part decomposition ---
+  // --- Word-as-part detection ---
   // When a word definition (codeString with /) appears at the part level,
-  // the parser keeps it as a single codeName. This post-parse step resolves
-  // those references into properly positioned parts using the layout engine.
+  // the parser keeps it as a single codeName. This post-parse step marks
+  // those references with an error so BlissElement can emit a warning.
 
   /**
-   * Walk a raw parsed structure and decompose any word-as-part references.
+   * Walk a raw parsed structure and flag any word-as-part references.
    * @param {Object} rawObj - Raw parsed blissObj with groups/glyphs/parts
-   * @param {Function} computeLayout - (code) => snapshot for position calculation
    */
-  static #decomposeWordParts(rawObj, computeLayout) {
+  static #flagWordParts(rawObj) {
     if (!rawObj.groups) return;
     for (const group of rawObj.groups) {
       if (!group.glyphs) continue;
       for (const glyph of group.glyphs) {
         if (!glyph.parts) continue;
-        glyph.parts = BlissSVGBuilder.#decomposePartsArray(glyph.parts, computeLayout);
+        glyph.parts = BlissSVGBuilder.#flagWordPartsInArray(glyph.parts);
       }
     }
   }
 
   /**
-   * Process a parts array, decomposing any word-definition parts into
-   * properly positioned sub-parts. Recurses into nested parts.
+   * Flag word-definition parts with an error. Recurses into nested parts.
    */
-  static #decomposePartsArray(parts, computeLayout) {
+  static #flagWordPartsInArray(parts) {
     const result = [];
     for (const part of parts) {
       const def = blissElementDefinitions[part.codeName];
       if (def?.codeString?.includes('/')) {
         part.error = `"${part.codeName}" is a word and cannot be composed with ;`;
+        part.errorCode = 'WORD_AS_PART';
         result.push(part);
       } else {
         if (part.parts) {
-          part.parts = BlissSVGBuilder.#decomposePartsArray(part.parts, computeLayout);
+          part.parts = BlissSVGBuilder.#flagWordPartsInArray(part.parts);
         }
         result.push(part);
       }
