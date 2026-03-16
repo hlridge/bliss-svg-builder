@@ -698,7 +698,7 @@ class BlissSVGBuilder {
   /**
    * Appends a new glyph group with automatic space management.
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   addGroup(code, opts) {
@@ -711,7 +711,7 @@ class BlissSVGBuilder {
    * with automatic space management.
    * @param {number} index - Semantic non-space group index
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   insertGroup(index, code, opts) {
@@ -743,7 +743,7 @@ class BlissSVGBuilder {
   /**
    * Appends a glyph to the last non-space group (creates one if empty).
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   addGlyph(code, opts) {
@@ -762,7 +762,7 @@ class BlissSVGBuilder {
   /**
    * Appends a part to the last non-space group's last glyph (creates group if empty).
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   addPart(code, opts) {
@@ -796,7 +796,7 @@ class BlissSVGBuilder {
    * Replaces the non-space group at the given semantic index.
    * @param {number} index - Semantic index (supports negative)
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   replaceGroup(index, code, opts) {
@@ -814,7 +814,7 @@ class BlissSVGBuilder {
   /**
    * Parses a code string and applies option layers to the first parsed group.
    * @param {string} code
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {object|null} parsed group or null
    */
   static #parseGroupWithOpts(code, opts) {
@@ -837,7 +837,7 @@ class BlissSVGBuilder {
   /**
    * Appends a raw group with no automatic space management.
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   addElement(code, opts) {
@@ -852,7 +852,7 @@ class BlissSVGBuilder {
    * Inserts a raw group at the given index with no automatic space management.
    * @param {number} index - Raw index (supports negative: -1 = before last)
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   insertElement(index, code, opts) {
@@ -888,7 +888,7 @@ class BlissSVGBuilder {
    * Replaces the raw group at the given index with new content.
    * @param {number} index - Raw index (supports negative: -1 = last)
    * @param {string} code - DSL code string
-   * @param {{ defaults?, overrides? }} [opts]
+   * @param {BlissOptions | { defaults?: BlissOptions, overrides?: BlissOptions }} [opts]
    * @returns {this}
    */
   replaceElement(index, code, opts) {
