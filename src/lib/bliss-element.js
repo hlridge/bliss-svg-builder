@@ -884,7 +884,7 @@ export class BlissElement {
       isExternalGlyph: !!this.#isExternalGlyph,
       isHeadGlyph: !!this.#blissObj.isHeadGlyph,
       index,
-      parentKey: this.#parentElement?.#key ?? null,
+      parentKey: this.#parentElement ? this.#parentElement.#key : null,
       children
     });
   }
