@@ -607,6 +607,26 @@ class BlissSVGBuilder {
   }
 
   /**
+   * Returns a live ElementHandle for any group (including spaces) at the given raw index.
+   * @param {number} index - Raw index (supports negative: -1 = last)
+   * @returns {ElementHandle|null}
+   */
+  element(index) {
+    const groups = this.#rawBlissObj.groups;
+    if (index < 0) index = groups.length + index;
+    if (index < 0 || index >= groups.length) return null;
+    return new ElementHandle(this.#mutationCtx, 'group', groups[index]);
+  }
+
+  /**
+   * Total number of raw groups (including space groups).
+   * @returns {number}
+   */
+  get elementCount() {
+    return this.#rawBlissObj.groups.length;
+  }
+
+  /**
    * Returns a live ElementHandle for the glyph at the given flat index across all groups.
    * @param {number} flatIndex
    * @returns {ElementHandle|null}
