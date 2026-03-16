@@ -584,18 +584,26 @@ export class BlissElement {
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
         if (!isPredefinedElement && !isCompositeElement) {
-          const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
-
           // When constructed directly (no builder), throw to preserve existing behaviour
           if (!this.#sharedOptions?.warnings) {
+            const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
             throw new Error(`Unable to create Bliss element: ${failedCode}`);
           }
 
-          this.#sharedOptions.warnings.push({
-            code: 'UNKNOWN_CODE',
-            message: `Unknown or invalid code: "${failedCode}"`,
-            source: failedCode,
-          });
+          if (this.#blissObj.error) {
+            this.#sharedOptions.warnings.push({
+              code: 'WORD_AS_PART',
+              message: this.#blissObj.error,
+              source: this.#blissObj.codeName || 'unknown',
+            });
+          } else {
+            const failedCode = this.#blissObj.codeName || 'unknown';
+            this.#sharedOptions.warnings.push({
+              code: 'UNKNOWN_CODE',
+              message: `Unknown or invalid code: "${failedCode}"`,
+              source: failedCode,
+            });
+          }
 
           // Render as zero-width invisible. Character level (level 2) handles
           // placeholder display for the entire character when any part fails.

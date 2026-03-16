@@ -227,7 +227,12 @@ export class BlissParser {
       function processXCodes(codeString) {
         // First, expand multi-char X-codes (like Xhello -> Xh/Xe/Xl/Xl/Xo or XTXT_héllo)
         // Match Latin, Latin Extended, and Cyrillic letters
-        let expanded = codeString.replace(/X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, chars) => {
+        let expanded = codeString.replace(/X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, chars, offset) => {
+          // Skip expansion when adjacent to ; — word expansion would break composition
+          const before = offset > 0 && codeString[offset - 1] === ';';
+          const after = offset + match.length < codeString.length && codeString[offset + match.length] === ';';
+          if (before || after) return match;
+
           const allHavePath = [...chars].every(char => hasPathData(char));
           if (allHavePath) {
             return [...chars].map(char => `X${char}`).join('/');
@@ -881,6 +886,11 @@ export class BlissParser {
                   part.codeName = definition.codeString;
                 }
               }
+            }
+
+            // Detect unexpanded multi-char X-codes (word text used as ; part)
+            if (/^X[a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,}$/.test(part.codeName)) {
+              part.error = `Multi-character text "${part.codeName.slice(1)}" is a word and cannot be composed with ;`;
             }
 
             BlissParser.#applyDefinitionMetadata(part, definition);

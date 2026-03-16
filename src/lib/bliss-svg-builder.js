@@ -903,7 +903,8 @@ class BlissSVGBuilder {
     for (const part of parts) {
       const def = blissElementDefinitions[part.codeName];
       if (def?.codeString?.includes('/')) {
-        result.push(...BlissSVGBuilder.#decomposeWordPart(part, def, computeLayout));
+        part.error = `"${part.codeName}" is a word and cannot be composed with ;`;
+        result.push(part);
       } else {
         if (part.parts) {
           part.parts = BlissSVGBuilder.#decomposePartsArray(part.parts, computeLayout);
@@ -912,57 +913,6 @@ class BlissSVGBuilder {
       }
     }
     return result;
-  }
-
-  /**
-   * Decompose a single word-definition part into positioned sub-parts.
-   * Each glyph in the word becomes one part at the glyph code level (e.g. B291),
-   * with position offsets from the layout engine. Internal expansion of each
-   * glyph code happens naturally through parseParts.
-   */
-  static #decomposeWordPart(part, definition, computeLayout) {
-    const code = definition.codeString;
-
-    // Get layout positions via temporary element tree
-    const snapshot = computeLayout(code);
-    const groupSnap = snapshot.children[0];
-    if (!groupSnap) return [part]; // fallback
-
-    const snapGlyphs = groupSnap.children.filter(c => c.type === 'glyph');
-
-    // Position offset from the original part (e.g. TW:2,3 → offset all sub-parts)
-    const offsetX = part.x ?? 0;
-    const offsetY = part.y ?? 0;
-
-    const decomposed = [];
-    for (let gi = 0; gi < snapGlyphs.length; gi++) {
-      const glyphSnap = snapGlyphs[gi];
-      const glyphX = (glyphSnap?.x ?? 0) + offsetX;
-      const glyphY = (glyphSnap?.y ?? 0) + offsetY;
-
-      // Get the glyph's code name from the snapshot
-      const glyphCode = glyphSnap.codeName;
-      if (!glyphCode) continue;
-
-      // Build position suffix
-      const posStr = (glyphX !== 0 || glyphY !== 0) ? `:${glyphX},${glyphY}` : '';
-
-      // Parse as a proper part via helper glyph — this gives full parseParts expansion
-      const helperParsed = BlissParser.parse(`H;${glyphCode}${posStr}`);
-      const helperGlyph = helperParsed.groups?.[0]?.glyphs?.[0];
-      if (helperGlyph?.parts?.length >= 2) {
-        const newPart = helperGlyph.parts[1];
-
-        // Propagate options from the original part
-        if (part.options && Object.keys(part.options).length > 0) {
-          newPart.options = { ...part.options, ...(newPart.options ?? {}) };
-        }
-
-        decomposed.push(newPart);
-      }
-    }
-
-    return decomposed.length > 0 ? decomposed : [part];
   }
 
   // Space codes used in space groups

@@ -140,34 +140,8 @@ export class ElementHandle {
       return rawGroup.glyphs[0].parts || [];
     }
 
-    // Multi-glyph code — use layout engine for glyph positions,
-    // then parse each glyph as a proper part via the helper approach
-    const snapshot = this.#ctx.computeLayout(code);
-    const groupSnap = snapshot.children[0];
-    const snapGlyphs = groupSnap.children.filter(c => c.type === 'glyph');
-
-    const parts = [];
-    for (let gi = 0; gi < snapGlyphs.length; gi++) {
-      const glyphSnap = snapGlyphs[gi];
-      const glyphCode = glyphSnap.codeName;
-      if (!glyphCode) continue;
-
-      const glyphX = glyphSnap?.x ?? 0;
-      const glyphY = glyphSnap?.y ?? 0;
-      const posStr = (glyphX !== 0 || glyphY !== 0) ? `:${glyphX},${glyphY}` : '';
-
-      // Parse as a proper part via helper glyph
-      const helperParsed = this.#ctx.parse(`H;${glyphCode}${posStr}`);
-      const helperGlyph = helperParsed.groups?.[0]?.glyphs?.[0];
-      if (helperGlyph?.parts?.length >= 2) {
-        parts.push(helperGlyph.parts[1]);
-      }
-    }
-
-    if (parts.length === 0) {
-      throw new Error(`Code "${code}" produced no parts`);
-    }
-    return parts;
+    // Multi-glyph code is a word — words cannot be composed with ;
+    return [{ codeName: code, error: `"${code}" is a word and cannot be composed with ;` }];
   }
 
   // Parse a single part (strict). Used by replace() which must swap exactly one part.
