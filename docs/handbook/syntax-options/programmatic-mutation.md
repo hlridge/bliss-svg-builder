@@ -195,6 +195,31 @@ builder.glyph(1).remove(); // B431 was the only glyph in group 1
 // now equivalent to 'B313' (group and space removed)
 ```
 
+### Non-Cascading Removal with `detach()`
+
+Sometimes you want to remove an element without cascade cleanup. `detach()` does a plain splice: it disconnects the node from its parent and nothing more.
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.glyph(1).detach(); // removes B431 but leaves the empty group and space
+```
+
+Compare with `remove()`:
+
+| Method | Behavior |
+|--------|----------|
+| `remove()` | Cascades: empty parents and adjacent spaces are cleaned up |
+| `detach()` | Plain splice: just disconnects from parent, no cleanup |
+
+Use `detach()` for fine-grained structural control. You can compose it with navigation instead of needing separate raw methods:
+
+```js
+builder.group(0).glyph(1).detach();  // plain-splice a glyph from a group
+builder.glyph(0).part(2).detach();   // plain-splice a part from a glyph
+```
+
+Like `remove()`, `detach()` returns `undefined` and cannot be chained. It can produce empty containers that render as zero-width elements. This is intentional for fine-grained structural control.
+
 ### Parent-Centric Remove and Replace
 
 Instead of getting a handle and calling `remove()` on it, you can operate by index from the parent:
@@ -226,6 +251,112 @@ Clear everything:
 ```js
 builder.clear();
 ```
+
+## Raw Element Access
+
+The managed API (`group()`, `addGroup()`, `removeGroup()`) auto-manages space groups between words. For direct control, including access to space groups, use the raw element API.
+
+### Navigating All Elements
+
+`element()` accesses all groups by raw index, including spaces:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+// Raw layout: [word group] [space group] [word group]
+
+builder.element(0);  // first word group (B313)
+builder.element(1);  // space group (TSP)
+builder.element(2);  // second word group (B431)
+builder.element(-1); // last group
+builder.elementCount; // 3
+```
+
+Both return the same `ElementHandle`. The only difference is indexing:
+
+| Navigation | Indexing |
+|------------|---------|
+| `builder.group(i)` | Skips space groups (word 0, word 1, ...) |
+| `builder.element(i)` | Raw index over all groups including spaces |
+
+Space management is a property of the **builder-level CRUD methods**, not the handles:
+
+| CRUD methods | Manages spaces? |
+|-------------|----------------|
+| `addGroup` / `insertGroup` / `removeGroup` | Yes (auto-inserts/removes space groups) |
+| `addElement` / `insertElement` / `removeElement` | No (plain splice) |
+
+### Modifying Raw Elements
+
+Insert, remove, and replace by raw index with no automatic space management:
+
+```js
+// Insert a space between two adjacent word groups
+builder.insertElement(1, 'SP');
+
+// Append a raw group (no auto-space inserted)
+builder.addElement('B291');
+
+// Remove a space group (adjacent words are not merged)
+builder.removeElement(1);
+
+// Replace a space with a different type
+builder.replaceElement(1, 'QSP');
+```
+
+`SP` is the standard space code. It auto-resolves to `TSP` (standard word spacing) or `QSP` (reduced spacing before punctuation). You can also use `TSP` or `QSP` explicitly for precise control.
+
+### Inspecting Space Groups
+
+Space groups are identified in snapshots with the `isSpaceGroup` flag:
+
+```js
+const snap = builder.snapshot();
+snap.children.forEach(child => {
+  if (child.isSpaceGroup) {
+    console.log('space group at index', child.index);
+  }
+});
+```
+
+Handles returned by `element()` are standard group handles. All existing methods work on them: `glyph()`, `addGlyph()`, `removeGlyph()`, `setOptions()`, `remove()`, `detach()`.
+
+## Space Manipulation
+
+### Splitting Words
+
+`splitAt()` divides a word group into two separate words with a space between:
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103/B431');
+builder.group(0).splitAt(2);
+// now equivalent to 'B313/B1103//B431'
+```
+
+The handle stays on the first half (the original group). Access the second half via `builder.group(1)`. The first half retains the original options object. The second half receives a shallow copy with the same values.
+
+### Merging Words
+
+`mergeWithNext()` absorbs the next word group into the current one, removing spaces in between:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.group(0).mergeWithNext();
+// now equivalent to 'B313/B431'
+```
+
+The merged word keeps the first word's options. The absorbed word's options are discarded. If there is no next word group, `mergeWithNext()` is a no-op.
+
+### Clearing All Spaces
+
+`clearSpaces()` removes all space groups and merges everything into a single word:
+
+```js
+const builder = new BlissSVGBuilder('B313//B1103//B431');
+builder.clearSpaces();
+// now equivalent to 'B313/B1103/B431'
+```
+
+The first word's options survive. All other word-level options are discarded. If there are no spaces, `clearSpaces()` is a no-op.
 
 ## Indicator Operations
 

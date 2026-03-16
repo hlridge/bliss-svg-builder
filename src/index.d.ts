@@ -114,6 +114,7 @@ export interface ElementSnapshot {
   readonly isBlissGlyph: boolean;
   readonly isExternalGlyph: boolean;
   readonly isHeadGlyph: boolean;
+  readonly isSpaceGroup: boolean;
   readonly index: number;
   readonly parentKey: string | null;
   readonly children: readonly ElementSnapshot[];
@@ -173,6 +174,9 @@ export declare class ElementHandle {
   /** Removes this element. Cascades: removing the last part removes its glyph, etc. */
   remove(): undefined;
 
+  /** Disconnects this element from its parent without cascade cleanup. May leave empty containers. */
+  detach(): undefined;
+
   /** Replaces this element with a new one. Valid on glyph and part handles. */
   replace(code: string, opts?: BlissOptions | OptionLayers): this;
 
@@ -203,6 +207,14 @@ export declare class ElementHandle {
 
   /** Removes grammatical indicators from the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
   clearHeadIndicators(opts?: { stripSemantic?: boolean }): this;
+
+  // --- Mutation: space/word structure ---
+
+  /** Splits this word group into two at the glyph boundary, inserting a space between. Only valid on group handles. */
+  splitAt(glyphIndex: number): this;
+
+  /** Merges this word group with the next one, removing spaces between them. Only valid on group handles. */
+  mergeWithNext(): this;
 
   // --- Mutation: options ---
 
@@ -387,6 +399,12 @@ export declare class BlissSVGBuilder {
   /** Returns a handle to the non-space group at the given index. Negative indices count from the end (-1 = last). */
   group(index: number): ElementHandle | null;
 
+  /** Returns a handle to any group (including spaces) at the given raw index. Negative indices count from the end (-1 = last). */
+  element(index: number): ElementHandle | null;
+
+  /** Total number of raw groups (including space groups). */
+  readonly elementCount: number;
+
   /** Returns a handle to the glyph at the given flat index across all groups. Negative indices count from the end (-1 = last). */
   glyph(flatIndex: number): ElementHandle | null;
 
@@ -415,6 +433,21 @@ export declare class BlissSVGBuilder {
 
   /** Replaces the group at the given index with new content. Negative indices count from the end. */
   replaceGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Appends a raw group with no automatic space management. SP auto-resolves to TSP/QSP. */
+  addElement(code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Inserts a raw group at the given index with no automatic space management. SP auto-resolves. */
+  insertElement(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Removes the raw group at the given index (plain splice, no space cleanup). */
+  removeElement(index: number): this;
+
+  /** Replaces the raw group at the given index with new content. */
+  replaceElement(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+
+  /** Removes all space groups and merges all words into one. First word's options survive. */
+  clearSpaces(): this;
 
   /** Removes all content from the builder. */
   clear(): this;
