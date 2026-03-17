@@ -355,17 +355,7 @@ class BlissSVGBuilder {
 
     // Reverse toJSON() normalization: codeName → internal field names
     if (typeof input !== 'string' && blissObj.groups) {
-      for (const group of blissObj.groups) {
-        if (group.glyphs) {
-          for (const glyph of group.glyphs) {
-            if (glyph.codeName && !glyph.glyphCode) {
-              glyph.glyphCode = glyph.codeName;
-              delete glyph.codeName;
-            }
-            // Parts already use codeName internally, no restore needed
-          }
-        }
-      }
+      BlissSVGBuilder.#normalizeGlyphCodes(blissObj.groups);
     }
 
     // Merge: defaults (lowest) < string options (middle) < overrides (highest)
@@ -811,6 +801,49 @@ class BlissSVGBuilder {
   }
 
   /**
+   * Merges another builder's content into this one. Appends the other
+   * builder's word groups (with a space group between) and discards
+   * its global options. The other builder is not modified.
+   *
+   * @param {BlissSVGBuilder} other
+   * @returns {this}
+   */
+  merge(other) {
+    if (!other || typeof other.toJSON !== 'function') {
+      throw new Error('merge() requires a BlissSVGBuilder instance');
+    }
+
+    const otherRaw = other.toJSON({ deep: true });
+    const otherGroups = otherRaw.groups;
+    if (!otherGroups || otherGroups.length === 0) return this;
+
+    // Filter out groups that are only spaces (no real content)
+    const hasContent = otherGroups.some(
+      g => !BlissSVGBuilder.#isRawSpaceGroup(g)
+    );
+    if (!hasContent) return this;
+
+    // Re-ingest toJSON output into internal format (same order as constructor)
+    BlissParser.expandParts({ groups: otherGroups });
+    BlissSVGBuilder.#normalizeGlyphCodes(otherGroups);
+    BlissSVGBuilder.#flagWordParts({ groups: otherGroups });
+
+    const groups = this.#rawBlissObj.groups;
+
+    // Insert space before appended content if this builder has content
+    const hasExisting = groups.some(
+      g => !BlissSVGBuilder.#isRawSpaceGroup(g)
+    );
+    if (hasExisting) {
+      groups.push(BlissSVGBuilder.#makeSpaceGroup());
+    }
+
+    groups.push(...otherGroups);
+    this.#rebuild();
+    return this;
+  }
+
+  /**
    * Parses a code string and applies option layers to the first parsed group.
    * @param {string} code
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
@@ -952,6 +985,24 @@ class BlissSVGBuilder {
   // When a word definition (codeString with /) appears at the part level,
   // the parser keeps it as a single codeName. This post-parse step marks
   // those references with an error so BlissElement can emit a warning.
+
+  /**
+   * Reverse toJSON() normalization on glyph-level codes: codeName → glyphCode.
+   * Parts already use codeName internally, so only glyph-level fields need renaming.
+   * @param {Object[]} groups - Array of raw group objects
+   */
+  static #normalizeGlyphCodes(groups) {
+    for (const group of groups) {
+      if (group.glyphs) {
+        for (const glyph of group.glyphs) {
+          if (glyph.codeName && !glyph.glyphCode) {
+            glyph.glyphCode = glyph.codeName;
+            delete glyph.codeName;
+          }
+        }
+      }
+    }
+  }
 
   /**
    * Walk a raw parsed structure and flag any word-as-part references.

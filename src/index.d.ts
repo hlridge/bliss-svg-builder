@@ -434,6 +434,9 @@ export declare class BlissSVGBuilder {
   /** Replaces the group at the given index with new content. Negative indices count from the end. */
   replaceGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
+  /** Merges another builder's content into this one. Appends the other builder's groups with a space between. The other builder's global options are discarded. */
+  merge(other: BlissSVGBuilder): this;
+
   /** Appends a raw group with no automatic space management. SP auto-resolves to TSP/QSP. */
   addElement(code: string, opts?: BlissOptions | OptionLayers): this;
 
