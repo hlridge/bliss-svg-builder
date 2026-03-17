@@ -637,6 +637,48 @@ export class ElementHandle {
     }
   }
 
+  // --- Mutation: word structure ---
+
+  /**
+   * Splits this word group into two at the glyph boundary, inserting
+   * a space group between. Only valid on group-level handles.
+   * @param {number} glyphIndex - Split point (1 to glyphs.length - 1)
+   * @returns {this}
+   */
+  splitAt(glyphIndex) {
+    this.#assertAlive();
+    if (this.#level !== 'group') return this;
+    const group = this.#nodeRef;
+    if (!group?.glyphs) return this;
+    const len = group.glyphs.length;
+    if (glyphIndex <= 0 || glyphIndex >= len) {
+      throw new Error(`splitAt(${glyphIndex}) is out of range: must be between 1 and ${len - 1} (inclusive) for a group with ${len} glyphs`);
+    }
+
+    // Resolve raw index before any destructive mutation
+    const groups = this.#ctx.getRaw().groups;
+    const rawIndex = groups.indexOf(this.#nodeRef);
+    if (rawIndex < 0) return this;
+
+    // Splice trailing glyphs from the original group (mutate in-place)
+    const rightGlyphs = group.glyphs.splice(glyphIndex);
+
+    // Build right-half group with copied options
+    const rightGroup = { glyphs: rightGlyphs };
+    if (group.options) {
+      rightGroup.options = { ...group.options };
+    }
+
+    const spaceGroup = this.#ctx.makeSpaceGroup();
+
+    // Insert [space, rightGroup] after the original group
+    groups.splice(rawIndex + 1, 0, spaceGroup, rightGroup);
+
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
   // --- Mutation: options ---
 
   setOptions(opts) {
