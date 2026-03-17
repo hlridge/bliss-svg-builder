@@ -238,9 +238,39 @@ builder.part(1);  // B431 (first part of second glyph)
 builder.part(-1); // last part (B81)
 ```
 
+### `element(index)`
+
+Returns a live handle for the group at a raw index, including space groups. Negative indices count from the end. Unlike `group()`, this does not skip space groups:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+// Raw layout: [word] [space] [word]
+
+builder.element(0);  // word group (B313)
+builder.element(1);  // space group (TSP)
+builder.element(2);  // word group (B431)
+builder.element(-1); // last group (B431)
+builder.element(99); // null
+```
+
+| Navigation | Indexing |
+|------------|---------|
+| `group(i)` | Skips space groups (word 0, word 1, ...) |
+| `element(i)` | Raw index over all groups including spaces |
+
+### `elementCount`
+
+Total number of raw groups, including space groups:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.elementCount; // 3 (word + space + word)
+builder.stats.groupCount; // 2 (words only)
+```
+
 ### `getElementByKey(key)`
 
-Returns a live handle for the element matching a snapshot key:
+Returns a live handle for the element matching a snapshot key, including space groups:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103');
@@ -256,6 +286,16 @@ Returns a frozen element tree for read-only inspection:
 ```js
 const snap = builder.snapshot();
 snap.children;  // groups (frozen)
+```
+
+Group-level snapshots include `isSpaceGroup` to identify space groups:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+const snap = builder.snapshot();
+snap.children[0].isSpaceGroup; // false (word group)
+snap.children[1].isSpaceGroup; // true  (space group)
+snap.children[2].isSpaceGroup; // false (word group)
 ```
 
 ### `stats`
@@ -361,6 +401,56 @@ Removes all content:
 ```js
 builder.clear();
 builder.toJSON().groups; // []
+```
+
+### Raw Element Methods
+
+These operate on the raw groups array with no automatic space management. Use them for direct control over space groups and element positioning.
+
+The managed methods (`addGroup`, `insertGroup`, `removeGroup`) auto-insert and clean up space groups. The raw element methods do not.
+
+#### `addElement(code, opts?)`
+
+Appends a raw group. No space group is inserted:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+builder.addElement('B431');
+// [B313, B431] — no space between
+```
+
+#### `insertElement(index, code, opts?)`
+
+Inserts a raw group at the given index. Negative indices count from the end:
+
+```js
+const builder = new BlissSVGBuilder('B313/B431');
+builder.insertElement(0, 'SP');
+// [SP, B313/B431] — leading space
+
+builder.insertElement(1, 'SP');
+// inserts space at raw index 1
+```
+
+`SP` auto-resolves to `TSP` (standard spacing) or `QSP` (reduced spacing before punctuation). Use `TSP` or `QSP` explicitly to bypass resolution.
+
+#### `removeElement(index)`
+
+Removes the raw group at the given index (plain splice, no space cleanup). Negative indices count from the end:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.removeElement(1); // remove space group
+// [B313, B431] — adjacent, no space
+```
+
+#### `replaceElement(index, code, opts?)`
+
+Replaces the raw group at the given index. Negative indices count from the end:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.replaceElement(1, 'QSP'); // swap TSP for QSP
 ```
 
 ## ElementHandle
@@ -481,10 +571,30 @@ builder.glyph(0).insertPart(0, 'B81'); // prepend
 
 #### `.remove()`
 
-Removes the element from its parent. Cascading: removing the last glyph in a group removes the group; removing the last part in a glyph removes the glyph:
+Removes the element from its parent. Cascading: removing the last glyph in a group removes the group; removing the last part in a glyph removes the glyph. Returns `undefined` (cannot be chained):
 
 ```js
 builder.glyph(1).remove();
+```
+
+#### `.detach()`
+
+Plain splice: disconnects the element from its parent with no cascade cleanup. Unlike `remove()`, empty parents and adjacent spaces are left in place. Returns `undefined` (cannot be chained):
+
+```js
+builder.glyph(1).detach(); // removes glyph, may leave empty group
+```
+
+| Method | Behavior |
+|--------|----------|
+| `remove()` | Cascades: empty parents and adjacent spaces are cleaned up |
+| `detach()` | Plain splice: just disconnects from parent, no cleanup |
+
+Compose with navigation for raw-level removal without needing separate methods:
+
+```js
+builder.group(0).glyph(1).detach();  // plain-splice a glyph from a group
+builder.glyph(0).part(2).detach();   // plain-splice a part from a glyph
 ```
 
 #### `.replace(code, opts?)`
@@ -526,6 +636,41 @@ On a glyph handle, replaces the part at the given index:
 ```js
 builder.glyph(0).replacePart(0, 'B81');
 ```
+
+### Space Manipulation
+
+#### `.splitAt(glyphIndex)`
+
+On a group handle, splits the word group into two at the glyph boundary, inserting a space group between. Returns `this` (the handle stays on the first half):
+
+```js
+const builder = new BlissSVGBuilder('B313/B1103/B431');
+builder.group(0).splitAt(2);
+// now: [B313/B1103] [SP] [B431]
+```
+
+The first half keeps the original options object. The second half receives a shallow copy. Throws if `glyphIndex` is out of range (must be between 1 and `glyphs.length - 1` inclusive):
+
+```js
+builder.group(0).splitAt(0);  // Error: would produce empty left half
+builder.group(0).splitAt(3);  // Error: would produce empty right half
+```
+
+On non-group handles, returns `this` with no effect.
+
+#### `.mergeWithNext()`
+
+On a group handle, absorbs the next non-space word group into this one, removing any space groups in between. Returns `this`:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+builder.group(0).mergeWithNext();
+// now: [B313/B431]
+```
+
+The merged word keeps the first group's options. The absorbed group's options are discarded. Glyph-level options on absorbed glyphs are preserved.
+
+No-op when there is no next word group, or when called on a space group or non-group handle.
 
 ### Options Mutation
 
