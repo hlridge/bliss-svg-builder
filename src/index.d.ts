@@ -446,9 +446,6 @@ export declare class BlissSVGBuilder {
   /** Replaces the raw group at the given index with new content. */
   replaceElement(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Removes all space groups and merges all words into one. First word's options survive. */
-  clearSpaces(): this;
-
   /** Removes all content from the builder. */
   clear(): this;
 

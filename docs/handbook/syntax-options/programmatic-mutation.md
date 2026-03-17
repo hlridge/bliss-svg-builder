@@ -346,18 +346,6 @@ builder.group(0).mergeWithNext();
 
 The merged word keeps the first word's options. The absorbed word's options are discarded. If there is no next word group, `mergeWithNext()` is a no-op.
 
-### Clearing All Spaces
-
-`clearSpaces()` removes all space groups and merges everything into a single word:
-
-```js
-const builder = new BlissSVGBuilder('B313//B1103//B431');
-builder.clearSpaces();
-// now equivalent to 'B313/B1103/B431'
-```
-
-The first word's options survive. All other word-level options are discarded. If there are no spaces, `clearSpaces()` is a no-op.
-
 ## Indicator Operations
 
 Indicators mark a glyph's grammatical role (action, description, thing). The mutation API provides dedicated methods for managing indicators with the same semantic preservation behavior as the DSL's `;;` syntax.
