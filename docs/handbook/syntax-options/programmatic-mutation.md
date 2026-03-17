@@ -457,6 +457,22 @@ builder.svgCode; // back on the builder
 
 Note: `remove()` returns `undefined` and cannot be chained.
 
+## Combining and Splitting Builders
+
+### Merging Two Builders
+
+Combine saved texts into one builder. The receiving builder's global
+options apply to everything:
+
+```js
+const morning = new BlissSVGBuilder('[color=red]||B313/B1103');
+const afternoon = new BlissSVGBuilder('[color=blue]||B431//B291');
+
+morning.merge(afternoon);
+// morning now contains all words, styled with color=red
+// afternoon is unchanged
+```
+
 ## Snapshots vs Live Handles
 
 The builder offers two ways to inspect the tree:

@@ -394,6 +394,28 @@ Replaces the group at the given index with new content:
 builder.replaceGroup(0, 'B431', { color: 'red' });
 ```
 
+### `.merge(other)`
+
+Merges another builder's content into this one. The other builder's word
+groups are appended (with a space group between), and its global options
+are discarded. The other builder is not modified.
+
+```js
+const textA = new BlissSVGBuilder('[color=red]||B313/B1103');
+const textB = new BlissSVGBuilder('[color=blue]||B431//B291');
+
+textA.merge(textB);
+// textA now has 3 words: B313/B1103, B431, B291
+// textA's global options (color=red) apply to all
+// textB is unchanged
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `other` | `BlissSVGBuilder` | Builder whose content to append |
+
+Returns `this` for chaining.
+
 ### `clear()`
 
 Removes all content:
