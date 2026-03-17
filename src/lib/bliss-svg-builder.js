@@ -557,7 +557,6 @@ class BlissSVGBuilder {
     for (let rawGi = 0; rawGi < groups.length; rawGi++) {
       const groupSnap = groups[rawGi];
       const rawGroup = rawGroups[rawGi];
-      if (BlissSVGBuilder.#isRawSpaceGroup(rawGroup)) continue;
 
       if (groupSnap.key === key) {
         return new ElementHandle(this.#mutationCtx, 'group', rawGroup);

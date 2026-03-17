@@ -32,6 +32,7 @@ export class BlissElement {
   #relativeToParentY
   #codeName
   #externalGlyphSpacing
+  #isSpaceGroup
   //#endregion
   #childStartOffset
   #parentElement;
@@ -387,10 +388,11 @@ export class BlissElement {
 
 
       // Check if this is a space group (all glyphs are space glyphs: TSP or QSP)
-      const isSpaceGroup = this.#blissObj.glyphs?.every(g => {
+      this.#isSpaceGroup = this.#blissObj.glyphs?.every(g => {
         const code = g.parts?.[0]?.codeName;
         return code && isSpaceGlyph(code);
       }) ?? false;
+      const isSpaceGroup = this.#isSpaceGroup;
 
       if (this.#previousElement) {
         if (this.#blissObj.x === undefined) {
@@ -891,6 +893,7 @@ export class BlissElement {
       isBlissGlyph: !!this.#isBlissGlyph,
       isExternalGlyph: !!this.#isExternalGlyph,
       isHeadGlyph: !!this.#blissObj.isHeadGlyph,
+      isSpaceGroup: !!this.#isSpaceGroup,
       index,
       parentKey: this.#parentElement ? this.#parentElement.#key : null,
       children
