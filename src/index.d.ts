@@ -437,6 +437,9 @@ export declare class BlissSVGBuilder {
   /** Merges another builder's content into this one. Appends the other builder's groups with a space between. The other builder's global options are discarded. */
   merge(other: BlissSVGBuilder): this;
 
+  /** Splits this builder at the given group index. This builder keeps the left half; a new builder with the right half is returned. Both share the same global options. */
+  splitAt(groupIndex: number): BlissSVGBuilder;
+
   /** Appends a raw group with no automatic space management. SP auto-resolves to TSP/QSP. */
   addElement(code: string, opts?: BlissOptions | OptionLayers): this;
 

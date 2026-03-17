@@ -844,6 +844,65 @@ class BlissSVGBuilder {
   }
 
   /**
+   * Splits this builder into two at the given non-space group boundary.
+   * This builder keeps groups 0 through groupIndex-1. A new builder is
+   * returned with groups from groupIndex onward. Both builders share the
+   * same global options. Space groups at the split boundary are consumed.
+   *
+   * @param {number} groupIndex - Non-space group index (1 to groupCount-1)
+   * @returns {BlissSVGBuilder} New builder with the right-half groups
+   */
+  splitAt(groupIndex) {
+    const indices = this.#getNonSpaceGroupIndices();
+    if (indices.length < 2) {
+      throw new Error('splitAt() requires at least 2 groups');
+    }
+    if (groupIndex <= 0 || groupIndex >= indices.length) {
+      throw new Error(
+        `splitAt(${groupIndex}) is out of range: must be between 1 and ${indices.length - 1} (inclusive) for a builder with ${indices.length} groups`
+      );
+    }
+
+    // Find the raw index of the split point
+    const rawSplitIndex = indices[groupIndex];
+
+    // Extract right-half groups (from rawSplitIndex onward)
+    const rightGroups = this.#rawBlissObj.groups.splice(rawSplitIndex);
+
+    // Clean up: remove trailing space groups from the left half
+    while (
+      this.#rawBlissObj.groups.length > 0 &&
+      BlissSVGBuilder.#isRawSpaceGroup(
+        this.#rawBlissObj.groups[this.#rawBlissObj.groups.length - 1]
+      )
+    ) {
+      this.#rawBlissObj.groups.pop();
+    }
+
+    // Clean up: remove leading space groups from the right half
+    while (
+      rightGroups.length > 0 &&
+      BlissSVGBuilder.#isRawSpaceGroup(rightGroups[0])
+    ) {
+      rightGroups.shift();
+    }
+
+    // Rebuild the left half (this builder)
+    this.#rebuild();
+
+    // Build the right half as a new builder
+    // Copy global options so both builders have the same styling
+    const rightObj = {
+      groups: rightGroups,
+    };
+    if (this.#rawBlissObj.options) {
+      rightObj.options = { ...this.#rawBlissObj.options };
+    }
+
+    return new BlissSVGBuilder(rightObj);
+  }
+
+  /**
    * Parses a code string and applies option layers to the first parsed group.
    * @param {string} code
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
