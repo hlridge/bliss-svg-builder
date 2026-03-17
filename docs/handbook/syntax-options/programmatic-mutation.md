@@ -473,6 +473,19 @@ morning.merge(afternoon);
 // afternoon is unchanged
 ```
 
+### Splitting a Builder
+
+Split a builder at a word boundary. Both halves keep the same global
+options:
+
+```js
+const text = new BlissSVGBuilder('[color=red]||B313//B431//B291');
+const page2 = text.splitAt(2);
+
+// text: B313, B431 (color=red)
+// page2: B291 (color=red)
+```
+
 ## Snapshots vs Live Handles
 
 The builder offers two ways to inspect the tree:

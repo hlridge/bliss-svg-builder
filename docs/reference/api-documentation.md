@@ -416,6 +416,28 @@ textA.merge(textB);
 
 Returns `this` for chaining.
 
+### `.splitAt(groupIndex)`
+
+Splits this builder into two at the given group boundary. This builder
+keeps the left half; a new independent builder is returned with the
+right half. Both builders share the same global options.
+
+```js
+const builder = new BlissSVGBuilder('[color=red]||B313//B431//B291');
+const right = builder.splitAt(1);
+
+builder.stats.groupCount;  // 1 (B313)
+right.stats.groupCount;    // 2 (B431, B291)
+right.toJSON().options;    // { color: 'red' }
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `groupIndex` | `number` | Split point: 1 to groupCount-1 |
+
+Returns a new `BlissSVGBuilder` with the right-half groups.
+Throws if `groupIndex` is out of range.
+
 ### `clear()`
 
 Removes all content:
