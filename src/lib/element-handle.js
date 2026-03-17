@@ -17,9 +17,10 @@ import {
  * Survives `#rebuild()` because it holds a direct reference to the raw node,
  * and resolves its current index dynamically when needed.
  *
- * Handles track a generation counter to detect staleness: any mutation on
- * the builder (by any handle) invalidates all other handles. The handle
- * that performed the mutation stays valid for chaining.
+ * Handles survive mutations to other parts of the tree. A handle only
+ * becomes invalid when its own node is removed from the tree. Relocated
+ * nodes (e.g. glyphs absorbed by mergeWithNext) are found via a full
+ * tree scan and the handle's parent reference is updated automatically.
  */
 export class ElementHandle {
   #ctx;
@@ -36,10 +37,64 @@ export class ElementHandle {
     this.#generation = ctx.getGeneration();
   }
 
-  #assertAlive() {
-    if (this.#generation !== this.#ctx.getGeneration()) {
-      throw new Error('ElementHandle is stale. Handles are invalidated when any mutation occurs on the builder.');
+  #assertReachable() {
+    // Fast path: no mutations since last check
+    if (this.#generation === this.#ctx.getGeneration()) return;
+
+    // Parent-based lookup (fast)
+    const idx = this.#resolveIndex();
+    if (idx !== null && idx !== -1) {
+      this.#generation = this.#ctx.getGeneration();
+      return;
     }
+
+    // Full tree scan (node may have moved to a different parent)
+    if (this.#relocate()) {
+      this.#generation = this.#ctx.getGeneration();
+      return;
+    }
+
+    throw new Error(
+      'ElementHandle references an element that has been removed.'
+    );
+  }
+
+  // Full tree scan: find this node anywhere in the raw tree.
+  // Updates #parentRef if the node moved to a different parent.
+  // Returns true if found, false if the node is gone.
+  #relocate() {
+    const raw = this.#ctx.getRaw();
+    const groups = raw.groups || [];
+
+    if (this.#level === 'group') {
+      return groups.indexOf(this.#nodeRef) >= 0;
+    }
+
+    if (this.#level === 'glyph') {
+      for (const group of groups) {
+        const gi = (group.glyphs || []).indexOf(this.#nodeRef);
+        if (gi >= 0) {
+          this.#parentRef = group;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (this.#level === 'part') {
+      for (const group of groups) {
+        for (const glyph of (group.glyphs || [])) {
+          const pi = (glyph.parts || []).indexOf(this.#nodeRef);
+          if (pi >= 0) {
+            this.#parentRef = { group, glyph };
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    return false;
   }
 
   // Update this handle's generation after a mutation it initiated,
@@ -53,12 +108,12 @@ export class ElementHandle {
   }
 
   get codeName() {
-    this.#assertAlive();
+    this.#assertReachable();
     return this.#nodeRef?.glyphCode || this.#nodeRef?.codeName || '';
   }
 
   get isIndicator() {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'part') return false;
     return this.#nodeRef?.isIndicator === true;
   }
@@ -176,7 +231,7 @@ export class ElementHandle {
    * @returns {ElementHandle|null}
    */
   headGlyph() {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return null;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
@@ -198,7 +253,7 @@ export class ElementHandle {
   }
 
   glyph(index) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return null;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
@@ -208,7 +263,7 @@ export class ElementHandle {
   }
 
   part(index) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level === 'glyph') {
       const glyph = this.#nodeRef;
       if (!glyph?.parts?.length) return null;
@@ -232,7 +287,7 @@ export class ElementHandle {
   // --- Mutation: add/insert ---
 
   addGlyph(code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group) return this;
@@ -240,7 +295,7 @@ export class ElementHandle {
   }
 
   insertGlyph(index, code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group) return this;
@@ -256,7 +311,7 @@ export class ElementHandle {
   }
 
   addPart(code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     // Group level: delegate to last glyph
     if (this.#level === 'group') {
       const group = this.#nodeRef;
@@ -274,7 +329,7 @@ export class ElementHandle {
   }
 
   insertPart(index, code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     // Group level: delegate to last glyph
     if (this.#level === 'group') {
       const group = this.#nodeRef;
@@ -302,7 +357,7 @@ export class ElementHandle {
   // --- Mutation: detach (plain splice, no cascade) ---
 
   detach() {
-    this.#assertAlive();
+    this.#assertReachable();
 
     if (this.#level === 'part') {
       const glyph = this.#parentRef.glyph;
@@ -339,7 +394,7 @@ export class ElementHandle {
   // --- Mutation: remove ---
 
   remove() {
-    this.#assertAlive();
+    this.#assertReachable();
     const raw = this.#ctx.getRaw();
     const groups = raw.groups;
 
@@ -376,7 +431,7 @@ export class ElementHandle {
   }
 
   removeGlyph(index) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
@@ -396,7 +451,7 @@ export class ElementHandle {
   }
 
   removePart(index) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
@@ -435,7 +490,7 @@ export class ElementHandle {
   // --- Mutation: parent-centric replace ---
 
   replaceGlyph(index, code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
@@ -450,7 +505,7 @@ export class ElementHandle {
   }
 
   replacePart(index, code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
@@ -467,7 +522,7 @@ export class ElementHandle {
   // --- Mutation: self-centric replace ---
 
   replace(code, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level === 'glyph') {
       const group = this.#parentRef;
       if (!group?.glyphs) return this;
@@ -502,7 +557,7 @@ export class ElementHandle {
   // --- Mutation: indicators ---
 
   applyIndicators(codes, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (codes === undefined || codes === null || codes === '') {
       throw new Error('applyIndicators() requires a codes argument. Use clearIndicators() to remove indicators.');
     }
@@ -510,12 +565,12 @@ export class ElementHandle {
   }
 
   clearIndicators(opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     return this.#applyOrClearIndicators(null, opts);
   }
 
   applyHeadIndicators(codes, opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const head = this.headGlyph();
     if (!head) return this;
@@ -525,7 +580,7 @@ export class ElementHandle {
   }
 
   clearHeadIndicators(opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const head = this.headGlyph();
     if (!head) return this;
@@ -646,7 +701,7 @@ export class ElementHandle {
    * @returns {this}
    */
   splitAt(glyphIndex) {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group?.glyphs) return this;
@@ -688,7 +743,7 @@ export class ElementHandle {
    * @returns {this}
    */
   mergeWithNext() {
-    this.#assertAlive();
+    this.#assertReachable();
     if (this.#level !== 'group') return this;
     const group = this.#nodeRef;
     if (!group?.glyphs) return this;
@@ -728,7 +783,7 @@ export class ElementHandle {
   // --- Mutation: options ---
 
   setOptions(opts) {
-    this.#assertAlive();
+    this.#assertReachable();
     const node = this.#nodeRef;
     if (!node) return this;
     this.#applyDefaultsOverrides(node, opts);
@@ -738,7 +793,7 @@ export class ElementHandle {
   }
 
   removeOptions(...keys) {
-    this.#assertAlive();
+    this.#assertReachable();
     const node = this.#nodeRef;
     if (!node?.options) return this;
     for (const key of keys) {
