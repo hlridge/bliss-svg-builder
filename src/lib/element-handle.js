@@ -679,6 +679,52 @@ export class ElementHandle {
     return this;
   }
 
+  /**
+   * Merges this word group with the next non-space group, removing any
+   * space groups between them. Only valid on group-level handles.
+   * No-op if no next word group exists or if this is a space group.
+   * The absorbed group's options are discarded; only this group's
+   * options apply to the merged result.
+   * @returns {this}
+   */
+  mergeWithNext() {
+    this.#assertAlive();
+    if (this.#level !== 'group') return this;
+    const group = this.#nodeRef;
+    if (!group?.glyphs) return this;
+
+    const groups = this.#ctx.getRaw().groups;
+    const rawIndex = groups.indexOf(this.#nodeRef);
+    if (rawIndex < 0) return this;
+
+    // No-op for space groups
+    if (this.#ctx.isRawSpaceGroup(group)) return this;
+
+    // Scan right to find the next non-space group
+    let nextWordIndex = -1;
+    for (let i = rawIndex + 1; i < groups.length; i++) {
+      if (!this.#ctx.isRawSpaceGroup(groups[i])) {
+        nextWordIndex = i;
+        break;
+      }
+    }
+    if (nextWordIndex < 0) return this;
+
+    // No-op if the next group has no glyphs to absorb
+    const nextGroup = groups[nextWordIndex];
+    if (!nextGroup.glyphs?.length) return this;
+
+    // Absorb the next word group's glyphs
+    group.glyphs.push(...nextGroup.glyphs);
+
+    // Remove everything from rawIndex+1 through nextWordIndex (spaces + absorbed word)
+    groups.splice(rawIndex + 1, nextWordIndex - rawIndex);
+
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
   // --- Mutation: options ---
 
   setOptions(opts) {
