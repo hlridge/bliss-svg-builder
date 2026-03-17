@@ -457,9 +457,10 @@ builder.replaceElement(1, 'QSP'); // swap TSP for QSP
 
 A live reference to a group, glyph, or part in the element tree. Obtained via `group()`, `glyph()`, `part()`, or `getElementByKey()`.
 
-### Handle Staleness
+### Handle Lifetime
 
-Handles track a generation counter. Any mutation on the builder (by any handle) invalidates all **other** handles. The handle that performed the mutation stays valid for chaining:
+Handles survive mutations to other parts of the tree, just like DOM node
+references. A handle only becomes invalid when its own node is removed:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103//B431');
@@ -467,12 +468,23 @@ const h1 = builder.group(0);
 const h2 = builder.group(1);
 
 h1.addGlyph('B291');     // h1 stays valid (it performed the mutation)
-h1.glyph(0);             // works fine
+h2.glyph(0);             // works -- h2's node was not affected
 
-h2.glyph(0);             // throws: "ElementHandle is stale"
+builder.removeGroup(1);
+h2.glyph(0);             // throws: "ElementHandle references an element
+                         //          that has been removed."
 ```
 
-After a mutation, re-acquire handles via `group()`, `glyph()`, or `part()`.
+Handles also survive relocations. When `mergeWithNext()` absorbs glyphs
+from one group into another, handles to those glyphs remain valid:
+
+```js
+const builder = new BlissSVGBuilder('B313//B431');
+const g = builder.glyph(1);        // B431 in group 1
+
+builder.group(0).mergeWithNext();   // B431 absorbed into group 0
+g.codeName;                         // 'B431' -- still works
+```
 
 ### Navigation
 

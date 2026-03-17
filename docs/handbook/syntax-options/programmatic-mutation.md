@@ -465,8 +465,11 @@ The builder offers two ways to inspect the tree:
 |---|---|---|
 | Type | Frozen tree | Live `ElementHandle` |
 | Mutates? | No | Yes |
-| Survives rebuilds? | Snapshot is isolated | Handle stays live |
+| Survives rebuilds? | Snapshot is isolated | Handle stays live across mutations |
 | Use for | Reading, diffing, serialization | Modifying content |
+
+Handles stay live across mutations to other parts of the tree. A handle
+throws only when its own node has been removed (similar to DOM references).
 
 Snapshots are frozen and unaffected by later mutations:
 
