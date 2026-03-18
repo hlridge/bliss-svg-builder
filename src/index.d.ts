@@ -107,6 +107,7 @@ export interface ElementSnapshot {
   readonly width: number;
   readonly height: number;
   readonly advanceX: number;
+  readonly baseWidth: number;
   readonly level: number;
   readonly bounds: ElementBounds;
   readonly isIndicator: boolean;

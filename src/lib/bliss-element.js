@@ -886,6 +886,7 @@ export class BlissElement {
       width: this.width,
       height: this.height,
       advanceX: this.#advanceX || 0,
+      baseWidth: this.baseWidth,
       level: this.#level,
       bounds: Object.freeze(this.#calculateBounds(parentOffsetX, parentOffsetY)),
       isIndicator: this.isIndicator,
