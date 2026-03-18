@@ -123,22 +123,32 @@ export class ElementHandle {
   #findSnapshot() {
     this.#assertReachable();
     const idx = this.#resolveIndex();
+    if (idx === null || idx === -1) {
+      throw new Error('Snapshot not found: handle index could not be resolved.');
+    }
     const snap = this.#ctx.getSnapshot();
 
     if (this.#level === 'group') {
-      return snap.children[idx];
+      const groupSnap = snap.children[idx];
+      if (!groupSnap) throw new Error('Snapshot not found for group handle.');
+      return groupSnap;
     }
 
     if (this.#level === 'glyph') {
       const groupSnap = snap.children[idx.groupIndex];
+      if (!groupSnap) throw new Error('Snapshot not found for group in glyph handle.');
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
-      return glyphs[idx.glyphIndex];
+      const glyphSnap = glyphs[idx.glyphIndex];
+      if (!glyphSnap) throw new Error('Snapshot not found for glyph handle.');
+      return glyphSnap;
     }
 
     if (this.#level === 'part') {
       const groupSnap = snap.children[idx.groupIndex];
+      if (!groupSnap) throw new Error('Snapshot not found for group in part handle.');
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
       const glyphSnap = glyphs[idx.glyphIndex];
+      if (!glyphSnap) throw new Error('Snapshot not found for glyph in part handle.');
       return glyphSnap.children[idx.partIndex];
     }
 
