@@ -1028,7 +1028,7 @@ class BlissSVGBuilder {
   /**
    * Returns group and glyph counts.
    *
-   * @returns {{ wordCount: number, characterCount: number }}
+   * @returns {{ groupCount: number, glyphCount: number }}
    */
   get stats() {
     const indices = this.#getNonSpaceGroupIndices();
@@ -1036,10 +1036,7 @@ class BlissSVGBuilder {
     for (const gi of indices) {
       glyphCount += (this.#rawBlissObj.groups[gi].glyphs || []).length;
     }
-    return {
-      groupCount: indices.length, glyphCount,
-      wordCount: indices.length, characterCount: glyphCount // deprecated aliases
-    };
+    return { groupCount: indices.length, glyphCount };
   }
 
   // --- Manipulation helpers ---

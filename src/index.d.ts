@@ -226,13 +226,13 @@ export declare class ElementHandle {
   // --- Mutation: indicators ---
 
   /** Replaces all indicators on this glyph with the given indicator codes. Preserves semantic indicators by default. Only valid on glyph handles. */
-  applyIndicators(codes: string, opts?: { stripSemantic?: boolean }): this;
+  applyIndicators(code: string, opts?: { stripSemantic?: boolean }): this;
 
   /** Removes all grammatical indicators from this glyph. Preserves semantic indicators by default. Only valid on glyph handles. */
   clearIndicators(opts?: { stripSemantic?: boolean }): this;
 
   /** Applies indicators to the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
-  applyHeadIndicators(codes: string, opts?: { stripSemantic?: boolean }): this;
+  applyHeadIndicators(code: string, opts?: { stripSemantic?: boolean }): this;
 
   /** Removes grammatical indicators from the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
   clearHeadIndicators(opts?: { stripSemantic?: boolean }): this;
@@ -368,10 +368,6 @@ export interface Warning {
 export interface BuilderStats {
   groupCount: number;
   glyphCount: number;
-  /** @deprecated Use `groupCount` instead. */
-  wordCount: number;
-  /** @deprecated Use `glyphCount` instead. */
-  characterCount: number;
 }
 
 // --- Main class ---
