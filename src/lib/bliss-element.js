@@ -335,7 +335,6 @@ export class BlissElement {
       }
       
       // Calculate indicator overhang for first character
-      // TODO: add option for if overhang is accepted?
       const firstCharacter = this.#getFirstCharacterElement();
       if (firstCharacter && firstCharacter.#classifiedParts) {
         const { glyphParts, indicatorParts } = firstCharacter.#classifiedParts;

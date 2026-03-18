@@ -36,7 +36,7 @@ export function createTextFallbackGlyph(str) {
   const charSpacing = (str.length - 1) * defaultCharSpace;
   const width = charWidths + charSpacing;
   // Approximate content bounds for effectiveBounds calculation.
-  // y=11 is a rough minY; actual values vary per glyph (TODO: compute from path data).
+  // y=11 is a rough minY; actual values vary per glyph.
   const approxMinY = 11;
   const maxY = 16;
 
@@ -625,7 +625,7 @@ export function createExternalGlyph(glyph) {
   const round = (num) => parseFloat(num.toFixed(4));
 
   // Approximate content bounds for effectiveBounds calculation.
-  // y=11 is a rough minY; actual values vary per glyph (TODO: compute from path data).
+  // y=11 is a rough minY; actual values vary per glyph.
   // aObj.height is actually maxY (where the bottom of the glyph path sits), not content height.
   const approxMinY = 11;
   const maxY = aObj.height || 0;
