@@ -77,6 +77,7 @@ export const blissHeadGlyphExclusions = [
   'B486', // opposite to (antonymy)
 
   // Concept-transforming operators
+  'B1060/B578/B608/B292', // rhymes with
   'B1060/B578/B303', // looks similar to
   'B1060/B578/B608', // sounds similar to
   'B1060/B578/B374', // feels similar to
@@ -89,6 +90,7 @@ export const blissHeadGlyphExclusions = [
   'B578/B473', // smells like
   'B578/B642', // tastes like
   'B348', // generalization of
+  'B444', // metaphor for
 
   // Relational operators
   'B449', // without (privative negation)
