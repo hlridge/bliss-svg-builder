@@ -614,12 +614,12 @@ export class ElementHandle {
 
   // --- Mutation: indicators ---
 
-  applyIndicators(codes, opts) {
+  applyIndicators(code, opts) {
     this.#assertReachable();
-    if (codes === undefined || codes === null || codes === '') {
-      throw new Error('applyIndicators() requires a codes argument. Use clearIndicators() to remove indicators.');
+    if (code === undefined || code === null || code === '') {
+      throw new Error('applyIndicators() requires a code argument. Use clearIndicators() to remove indicators.');
     }
-    return this.#applyOrClearIndicators(codes, opts);
+    return this.#applyOrClearIndicators(code, opts);
   }
 
   clearIndicators(opts) {
@@ -627,12 +627,12 @@ export class ElementHandle {
     return this.#applyOrClearIndicators(null, opts);
   }
 
-  applyHeadIndicators(codes, opts) {
+  applyHeadIndicators(code, opts) {
     this.#assertReachable();
     if (this.#level !== 'group') return this;
     const head = this.headGlyph();
     if (!head) return this;
-    head.applyIndicators(codes, opts);
+    head.applyIndicators(code, opts);
     this.#syncGeneration();
     return this;
   }
@@ -647,7 +647,7 @@ export class ElementHandle {
     return this;
   }
 
-  #applyOrClearIndicators(codes, opts) {
+  #applyOrClearIndicators(code, opts) {
     if (this.#level !== 'glyph') return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
@@ -680,8 +680,8 @@ export class ElementHandle {
 
     // Determine new indicator codes
     let newIndicatorParts = [];
-    if (codes !== null) {
-      const requestedCodes = codes.split(';').map(s => s.trim()).filter(Boolean);
+    if (code !== null) {
+      const requestedCodes = code.split(';').map(s => s.trim()).filter(Boolean);
       const validCodes = filterToIndicators(requestedCodes, definitions);
 
       if (validCodes.length > 0) {

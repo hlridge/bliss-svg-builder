@@ -818,9 +818,9 @@ builder.glyph(0).removeOptions('color', 'strokeWidth');
 
 Indicator methods manage the grammatical indicator parts on a glyph. Unlike other mutation methods, the `opts` parameter accepts `{ stripSemantic?: boolean }`, not `BlissOptions`.
 
-#### `.applyIndicators(codes, opts?)`
+#### `.applyIndicators(code, opts?)`
 
-On a glyph handle, replaces all existing indicators with the given codes. `codes` is required (throws if missing; use `clearIndicators()` to remove). Semantic indicators are preserved unless the new codes include one or `{ stripSemantic: true }` is passed:
+On a glyph handle, replaces all existing indicators with the given code. `code` is required (throws if missing; use `clearIndicators()` to remove). Semantic indicators are preserved unless the new code includes one or `{ stripSemantic: true }` is passed:
 
 ```js
 builder.glyph(0).applyIndicators('B86');
@@ -839,7 +839,7 @@ builder.glyph(0).clearIndicators();
 builder.glyph(0).clearIndicators({ stripSemantic: true });
 ```
 
-#### `.applyHeadIndicators(codes, opts?)`
+#### `.applyHeadIndicators(code, opts?)`
 
 On a group handle, applies indicators to the head glyph. Equivalent to the `;;` DSL syntax:
 
