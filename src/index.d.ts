@@ -141,6 +141,23 @@ export declare class ElementHandle {
   /** Whether this part is an indicator. Only true on part-level handles. */
   readonly isIndicator: boolean;
 
+  // --- Dimensions (read-only, from snapshot) ---
+
+  /** Absolute x position of this element's origin. */
+  readonly x: number;
+  /** Absolute y position of this element's origin. */
+  readonly y: number;
+  /** Total width including indicator overhang. */
+  readonly width: number;
+  /** Total height. */
+  readonly height: number;
+  /** Absolute bounding box. */
+  readonly bounds: ElementBounds;
+  /** Horizontal spacing step to next sibling. */
+  readonly advanceX: number;
+  /** Width excluding indicators. Equals width when no indicators present. */
+  readonly baseWidth: number;
+
   // --- Navigation ---
 
   /** Returns the head glyph handle within this group. Only valid on group handles. */

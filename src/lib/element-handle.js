@@ -118,6 +118,41 @@ export class ElementHandle {
     return this.#nodeRef?.isIndicator === true;
   }
 
+  // --- Dimensions (read-only, from snapshot) ---
+
+  #findSnapshot() {
+    this.#assertReachable();
+    const idx = this.#resolveIndex();
+    const snap = this.#ctx.getSnapshot();
+
+    if (this.#level === 'group') {
+      return snap.children[idx];
+    }
+
+    if (this.#level === 'glyph') {
+      const groupSnap = snap.children[idx.groupIndex];
+      const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+      return glyphs[idx.glyphIndex];
+    }
+
+    if (this.#level === 'part') {
+      const groupSnap = snap.children[idx.groupIndex];
+      const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+      const glyphSnap = glyphs[idx.glyphIndex];
+      return glyphSnap.children[idx.partIndex];
+    }
+
+    throw new Error(`Unsupported handle level: ${this.#level}`);
+  }
+
+  get x() { return this.#findSnapshot().x; }
+  get y() { return this.#findSnapshot().y; }
+  get width() { return this.#findSnapshot().width; }
+  get height() { return this.#findSnapshot().height; }
+  get bounds() { return this.#findSnapshot().bounds; }
+  get advanceX() { return this.#findSnapshot().advanceX; }
+  get baseWidth() { return this.#findSnapshot().baseWidth; }
+
   // Resolve the current index of this node within its parent array
   #resolveIndex() {
     if (this.#level === 'group') {
