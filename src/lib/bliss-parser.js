@@ -109,6 +109,7 @@ export class BlissParser {
     }
     inputString = inputString.trim();
     let result = { groups: [] };
+    const parseWarnings = [];
 
     // Parse a Blissymbolics string and convert it to an internal representation (BlissComposition)
     //Ex. 
@@ -215,7 +216,7 @@ export class BlissParser {
           group.options = this.#parseOptions(restorePlaceholders(beforePipe));
           groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
-          console.warn(`Invalid group options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`);
+          parseWarnings.push({ code: 'INVALID_GROUP_OPTIONS', message: `Invalid group options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`, source: beforePipe });
           groupCodeString = afterPipe;
         } else {
           groupCodeString = afterPipe;
@@ -497,7 +498,7 @@ export class BlissParser {
               isHeadGlyph = true;
               headGlyphFound = true;
             } else {
-              console.warn(`Multiple head markers (^) found in word: ${wordCode}. Using first marked glyph.`);
+              parseWarnings.push({ code: 'MULTIPLE_HEAD_MARKERS', message: `Multiple head markers (^) found in word: ${wordCode}. Using first marked glyph.`, source: wordCode });
             }
             str = str.slice(0, -1);
           }
@@ -945,6 +946,7 @@ export class BlissParser {
 
     result.groups = parsedGroups;
 
+    if (parseWarnings.length) result._parseWarnings = parseWarnings;
     this.#extractPositionFromOptions(result);
     return result;
   }

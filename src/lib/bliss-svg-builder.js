@@ -466,6 +466,10 @@ class BlissSVGBuilder {
       errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
       keys: new Set(),
     };
+    if (blissObj._parseWarnings) {
+      this.#warnings.push(...blissObj._parseWarnings);
+      delete blissObj._parseWarnings;
+    }
     blissObj.options = remainingOptions;
     this.#processedOptions = blissObj.options;
 

@@ -306,7 +306,11 @@ export class BlissElement {
     // auto-generated 8-char random keys have negligible collision probability (~2.8T combinations).
     if (this.#sharedOptions.keys) {
       if (this.#blissObj.key && this.#sharedOptions.keys.has(this.#key)) {
-        console.warn(`Duplicate element key: "${this.#key}"`);
+        this.#sharedOptions.warnings.push({
+          code: 'DUPLICATE_KEY',
+          message: `Duplicate element key: "${this.#key}"`,
+          source: this.#key,
+        });
       }
       this.#sharedOptions.keys.add(this.#key);
     }
