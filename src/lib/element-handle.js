@@ -153,6 +153,19 @@ export class ElementHandle {
   get advanceX() { return this.#findSnapshot().advanceX; }
   get baseWidth() { return this.#findSnapshot().baseWidth; }
 
+  measure() {
+    const snap = this.#findSnapshot();
+    return Object.freeze({
+      x: snap.x,
+      y: snap.y,
+      width: snap.width,
+      height: snap.height,
+      bounds: snap.bounds,
+      advanceX: snap.advanceX,
+      baseWidth: snap.baseWidth,
+    });
+  }
+
   // Resolve the current index of this node within its parent array
   #resolveIndex() {
     if (this.#level === 'group') {

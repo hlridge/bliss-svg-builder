@@ -158,6 +158,17 @@ export declare class ElementHandle {
   /** Width excluding indicators. Equals width when no indicators present. */
   readonly baseWidth: number;
 
+  /** Returns all dimension properties at once. */
+  measure(): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    bounds: ElementBounds;
+    advanceX: number;
+    baseWidth: number;
+  };
+
   // --- Navigation ---
 
   /** Returns the head glyph handle within this group. Only valid on group handles. */
