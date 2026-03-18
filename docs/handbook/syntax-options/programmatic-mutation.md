@@ -495,7 +495,8 @@ The builder offers two ways to inspect the tree:
 | Type | Frozen tree | Live `ElementHandle` |
 | Mutates? | No | Yes |
 | Survives rebuilds? | Snapshot is isolated | Handle stays live across mutations |
-| Use for | Reading, diffing, serialization | Modifying content |
+| Dimensions? | Via properties on each node | Via `.x`, `.y`, `.width`, `.height`, `.bounds`, `.measure()` |
+| Use for | Reading, diffing, serialization | Modifying content, measuring elements |
 
 Handles stay live across mutations to other parts of the tree. A handle
 throws only when its own node has been removed (similar to DOM references).

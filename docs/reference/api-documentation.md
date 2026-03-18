@@ -576,6 +576,67 @@ On a part handle, returns `true` if this part is an indicator. Returns `false` o
 builder.glyph(0).part(1).isIndicator; // true for indicator parts
 ```
 
+### Dimensions
+
+Handles expose read-only dimension getters that pull values from the snapshot tree. These are live: they reflect the current state and update automatically after mutations.
+
+#### `.x`, `.y`
+
+Absolute position of this element's origin:
+
+```js
+const group = builder.group(0);
+console.log(group.x, group.y); // position of the first word group
+```
+
+#### `.width`, `.height`
+
+Total dimensions including indicator overhang:
+
+```js
+const glyph = builder.group(0).glyph(0);
+console.log(glyph.width, glyph.height);
+```
+
+#### `.baseWidth`
+
+Width excluding indicators. Equals `.width` when no indicators are present:
+
+```js
+const glyph = builder.group(0).glyph(0);
+glyph.baseWidth; // just the base character, no indicator overhang
+```
+
+#### `.advanceX`
+
+Horizontal spacing step to the next sibling:
+
+```js
+builder.group(0).advanceX; // how far to advance before the next group
+```
+
+#### `.bounds`
+
+Absolute bounding box (`{ x, y, width, height }`):
+
+```js
+const bounds = builder.group(0).glyph(0).bounds;
+// { x: 0, y: 0, width: 128, height: 256 }
+```
+
+#### `.measure()`
+
+Returns all dimension properties at once in a frozen object. More efficient than reading individual getters when you need multiple values:
+
+```js
+const m = builder.group(0).measure();
+// { x, y, width, height, bounds, advanceX, baseWidth }
+
+// Useful for editor integration
+const cursor = { left: m.x + m.advanceX, top: m.y };
+const highlight = { left: m.bounds.x, width: m.bounds.width };
+```
+
 ### Structural Mutation
 
 All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed). Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
