@@ -7,19 +7,19 @@ Get Bliss SVG Builder installed and render your first SVG.
 ### Using npm
 
 ```bash
-npm install bliss-svg-builder@alpha
+npm install bliss-svg-builder@next
 ```
 
 ### Using pnpm
 
 ```bash
-pnpm add bliss-svg-builder@alpha
+pnpm add bliss-svg-builder@next
 ```
 
 ### Using yarn
 
 ```bash
-yarn add bliss-svg-builder@alpha
+yarn add bliss-svg-builder@next
 ```
 
 ## Import Patterns
@@ -71,7 +71,7 @@ Create shareable examples on CodePen or JSFiddle using unpkg.
 Paste this in the JavaScript panel (with module mode enabled):
 
 ```js
-import { BlissSVGBuilder } from 'https://unpkg.com/bliss-svg-builder@alpha/dist/bliss-svg-builder.esm.js';
+import { BlissSVGBuilder } from 'https://unpkg.com/bliss-svg-builder@next/dist/bliss-svg-builder.esm.js';
 
 const builder = new BlissSVGBuilder('B313');  // "feeling"
 document.body.appendChild(builder.svgElement);

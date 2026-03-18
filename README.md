@@ -1,17 +1,17 @@
-# Bliss SVG Builder - SVG Generator for Blissymbolics
+# Bliss SVG Builder - SVG Toolkit for Blissymbolics
 
-A JavaScript library for generating SVG representations of **Blissymbolics (Bliss)**, an ideographic language, using a compact Domain-Specific Language (DSL).
+A JavaScript library for composing, inspecting, and manipulating **Blissymbolics (Bliss)** symbols, with SVG output for display in browsers and Node.js.
 
-[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/alpha)](https://www.npmjs.com/package/bliss-svg-builder) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@0.1.0-alpha.20,bliss-svg-builder@0.1.0-alpha.20&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
+[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/next)](https://www.npmjs.com/package/bliss-svg-builder) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@1.0.0-rc.1,bliss-svg-builder@1.0.0-rc.1&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
 
-Bliss SVG Builder enables you to **programmatically generate Bliss characters and compositions** in your JavaScript applications. It's designed to power AAC applications, educational tools, communication boards, and any system that needs to **write, render, or display Bliss dynamically.**
+Bliss SVG Builder lets you **build Bliss characters, words, and sentences** from a compact DSL, then **modify, query, and render** the results. It's designed to power websites, AAC applications, educational tools, communication boards, and any project that works with Bliss.
 
 Bliss-SVG-Builder ships with a built-in set of more than 1,100 Bliss characters and 450 graphical shapes defined using the same recursive composition system available to users. You can use these directly, or define your own Bliss characters as needed.
 
 ## Installation
 
 ```bash
-npm install bliss-svg-builder@alpha
+npm install bliss-svg-builder@next
 ```
 
 ## Quick Start
@@ -70,7 +70,7 @@ As a result, it works in:
 
 ## Documentation
 
-For complete documentation including DSL syntax, shapes reference, options, and examples, visit the **[Full Documentation](https://hlridge.github.io/bliss-svg-builder/)**.
+For complete documentation including DSL syntax, mutation API, element inspection, shapes reference, options, and more, visit the **[Full Documentation](https://hlridge.github.io/bliss-svg-builder/)**.
 
 - [Get Started](https://hlridge.github.io/bliss-svg-builder/get-started/installation-setup)
 - [Handbook](https://hlridge.github.io/bliss-svg-builder/handbook/writing/characters-bcodes)
@@ -78,7 +78,7 @@ For complete documentation including DSL syntax, shapes reference, options, and 
 
 ## Stability Notice
 
-**Alpha Software**: This package is in active development. Breaking changes may occur without notice. Use at your own risk.
+**Release Candidate**: The API is considered stable. Breaking changes are unlikely but possible before the final 1.0.0 release.
 
 ## License
 

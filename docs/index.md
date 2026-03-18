@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: Bliss SVG Builder
-  text: Generate SVG for Blissymbolics
-  tagline: Compose and render Blissymbolics using a compact DSL
+  text: SVG Toolkit for Blissymbolics
+  tagline: Compose, inspect, and manipulate Blissymbolics with a full-featured API
   actions:
     - theme: brand
       text: Get Started
@@ -14,14 +14,18 @@ hero:
       link: https://github.com/hlridge/bliss-svg-builder
 
 features:
-  - title: DSL-Powered
-    details: Use a simple domain-specific language to describe Bliss characters and compositions
-  - title: Dynamic Rendering
-    details: Generate SVG output at runtime - no pre-built assets needed
-  - title: Highly Customizable
-    details: Control colors, sizes, spacing, grids and more with flexible options
-  - title: Multi-Format
-    details: Supports ES modules, CommonJS, and UMD for maximum compatibility
+  - title: DSL Composition
+    details: Describe characters, words, and sentences using a compact domain-specific language with inline options
+  - title: Programmatic Mutation
+    details: Modify elements after creation by setting options, replacing parts, or restructuring the tree
+  - title: Element Inspection
+    details: Traverse the element tree, take snapshots, and read computed dimensions at any level
+  - title: Definition Management
+    details: Register custom glyphs and shapes, extend the built-in dictionary, or override existing definitions
+  - title: Flexible Styling
+    details: Control colors, sizes, spacing, margins, cropping, and grid overlays through a rich multi-level options system
+  - title: Multi-Format Output
+    details: Ships as ESM, CommonJS, and UMD, and renders to SVG strings or live DOM elements
 ---
 
 ## Quick Example
@@ -48,7 +52,7 @@ Style with options:
 
 **Blissymbolics (or Bliss)** is an ideographic language in which meaning is expressed through the composition of Bliss characters, each of which carries its own conceptual meaning. It is widely used as an augmentative and alternative communication (AAC) system.
 
-Bliss-SVG-Builder makes it easy to work with the graphical representation of Bliss programmatically, supporting recursive composition of graphical elements and Bliss characters into complete Bliss sentences using SVG.
+Bliss SVG Builder makes it easy to work with the graphical representation of Bliss programmatically, supporting recursive composition of graphical elements and Bliss characters into complete Bliss sentences, with tools for inspecting, modifying, and rendering the result as SVG.
 
 <div style="text-align: center; margin: 3rem 0;">
   <a href="./get-started/installation-setup" class="vp-button brand medium">Get Started</a>
