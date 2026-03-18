@@ -14,11 +14,9 @@ const banner = `/*!
 function addBanner() {
   return {
     name: 'add-banner',
-    generateBundle(options, bundle) {
-      for (const chunk of Object.values(bundle)) {
-        if (chunk.type === 'chunk' && !chunk.code.startsWith(banner)) {
-          chunk.code = banner + chunk.code;
-        }
+    renderChunk(code) {
+      if (!code.startsWith(banner)) {
+        return banner + code;
       }
     },
   };
@@ -48,9 +46,11 @@ export default defineConfig(({ command }) => ({
   },
   plugins: command === 'build' ? [addBanner(), copyFontLicense()] : [],
   build: {
-    minify: 'esbuild',
-    esbuild: {
-      legalComments: 'inline',
+    rolldownOptions: {
+      onwarn(warning, warn) {
+        if (warning.code === 'COMMONJS_VARIABLE_IN_ESM') return;
+        warn(warning);
+      },
     },
     lib: {
       entry: resolve(__dirname, 'src/index.js'),
