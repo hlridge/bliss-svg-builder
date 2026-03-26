@@ -1369,7 +1369,7 @@ class BlissSVGBuilder {
     }
 
     // Otherwise, wrap raw path data in a <path> element
-    return `<path d="${content}"></path>`;
+    return `<path d="${content}"/>`;
   }
 
   /**
@@ -1401,7 +1401,7 @@ class BlissSVGBuilder {
    * @returns {string} SVG string with XML declaration
    */
   get standaloneSvg() {
-    return `<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n${this.#svgCode}`;
+    return `<?xml version="1.0" encoding="utf-8"?>\n${this.#svgCode}`;
   }
 
 
@@ -2039,8 +2039,8 @@ class BlissSVGBuilder {
     const backgroundBottom = this.#processedOptions.backgroundBottom;
     const hasZones = backgroundTop || backgroundMid || backgroundBottom;
 
-    let title = svgTitle ? `<title>${svgTitle}</title>` : "";
-    let desc = svgDesc ? `<desc>${svgDesc}</desc>` : "";
+    let title = svgTitle ? `  <title>${svgTitle}</title>` : "";
+    let desc = svgDesc ? `  <desc>${svgDesc}</desc>` : "";
     let gridPath = "";
     let svgText = "";
 
@@ -2057,14 +2057,14 @@ class BlissSVGBuilder {
       const bottomHeight = round(viewBoxY + viewBoxHeight - 16);
 
       const zoneRects = [
-        topColor ? `<rect class="bliss-background--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
-        midColor ? `<rect class="bliss-background--mid" x="${zoneX}" y="8" width="${zoneWidth}" height="8" stroke="none" fill="${midColor}"/>` : '',
-        bottomColor ? `<rect class="bliss-background--bottom" x="${zoneX}" y="16" width="${zoneWidth}" height="${bottomHeight}" stroke="none" fill="${bottomColor}"/>` : '',
-      ].filter(Boolean).join('\n  ');
+        topColor ? `    <rect class="bliss-background--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
+        midColor ? `    <rect class="bliss-background--mid" x="${zoneX}" y="8" width="${zoneWidth}" height="8" stroke="none" fill="${midColor}"/>` : '',
+        bottomColor ? `    <rect class="bliss-background--bottom" x="${zoneX}" y="16" width="${zoneWidth}" height="${bottomHeight}" stroke="none" fill="${bottomColor}"/>` : '',
+      ].filter(Boolean).join('\n');
 
-      backgroundContent = `<g class="bliss-background">\n  ${zoneRects}\n</g>`;
+      backgroundContent = `  <g class="bliss-background">\n${zoneRects}\n  </g>`;
     } else {
-      backgroundContent = background === "" ? "" : `<rect class="bliss-background" x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`;
+      backgroundContent = background === "" ? "" : `  <rect class="bliss-background" x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`;
     }
 
     // Grid boundaries adjusted for cropping
@@ -2118,23 +2118,23 @@ class BlissSVGBuilder {
       const earthD = 16 >= gridMinY && 16 <= gridMaxY ? hLine(16) : '';
 
       const gridLines = [
-        minorD ? `  <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="${minorD}"/>` : '',
-        mediumD ? `  <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="${mediumD}"/>` : '',
-        majorD ? `  <path class="bliss-grid-line bliss-grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="${majorD}"/>` : '',
-        skyD ? `  <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="${skyD}"/>` : '',
-        earthD ? `  <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="${earthD}"/>` : '',
+        minorD ? `    <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="${minorD}"/>` : '',
+        mediumD ? `    <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="${mediumD}"/>` : '',
+        majorD ? `    <path class="bliss-grid-line bliss-grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="${majorD}"/>` : '',
+        skyD ? `    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="${skyD}"/>` : '',
+        earthD ? `    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="${earthD}"/>` : '',
       ].filter(Boolean).join('\n');
 
-      gridPath =
-  `<style>
-  @supports (-webkit-hyphens: none) {
-    .bliss-grid-line { shape-rendering: geometricPrecision; }
-  }
-</style>
-<g class="bliss-grid" shape-rendering="crispEdges">
-${gridLines}
-</g>
-  `;
+      gridPath = [
+        '  <style>',
+        '    @supports (-webkit-hyphens: none) {',
+        '      .bliss-grid-line { shape-rendering: geometricPrecision; }',
+        '    }',
+        '  </style>',
+        '  <g class="bliss-grid" shape-rendering="crispEdges">',
+        gridLines,
+        '  </g>',
+      ].join('\n');
     }
 
     // Build content group attributes: defaults + all global SVG attributes
@@ -2152,15 +2152,21 @@ ${gridLines}
 
     const generator = LIB_VERSION ? `bliss-svg-builder/${LIB_VERSION}` : 'bliss-svg-builder';
 
-    let svgStr =
-`<svg xmlns="http://www.w3.org/2000/svg" data-generator="${generator}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}">
-  ${title}${desc}${backgroundContent}${gridPath}<g class="bliss-content" ${contentAttrsStr}>
-    ${content}
-  </g>${svgText}
-</svg>`;
+    let svgStr = [
+      `<svg xmlns="http://www.w3.org/2000/svg" data-generator="${generator}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}">`,
+      title,
+      desc,
+      backgroundContent,
+      gridPath,
+      `  <g class="bliss-content" ${contentAttrsStr}>`,
+      `    ${content}`,
+      '  </g>',
+      svgText,
+      '</svg>',
+    ].filter(Boolean).join('\n');
 
-    // Clean up empty <path d=""></path> elements from DOT/COMMA/external glyphs
-    svgStr = svgStr.replace(/<path d=""><\/path>/g, '');
+    // Clean up empty <path d=""/> elements from DOT/COMMA/external glyphs
+    svgStr = svgStr.replace(/<path d=""\/>/g, '');
 
     return svgStr;
   }

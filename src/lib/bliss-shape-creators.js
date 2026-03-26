@@ -44,7 +44,7 @@ export function createTextFallbackGlyph(str) {
     getPath: (x, y, options = {}) => {
       const fill = escapeHtml(options.color || '#000000');
       const safeStr = escapeHtml(str);
-      const closePath = `"></path>`;
+      const closePath = `"/>`;
       const openPath = `<path d="`;
       const baseline = 16;
       const textX = x - 0.3;
@@ -489,11 +489,11 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
       const dotStrokeWidth = (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
       const dotStrokeRadius = dotStrokeWidth / 2;
       return {
-        closePath: `"></path>`,
+        closePath: `"/>`,
         openWrapper: `<g stroke-width="${dotStrokeWidth}">`,
         openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
-        closeDotPath: `"></path>`,
+        closeDotPath: `"/>`,
         closeWrapper: `</g>`,
         openPath: `<path d="`
       };
@@ -547,16 +547,16 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
       const commaQX = commaStrokeWidth / 4
       const commaQY = commaStrokeWidth * 2.5;
       return {
-        closePath: `"></path>`,
+        closePath: `"/>`,
         openDotWrapper: `<g stroke-width="${dotStrokeWidth}">`,
         openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
-        closeDotPath: `"></path>`,
+        closeDotPath: `"/>`,
         closeDotWrapper: `</g>`,
         openCommaWrapper: `<g stroke-width="${commaStrokeWidth}">`,
         openCommaPath: `<path d="`,
         commaPath: `M${commaStartX},${commaStartY}q${commaQX},${commaQY} ${commaEndX},${commaEndY}`,
-        closeCommaPath: `"></path>`,
+        closeCommaPath: `"/>`,
         closeCommaWrapper: `</g>`,
         openPath: `<path d="`
       };
@@ -618,7 +618,7 @@ export function createExternalGlyph(glyph) {
   const aObj = alphabetData[`X${glyph}`];
   const adjustX = -aObj.leftSideBearing;
   const adjustY = -0.015; //revisit this
-  const closePath = `"></path>`;
+  const closePath = `"/>`;
   const glyphPath = aObj?.getPath() || "";
   const openPath = `<path d="`;
 

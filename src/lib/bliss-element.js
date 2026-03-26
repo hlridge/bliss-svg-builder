@@ -55,7 +55,7 @@ export class BlissElement {
     const needsPathWrapper = !content.startsWith('<');
 
     if (hasHref) {
-      const wrappedContent = needsPathWrapper ? `<path d="${content}"></path>` : content;
+      const wrappedContent = needsPathWrapper ? `<path d="${content}"/>` : content;
       if (groupAttrs) {
         return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${wrappedContent}</g></a>`;
       }
@@ -63,7 +63,7 @@ export class BlissElement {
     }
 
     if (groupAttrs) {
-      const wrappedContent = needsPathWrapper ? `<path d="${content}"></path>` : content;
+      const wrappedContent = needsPathWrapper ? `<path d="${content}"/>` : content;
       return `<g ${groupAttrs}>${wrappedContent}</g>`;
     }
 
@@ -360,7 +360,7 @@ export class BlissElement {
         const hasRawContent = childContents.some(c => !c.startsWith('<'));
 
         const content = hasTaggedContent && hasRawContent
-          ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+          ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
         // At level 0 (sentence/global), only pass anchor attributes to #wrapWithAnchorAndGroup
@@ -442,7 +442,7 @@ export class BlissElement {
         const hasRawContent = childContents.some(c => !c.startsWith('<'));
 
         const content = hasTaggedContent && hasRawContent
-          ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+          ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
         return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
@@ -571,7 +571,7 @@ export class BlissElement {
             const hasRawContent = childContents.some(c => !c.startsWith('<'));
 
             const content = hasTaggedContent && hasRawContent
-              ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+              ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
               : childContents.join('');
 
             return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
@@ -1103,7 +1103,7 @@ export class BlissElement {
       const hasRawContent = childContents.some(c => !c.startsWith('<'));
 
       const content = hasTaggedContent && hasRawContent
-        ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"></path>`).join('')
+        ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
         : childContents.join('');
 
       return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
