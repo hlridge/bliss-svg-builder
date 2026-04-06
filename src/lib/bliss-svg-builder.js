@@ -726,7 +726,7 @@ class BlissSVGBuilder {
     } else {
       // Insert in middle: before the target raw index, add [space, newGroup]
       const rawIndex = indices[index];
-      groups.splice(rawIndex, 0, BlissSVGBuilder.#makeSpaceGroup(), newGroup);
+      groups.splice(rawIndex, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
     }
 
     this.#rebuild();

@@ -407,6 +407,10 @@ export class ElementHandle {
     }
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.splice(index, 0, ...newParts);
+    // Adding parts changes the glyph's composition, so clear its identity
+    // so toString() serializes the individual parts instead of the old code.
+    delete glyph.isBlissGlyph;
+    delete glyph.codeName;
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
