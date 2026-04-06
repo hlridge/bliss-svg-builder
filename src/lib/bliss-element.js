@@ -1049,12 +1049,6 @@ export class BlissElement {
         pathOptions
       );
 
-      // If the definition returns SVG tags (like DOT/COMMA with extraPathOptions),
-      // return as-is without wrapping
-      if (pathData.includes('<')) {
-        return pathData;
-      }
-
       return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options);
     };
   }
