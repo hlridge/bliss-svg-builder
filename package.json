@@ -78,11 +78,11 @@
   },
   "homepage": "https://hlridge.github.io/bliss-svg-builder/",
   "devDependencies": {
-    "@vitest/ui": "^4.1.0",
+    "@vitest/ui": "^4.1.4",
     "canvas": "^3.2.1",
     "vite": "^8.0.8",
     "vitepress": "^1.6.4",
-    "vitest": "^4.1.0",
+    "vitest": "^4.1.4",
     "vue": "^3.5.30"
   },
   "pnpm": {
@@ -90,7 +90,9 @@
       "canvas"
     ],
     "overrides": {
-      "esbuild": ">=0.25.0"
+      "esbuild": ">=0.25.0",
+      "picomatch": ">=4.0.4",
+      "vitepress>vite": ">=6.4.2"
     }
   }
 }
