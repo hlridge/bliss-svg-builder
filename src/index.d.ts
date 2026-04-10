@@ -404,8 +404,8 @@ export declare class BlissSVGBuilder {
   /** Root element snapshot (frozen tree of all elements). */
   readonly elements: ElementSnapshot;
 
-  /** Non-space group snapshots (words only). */
-  readonly words: readonly ElementSnapshot[];
+  /** Non-space group snapshots. */
+  readonly groups: readonly ElementSnapshot[];
 
   /** Group and glyph counts. */
   readonly stats: BuilderStats;

@@ -449,7 +449,7 @@ class BlissSVGBuilder {
   #rebuild() {
     this.#generation++;
     this.#elementsCache = undefined;
-    this.#wordsCache = undefined;
+    this.#groupsCache = undefined;
     this.#warnings = [];
 
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
@@ -1007,22 +1007,22 @@ class BlissSVGBuilder {
     return this;
   }
 
-  #wordsCache;
+  #groupsCache;
 
   /**
-   * Returns non-space group snapshots (words only, no space groups).
+   * Returns non-space group snapshots.
    * Cached and frozen.
    *
    * @returns {ElementSnapshot[]}
    */
-  get words() {
-    if (!this.#wordsCache) {
+  get groups() {
+    if (!this.#groupsCache) {
       const groups = this.elements.children.filter(g =>
-        g.type === 'group' && g.children.some(c => c.codeName !== '')
+        g.type === 'group' && !g.isSpaceGroup
       );
-      this.#wordsCache = Object.freeze(groups);
+      this.#groupsCache = Object.freeze(groups);
     }
-    return this.#wordsCache;
+    return this.#groupsCache;
   }
 
   /**
