@@ -2,7 +2,7 @@
 
 A JavaScript library for composing, inspecting, and manipulating **Blissymbolics (Bliss)** symbols, with SVG output for display in browsers and Node.js.
 
-[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/next)](https://www.npmjs.com/package/bliss-svg-builder) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@1.0.0-rc.1,bliss-svg-builder@1.0.0-rc.1&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
+[![npm version](https://img.shields.io/npm/v/bliss-svg-builder/next)](https://www.npmjs.com/package/bliss-svg-builder) ![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg) ![bundlejs](https://deno.bundlejs.com/badge?q=bliss-svg-builder@1.0.0-rc.2,bliss-svg-builder@1.0.0-rc.2&treeshake=[*],[{+default+as+blissSvgBuilderDefault1+}])
 
 Bliss SVG Builder lets you **build Bliss characters, words, and sentences** from a compact DSL, then **modify, query, and render** the results. It's designed to power websites, AAC applications, educational tools, communication boards, and any project that works with Bliss.
 

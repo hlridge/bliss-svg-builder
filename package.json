@@ -1,6 +1,6 @@
 {
   "name": "bliss-svg-builder",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "description": "Compose, render, and manipulate Blissymbolics SVG using a compact DSL and a programmatic mutation API.",
   "main": "dist/bliss-svg-builder.cjs",
   "module": "dist/bliss-svg-builder.esm.js",
@@ -80,7 +80,7 @@
   "devDependencies": {
     "@vitest/ui": "^4.1.0",
     "canvas": "^3.2.1",
-    "vite": "^8.0.0",
+    "vite": "^8.0.8",
     "vitepress": "^1.6.4",
     "vitest": "^4.1.0",
     "vue": "^3.5.30"
