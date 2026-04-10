@@ -87,7 +87,7 @@ Returns the SVG with an XML declaration, suitable for saving as `.svg` files:
 ```js
 const builder = new BlissSVGBuilder('B313');
 const fileContent = builder.standaloneSvg;
-// '<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n<svg ...>...</svg>'
+// '<?xml version="1.0" encoding="utf-8"?>\n<svg ...>...</svg>'
 ```
 
 Use for: `.svg` file export, standalone SVG documents.
@@ -99,7 +99,7 @@ Returns only the inner SVG content (paths and groups) without the `<svg>` wrappe
 ```js
 const builder = new BlissSVGBuilder('B313');
 const inner = builder.svgContent;
-// '<path d="..."></path>' or '<g ...>...</g>'
+// '<path d="..."/>' or '<g ...>...</g>'
 ```
 
 Use for: compositing into larger SVG documents, extracting raw path data.
