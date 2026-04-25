@@ -2172,7 +2172,4 @@ class BlissSVGBuilder {
   }
 }
 
-if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') {
-  module.exports = { BlissSVGBuilder }; // CommonJS exports
-}
-export { BlissSVGBuilder }; // ES module export
+export { BlissSVGBuilder };

@@ -46,12 +46,6 @@ export default defineConfig(({ command }) => ({
   },
   plugins: command === 'build' ? [addBanner(), copyFontLicense()] : [],
   build: {
-    rolldownOptions: {
-      onwarn(warning, warn) {
-        if (warning.code === 'COMMONJS_VARIABLE_IN_ESM') return;
-        warn(warning);
-      },
-    },
     lib: {
       entry: resolve(__dirname, 'src/index.js'),
       name: 'BlissSVGBuilder',
