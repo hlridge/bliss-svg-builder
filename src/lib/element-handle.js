@@ -194,6 +194,8 @@ export class ElementHandle {
     return Object.freeze({
       x: snap.x,
       y: snap.y,
+      offsetX: snap.offsetX,
+      offsetY: snap.offsetY,
       width: snap.width,
       height: snap.height,
       bounds: snap.bounds,

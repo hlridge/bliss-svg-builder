@@ -138,7 +138,7 @@ export declare class ElementHandle {
   /** The code name of this element. */
   readonly codeName: string;
 
-  /** Stable element identifier matching `snapshot.key` for the same node. */
+  /** Stable across mutations. Use with `getElementByKey(key)` to recover a handle to this same node later. */
   readonly key: string;
 
   /** Whether this part is an indicator. Only true on part-level handles. */
@@ -184,6 +184,8 @@ export declare class ElementHandle {
   measure(): {
     x: number;
     y: number;
+    offsetX: number;
+    offsetY: number;
     width: number;
     height: number;
     bounds: ElementBounds;
