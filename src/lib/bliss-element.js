@@ -831,8 +831,20 @@ export class BlissElement {
     return this.#isExternalGlyph;
   }
 
+  get isRoot() {
+    return this.#level === 0;
+  }
+
+  get isGroup() {
+    return this.#level === 1;
+  }
+
   get isGlyph() {
-    return this.#isBlissGlyph || this.#isExternalGlyph;
+    return this.#level === 2;
+  }
+
+  get isPart() {
+    return this.#level >= 3;
   }
 
   get key() {
@@ -891,6 +903,10 @@ export class BlissElement {
       advanceX: this.#advanceX || 0,
       baseWidth: this.baseWidth,
       level: this.#level,
+      isRoot: this.#level === 0,
+      isGroup: this.#level === 1,
+      isGlyph: this.#level === 2,
+      isPart: this.#level >= 3,
       bounds: Object.freeze(this.#calculateBounds(parentOffsetX, parentOffsetY)),
       isIndicator: this.isIndicator,
       isShape: !!this.#isShape,
