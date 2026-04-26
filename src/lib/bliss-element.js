@@ -764,7 +764,7 @@ export class BlissElement {
     if (this.#height !== undefined) {
       return this.#height;
     }
-    if (this.isGlyph) {
+    if (this.#level === 2) {
       return 20;
     }
     if (this.#children && this.#children.length > 0) {
