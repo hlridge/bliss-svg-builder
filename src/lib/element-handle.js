@@ -149,7 +149,7 @@ export class ElementHandle {
     if (this.#level === 2) {
       const groupSnap = snap.children[idx.groupIndex];
       if (!groupSnap) throw new Error('Snapshot not found for group in glyph handle.');
-      const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+      const glyphs = groupSnap.children.filter(c => c.isGlyph);
       const glyphSnap = glyphs[idx.glyphIndex];
       if (!glyphSnap) throw new Error('Snapshot not found for glyph handle.');
       return glyphSnap;
@@ -158,7 +158,7 @@ export class ElementHandle {
     if (this.#level === 3) {
       const groupSnap = snap.children[idx.groupIndex];
       if (!groupSnap) throw new Error('Snapshot not found for group in part handle.');
-      const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+      const glyphs = groupSnap.children.filter(c => c.isGlyph);
       const glyphSnap = glyphs[idx.glyphIndex];
       if (!glyphSnap) throw new Error('Snapshot not found for glyph in part handle.');
       return glyphSnap.children[idx.partIndex];
@@ -314,7 +314,7 @@ export class ElementHandle {
     const groupSnap = snap.children[groupIndex];
     if (!groupSnap) return null;
 
-    const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+    const glyphs = groupSnap.children.filter(c => c.isGlyph);
     const headIndex = glyphs.findIndex(g => g.isHeadGlyph);
     const index = headIndex >= 0 ? headIndex : 0;
 

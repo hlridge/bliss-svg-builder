@@ -556,7 +556,7 @@ class BlissSVGBuilder {
         return new ElementHandle(this.#mutationCtx, 1, rawGroup);
       }
 
-      const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
+      const glyphs = groupSnap.children.filter(c => c.isGlyph);
       for (let gi = 0; gi < glyphs.length; gi++) {
         const rawGlyph = rawGroup.glyphs[gi];
         if (glyphs[gi].key === key) {
@@ -1018,7 +1018,7 @@ class BlissSVGBuilder {
   get groups() {
     if (!this.#groupsCache) {
       const groups = this.elements.children.filter(g =>
-        g.type === 'group' && !g.isSpaceGroup
+        g.isGroup && !g.isSpaceGroup
       );
       this.#groupsCache = Object.freeze(groups);
     }
