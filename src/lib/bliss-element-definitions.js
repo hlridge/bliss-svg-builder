@@ -13,10 +13,10 @@ import { alphabetData } from "../external-font-data/liberation-sans-svg-path-dat
  * These codes have dynamic width calculated by BlissElement.
  * DO NOT rename or remove these without updating BlissElement.
  */
-const SPACE_GLYPH_CODES = Object.freeze(new Set(['TSP', 'QSP']));
+const SPACE_GLYPH_CODES = ['TSP', 'QSP'];
 
 export function isSpaceGlyph(code) {
-  return SPACE_GLYPH_CODES.has(code);
+  return SPACE_GLYPH_CODES.includes(code);
 }
 
 // Non-shape elements: spacing and anchors
