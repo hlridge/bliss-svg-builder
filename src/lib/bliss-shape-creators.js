@@ -5,7 +5,7 @@
  */
 
 import { alphabetData } from "../external-font-data/liberation-sans-svg-path-data.js";
-import { escapeHtml } from "./bliss-constants.js";
+import { escapeHtml, APPROX_GLYPH_MIN_Y } from "./bliss-constants.js";
 
 /**
  * Checks if a character has hardcoded path data available.
@@ -35,9 +35,7 @@ export function createTextFallbackGlyph(str) {
   }, 0);
   const charSpacing = (str.length - 1) * defaultCharSpace;
   const width = charWidths + charSpacing;
-  // Approximate content bounds for effectiveBounds calculation.
-  // y=11 is a rough minY; actual values vary per glyph.
-  const approxMinY = 11;
+  const approxMinY = APPROX_GLYPH_MIN_Y;
   const maxY = 16;
 
   return {
@@ -367,7 +365,7 @@ export function createDescendingDiagonalLine(width, height) {
 */
 export function createDiagonalLineOutsideCircle(size, direction) {
   const radius = size / 2;
-  const lineWidth = radius * (1 - 0.70711);
+  const lineWidth = radius * (1 - Math.SQRT1_2);
   const lineHeight = lineWidth;
 
   const directionMapping = {
@@ -397,7 +395,7 @@ export function createDiagonalLineOutsideCircle(size, direction) {
  * @returns {Object} - An object with a getPath method, width, and height properties.
 */
 export function createAscendingDiagonalLineInsideCircle(radius) {
-  const lineWidth = radius * 2 * 0.70711;
+  const lineWidth = radius * 2 * Math.SQRT1_2;
   const lineHeight = lineWidth;
 
   return {
@@ -420,7 +418,7 @@ export function createAscendingDiagonalLineInsideCircle(radius) {
  * @returns {Object} - An object with a getPath method, width, and height properties.
 */
 export function createDescendingDiagonalLineInsideCircle(radius) {
-  const lineWidth = radius * 2 * 0.70711;
+  const lineWidth = radius * 2 * Math.SQRT1_2;
   const lineHeight = lineWidth;
 
   return {
@@ -624,10 +622,8 @@ export function createExternalGlyph(glyph) {
 
   const round = (num) => parseFloat(num.toFixed(4));
 
-  // Approximate content bounds for effectiveBounds calculation.
-  // y=11 is a rough minY; actual values vary per glyph.
   // aObj.height is actually maxY (where the bottom of the glyph path sits), not content height.
-  const approxMinY = 11;
+  const approxMinY = APPROX_GLYPH_MIN_Y;
   const maxY = aObj.height || 0;
 
   return {

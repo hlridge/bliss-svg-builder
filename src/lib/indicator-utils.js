@@ -10,7 +10,7 @@ import { SEMANTIC_INDICATOR_ROOTS } from './bliss-constants.js';
  * Extract the bare B-code from a code string that may include
  * option prefixes (e.g. '[color=red]>B81') and position suffixes (':0,4').
  */
-function getBareCode(str) {
+export function getBareCode(str) {
   const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
   if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
   const optionsMatch = str.match(/^(\[.*?\])(?!>)/);

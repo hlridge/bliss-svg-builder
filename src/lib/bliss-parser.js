@@ -16,8 +16,10 @@ import {
   getSemanticRoot,
   hasSemantic,
   filterToIndicators,
-  buildWithSemantic
+  buildWithSemantic,
+  getBareCode
 } from "./indicator-utils.js";
+import { MAX_RECURSION_DEPTH } from "./bliss-constants.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -375,15 +377,6 @@ export class BlissParser {
           });
         };
 
-        // Helper: get bare code from string with potential options prefix
-        const getBareCode = (str) => {
-          const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
-          if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
-          const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
-          const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
-          return code.split(':')[0].split(';')[0];
-        };
-
         // After ;; modifies a glyph's .part, update its identity (isBlissGlyph/glyphCode).
         // If the new part is a bare known glyph, restore identity; otherwise clear it.
         const updateGlyphIdentity = (expandedPart) => {
@@ -491,7 +484,7 @@ export class BlissParser {
         // isTopLevel: true for user input, false for internal codeString expansion
         // Indicator replacement only applies at top level (user input)
         function expand(str, definitions, isTopLevel = true, depth = 0) {
-          if (depth > 50) throw new Error('Maximum recursion depth exceeded');
+          if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
           let isHeadGlyph = false;
           if (str.endsWith('^')) {
             if (!headGlyphFound) {
@@ -859,7 +852,7 @@ export class BlissParser {
         }
 
         const parseParts = (partsString, depth = 0) => {
-          if (depth > 50) throw new Error('Maximum recursion depth exceeded');
+          if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
           const parts = [];
 
           // Split on ; (brackets are already replaced with placeholders at this point)
@@ -1027,7 +1020,7 @@ export class BlissParser {
    * of part objects, recursively expanding nested definitions.
    */
   static #parseCodeStringToParts(codeString, depth = 0) {
-    if (depth > 50) throw new Error('Maximum recursion depth exceeded');
+    if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
     const segments = codeString.split(';');
     const parts = [];
 

@@ -136,3 +136,16 @@ export const SEMANTIC_INDICATOR_ROOTS = {
   thing: 'B97',
   abstract: 'B6436'
 };
+
+/**
+ * Maximum allowed depth for element nesting and parser recursion.
+ * Prevents stack overflow on pathological or self-referential definitions.
+ */
+export const MAX_RECURSION_DEPTH = 50;
+
+/**
+ * Approximate minimum y-coordinate for content bounds in external glyphs
+ * and text fallbacks. Actual values vary per glyph; this is used for
+ * effectiveBounds estimation only.
+ */
+export const APPROX_GLYPH_MIN_Y = 11;
