@@ -86,19 +86,9 @@ export interface ElementBounds {
   readonly height: number;
 }
 
-/** Snapshot type identifiers. */
-export type ElementType =
-  | 'root'
-  | 'group'
-  | 'glyph'
-  | 'characterPart'
-  | 'shape'
-  | 'part';
-
 /** A frozen, read-only snapshot of an element in the composition tree. */
 export interface ElementSnapshot {
   readonly key: string;
-  readonly type: ElementType;
   readonly codeName: string;
   readonly x: number;
   readonly y: number;

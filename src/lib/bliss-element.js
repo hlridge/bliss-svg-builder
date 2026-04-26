@@ -330,7 +330,6 @@ export class BlissElement {
 
       for (const group of this.#blissObj.groups) {
         const child = new BlissElement(group, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
-        child.type = "group";
         this.#children.push(child);
       }
       
@@ -385,7 +384,6 @@ export class BlissElement {
 
       for (const glyph of this.#blissObj.glyphs) {
         const child = new BlissElement(glyph, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
-        child.type = "glyph";
         this.#children.push(child);
       }
 
@@ -462,7 +460,6 @@ export class BlissElement {
 
         for (const part of this.#blissObj.parts) {
           const child = new BlissElement(part, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
-          child.type = "characterPart";
           this.#children.push(child);
         }
 
@@ -480,7 +477,6 @@ export class BlissElement {
                 level: this.#level + 1,
                 sharedOptions: this.#sharedOptions,
               });
-              child.type = "characterPart";
               this.#children.push(child);
             }
           } else {
@@ -881,18 +877,8 @@ export class BlissElement {
 
     const children = Object.freeze(childSnapshots);
 
-    // Determine type from level and set type
-    let type;
-    if (this.#level === 0) type = 'root';
-    else if (this.type === 'group') type = 'group';
-    else if (this.type === 'glyph') type = 'glyph';
-    else if (this.type === 'characterPart') type = 'characterPart';
-    else if (this.#isShape || (this.#leafWidth !== undefined)) type = 'shape';
-    else type = 'part';
-
     return Object.freeze({
       key: this.#key,
-      type,
       codeName: this.#codeName || '',
       x: absX,
       y: absY,
