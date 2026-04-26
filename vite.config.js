@@ -41,6 +41,9 @@ function copyFontLicense() {
 }
 
 export default defineConfig(({ command }) => ({
+  // __LIB_VERSION__ is replaced at build time and read by bliss-constants.js
+  // to expose the package version. Banner and font-license plugins run on
+  // build only, not during dev/test.
   define: {
     __LIB_VERSION__: JSON.stringify(pkg.version),
   },

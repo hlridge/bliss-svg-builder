@@ -1,3 +1,9 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 const digitKerning = {
   B9: -1, B10: -1, B11: -1, B12: -1, B13: -1,
   B14: -1, B15: -1, B16: -1, B17: -1, B18: -1

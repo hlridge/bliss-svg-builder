@@ -418,6 +418,12 @@ export class ElementHandle {
 
   // --- Mutation: detach (plain splice, no cascade) ---
 
+  /**
+   * Removes this node from the tree without cascading deletions to its parent.
+   * Terminal mutation: returns undefined (not chainable), since the handle's
+   * node is no longer reachable after detach.
+   * @returns {undefined}
+   */
   detach() {
     this.#assertReachable();
 
@@ -455,6 +461,13 @@ export class ElementHandle {
 
   // --- Mutation: remove ---
 
+  /**
+   * Removes this node and cascades cleanup upward (e.g. removing the last
+   * part also removes its glyph; removing the last glyph also removes its
+   * group and surrounding spaces). Terminal mutation: returns undefined
+   * (not chainable), since the handle's node is no longer reachable.
+   * @returns {undefined}
+   */
   remove() {
     this.#assertReachable();
     const raw = this.#ctx.getRaw();
