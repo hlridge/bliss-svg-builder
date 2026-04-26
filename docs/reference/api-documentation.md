@@ -600,6 +600,26 @@ On a part handle, returns `true` if this part is an indicator. Returns `false` o
 builder.glyph(0).part(1).isIndicator; // true for indicator parts
 ```
 
+#### `.key`
+
+Stable across mutations. Use with `getElementByKey(key)` to recover a handle to this same node later:
+
+```js
+const key = builder.glyph(0).key;
+// later, after mutations elsewhere
+const handle = builder.getElementByKey(key);
+```
+
+#### `.isShape`, `.isBlissGlyph`, `.isExternalGlyph`, `.isHeadGlyph`, `.isSpaceGroup`
+
+Content flags mirroring the same-named fields on snapshots. Each returns `false` when not applicable to the handle's level (e.g., `.isHeadGlyph` is `false` on group and part handles):
+
+```js
+builder.glyph(0).isBlissGlyph;          // true for B-code characters
+builder.group(0).headGlyph().isHeadGlyph; // true on the head glyph
+builder.element(1).isSpaceGroup;        // true for auto-inserted spaces
+```
+
 ### Dimensions
 
 Handles expose read-only dimension getters that pull values from the snapshot tree. These are live: they reflect the current state and update automatically after mutations.
@@ -611,6 +631,15 @@ Absolute position of this element's origin:
 ```js
 const group = builder.group(0);
 console.log(group.x, group.y); // position of the first word group
+```
+
+#### `.offsetX`, `.offsetY`
+
+Position offset relative to the parent. Useful when computing local layout without mixing in ancestor offsets:
+
+```js
+const part = builder.glyph(0).part(1);
+console.log(part.offsetX, part.offsetY); // offset within its glyph
 ```
 
 #### `.width`, `.height`
