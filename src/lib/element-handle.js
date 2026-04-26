@@ -169,11 +169,25 @@ export class ElementHandle {
 
   get x() { return this.#findSnapshot().x; }
   get y() { return this.#findSnapshot().y; }
+  get offsetX() { return this.#findSnapshot().offsetX; }
+  get offsetY() { return this.#findSnapshot().offsetY; }
   get width() { return this.#findSnapshot().width; }
   get height() { return this.#findSnapshot().height; }
   get bounds() { return this.#findSnapshot().bounds; }
   get advanceX() { return this.#findSnapshot().advanceX; }
   get baseWidth() { return this.#findSnapshot().baseWidth; }
+
+  // --- Identity (read-only, from snapshot) ---
+
+  get key() { return this.#findSnapshot().key; }
+
+  // --- Content flags (read-only, from snapshot) ---
+
+  get isShape() { return this.#findSnapshot().isShape; }
+  get isBlissGlyph() { return this.#findSnapshot().isBlissGlyph; }
+  get isExternalGlyph() { return this.#findSnapshot().isExternalGlyph; }
+  get isHeadGlyph() { return this.#findSnapshot().isHeadGlyph; }
+  get isSpaceGroup() { return this.#findSnapshot().isSpaceGroup; }
 
   measure() {
     const snap = this.#findSnapshot();

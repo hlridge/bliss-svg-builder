@@ -138,8 +138,26 @@ export declare class ElementHandle {
   /** The code name of this element. */
   readonly codeName: string;
 
+  /** Stable element identifier matching `snapshot.key` for the same node. */
+  readonly key: string;
+
   /** Whether this part is an indicator. Only true on part-level handles. */
   readonly isIndicator: boolean;
+
+  /** Whether this part is a shape primitive. */
+  readonly isShape: boolean;
+
+  /** Whether this glyph is a B-code Bliss character. */
+  readonly isBlissGlyph: boolean;
+
+  /** Whether this glyph is an external font character. */
+  readonly isExternalGlyph: boolean;
+
+  /** Whether this glyph is the head of its word group. */
+  readonly isHeadGlyph: boolean;
+
+  /** Whether this group is a space separator (TSP/QSP). */
+  readonly isSpaceGroup: boolean;
 
   // --- Dimensions (read-only, from snapshot) ---
 
@@ -147,6 +165,10 @@ export declare class ElementHandle {
   readonly x: number;
   /** Absolute y position of this element's origin. */
   readonly y: number;
+  /** Position offset relative to the parent. */
+  readonly offsetX: number;
+  /** Position offset relative to the parent. */
+  readonly offsetY: number;
   /** Total width including indicator overhang. */
   readonly width: number;
   /** Total height. */
