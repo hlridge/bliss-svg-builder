@@ -298,6 +298,18 @@ snap.children[1].isSpaceGroup; // true  (space group)
 snap.children[2].isSpaceGroup; // false (word group)
 ```
 
+Every snapshot node carries `level` (a number: `0` root, `1` group, `2` glyph, `3+` part) and four convenience booleans derived from it: `isRoot`, `isGroup`, `isGlyph`, `isPart`. Use these to filter or branch by structural depth without comparing strings:
+
+```js
+const snap = builder.snapshot();
+snap.isRoot;                                     // true
+snap.children[0].isGroup;                        // true
+snap.children[0].children[0].isGlyph;            // true
+snap.children[0].children[0].children[0].isPart; // true
+```
+
+Content flags (`isShape`, `isBlissGlyph`, `isExternalGlyph`, `isIndicator`, `isHeadGlyph`, `isSpaceGroup`) are orthogonal to level. For example, an inline composite character has `isGlyph: true` and `isBlissGlyph: false`.
+
 ### `stats`
 
 Returns group and glyph counts:
@@ -313,7 +325,7 @@ Depth-first walk of all element snapshots. Return `false` to stop early:
 
 ```js
 builder.traverse(el => {
-  console.log(el.type, el.codeName);
+  console.log(el.level, el.codeName);
 });
 ```
 
@@ -322,7 +334,7 @@ builder.traverse(el => {
 Returns all element snapshots matching a predicate:
 
 ```js
-const glyphs = builder.query(el => el.type === 'glyph');
+const glyphs = builder.query(el => el.isGlyph);
 ```
 
 ## Builder Mutation
@@ -532,9 +544,21 @@ g.codeName;                         // 'B431' -- still works
 
 ### Navigation
 
-#### `.level`
+#### `.level`, `.isGroup`, `.isGlyph`, `.isPart`
 
-Returns `'group'`, `'glyph'`, or `'part'`.
+`level` is a number: `1` for group handles, `2` for glyph handles, `3+` for part handles (matches `snapshot.level`). The three boolean getters are conveniences for branching by structural depth:
+
+```js
+const g = builder.group(0);
+g.level;    // 1
+g.isGroup;  // true
+
+const c = g.glyph(0);
+c.level;    // 2
+c.isGlyph;  // true
+```
+
+(Handles never represent the root, so there is no `isRoot`.)
 
 #### `.glyph(index)`
 
