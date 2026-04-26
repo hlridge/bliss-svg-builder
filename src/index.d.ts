@@ -127,17 +127,23 @@ export interface ElementSnapshot {
 
 // --- Element handle (live mutation API) ---
 
-/** Level of an element in the composition tree. */
-export type HandleLevel = 'group' | 'glyph' | 'part';
-
 /**
  * A live handle referencing a node in the raw composition object.
  * Returned by `getElementByKey()`, `group()`, `glyph()`, and `part()`.
  * Mutations through a handle trigger a rebuild of the composition.
  */
 export declare class ElementHandle {
-  /** The structural level of this element. */
-  readonly level: HandleLevel;
+  /** Structural depth: 1 = group, 2 = glyph, 3+ = part. */
+  readonly level: number;
+
+  /** True when level === 1 (a word group). */
+  readonly isGroup: boolean;
+
+  /** True when level === 2 (a Bliss character). */
+  readonly isGlyph: boolean;
+
+  /** True when level >= 3 (a part within a character). */
+  readonly isPart: boolean;
 
   /** The code name of this element. */
   readonly codeName: string;

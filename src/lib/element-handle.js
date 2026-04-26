@@ -66,11 +66,11 @@ export class ElementHandle {
     const raw = this.#ctx.getRaw();
     const groups = raw.groups || [];
 
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       return groups.indexOf(this.#nodeRef) >= 0;
     }
 
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       for (const group of groups) {
         const gi = (group.glyphs || []).indexOf(this.#nodeRef);
         if (gi >= 0) {
@@ -81,7 +81,7 @@ export class ElementHandle {
       return false;
     }
 
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       for (const group of groups) {
         for (const glyph of (group.glyphs || [])) {
           const pi = (glyph.parts || []).indexOf(this.#nodeRef);
@@ -107,6 +107,18 @@ export class ElementHandle {
     return this.#level;
   }
 
+  get isGroup() {
+    return this.#level === 1;
+  }
+
+  get isGlyph() {
+    return this.#level === 2;
+  }
+
+  get isPart() {
+    return this.#level >= 3;
+  }
+
   get codeName() {
     this.#assertReachable();
     return this.#nodeRef?.glyphCode || this.#nodeRef?.codeName || '';
@@ -114,7 +126,7 @@ export class ElementHandle {
 
   get isIndicator() {
     this.#assertReachable();
-    if (this.#level !== 'part') return false;
+    if (this.#level !== 3) return false;
     return this.#nodeRef?.isIndicator === true;
   }
 
@@ -128,13 +140,13 @@ export class ElementHandle {
     }
     const snap = this.#ctx.getSnapshot();
 
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       const groupSnap = snap.children[idx];
       if (!groupSnap) throw new Error('Snapshot not found for group handle.');
       return groupSnap;
     }
 
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       const groupSnap = snap.children[idx.groupIndex];
       if (!groupSnap) throw new Error('Snapshot not found for group in glyph handle.');
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
@@ -143,7 +155,7 @@ export class ElementHandle {
       return glyphSnap;
     }
 
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       const groupSnap = snap.children[idx.groupIndex];
       if (!groupSnap) throw new Error('Snapshot not found for group in part handle.');
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
@@ -178,18 +190,18 @@ export class ElementHandle {
 
   // Resolve the current index of this node within its parent array
   #resolveIndex() {
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       const groups = this.#ctx.getRaw().groups;
       return groups.indexOf(this.#nodeRef);
     }
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       const groupIndex = this.#ctx.getRaw().groups.indexOf(this.#parentRef);
       if (groupIndex < 0) return null;
       const glyphIndex = this.#parentRef.glyphs?.indexOf(this.#nodeRef) ?? -1;
       if (glyphIndex < 0) return null;
       return { groupIndex, glyphIndex };
     }
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       const raw = this.#ctx.getRaw();
       const groupIndex = raw.groups.indexOf(this.#parentRef.group);
       if (groupIndex < 0) return null;
@@ -290,7 +302,7 @@ export class ElementHandle {
    */
   headGlyph() {
     this.#assertReachable();
-    if (this.#level !== 'group') return null;
+    if (this.#level !== 1) return null;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
 
@@ -307,37 +319,37 @@ export class ElementHandle {
     const index = headIndex >= 0 ? headIndex : 0;
 
     if (index >= group.glyphs.length) return null;
-    return new ElementHandle(this.#ctx, 'glyph', group.glyphs[index], group);
+    return new ElementHandle(this.#ctx, 2, group.glyphs[index], group);
   }
 
   glyph(index) {
     this.#assertReachable();
-    if (this.#level !== 'group') return null;
+    if (this.#level !== 1) return null;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
     if (index < 0) index = group.glyphs.length + index;
     if (index < 0 || index >= group.glyphs.length) return null;
-    return new ElementHandle(this.#ctx, 'glyph', group.glyphs[index], group);
+    return new ElementHandle(this.#ctx, 2, group.glyphs[index], group);
   }
 
   part(index) {
     this.#assertReachable();
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       const glyph = this.#nodeRef;
       if (!glyph?.parts?.length) return null;
       if (index < 0) index = glyph.parts.length + index;
       if (index < 0 || index >= glyph.parts.length) return null;
-      return new ElementHandle(this.#ctx, 'part', glyph.parts[index], {
+      return new ElementHandle(this.#ctx, 3, glyph.parts[index], {
         group: this.#parentRef,
         glyph
       });
     }
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       const part = this.#nodeRef;
       if (!part?.parts?.length) return null;
       if (index < 0) index = part.parts.length + index;
       if (index < 0 || index >= part.parts.length) return null;
-      return new ElementHandle(this.#ctx, 'part', part.parts[index], this.#parentRef);
+      return new ElementHandle(this.#ctx, 3, part.parts[index], this.#parentRef);
     }
     return null;
   }
@@ -346,7 +358,7 @@ export class ElementHandle {
 
   addGlyph(code, opts) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group) return this;
     return this.insertGlyph(group.glyphs?.length ?? 0, code, opts);
@@ -354,7 +366,7 @@ export class ElementHandle {
 
   insertGlyph(index, code, opts) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group) return this;
     const newGlyphs = this.#parseGlyphs(code);
@@ -371,16 +383,16 @@ export class ElementHandle {
   addPart(code, opts) {
     this.#assertReachable();
     // Group level: delegate to last glyph
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       const group = this.#nodeRef;
       if (!group?.glyphs?.length) return this;
       const lastGlyph = group.glyphs[group.glyphs.length - 1];
-      const glyphHandle = new ElementHandle(this.#ctx, 'glyph', lastGlyph, group);
+      const glyphHandle = new ElementHandle(this.#ctx, 2, lastGlyph, group);
       glyphHandle.addPart(code, opts);
       this.#syncGeneration();
       return this;
     }
-    if (this.#level !== 'glyph') return this;
+    if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
     return this.insertPart(glyph.parts?.length ?? 0, code, opts);
@@ -389,16 +401,16 @@ export class ElementHandle {
   insertPart(index, code, opts) {
     this.#assertReachable();
     // Group level: delegate to last glyph
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       const group = this.#nodeRef;
       if (!group?.glyphs?.length) return this;
       const lastGlyph = group.glyphs[group.glyphs.length - 1];
-      const glyphHandle = new ElementHandle(this.#ctx, 'glyph', lastGlyph, group);
+      const glyphHandle = new ElementHandle(this.#ctx, 2, lastGlyph, group);
       glyphHandle.insertPart(index, code, opts);
       this.#syncGeneration();
       return this;
     }
-    if (this.#level !== 'glyph') return this;
+    if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
     const newParts = this.#parseParts(code);
@@ -427,7 +439,7 @@ export class ElementHandle {
   detach() {
     this.#assertReachable();
 
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return undefined;
       const partIndex = glyph.parts.indexOf(this.#nodeRef);
@@ -437,7 +449,7 @@ export class ElementHandle {
       return undefined;
     }
 
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       const group = this.#parentRef;
       if (!group?.glyphs) return undefined;
       const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
@@ -447,7 +459,7 @@ export class ElementHandle {
       return undefined;
     }
 
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       const groups = this.#ctx.getRaw().groups;
       const groupIndex = groups.indexOf(this.#nodeRef);
       if (groupIndex < 0) return undefined;
@@ -473,7 +485,7 @@ export class ElementHandle {
     const raw = this.#ctx.getRaw();
     const groups = raw.groups;
 
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       const idx = this.#resolveIndex();
       if (!idx) return undefined;
       const glyph = this.#parentRef.glyph;
@@ -489,12 +501,12 @@ export class ElementHandle {
       return undefined;
     }
 
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       const group = this.#parentRef;
       return this.#removeGlyphFromGroup(groups, group, this.#nodeRef);
     }
 
-    if (this.#level === 'group') {
+    if (this.#level === 1) {
       const groupIndex = groups.indexOf(this.#nodeRef);
       if (groupIndex < 0) return undefined;
       this.#ctx.removeGlyphGroup(raw, groupIndex);
@@ -507,7 +519,7 @@ export class ElementHandle {
 
   removeGlyph(index) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
     if (index < 0) index = group.glyphs.length + index;
@@ -527,7 +539,7 @@ export class ElementHandle {
 
   removePart(index) {
     this.#assertReachable();
-    if (this.#level !== 'glyph') return this;
+    if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
     if (index < 0) index = glyph.parts.length + index;
@@ -566,7 +578,7 @@ export class ElementHandle {
 
   replaceGlyph(index, code, opts) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
     if (index < 0) index = group.glyphs.length + index;
@@ -581,7 +593,7 @@ export class ElementHandle {
 
   replacePart(index, code, opts) {
     this.#assertReachable();
-    if (this.#level !== 'glyph') return this;
+    if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
     if (index < 0) index = glyph.parts.length + index;
@@ -598,7 +610,7 @@ export class ElementHandle {
 
   replace(code, opts) {
     this.#assertReachable();
-    if (this.#level === 'glyph') {
+    if (this.#level === 2) {
       const group = this.#parentRef;
       if (!group?.glyphs) return this;
       const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
@@ -612,7 +624,7 @@ export class ElementHandle {
       return this;
     }
 
-    if (this.#level === 'part') {
+    if (this.#level === 3) {
       const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return this;
       const partIndex = glyph.parts.indexOf(this.#nodeRef);
@@ -646,7 +658,7 @@ export class ElementHandle {
 
   applyHeadIndicators(code, opts) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const head = this.headGlyph();
     if (!head) return this;
     head.applyIndicators(code, opts);
@@ -656,7 +668,7 @@ export class ElementHandle {
 
   clearHeadIndicators(opts) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const head = this.headGlyph();
     if (!head) return this;
     head.clearIndicators(opts);
@@ -665,7 +677,7 @@ export class ElementHandle {
   }
 
   #applyOrClearIndicators(code, opts) {
-    if (this.#level !== 'glyph') return this;
+    if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
 
@@ -777,7 +789,7 @@ export class ElementHandle {
    */
   splitAt(glyphIndex) {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs) return this;
     const len = group.glyphs.length;
@@ -819,7 +831,7 @@ export class ElementHandle {
    */
   mergeWithNext() {
     this.#assertReachable();
-    if (this.#level !== 'group') return this;
+    if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs) return this;
 

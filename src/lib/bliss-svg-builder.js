@@ -553,19 +553,19 @@ class BlissSVGBuilder {
       const rawGroup = rawGroups[rawGi];
 
       if (groupSnap.key === key) {
-        return new ElementHandle(this.#mutationCtx, 'group', rawGroup);
+        return new ElementHandle(this.#mutationCtx, 1, rawGroup);
       }
 
       const glyphs = groupSnap.children.filter(c => c.type === 'glyph');
       for (let gi = 0; gi < glyphs.length; gi++) {
         const rawGlyph = rawGroup.glyphs[gi];
         if (glyphs[gi].key === key) {
-          return new ElementHandle(this.#mutationCtx, 'glyph', rawGlyph, rawGroup);
+          return new ElementHandle(this.#mutationCtx, 2, rawGlyph, rawGroup);
         }
         const parts = glyphs[gi].children;
         for (let pi = 0; pi < parts.length; pi++) {
           if (parts[pi].key === key) {
-            return new ElementHandle(this.#mutationCtx, 'part', rawGlyph.parts[pi], { group: rawGroup, glyph: rawGlyph });
+            return new ElementHandle(this.#mutationCtx, 3, rawGlyph.parts[pi], { group: rawGroup, glyph: rawGlyph });
           }
         }
       }
@@ -596,7 +596,7 @@ class BlissSVGBuilder {
     if (index < 0) index = indices.length + index;
     if (index < 0 || index >= indices.length) return null;
     const rawGroup = this.#rawBlissObj.groups[indices[index]];
-    return new ElementHandle(this.#mutationCtx, 'group', rawGroup);
+    return new ElementHandle(this.#mutationCtx, 1, rawGroup);
   }
 
   /**
@@ -608,7 +608,7 @@ class BlissSVGBuilder {
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
     if (index < 0 || index >= groups.length) return null;
-    return new ElementHandle(this.#mutationCtx, 'group', groups[index]);
+    return new ElementHandle(this.#mutationCtx, 1, groups[index]);
   }
 
   /**
@@ -639,7 +639,7 @@ class BlissSVGBuilder {
       const group = this.#rawBlissObj.groups[gi];
       const glyphs = group.glyphs || [];
       if (flatIndex < count + glyphs.length) {
-        return new ElementHandle(this.#mutationCtx, 'glyph', glyphs[flatIndex - count], group);
+        return new ElementHandle(this.#mutationCtx, 2, glyphs[flatIndex - count], group);
       }
       count += glyphs.length;
     }
@@ -670,7 +670,7 @@ class BlissSVGBuilder {
       for (const glyph of glyphs) {
         const parts = glyph.parts || [];
         if (flatIndex < count + parts.length) {
-          return new ElementHandle(this.#mutationCtx, 'part', parts[flatIndex - count], { group, glyph });
+          return new ElementHandle(this.#mutationCtx, 3, parts[flatIndex - count], { group, glyph });
         }
         count += parts.length;
       }
@@ -747,7 +747,7 @@ class BlissSVGBuilder {
     }
     const lastGi = indices[indices.length - 1];
     const rawGroup = this.#rawBlissObj.groups[lastGi];
-    const handle = new ElementHandle(this.#mutationCtx, 'group', rawGroup);
+    const handle = new ElementHandle(this.#mutationCtx, 1, rawGroup);
     handle.addGlyph(code, opts);
     return this;
   }
@@ -765,7 +765,7 @@ class BlissSVGBuilder {
     }
     const lastGi = indices[indices.length - 1];
     const rawGroup = this.#rawBlissObj.groups[lastGi];
-    const handle = new ElementHandle(this.#mutationCtx, 'group', rawGroup);
+    const handle = new ElementHandle(this.#mutationCtx, 1, rawGroup);
     handle.addPart(code, opts);
     return this;
   }
