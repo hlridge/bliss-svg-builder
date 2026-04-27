@@ -556,7 +556,10 @@ export declare class BlissSVGBuilder {
   static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true };
 }
 
-/** Library version string (set at build time). */
+/**
+ * Library version string (set at build time).
+ * Also accessible as the `BlissSVGBuilder.LIB_VERSION` static.
+ */
 export declare const LIB_VERSION: string;
 
 export default BlissSVGBuilder;
