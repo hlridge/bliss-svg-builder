@@ -19,9 +19,9 @@ const createTestIndex = () => {
 </head>
 <body>
   <h1>BlissSvgBuilder Browser Tests</h1>
-  <a class="test-link" href="/examples/browser-umd.html" target="_blank">
-    <h2>UMD Test</h2>
-    <p>Test the UMD build for browsers using global variables</p>
+  <a class="test-link" href="/examples/browser-iife.html" target="_blank">
+    <h2>IIFE Test</h2>
+    <p>Test the IIFE build for browsers using global variables</p>
   </a>
   <a class="test-link" href="/examples/browser-esm.html" target="_blank">
     <h2>ESM Test</h2>
@@ -30,7 +30,8 @@ const createTestIndex = () => {
 </body>
 </html>
   `;
-  
+
+  fs.mkdirSync('temp', { recursive: true });
   fs.writeFileSync('temp/test-index.html', indexHtml);
   return 'temp/test-index.html';
 };
