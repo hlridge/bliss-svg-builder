@@ -58,15 +58,14 @@ document.getElementById('container').appendChild(svgElement);
 
 ## Compatibility
 
-This package supports the three major JavaScript module systems:
-**ES Modules (ESM), CommonJS (CJS), and UMD**.
+This package ships in three build formats:
+**ES Modules (ESM)**, **CommonJS (CJS)**, and a browser **IIFE** bundle.
 
-As a result, it works in:
+It works in:
 
-- Modern browsers (ESM or UMD)
-- Node.js (ESM or CJS)
-- Bundlers (Vite, Webpack, Rollup, Parcel, etc.)
-- Script tags and legacy setups (UMD)
+- Modern browsers (ESM `<script type="module">` or IIFE `<script>` tag)
+- Node.js (ESM `import` or CJS `require`)
+- Bundlers (Vite, Webpack, Rollup, Parcel, esbuild, etc.)
 
 ## Documentation
 
