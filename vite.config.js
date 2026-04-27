@@ -49,21 +49,29 @@ export default defineConfig(({ command }) => ({
   },
   plugins: command === 'build' ? [addBanner(), copyFontLicense()] : [],
   build: {
+    sourcemap: true,
+    // false because vite.config.iife.js writes to the same dist/ in a
+    // chained build; emptying would wipe the IIFE bundle (and vice versa).
+    emptyOutDir: false,
     lib: {
       entry: resolve(__dirname, 'src/index.js'),
-      name: 'BlissSVGBuilder',
-      formats: ['es', 'umd', 'cjs'],
+      formats: ['es', 'cjs'],
       fileName: (format) => {
         switch (format) {
           case 'es':
             return 'bliss-svg-builder.esm.js';
-          case 'umd':
-            return 'bliss-svg-builder.umd.js';
           case 'cjs':
             return 'bliss-svg-builder.cjs';
           default:
             throw new Error(`Unsupported format: ${format}`);
         }
+      },
+    },
+    rollupOptions: {
+      output: {
+        // Silences MIXED_EXPORTS: src/index.js has named + default
+        // exports; named is the canonical shape for ESM/CJS consumers.
+        exports: 'named',
       },
     },
   },
