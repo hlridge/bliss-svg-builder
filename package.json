@@ -17,7 +17,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "prepare": "vite build && vite build --config vite.config.iife.js",
+    "prepare": "pnpm run build",
     "build": "vite build && vite build --config vite.config.iife.js",
     "test": "vitest run --project unit --project integration",
     "test:ui": "vitest --ui --project unit --project integration",
