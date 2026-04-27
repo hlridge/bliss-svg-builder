@@ -53,12 +53,11 @@ console.log(builder.svgCode);
 </script>
 ```
 
-### Browser (UMD)
+### Browser (IIFE / `<script>` tag)
 
 ```html
-<script src="bliss-svg-builder.umd.js"></script>
+<script src="bliss-svg-builder.iife.js"></script>
 <script>
-  const { BlissSVGBuilder } = window.BlissSVGBuilder;
   const builder = new BlissSVGBuilder('B313');  // "feeling"
   document.body.appendChild(builder.svgElement);
 </script>
