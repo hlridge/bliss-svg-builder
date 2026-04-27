@@ -1,5 +1,5 @@
-import { BlissSVGBuilder } from './lib/bliss-svg-builder.js'
-import { LIB_VERSION } from './lib/bliss-constants.js'
+import { BlissSVGBuilder } from './lib/bliss-svg-builder.js';
+import { LIB_VERSION } from './lib/bliss-constants.js';
 
 // Hoist LIB_VERSION onto the class so IIFE consumers, where
 // `window.BlissSVGBuilder` is the class itself, can read the
