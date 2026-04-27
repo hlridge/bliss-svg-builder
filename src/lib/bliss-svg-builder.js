@@ -14,6 +14,10 @@ import { ElementHandle } from "./element-handle.js";
 // load so BlissElement can clone it without importing BlissParser itself.
 const ERROR_PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].glyphs[0].parts;
 
+// Note: BlissSVGBuilder.LIB_VERSION is attached at the public entry point
+// (src/index.js), not declared here. Code that imports the class directly
+// from this file (e.g. internal tests) will see LIB_VERSION as undefined.
+// External consumers always go through src/index.js, where the static is set.
 class BlissSVGBuilder {
   #processedOptions;
   #sharedOptions;
