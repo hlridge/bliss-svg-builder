@@ -25,7 +25,7 @@ features:
   - title: Flexible Styling
     details: Control colors, sizes, spacing, margins, cropping, and grid overlays through a rich multi-level options system
   - title: Multi-Format Output
-    details: Ships as ESM, CommonJS, and UMD, and renders to SVG strings or live DOM elements
+    details: Ships as ESM, CommonJS, and a browser IIFE, and renders to SVG strings or live DOM elements
 ---
 
 ## Quick Example
