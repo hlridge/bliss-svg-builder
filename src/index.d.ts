@@ -404,6 +404,12 @@ export declare class BlissSVGBuilder {
    */
   constructor(input?: string | BlissJSON, options?: BlissOptions | OptionLayers);
 
+  /**
+   * Library version string (set at build time).
+   * Also exported as the named `LIB_VERSION` constant.
+   */
+  static readonly LIB_VERSION: string;
+
   // --- SVG output (getters) ---
 
   /** SVG content (path elements and groups) without the outer `<svg>` wrapper. */
@@ -552,3 +558,5 @@ export declare class BlissSVGBuilder {
 
 /** Library version string (set at build time). */
 export declare const LIB_VERSION: string;
+
+export default BlissSVGBuilder;
