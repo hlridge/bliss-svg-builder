@@ -2,19 +2,13 @@
   "name": "bliss-svg-builder",
   "version": "1.0.0-rc.2",
   "description": "Compose, render, and manipulate Blissymbolics SVG using a compact DSL and a programmatic mutation API.",
-  "main": "dist/bliss-svg-builder.cjs",
-  "module": "dist/bliss-svg-builder.esm.js",
   "type": "module",
   "types": "src/index.d.ts",
   "exports": {
     "types": "./src/index.d.ts",
-    "browser": {
-      "import": "./dist/bliss-svg-builder.esm.js",
-      "require": "./dist/bliss-svg-builder.umd.js"
-    },
-    "require": "./dist/bliss-svg-builder.cjs",
     "import": "./dist/bliss-svg-builder.esm.js",
-    "default": "./dist/bliss-svg-builder.umd.js"
+    "require": "./dist/bliss-svg-builder.cjs",
+    "default": "./dist/bliss-svg-builder.esm.js"
   },
   "files": [
     "dist",
@@ -23,8 +17,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "prepare": "vite build",
-    "build": "vite build",
+    "prepare": "vite build && vite build --config vite.config.iife.js",
+    "build": "vite build && vite build --config vite.config.iife.js",
     "test": "vitest run --project unit --project integration",
     "test:ui": "vitest --ui --project unit --project integration",
     "test:unit": "vitest run --project unit",
@@ -37,7 +31,7 @@
     "test:e2e:ui": "vitest --ui --project e2e",
     "test:all": "vitest run",
     "prepublishOnly": "pnpm run test && pnpm run build",
-    "example:browser-umd": "vite --open examples/browser-umd.html",
+    "example:browser-iife": "vite --open examples/browser-iife.html",
     "example:browser-esm": "vite --open examples/browser-esm.html",
     "example:node-cjs": "node examples/node.cjs",
     "example:node-esm": "node examples/node.esm.js",
