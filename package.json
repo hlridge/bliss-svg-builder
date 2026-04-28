@@ -31,6 +31,7 @@
     "test:e2e:ui": "vitest --ui --project e2e",
     "test:all": "vitest run",
     "test:dist": "pnpm run build && vitest run --project dist",
+    "mutation-test": "stryker run",
     "prepublishOnly": "pnpm run test && pnpm run test:dist",
     "example:browser-iife": "vite --open examples/browser-iife.html",
     "example:browser-esm": "vite --open examples/browser-esm.html",
@@ -79,6 +80,8 @@
   },
   "homepage": "https://hlridge.github.io/bliss-svg-builder/",
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/vitest-runner": "^9.6.1",
     "@vitest/ui": "^4.1.4",
     "canvas": "^3.2.1",
     "vite": "^8.0.8",

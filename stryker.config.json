@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "pnpm",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "mutate": [
+    "src/lib/bliss-element.js",
+    "src/lib/bliss-parser.js"
+  ],
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.js"
+  },
+  "coverageAnalysis": "perTest",
+  "concurrency": 4,
+  "reporters": ["html", "clear-text", "progress"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "incremental": true,
+  "incrementalFile": ".stryker-tmp/incremental.json",
+  "tempDirName": ".stryker-tmp",
+  "timeoutMS": 10000,
+  "logLevel": "info",
+  "disableTypeChecks": "{src,tests}/**/*.{js,ts}",
+  "ignorePatterns": [
+    "dist",
+    "docs",
+    "examples",
+    "dev",
+    "scripts",
+    "temp",
+    "reports",
+    ".stryker-tmp",
+    ".worktrees",
+    "node_modules"
+  ]
+}

@@ -25,3 +25,7 @@ vitest.config.js
 # VitePress build artifacts
 docs/.vitepress/cache/
 docs/.vitepress/dist/
+
+# Stryker mutation testing
+reports/
+.stryker-tmp/
