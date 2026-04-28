@@ -21,7 +21,7 @@ const createTestIndex = () => {
   <h1>BlissSvgBuilder Browser Tests</h1>
   <a class="test-link" href="/examples/browser-iife.html" target="_blank">
     <h2>IIFE Test</h2>
-    <p>Test the IIFE build for browsers using global variables</p>
+    <p>Test the IIFE build for browsers using a global variable</p>
   </a>
   <a class="test-link" href="/examples/browser-esm.html" target="_blank">
     <h2>ESM Test</h2>
