@@ -54,7 +54,13 @@ export function createTextFallbackGlyph(str) {
     height: maxY - approxMinY,
     isExternalGlyph: true,
     isTextFallback: true,
-    glyph: str,
+    // Single-char fallback IS a single glyph: `glyph` + `glyphCode`,
+    // parallel to single X-codes.
+    // Multi-char fallback is a composite carrying multiple chars: no
+    // `glyph`, no `glyphCode`, but a `codeName` (alias-style identifier).
+    ...(str.length === 1
+      ? { glyph: str, glyphCode: `XTXT_${str}` }
+      : { codeName: `XTXT_${str}` }),
   };
 }
 
@@ -644,6 +650,8 @@ export function createExternalGlyph(glyph) {
     isExternalGlyph: true,
     // The glyph represented.
     glyph: aObj.glyph,
+    // Single external glyph identifier (parallel to B-codes' glyphCode).
+    glyphCode: `X${aObj.glyph}`,
     // The kerning rules for the glyph
     kerningRules: {...aObj.kerningRules}
   }

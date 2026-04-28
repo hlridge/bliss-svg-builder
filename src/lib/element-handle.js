@@ -121,7 +121,14 @@ export class ElementHandle {
 
   get codeName() {
     this.#assertReachable();
-    return this.#nodeRef?.glyphCode || this.#nodeRef?.codeName || '';
+    // Same priority chain as BlissElement: explicit glyphCode (single named
+    // glyph), explicit codeName (alias for a non-glyph composite), then a
+    // single-part fallback — a glyph with exactly one part inherits that
+    // part's identity (covers text-fallback XTXT_word and similar).
+    return this.#nodeRef?.glyphCode
+      ?? this.#nodeRef?.codeName
+      ?? (this.#nodeRef?.parts?.length === 1 ? this.#nodeRef.parts[0].codeName : '')
+      ?? '';
   }
 
   get isIndicator() {

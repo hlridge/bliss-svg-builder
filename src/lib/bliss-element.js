@@ -448,7 +448,15 @@ export class BlissElement {
     } else {
       if (this.#level === 2) {
         // Character level
-        this.#codeName = this.#blissObj.glyphCode || this.#blissObj.codeName || "";
+        // Glyph identity, in priority order: explicit glyphCode (single named
+        // glyph), explicit codeName (alias for a non-glyph composite), then a
+        // single-part fallback — every code in the input is a part by
+        // definition, so a glyph with exactly one part inherits that part's
+        // identity (covers text-fallback XTXT_word and similar).
+        this.#codeName = this.#blissObj.glyphCode
+          ?? this.#blissObj.codeName
+          ?? (this.#blissObj.parts?.length === 1 ? this.#blissObj.parts[0].codeName : "")
+          ?? "";
         this.#isBlissGlyph = !!this.#blissObj.isBlissGlyph;
         this.#isExternalGlyph = !!this.#blissObj.isExternalGlyph;
 
