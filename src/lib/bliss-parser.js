@@ -46,7 +46,12 @@ export class BlissParser {
   static #parseOptions(optionsString) {
     if (!optionsString) return;
 
-    const extractedContent = optionsString.match(/\[([^\]]*)\]/)?.[1];
+    const bracketMatch = optionsString.match(/\[([^\]]*)\]/);
+    // Stryker disable next-line all: internal invariant, unreachable from public API
+    if (!bracketMatch) {
+      throw new Error(`#parseOptions: expected bracketed input, got: ${optionsString}`);
+    }
+    const extractedContent = bracketMatch[1];
     if (!extractedContent) return;
 
     const parsedObject = Object.create(null);
