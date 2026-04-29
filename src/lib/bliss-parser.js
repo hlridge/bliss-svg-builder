@@ -878,12 +878,7 @@ export class BlissParser {
                 part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {
-                // Built-in codes preserve identity; non-built-in resolve to target
-                if (builtInCodes.has(part.codeName)) {
-                  part.parts = [{ codeName: definition.codeString }];
-                } else {
-                  part.codeName = definition.codeString;
-                }
+                part.codeName = definition.codeString;
               }
             }
 
@@ -1010,11 +1005,7 @@ export class BlissParser {
     if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString) {
       part.parts = BlissParser.#parseCodeStringToParts(codeString);
     } else {
-      if (builtInCodes.has(part.codeName)) {
-        part.parts = [{ codeName: codeString }];
-      } else {
-        part.codeName = codeString;
-      }
+      part.codeName = codeString;
     }
 
     BlissParser.#applyDefinitionMetadata(part, definition);
@@ -1041,11 +1032,7 @@ export class BlissParser {
         } else if (innerCodeString.includes(';') || innerCodeString.includes(':') || blissElementDefinitions[innerCodeString]?.codeString) {
           part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, depth + 1);
         } else {
-          if (builtInCodes.has(part.codeName)) {
-            part.parts = [{ codeName: innerCodeString }];
-          } else {
-            part.codeName = innerCodeString;
-          }
+          part.codeName = innerCodeString;
         }
       }
 
