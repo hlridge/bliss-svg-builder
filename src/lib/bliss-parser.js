@@ -115,7 +115,7 @@ export class BlissParser {
       throw new Error('Input string exceeds maximum length of 10,000 characters');
     }
     inputString = inputString.trim();
-    let result = { groups: [] };
+    const result = {};
     const parseWarnings = [];
 
     // Parse a Blissymbolics string and convert it to an internal representation (BlissComposition)
@@ -181,22 +181,14 @@ export class BlissParser {
       }
     }
 
-    // Step 3: Build parsed groups, converting SP to TSP/QSP
+    // Step 3: Build parsed groups, staging spaces for TSP/QSP resolution
     const parsedGroups = [];
     for (let gi = 0; gi < groupedCodes.length; gi++) {
       const { codes, isSpace } = groupedCodes[gi];
 
       if (isSpace) {
-        // Space group: convert SP to TSP or QSP
-        // Use QSP only if: single space AND next group is punctuation-only
-        const nextGroup = groupedCodes[gi + 1];
-        let useQSP = false;
-        if (codes.length === 1 && codes[0] === 'SP' && nextGroup && !nextGroup.isSpace) {
-          // Check if next group is punctuation-only (will be determined after parsing)
-          // For now, mark it and we'll resolve after parsing all groups
-        }
-        // Convert codes: SP→TSP (or QSP), keep TSP/QSP as-is
-        // Mark whether each space was from SP (implicit) or user-specified
+        // Keep explicit spaces and mark implicit SP for the later TSP/QSP pass.
+        // See Step 4 below for SP -> TSP/QSP resolution.
         const spaceGlyphs = codes.map(code => {
           const fromSP = code === 'SP';
           return { parts: [{ codeName: fromSP ? 'TSP' : code, _fromSP: fromSP }] };
@@ -223,7 +215,12 @@ export class BlissParser {
           group.options = this.#parseOptions(restorePlaceholders(beforePipe));
           groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
-          parseWarnings.push({ code: 'INVALID_GROUP_OPTIONS', message: `Invalid group options syntax: "${beforePipe}|" - expected [options]| format. Ignoring.`, source: beforePipe });
+          const restoredBeforePipe = restorePlaceholders(beforePipe);
+          parseWarnings.push({
+            code: 'INVALID_GROUP_OPTIONS',
+            message: `Invalid group options syntax: "${restoredBeforePipe}|" - expected [options]| format. Ignoring.`,
+            source: restoredBeforePipe
+          });
           groupCodeString = afterPipe;
         } else {
           groupCodeString = afterPipe;
