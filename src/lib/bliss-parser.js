@@ -158,7 +158,19 @@ export class BlissParser {
 
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
-    result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
+    if (globalOptionsString && globalOptionsString.match(/^\[.*\]$/)) {
+      result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
+    } else {
+      if (globalOptionsString && globalOptionsString.length > 0) {
+        const restored = restorePlaceholders(globalOptionsString);
+        parseWarnings.push({
+          code: 'INVALID_GLOBAL_OPTIONS',
+          message: `Invalid global options syntax: "${restored}||" - expected [options]|| format. Ignoring.`,
+          source: restored,
+        });
+      }
+      result.options = {};
+    }
 
     // Step 1: Replace // patterns with /SP/ (space placeholder)
     // Each // adds one SP, /// adds two SPs, etc.
