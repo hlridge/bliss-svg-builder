@@ -507,7 +507,7 @@ export class BlissParser {
               part: str,
               ...(isHeadGlyph && { isHeadGlyph }),
               ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
-              ...(definition.glyph && { glyph: definition.glyph }),
+              ...(definition.char && { char: definition.char }),
               ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
             }];
           }
@@ -607,7 +607,7 @@ export class BlissParser {
                 ...(definition.shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace: true }),
                 ...(definition.isIndicator === true && { isIndicator: true }),
                 ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
-                ...(definition.glyph && { glyph: definition.glyph }),
+                ...(definition.char && { char: definition.char }),
                 ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
                 ...(definition.glyphCode && { glyphCode: definition.glyphCode }),
                 ...(definition.isBlissGlyph && { isBlissGlyph: definition.isBlissGlyph }),
@@ -659,7 +659,7 @@ export class BlissParser {
                 const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
                 const isExternalGlyph = expandedSubPart.isExternalGlyph;
                 const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
-                const glyph = expandedSubPart.glyph;
+                const char = expandedSubPart.char;
                 const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
                 // For multi-glyph words, each part keeps its own glyphCode.
                 // For single-character composites: outer definition's glyphCode wins
@@ -673,7 +673,7 @@ export class BlissParser {
                   ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
                   ...(isIndicator === true && { isIndicator }),
                   ...(isExternalGlyph && { isExternalGlyph }),
-                  ...(glyph && { glyph }),
+                  ...(char && { char }),
                   ...(kerningRules && { kerningRules }),
                   ...(glyphCode && { glyphCode }),
                   ...(isBlissGlyph && { isBlissGlyph }),
@@ -760,7 +760,7 @@ export class BlissParser {
           const isIndicator = definition.isIndicator;
           const isExternalGlyph = definition.isExternalGlyph;
           const kerningRules = definition.kerningRules;
-          const glyph = definition.glyph;
+          const char = definition.char;
           const glyphCode = definition.glyphCode;
           const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
@@ -769,7 +769,7 @@ export class BlissParser {
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph && { isExternalGlyph }),
-            ...(glyph && { glyph }),
+            ...(char && { char }),
             ...(kerningRules && { kerningRules }),
             ...(glyphCode && { glyphCode }),
             ...(isBlissGlyph && { isBlissGlyph }),
@@ -796,7 +796,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, glyph, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak } of expandedGlyphParts) {
         // Word break marker from // in bare alias codeString:
         // push current group, add a default space group, start a new group
         if (_wordBreak) {
@@ -815,7 +815,7 @@ export class BlissParser {
           ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
           ...(typeof isIndicator === "boolean" && { isIndicator }),
           ...(typeof isExternalGlyph === "boolean" && { isExternalGlyph }),
-          ...(typeof glyph === "string" && { glyph }),
+          ...(typeof char === "string" && { char }),
           ...((kerningRules !== null && kerningRules?.constructor === Object) && { kerningRules }),
           ...(typeof glyphCode === "string" && { glyphCode }),
           ...(isBlissGlyph === true && { isBlissGlyph }),

@@ -31,6 +31,7 @@ export class BlissElement {
   #relativeToParentX
   #relativeToParentY
   #codeName
+  #char
   #externalGlyphSpacing
   #isSpaceGroup
   //#endregion
@@ -319,7 +320,7 @@ export class BlissElement {
     this.#relativeToParentX = 0;
     this.#relativeToParentY = 0;
     this.#children = [];
-    this.#externalGlyphSpacing = this.#sharedOptions.externalGlyphSpace - (this.kerningRules?.[previousElement?.glyph] ?? 0);
+    this.#externalGlyphSpacing = this.#sharedOptions.externalGlyphSpace - (this.kerningRules?.[previousElement?.char] ?? 0);
     this.#childStartOffset = 0;
 
     if (this.#level === 0) {
@@ -448,15 +449,26 @@ export class BlissElement {
     } else {
       if (this.#level === 2) {
         // Character level
-        // Glyph identity, in priority order: explicit glyphCode (single named
-        // glyph), explicit codeName (alias for a non-glyph composite), then a
-        // single-part fallback — every code in the input is a part by
-        // definition, so a glyph with exactly one part inherits that part's
-        // identity (covers text-fallback XTXT_word and similar).
-        this.#codeName = this.#blissObj.glyphCode
-          ?? this.#blissObj.codeName
-          ?? (this.#blissObj.parts?.length === 1 ? this.#blissObj.parts[0].codeName : "")
-          ?? "";
+
+        // codeName at glyph level: the input code that produces this glyph,
+        // when the glyph is actually a glyph. Empty string for composites,
+        // bare shape primitives, ad-hoc composites, and multi-char text
+        // fallback. The presence of glyphCode IS the "this is a glyph" signal:
+        // the parser only sets it for registered glyphs (B-codes, X-codes,
+        // single-char text fallback, define()d 'glyph'-type aliases). The JSON
+        // postParse step (bliss-svg-builder.js) normalizes JSON's codeName
+        // field back to glyphCode, so glyph-level codeName never reaches
+        // construction. For single-char text fallback the parser stores
+        // 'XTXT_<char>' as the internal routing key; surface it publicly as
+        // 'X<char>'.
+        if (typeof this.#blissObj.glyphCode === 'string') {
+          const code = this.#blissObj.glyphCode;
+          this.#codeName = code.startsWith('XTXT_') ? 'X' + code.slice(5) : code;
+        } else {
+          this.#codeName = "";
+        }
+
+        this.#char = this.#blissObj.char ?? "";
         this.#isBlissGlyph = !!this.#blissObj.isBlissGlyph;
         this.#isExternalGlyph = !!this.#blissObj.isExternalGlyph;
 
@@ -627,7 +639,10 @@ export class BlissElement {
             this.#relativeToParentY = this.#blissObj.y;
           }
         } else if (isCompositeElement) {
-          this.#codeName = this.#blissObj.codeName || "";
+          // Surface 'XTXT_<chars>' (internal text-fallback routing key) as
+          // 'X<chars>' publicly. Internal lookup uses #blissObj.codeName.
+          const raw = this.#blissObj.codeName || "";
+          this.#codeName = raw.startsWith('XTXT_') ? 'X' + raw.slice(5) : raw;
           this.#handleCompositeElement(this.#blissObj.parts);
         }
       }
@@ -811,8 +826,8 @@ export class BlissElement {
     return this.#isCharacter;
   }
 
-  get glyph() {
-    return this.#blissObj.glyph || "";
+  get char() {
+    return this.#char ?? "";
   }
 
   get kerningRules() {
@@ -888,6 +903,7 @@ export class BlissElement {
     return Object.freeze({
       key: this.#key,
       codeName: this.#codeName || '',
+      char: this.#char ?? '',
       x: absX,
       y: absY,
       offsetX: this.#relativeToParentX,
@@ -1031,7 +1047,12 @@ export class BlissElement {
   #handlePredefinedElement(definition) {
     if (typeof definition?.getPath !== 'function') throw new Error('An element is only predefined if has a proper getPath function.');
 
-    this.#codeName = this.#blissObj.codeName;                    //default: empty string
+    // Surface 'XTXT_<chars>' (internal text-fallback routing key) as
+    // 'X<chars>' publicly. Internal lookup uses #blissObj.codeName.
+    const raw = this.#blissObj.codeName;
+    this.#codeName = (typeof raw === 'string' && raw.startsWith('XTXT_'))
+      ? 'X' + raw.slice(5)
+      : raw;
     this.#extraPathOptions = definition.extraPathOptions || {}; //default: empty object
     this.#isCharacter = !!definition.isCharacter;               //default: false
     this.#isShape = !!definition.isShape;                      //default: false

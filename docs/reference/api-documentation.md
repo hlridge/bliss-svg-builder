@@ -590,7 +590,34 @@ builder.group(0).headGlyph();
 
 #### `.codeName`
 
-Returns the code name of this element (e.g., `'B291'`).
+Returns the input code that produces this element. The exact meaning depends on level:
+
+- **Part level** (`builder.glyph(0).part(0).codeName`): the structural lookup key the user would write (e.g. `'B81'`, `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`).
+- **Glyph level** (`builder.glyph(0).codeName`): the live identity, set only when the glyph is actually a glyph: B-codes (`'B431'`), single X-codes (`'Xa'`, `'Xα'` — built-in alphabet OR single-character text fallback, X-prefix preserved), or `define()`d `type: 'glyph'` aliases (`'LOVE'`). Returns `''` for composites (`H;C8`), bare shape primitives written alone (`H`), and multi-character text fallback (`Xhαllo` is a string of glyphs, not a glyph).
+- **Group level** (`builder.group(0).codeName`): always `''`. Groups are containers without identity.
+
+```js
+new BlissSVGBuilder('B431').glyph(0).codeName;   // 'B431'
+new BlissSVGBuilder('Xa').glyph(0).codeName;     // 'Xa'
+new BlissSVGBuilder('Xα').glyph(0).codeName;     // 'Xα'  (single-char fallback)
+new BlissSVGBuilder('Xhαllo').glyph(0).codeName; // ''   (text, not a glyph)
+new BlissSVGBuilder('H').glyph(0).codeName;      // ''   (shape primitive)
+new BlissSVGBuilder('H').glyph(0).part(0).codeName; // 'H'
+new BlissSVGBuilder('Xα').glyph(0).part(0).codeName; // 'Xα'
+new BlissSVGBuilder('Xhαllo').glyph(0).part(0).codeName; // 'Xhαllo'
+```
+
+`.codeName` is the live identity. Serialization via `toString()` / `toJSON()` decomposes alias names by default; pass `{ preserve: true }` to keep them in serialized output. The `preserve` option does not affect this getter.
+
+#### `.char`
+
+Returns the rendered Unicode character for an external glyph (`'a'` for `Xa`, `'α'` for `Xα`). Returns `''` for B-codes, composites, shape primitives, multi-character text fallback, and non-glyph levels.
+
+```js
+builder.glyph(0).char;  // 'a' for Xa, 'α' for Xα, '' otherwise
+```
+
+`codeName` and `char` carry distinct, complementary information for X-codes — input syntax (`'Xa'`) versus rendered character (`'a'`).
 
 #### `.isIndicator`
 
@@ -991,14 +1018,14 @@ For adding characters from external font systems. Requires providing your own SV
 |----------|------|----------|-------------|
 | `getPath` | `function(x, y, options)` | yes | Returns SVG path `d` string |
 | `width` | `number` | yes | Glyph width |
-| `glyph` | `string` | yes | Character identifier |
+| `char` | `string` | yes | Rendered Unicode character (e.g. `'a'` for the external glyph registered as `'Xa'`) |
 | `y` | `number` | no | Y offset |
 | `height` | `number` | no | Glyph height |
 | `kerningRules` | `object` | no | Kerning pair adjustments |
 
 **Auto-detection (no type, getPath-based):**
-- Has `getPath` + `glyph` → external glyph
-- Has `getPath` (no `glyph`) → shape
+- Has `getPath` + `char` → external glyph
+- Has `getPath` (no `char`) → shape
 
 ### Options
 
@@ -1054,7 +1081,7 @@ Returns `{ patched: true }` on success. Only properties valid for the definition
 Allowed properties by type:
 - **glyph**: `codeString`, `anchorOffsetX`, `anchorOffsetY`, `width`, `isIndicator`, `shrinksPrecedingWordSpace`, `kerningRules`, `defaultOptions`
 - **shape**: `getPath`, `codeString`, `width`, `height`, `x`, `y`, `extraPathOptions`, `defaultOptions`
-- **externalGlyph**: `getPath`, `width`, `glyph`, `y`, `height`, `kerningRules`, `defaultOptions`
+- **externalGlyph**: `getPath`, `width`, `char`, `y`, `height`, `kerningRules`, `defaultOptions`
 - **bare**: `codeString`, `defaultOptions`
 
 Patching `defaultOptions` replaces the entire sub-object (not a deep merge). Patching `codeString` validates references and checks for circular dependencies.

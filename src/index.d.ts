@@ -89,7 +89,24 @@ export interface ElementBounds {
 /** A frozen, read-only snapshot of an element in the composition tree. */
 export interface ElementSnapshot {
   readonly key: string;
+  /**
+   * The input code that produces this element (e.g. `'B431'`, `'Xa'`, `'H'`).
+   * At part level, the structural lookup key the user would write (`'B81'`,
+   * `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`). At glyph level, the input
+   * code only when the glyph is actually a glyph: B-codes (`'B431'`), single
+   * X-codes (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases
+   * (`'LOVE'`); `''` for composites, bare shape primitives, and
+   * multi-character text fallback. Always `''` at group level. Note: this is
+   * the live identity. `toString()` and `toJSON()` decompose alias names by
+   * default; pass `{ preserve: true }` to keep them in serialized output.
+   */
   readonly codeName: string;
+  /**
+   * The rendered Unicode character for an external glyph (e.g. `'a'` for
+   * `Xa`, `'α'` for `Xα`). `''` for B-codes, composites, shape primitives,
+   * multi-character text fallback, and non-glyph levels.
+   */
+  readonly char: string;
   readonly x: number;
   readonly y: number;
   readonly offsetX: number;
@@ -135,8 +152,25 @@ export declare class ElementHandle {
   /** True when level >= 3 (a part within a character). */
   readonly isPart: boolean;
 
-  /** The code name of this element. */
+  /**
+   * The input code that produces this element (e.g. `'B431'`, `'Xa'`, `'H'`).
+   * At part level, the structural lookup key the user would write (`'B81'`,
+   * `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`). At glyph level, the input
+   * code only when the glyph is actually a glyph: B-codes (`'B431'`), single
+   * X-codes (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases
+   * (`'LOVE'`); `''` for composites, bare shape primitives, and
+   * multi-character text fallback. Always `''` at group level. Note: this is
+   * the live identity. `toString()` and `toJSON()` decompose alias names by
+   * default; pass `{ preserve: true }` to keep them in serialized output.
+   */
   readonly codeName: string;
+
+  /**
+   * The rendered Unicode character for an external glyph (e.g. `'a'` for
+   * `Xa`, `'α'` for `Xα`). `''` for B-codes, composites, shape primitives,
+   * multi-character text fallback, and non-glyph levels.
+   */
+  readonly char: string;
 
   /** Stable across mutations. Use with `getElementByKey(key)` to recover a handle to this same node later. */
   readonly key: string;
@@ -311,12 +345,13 @@ export interface ShapeDefinition {
   defaultOptions?: BlissOptions;
 }
 
-/** Definition for an external glyph (custom rendering around a glyph). */
+/** Definition for an external glyph (custom rendering around a Unicode character). */
 export interface ExternalGlyphDefinition {
   type: 'externalGlyph';
   getPath: (ctx: ShapeContext) => string;
   width: number;
-  glyph: string;
+  /** The rendered Unicode character (e.g. `'a'` for the external glyph registered as `'Xa'`). */
+  char: string;
   y?: number;
   height?: number;
   kerningRules?: Record<string, any>;

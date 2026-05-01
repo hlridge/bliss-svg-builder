@@ -528,7 +528,7 @@ shapeDefinitions['COMMA'].extraPathOptions = {
  */
 const externalGlyphDefinitions = {};
 for (const [code, data] of Object.entries(alphabetData)) {
-  externalGlyphDefinitions[code] = sc.createExternalGlyph(data.glyph);
+  externalGlyphDefinitions[code] = sc.createExternalGlyph(data.char);
 }
 
 for (const definition of Object.values(shapeDefinitions)) {

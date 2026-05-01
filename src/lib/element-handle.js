@@ -121,14 +121,36 @@ export class ElementHandle {
 
   get codeName() {
     this.#assertReachable();
-    // Same priority chain as BlissElement: explicit glyphCode (single named
-    // glyph), explicit codeName (alias for a non-glyph composite), then a
-    // single-part fallback — a glyph with exactly one part inherits that
-    // part's identity (covers text-fallback XTXT_word and similar).
-    return this.#nodeRef?.glyphCode
-      ?? this.#nodeRef?.codeName
-      ?? (this.#nodeRef?.parts?.length === 1 ? this.#nodeRef.parts[0].codeName : '')
-      ?? '';
+    const node = this.#nodeRef;
+    if (!node) return '';
+
+    // Glyph level: the input code that produces this glyph, when it is
+    // actually a glyph. Empty string for composites, bare shape primitives,
+    // and multi-char text fallback. The presence of glyphCode IS the
+    // "this is a glyph" signal (set by the parser for B-codes, X-codes,
+    // single-char text fallback, and define()d 'glyph'-type aliases).
+    // For single-char text fallback the internal routing key 'XTXT_<char>'
+    // is surfaced publicly as 'X<char>'. Mirrors the rule in BlissElement.
+    if (this.#level === 2) {
+      if (typeof node.glyphCode === 'string') {
+        return node.glyphCode.startsWith('XTXT_')
+          ? 'X' + node.glyphCode.slice(5)
+          : node.glyphCode;
+      }
+      return '';
+    }
+
+    // Part level: structural lookup key. Group level: groups have no
+    // codeName field on their data object, so this returns ''.
+    // For text-fallback parts the internal routing key 'XTXT_<chars>' is
+    // surfaced publicly as 'X<chars>'.
+    const code = node.codeName ?? '';
+    return code.startsWith('XTXT_') ? 'X' + code.slice(5) : code;
+  }
+
+  get char() {
+    this.#assertReachable();
+    return this.#nodeRef?.char ?? '';
   }
 
   get isIndicator() {
@@ -446,6 +468,7 @@ export class ElementHandle {
     // so toString() serializes the individual parts instead of the old code.
     delete glyph.isBlissGlyph;
     delete glyph.codeName;
+    delete glyph.glyphCode;
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;

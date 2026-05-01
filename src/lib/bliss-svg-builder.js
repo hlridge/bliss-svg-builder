@@ -1051,21 +1051,42 @@ class BlissSVGBuilder {
   // those references with an error so BlissElement can emit a warning.
 
   /**
-   * Reverse toJSON() normalization on glyph-level codes: codeName → glyphCode.
-   * Parts already use codeName internally, so only glyph-level fields need renaming.
+   * Reverse toJSON() normalization for object input:
+   *  - Glyph level: codeName → glyphCode rename.
+   *  - Glyphs and parts: surface text-fallback form 'X<chars>' → internal
+   *    routing key 'XTXT_<chars>' so BlissElement / parser routing works.
    * @param {Object[]} groups - Array of raw group objects
    */
   static #normalizeGlyphCodes(groups) {
     for (const group of groups) {
-      if (group.glyphs) {
-        for (const glyph of group.glyphs) {
-          if (glyph.codeName && !glyph.glyphCode) {
-            glyph.glyphCode = glyph.codeName;
-            delete glyph.codeName;
-          }
+      if (!group.glyphs) continue;
+      for (const glyph of group.glyphs) {
+        if (glyph.codeName && !glyph.glyphCode) {
+          glyph.glyphCode = BlissSVGBuilder.#textFallbackInternalForm(glyph.codeName);
+          delete glyph.codeName;
         }
+        if (glyph.parts) BlissSVGBuilder.#normalizePartCodes(glyph.parts);
       }
     }
+  }
+
+  static #normalizePartCodes(parts) {
+    for (const part of parts) {
+      if (part.codeName) {
+        part.codeName = BlissSVGBuilder.#textFallbackInternalForm(part.codeName);
+      }
+      if (part.parts) BlissSVGBuilder.#normalizePartCodes(part.parts);
+    }
+  }
+
+  // 'X<chars>' (public text-fallback form) → 'XTXT_<chars>' (internal
+  // routing key). Built-in / registered codes (Xa, XL8, B431, …) and
+  // already-internal forms pass through unchanged.
+  static #textFallbackInternalForm(code) {
+    if (code.startsWith('XTXT_')) return code;
+    if (code.length < 2 || code[0] !== 'X') return code;
+    if (blissElementDefinitions[code]) return code;
+    return 'XTXT_' + code.slice(1);
   }
 
   /**
@@ -1185,7 +1206,10 @@ class BlissSVGBuilder {
             return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
           }
         }
-        let str = part.codeName;
+        // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
+        let str = part.codeName?.startsWith('XTXT_')
+          ? 'X' + part.codeName.slice(5)
+          : part.codeName;
         if (x !== 0 || y !== 0) {
           str += `:${x},${y}`;
         }
@@ -1314,6 +1338,10 @@ class BlissSVGBuilder {
         for (const part of parts) {
           delete part.key;
           if (part.options) delete part.options.key;
+          // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
+          if (part.codeName?.startsWith('XTXT_')) {
+            part.codeName = 'X' + part.codeName.slice(5);
+          }
           if (options.deep && part.parts) {
             stripParts(part.parts);
           } else {
@@ -1333,6 +1361,10 @@ class BlissSVGBuilder {
 
             // Normalize glyphCode → codeName for public API
             if (glyph.glyphCode) {
+              // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
+              const publicCode = glyph.glyphCode.startsWith('XTXT_')
+                ? 'X' + glyph.glyphCode.slice(5)
+                : glyph.glyphCode;
               // Decompose custom glyphs to portable codes by default
               if (!options.preserve && !builtInCodes.has(glyph.glyphCode)) {
                 const def = blissElementDefinitions[glyph.glyphCode];
@@ -1341,10 +1373,10 @@ class BlissSVGBuilder {
                   const resolved = BlissSVGBuilder.#resolveToBuiltInCode(glyph.glyphCode);
                   if (resolved) glyph.codeName = resolved;
                 } else {
-                  glyph.codeName = glyph.glyphCode;
+                  glyph.codeName = publicCode;
                 }
               } else {
-                glyph.codeName = glyph.glyphCode;
+                glyph.codeName = publicCode;
               }
               delete glyph.glyphCode;
             }
@@ -1628,8 +1660,8 @@ class BlissSVGBuilder {
     if (typeof definition.width !== 'number' || !isFinite(definition.width)) {
       throw new Error(`define("${code}"): "width" must be a finite number.`);
     }
-    if (typeof definition.glyph !== 'string' || definition.glyph.length === 0) {
-      throw new Error(`define("${code}"): "glyph" must be a non-empty string.`);
+    if (typeof definition.char !== 'string' || definition.char.length === 0) {
+      throw new Error(`define("${code}"): "char" must be a non-empty string.`);
     }
 
     if (blissElementDefinitions[code] && !options.overwrite) {
@@ -1639,7 +1671,7 @@ class BlissSVGBuilder {
     const entry = {
       getPath: definition.getPath,
       width: definition.width,
-      glyph: definition.glyph,
+      char: definition.char,
       isExternalGlyph: true
     };
     if (typeof definition.y === 'number') entry.y = definition.y;
@@ -1752,14 +1784,14 @@ class BlissSVGBuilder {
           BlissSVGBuilder.#defineShape(code, definition, options);
         } else if (type === 'externalGlyph') {
           BlissSVGBuilder.#defineExternalGlyph(code, definition, options);
-        } else if (typeof definition?.getPath === 'function' && typeof definition?.glyph === 'string') {
+        } else if (typeof definition?.getPath === 'function' && typeof definition?.char === 'string') {
           BlissSVGBuilder.#defineExternalGlyph(code, definition, options);
         } else if (typeof definition?.getPath === 'function') {
           BlissSVGBuilder.#defineShape(code, definition, options);
         } else if (typeof definition?.codeString === 'string') {
           BlissSVGBuilder.#defineBare(code, definition, options);
         } else {
-          result.errors.push(`"${code}": unable to detect definition type. Provide codeString, type+getPath+width+height (shape), or type+getPath+glyph (externalGlyph).`);
+          result.errors.push(`"${code}": unable to detect definition type. Provide codeString, type+getPath+width+height (shape), or type+getPath+char (externalGlyph).`);
           continue;
         }
         result.defined.push(code);
@@ -1882,7 +1914,7 @@ class BlissSVGBuilder {
     const allowedByType = {
       glyph: ['codeString', 'anchorOffsetX', 'anchorOffsetY', 'width', 'isIndicator', 'shrinksPrecedingWordSpace', 'kerningRules', 'defaultOptions'],
       shape: ['getPath', 'codeString', 'width', 'height', 'x', 'y', 'extraPathOptions', 'defaultOptions'],
-      externalGlyph: ['getPath', 'width', 'glyph', 'y', 'height', 'kerningRules', 'defaultOptions'],
+      externalGlyph: ['getPath', 'width', 'char', 'y', 'height', 'kerningRules', 'defaultOptions'],
       bare: ['codeString', 'defaultOptions'],
       space: ['defaultOptions']
     };

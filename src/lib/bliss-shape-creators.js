@@ -53,13 +53,12 @@ export function createTextFallbackGlyph(str) {
     y: approxMinY,
     height: maxY - approxMinY,
     isExternalGlyph: true,
-    isTextFallback: true,
-    // Single-char fallback IS a single glyph: `glyph` + `glyphCode`,
+    // Single-char fallback IS a single glyph: `char` + `glyphCode`,
     // parallel to single X-codes.
     // Multi-char fallback is a composite carrying multiple chars: no
-    // `glyph`, no `glyphCode`, but a `codeName` (alias-style identifier).
+    // `char`, no `glyphCode`, but a `codeName` (alias-style identifier).
     ...(str.length === 1
-      ? { glyph: str, glyphCode: `XTXT_${str}` }
+      ? { char: str, glyphCode: `XTXT_${str}` }
       : { codeName: `XTXT_${str}` }),
   };
 }
@@ -613,13 +612,13 @@ export function createFiber(height) {
 }
 
 /**
- * Creates an external glyph object based on the given glyph identifier.
+ * Creates an external glyph object for the given rendered character.
  *
- * @param {string} glyph - The glyph identifier (expects format like "Xa" where "a" is the character).
- * @return {object} An object with a getPath method, width, kerningRules, glyph and isExternalGlyph properties.
+ * @param {string} char - The rendered character (e.g. "a" from input code "Xa").
+ * @return {object} An object with getPath, width, kerningRules, char, glyphCode, isExternalGlyph properties.
  */
-export function createExternalGlyph(glyph) {
-  const aObj = alphabetData[`X${glyph}`];
+export function createExternalGlyph(char) {
+  const aObj = alphabetData[`X${char}`];
   const adjustX = -aObj.leftSideBearing;
   const adjustY = -0.015; //revisit this
   const closePath = `"/>`;
@@ -648,10 +647,10 @@ export function createExternalGlyph(glyph) {
     height: maxY - approxMinY,
     // Indicates that this "shape" is an external, non-Bliss glyph.
     isExternalGlyph: true,
-    // The glyph represented.
-    glyph: aObj.glyph,
+    // The rendered character.
+    char: aObj.char,
     // Single external glyph identifier (parallel to B-codes' glyphCode).
-    glyphCode: `X${aObj.glyph}`,
+    glyphCode: `X${aObj.char}`,
     // The kerning rules for the glyph
     kerningRules: {...aObj.kerningRules}
   }
