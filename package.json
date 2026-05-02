@@ -1,6 +1,6 @@
 {
   "name": "bliss-svg-builder",
-  "version": "1.0.0-rc.2",
+  "version": "1.0.0-rc.3",
   "description": "Compose, render, and manipulate Blissymbolics SVG using a compact DSL and a programmatic mutation API.",
   "type": "module",
   "types": "src/index.d.ts",
