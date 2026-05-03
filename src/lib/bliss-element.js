@@ -18,8 +18,6 @@ export class BlissElement {
   #isShape
   #isBlissGlyph
   #isExternalGlyph
-  #width
-  #height
   #leafX
   #leafY
   #leafWidth
@@ -780,9 +778,6 @@ export class BlissElement {
 
   get height() {
     if (this.#leafHeight !== undefined) return this.#leafHeight;
-    if (this.#height !== undefined) {
-      return this.#height;
-    }
     if (this.#level === 2) {
       return 20;
     }
