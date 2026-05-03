@@ -126,9 +126,22 @@ export class BlissParser {
     let placeholderMap = {};
     let placeholderCount = 0;
 
-    // Preserve content in both {...} and [...] to protect spaces
-    // {...} uses greedy match since it's always at the end and can contain any characters
-    // [...] uses non-greedy match since it can appear multiple times
+    // Preserve content in both {...} and [...] to protect spaces.
+    // {...} uses greedy match because text content must be able to contain any
+    // characters, including literal `{` and `}`. The downside is that multiple
+    // `{...}` blocks in one input collapse into a single match, which silently
+    // merges the glyphs between them. We emit MULTIPLE_TEXT_BLOCKS below to
+    // make that visible. Proper multi-block support requires a stateful
+    // tokenizer and ships with the {text} rendering feature
+    // (see .claude/backlog/text-overlay.md).
+    // [...] uses non-greedy match since it can appear multiple times.
+    if ((inputString.match(/\{/g) || []).length > 1) {
+      parseWarnings.push({
+        code: 'MULTIPLE_TEXT_BLOCKS',
+        message: 'Multiple `{...}` blocks in one input are not supported by the current parser. Behavior is undefined until proper text-block tokenization ships. Use a single trailing `{text}` per group.',
+        source: inputString,
+      });
+    }
     inputString = inputString.replace(/\{(.*)\}|\[([^\]]*)\]/g, (match, textContent, optionContent) => {
       let placeholder = `PLACEHOLDER_${placeholderCount++}`;
       if (textContent !== undefined) {
