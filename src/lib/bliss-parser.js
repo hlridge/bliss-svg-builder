@@ -937,7 +937,8 @@ export class BlissParser {
         // Determine default space code for this position
         const nextGroup = parsedGroups[i + 1];
         const isPunctuation = nextGroup && !nextGroup._isSpaceGroup &&
-          (nextGroup.glyphs?.every(g => g.shrinksPrecedingWordSpace === true) ?? false);
+          (nextGroup.glyphs?.length > 0) &&
+          nextGroup.glyphs.every(g => g.shrinksPrecedingWordSpace === true);
         const defaultCode = isPunctuation ? 'QSP' : 'TSP';
 
         for (const glyph of group.glyphs) {
