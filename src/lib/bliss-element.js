@@ -616,7 +616,7 @@ export class BlissElement {
               source: this.#blissObj.codeName || 'unknown',
             });
           } else {
-            const failedCode = this.#blissObj.codeName || 'unknown';
+            const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
             this.#sharedOptions.warnings.push({
               code: 'UNKNOWN_CODE',
               message: `Unknown or invalid code: "${failedCode}"`,
