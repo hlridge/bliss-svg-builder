@@ -847,7 +847,7 @@ export class BlissParser {
           ...(isHeadGlyph === true && { isHeadGlyph })
         };
 
-        const kerningMatch = part.match(/^(RK|AK)(?::([+-]?\d+(?:\.\d+)?))?$/);
+        const kerningMatch = part.match(/^(RK|AK)(?::([+-]?(?:\d+(?:\.\d*)?|\.\d+)))?$/);
         if (kerningMatch) {
           const [_, kerningType, kerningValue = 0] = kerningMatch;
           if (kerningType === "RK") pendingRelativeKerning = Number(kerningValue);
