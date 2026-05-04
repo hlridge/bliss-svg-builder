@@ -434,8 +434,8 @@ export class BlissParser {
         const wordLevelMatch = str.match(/^(.+);;(.*)$/);
         if (wordLevelMatch) {
           const [_, baseCode, rawIndicators] = wordLevelMatch;
-          const forceStrip = rawIndicators.startsWith('!');
-          const indicators = forceStrip ? rawIndicators.slice(1) : rawIndicators;
+          const stripSemantic = rawIndicators.startsWith('!');
+          const indicators = stripSemantic ? rawIndicators.slice(1) : rawIndicators;
 
           // Process baseCode using the normal flow (splits on / and expands each part)
           // This recursive call handles everything: definitions, ^markers, options, etc.
@@ -445,7 +445,7 @@ export class BlissParser {
             // Multiple glyphs: Apply indicators to head glyph
             const targetIndex = findHeadGlyphIndex(expandedParts);
             const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-            const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
+            const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
             const bareCode = getBaseCode(expandedParts[targetIndex]);
 
             if (indicators) {
@@ -463,7 +463,7 @@ export class BlissParser {
                   : bareCode;
               }
             } else {
-              // Empty ;; or ;;! — preserve semantic root unless force-stripped
+              // Empty ;; or ;;! — preserve semantic root unless stripSemantic is set
               expandedParts[targetIndex].part = semanticRoot
                 ? bareCode + ';' + semanticRoot
                 : bareCode;
@@ -479,7 +479,7 @@ export class BlissParser {
           } else if (expandedParts.length === 1) {
             // Single glyph: ;; behaves like ; (attach or strip indicator on the single glyph)
             const existingInds = getIndicatorParts(expandedParts[0]);
-            const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
+            const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
             const baseCode = getBaseCode(expandedParts[0]);
 
             if (indicators) {
@@ -543,9 +543,9 @@ export class BlissParser {
           const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
 
           const [potentialBaseCodeRaw, ...rawIndicators] = codeForLookup.split(';');
-          // Detect force-strip modifier (! prefix on first indicator)
-          const forceStrip = rawIndicators.length > 0 && rawIndicators[0]?.startsWith('!');
-          if (forceStrip) rawIndicators[0] = rawIndicators[0].slice(1);
+          // Detect strip-semantic modifier (! prefix on first indicator)
+          const stripSemantic = rawIndicators.length > 0 && rawIndicators[0]?.startsWith('!');
+          if (stripSemantic) rawIndicators[0] = rawIndicators[0].slice(1);
           const filteredIndicators = rawIndicators.filter(ind => ind !== '');
           const hasInputIndicators = rawIndicators.length > 0;
 
@@ -600,7 +600,7 @@ export class BlissParser {
             if (shouldReplace || shouldRemove) {
               const codeStringParts = definition.codeString.split(';');
               const existingIndicatorCodes = codeStringParts.slice(1).map(p => p.split(':')[0]);
-              const semanticRoot = !forceStrip ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
+              const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
 
               codeStringToExpand = codeStringParts[0];
               if (filteredIndicators.length > 0) {
@@ -717,7 +717,7 @@ export class BlissParser {
               if (validInds.length > 0) {
                 const targetIndex = findHeadGlyphIndex(expandedParts);
                 const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-                const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
+                const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
                 const baseCode = getBaseCode(expandedParts[targetIndex]);
 
                 // Reattach with new indicators, preserving semantic root when appropriate
@@ -736,7 +736,7 @@ export class BlissParser {
             if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
               const targetIndex = findHeadGlyphIndex(expandedParts);
               const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-              const semanticRoot = !forceStrip ? getSemanticRoot(existingInds, definitions) : null;
+              const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
               const baseCode = getBaseCode(expandedParts[targetIndex]);
 
               expandedParts[targetIndex].part = semanticRoot
@@ -789,9 +789,9 @@ export class BlissParser {
           const glyphCode = definition.glyphCode;
           const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
-          // forceStrip consumed the ! marker from rawIndicators above, but `str`
+          // stripSemantic consumed the ! marker from rawIndicators above, but `str`
           // still contains it. Strip it here so it doesn't leak into part.codeName.
-          const baseStr = forceStrip ? str.replace(';!', ';') : str;
+          const baseStr = stripSemantic ? str.replace(';!', ';') : str;
           return [{
             part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode + positionSuffix : baseStr.replace(/;$/, ''),
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),

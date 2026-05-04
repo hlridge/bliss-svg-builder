@@ -11,9 +11,9 @@ Pattern: Single = character level, Double = word level
 | `//` | Word separator | `B313//B431` | Two words |
 | `/` | Character separator | `B313/B1103` | Two characters in one word |
 | `;;` | Word-level indicators | `B313/B1103;;B81` | Indicator on head glyph, keeps thing/abstract |
-| `;;!` | Force-strip indicators | `B313/B1103;;!B81` | Strips all indicators, then adds B81 |
+| `;;!` | Strip-semantic indicators | `B313/B1103;;!B81` | Strips all indicators including the semantic root, then adds B81 |
 | `;` | Character-level indicators | `B431;B81` | Indicator on character, keeps thing/abstract |
-| `;!` | Force-strip indicators | `B431;!B81` | Strips all indicators, then adds B81 |
+| `;!` | Strip-semantic indicators | `B431;!B81` | Strips all indicators including the semantic root, then adds B81 |
 
 ### Indicator Resolution
 
@@ -25,6 +25,19 @@ toString(): B313;B81/B1103     (indicator attached to B313)
 ```
 
 The visual output is identical. The difference only matters when inspecting `toString()` output or the element tree.
+
+### The semantic root and `!`
+
+Many Bliss words carry a *semantic root* indicator: `B97` (thing) or `B6436` (abstract). It marks the word's broad part-of-speech category and is preserved by default when you replace indicators with `;` or `;;`. So `B431;B81` keeps the existing thing/abstract root and attaches `B81` alongside it.
+
+Prefix the new indicator with `!` to strip the semantic root as well. Use `;!` for character-level and `;;!` for word-level. Either form replaces the entire indicator stack with only what you provide.
+
+```
+B431;B81    →  keeps semantic root, attaches B81
+B431;!B81   →  drops semantic root, attaches only B81
+```
+
+The same behavior is available on the API as `applyIndicators(newInds, { stripSemantic: true })`.
 
 ## Option Scope Separators
 
