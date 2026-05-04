@@ -789,8 +789,11 @@ export class BlissParser {
           const glyphCode = definition.glyphCode;
           const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
+          // forceStrip consumed the ! marker from rawIndicators above, but `str`
+          // still contains it. Strip it here so it doesn't leak into part.codeName.
+          const baseStr = forceStrip ? str.replace(';!', ';') : str;
           return [{
-            part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode + positionSuffix : str.replace(/;$/, ''),
+            part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode + positionSuffix : baseStr.replace(/;$/, ''),
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph && { isExternalGlyph }),
