@@ -26,6 +26,40 @@ Boolean options use a bare key (no `=value`). The option is enabled when present
 
 <Demo code="[grid]||B313" title="Boolean option" />
 
+## Option Values
+
+Option values are usually written bare:
+
+```
+[color=red;stroke-width=0.8]||B313
+```
+
+When a value needs to contain a `;` (which would otherwise end the option), wrap it in matching single or double quotes. The outer quotes are stripped from the parsed value:
+
+```
+[svg-title="Heart; with semicolon"]||B313
+```
+
+Inside matching quotes, `\"` and `\'` are unescaped so a literal quote of the same kind can appear in the value:
+
+```
+[svg-title="She said \"hi\""]||B313    parses to: She said "hi"
+```
+
+A lone leading or trailing quote without its partner is treated as a literal character; only matching pairs are stripped.
+
+| Input value | Parsed value |
+|---|---|
+| `red` | `red` |
+| `"red"` | `red` |
+| `'red'` | `red` |
+| `"red` | `"red` |
+| `red"` | `red"` |
+| `"a\"b"` | `a"b` |
+| `'a\'b'` | `a'b` |
+
+This applies to options at every scope level.
+
 ## Scope Levels
 
 Options can be applied at four levels, from broadest to most specific:

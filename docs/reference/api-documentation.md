@@ -1153,8 +1153,15 @@ Each warning object has:
 | Property | Type | Description |
 |----------|------|-------------|
 | `code` | `string` | Warning type identifier (e.g., `'UNKNOWN_CODE'`) |
-| `message` | `string` | Human-readable description |
-| `source` | `string` | The problematic DSL code |
+| `message` | `string` | Human-readable description, quoting the offending input |
+| `source` | `string` | The problematic DSL code, exactly as written |
+
+`source` and `message` always quote the original input verbatim, including any bracketed options or `{text}` content the parser had to look past:
+
+```js
+new BlissSVGBuilder('bad[color=red]|B313').warnings;
+// ↳ source: 'bad[color=red]'
+```
 
 Valid input produces an empty array:
 
