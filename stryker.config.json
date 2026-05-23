@@ -8,7 +8,7 @@
   ],
   "testRunner": "vitest",
   "vitest": {
-    "configFile": "vitest.config.js"
+    "configFile": "vitest.stryker.config.js"
   },
   "coverageAnalysis": "perTest",
   "concurrency": 4,
