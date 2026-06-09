@@ -2182,6 +2182,17 @@ class BlissSVGBuilder {
       'stroke-width': strokeWidth,
     };
     const contentAttrs = { ...contentDefaults, ...this.globalSvgAttributes };
+    // vector-effect is non-inherited; relocate it from the content group onto
+    // the glyph paths so it actually takes effect. Always remove it from the
+    // group (even an empty value, which would otherwise be a dead attribute on
+    // the <g>); only stamp the paths when there is a value, matching the
+    // element-scope handling in BlissElement.
+    let contentInner = content;
+    if ('vector-effect' in contentAttrs) {
+      const vectorEffect = contentAttrs['vector-effect'];
+      delete contentAttrs['vector-effect'];
+      if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
+    }
     const contentAttrsStr = Object.entries(contentAttrs)
       .map(([key, value]) => `${key}="${value}"`)
       .join(' ');
@@ -2195,7 +2206,7 @@ class BlissSVGBuilder {
       backgroundContent,
       gridPath,
       `  <g class="bliss-content" ${contentAttrsStr}>`,
-      `    ${content}`,
+      `    ${contentInner}`,
       '  </g>',
       svgText,
       '</svg>',

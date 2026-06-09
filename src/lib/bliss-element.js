@@ -39,6 +39,25 @@ export class BlissElement {
   #classifiedParts; // Cached result of #classifyParts (level 2 only)
 
   /**
+   * Stamps a non-inherited `vector-effect` onto bare <path> elements.
+   *
+   * vector-effect does not inherit and has no rendering effect on a <g>, so a
+   * pass-through vector-effect is relocated from the group onto each descendant
+   * <path> that does not already declare one. Innermost scope wins, because
+   * inner groups are rendered before their enclosing content.
+   *
+   * @param {string} content - inner SVG string (may contain nested <g>/<path>)
+   * @param {string} value - already-escaped vector-effect value
+   * @returns {string} content with vector-effect applied to bare <path> elements
+   */
+  static applyVectorEffectToPaths(content, value) {
+    // Skip empty placeholder paths (<path d=""/>): they draw nothing and are
+    // stripped later, so stamping them would defeat that cleanup. Skip paths
+    // that already declare a vector-effect so an inner scope wins.
+    return content.replace(/<path (?!d="")(?![^>]*\bvector-effect=)/g, () => `<path vector-effect="${value}" `);
+  }
+
+  /**
    * Wraps content with <a> and/or <g> tags based on options.
    * Ensures consistent wrapping behavior across all element levels.
    *
@@ -47,14 +66,17 @@ export class BlissElement {
    * @returns {string} The wrapped content
    */
   static #wrapWithAnchorAndGroup(content, options) {
-    const { anchorAttrs, groupAttrs, hasHref } = BlissElement.#separateAnchorAndGroupOptions(options);
+    const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(options);
 
     // Content that starts with '<' is already wrapped in proper tags
     // Raw path data or fragments need wrapping
     const needsPathWrapper = !content.startsWith('<');
 
+    // vector-effect is non-inherited: relocate it onto the <path>, not the <g>.
+    const stamp = (inner) => vectorEffect ? BlissElement.applyVectorEffectToPaths(inner, vectorEffect) : inner;
+
     if (hasHref) {
-      const wrappedContent = needsPathWrapper ? `<path d="${content}"/>` : content;
+      const wrappedContent = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
       if (groupAttrs) {
         return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${wrappedContent}</g></a>`;
       }
@@ -62,8 +84,12 @@ export class BlissElement {
     }
 
     if (groupAttrs) {
-      const wrappedContent = needsPathWrapper ? `<path d="${content}"/>` : content;
+      const wrappedContent = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
       return `<g ${groupAttrs}>${wrappedContent}</g>`;
+    }
+
+    if (vectorEffect) {
+      return stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
     }
 
     return content;
@@ -96,6 +122,7 @@ export class BlissElement {
     const groupAttrs = [];
     let hasHref = false;
     let hasPointerEvents = false;
+    let vectorEffect = null;
 
     const isSafeHref = (value) => {
       const cleaned = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim();
@@ -114,6 +141,8 @@ export class BlissElement {
         anchorAttrs.push(`${key}="${value}"`);
       } else {
         const attrName = attrMap[key] || key;
+        // vector-effect is non-inherited; capture it for relocation onto paths
+        if (attrName === 'vector-effect') { vectorEffect = value; continue; }
         if (key === 'pointer-events') hasPointerEvents = true;
         groupAttrs.push(`${attrName}="${value}"`);
       }
@@ -126,7 +155,8 @@ export class BlissElement {
     return {
       anchorAttrs: anchorAttrs.join(' '),
       groupAttrs: groupAttrs.join(' '),
-      hasHref
+      hasHref,
+      vectorEffect
     };
   }
 
