@@ -751,6 +751,17 @@ export class BlissParser {
 
             // For words without explicit marker: set isHeadGlyph only if fallback finds non-default (index > 0)
             // This keeps data clean for toString() - only mark when deviating from default
+            //
+            // This inner pass is NOT redundant with the top-level pass below
+            // (replaceWithDefinition postprocess): it runs before the outer
+            // position suffix / options prefix is written onto the first
+            // part string. When the first glyph carries no glyphCode (e.g. a
+            // composite like B486;B303), the decorated part string no longer
+            // matches the head-glyph exclusion lists, so the top-level pass
+            // would pick index 0 and mark nothing. Verified 2026-06-10 by
+            // deleting this block: 'keeps the fallback head when the alias
+            // is invoked with a position suffix / an options prefix' in
+            // BlissParser.head-glyph.test.js fail without it.
             if (!isHeadGlyph && expandedParts.length > 1 && !expandedParts.some(p => p.isHeadGlyph)) {
               const fallbackIndex = findHeadGlyphIndex(expandedParts);
               if (fallbackIndex > 0) {

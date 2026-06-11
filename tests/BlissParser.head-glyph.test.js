@@ -30,6 +30,12 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   list, an explicit `^` carried inside a codeString, an outer `^`
  *   on the definition code itself, and `MULTIPLE_HEAD_MARKERS`
  *   emission when a definition expands multiple `^` markers.
+ * - The single-crown invariant: exactly one `isHeadGlyph: true` per
+ *   word group, including when an explicit `^` disagrees with the
+ *   fallback's default pick, when an alias resolves through another
+ *   alias to a multi-glyph word, and when an alias invocation carries
+ *   a position suffix or options prefix that decorates the first
+ *   part string after expansion.
  * - `^` is scoped per word group: a separate marker in each of two
  *   `//`-separated words marks each word's own head without warning,
  *   and a second `^` in a different word never triggers
@@ -167,6 +173,20 @@ describe('BlissParser head-glyph marker', () => {
       const result = BlissParser.parse('B101/B208^/B303');
 
       expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
+    });
+
+    it('marks exactly one head when the explicit marker disagrees with the default pick', () => {
+      // Single-crown invariant: the default pick for B291/B313/B208 is
+      // index 0, the explicit ^ overrides to index 1, and no second
+      // isHeadGlyph may appear anywhere in the group. A silent two-crowns
+      // state would mis-route word-level indicators and serialization.
+      const result = BlissParser.parse('B291/B313^/B208');
+
+      const glyphs = result.groups[0].glyphs;
+      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
+      expect(glyphs[1].isHeadGlyph).toBe(true);
+      expect(Object.hasOwn(glyphs[0], 'isHeadGlyph')).toBe(false);
+      expect(Object.hasOwn(glyphs[2], 'isHeadGlyph')).toBe(false);
     });
   });
 
@@ -420,6 +440,9 @@ describe('BlissParser head-glyph marker', () => {
       });
       defineLocal('_C15B_WORD_FIRST_MARKED', { codeString: 'B486^/B291/B313' });
       defineLocal('_C15B_MULTI_HEAD', { codeString: 'B486^/B291^/B313' });
+      defineLocal('_HG_NESTED_INNER', { codeString: 'B486/B291;B97/B313' });
+      defineLocal('_HG_NESTED_OUTER', { codeString: '_HG_NESTED_INNER' });
+      defineLocal('_HG_COMPOSITE_FIRST', { codeString: 'B486;B303/B291/B313' });
     });
 
     afterAll(() => {
@@ -464,6 +487,42 @@ describe('BlissParser head-glyph marker', () => {
         message: 'Multiple head markers (^) found in word: _C15B_MULTI_HEAD. Using first marked glyph.',
         source: '_C15B_MULTI_HEAD'
       }]);
+    });
+
+    it('marks the default-pick glyph as the only head across a nested alias expansion', () => {
+      // Alias resolving through another alias to a multi-glyph word:
+      // _HG_NESTED_OUTER -> _HG_NESTED_INNER -> B486/B291;B97/B313.
+      // The fallback skips the B486 exclusion and crowns index 1 exactly once.
+      const r = BlissParser.parse('_HG_NESTED_OUTER');
+      const glyphs = r.groups[0].glyphs;
+
+      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
+      expect(glyphs[1].isHeadGlyph).toBe(true);
+      expect(Object.hasOwn(glyphs[0], 'isHeadGlyph')).toBe(false);
+      expect(Object.hasOwn(glyphs[2], 'isHeadGlyph')).toBe(false);
+    });
+
+    it('keeps the fallback head when the alias is invoked with a position suffix', () => {
+      // First glyph is a composite (B486;B303) so it carries no glyphCode;
+      // the head pick must run on the clean expanded parts before the outer
+      // :2,0 suffix lands on the first part string.
+      const r = BlissParser.parse('_HG_COMPOSITE_FIRST:2,0');
+      const glyphs = r.groups[0].glyphs;
+
+      expect(glyphs[0].parts[0].x).toBe(2);
+      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
+      expect(glyphs[1].isHeadGlyph).toBe(true);
+    });
+
+    it('keeps the fallback head when the alias is invoked with an options prefix', () => {
+      // Same composite-first word; the [color=red] prefix lands on the first
+      // part string after expansion, so the head pick must already be done.
+      const r = BlissParser.parse('[color=red]_HG_COMPOSITE_FIRST');
+      const glyphs = r.groups[0].glyphs;
+
+      expect(glyphs[0].options.color).toBe('red');
+      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
+      expect(glyphs[1].isHeadGlyph).toBe(true);
     });
   });
 });
