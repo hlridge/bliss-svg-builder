@@ -13,8 +13,11 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     exclude: [
-      'node_modules',
-      'dist'
+      '**/node_modules/**',
+      '**/dist/**',
+      // Stryker sandboxes hold full copies of tests/; never discover those.
+      '**/.stryker-tmp/**',
+      '**/.worktrees/**',
     ],
     root: '.',
     reporters: ['verbose'],
