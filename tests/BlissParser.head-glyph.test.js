@@ -28,8 +28,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - The head-glyph algorithm running over a definition's recursive
  *   expansion: fallback heuristics applied to the expanded glyph
  *   list, an explicit `^` carried inside a codeString, an outer `^`
- *   on the definition code itself, and `MULTIPLE_HEAD_MARKERS`
- *   emission when a definition expands multiple `^` markers.
+ *   on a multi-character definition code dropping with
+ *   `HEAD_MARKER_ON_WORD` (head-marker contract rule 1), and
+ *   `MULTIPLE_HEAD_MARKERS` emission when a definition expands
+ *   multiple `^` markers.
  * - The single-crown invariant: exactly one `isHeadGlyph: true` per
  *   word group, including when an explicit `^` disagrees with the
  *   fallback's default pick, when an alias resolves through another
@@ -468,12 +470,19 @@ describe('BlissParser head-glyph marker', () => {
       expect(Object.hasOwn(glyphs[1], 'isHeadGlyph')).toBe(false);
     });
 
-    it('applies an outer ^ marker to the first glyph of the expansion', () => {
+    it('drops an outer ^ marker on a multi-character definition and falls back to the heuristic', () => {
+      // Head-marker contract rule 1: ^ attaches to characters. A marker on
+      // a multi-character alias is dropped with HEAD_MARKER_ON_WORD; the
+      // automatic scan then skips the B486 exclusion and crowns B291.
       const r = BlissParser.parse('_C15B_WORD_SEMANTIC^');
       const glyphs = r.groups[0].glyphs;
 
-      expect(glyphs[0].isHeadGlyph).toBe(true);
-      expect(Object.hasOwn(glyphs[1], 'isHeadGlyph')).toBe(false);
+      expect(Object.hasOwn(glyphs[0], 'isHeadGlyph')).toBe(false);
+      expect(glyphs[1].isHeadGlyph).toBe(true);
+      expect(Object.hasOwn(glyphs[2], 'isHeadGlyph')).toBe(false);
+      expect(r._parseWarnings).toEqual([
+        expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' }),
+      ]);
     });
 
     it('uses the first marker and warns when a definition expansion carries multiple ^ markers', () => {

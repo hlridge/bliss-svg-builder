@@ -315,16 +315,24 @@ export class BlissParser {
 
       function replaceWithDefinition(str, definitions) {
         const wordCode = str;
-        let headGlyphFound = false;
 
-        // Helper: Find head glyph index (explicit marker or fallback skipping modifiers)
-        // Defined at top level for use in both ;; handling and expand()
+        // Helper: Find head glyph index (explicit resolution mark or fallback scan)
+        // Used by the ;; handling to find the indicator target after resolution
         const findHeadGlyphIndex = (parts) => {
-          // Check for explicit marker first
           const explicitIndex = parts.findIndex(p => p.isHeadGlyph);
           if (explicitIndex !== -1) return explicitIndex;
+          return findFallbackHeadIndex(parts);
+        };
 
-          const getCode = (i) => parts[i].glyphCode || parts[i].part.split(';')[0];
+        // Rule-3 automatic scan: skip exclusions from the start, stop at the
+        // first non-excluded character, or pick by priority tier when the
+        // whole word is exclusions. Custom glyph identity (glyphCode) governs
+        // first: a custom glyph wrapping an exclusion is its own character,
+        // not that exclusion. Without an identity, _scanCode (the character
+        // code stashed at part creation) keeps exclusion matching immune to
+        // decorations written onto part strings by outer expansion levels.
+        const findFallbackHeadIndex = (parts) => {
+          const getCode = (i) => parts[i].glyphCode ?? parts[i]._scanCode ?? parts[i].part.split(';')[0];
 
           // Check if exclusion applies (handles conditional exceptions like B10/B4)
           const isExcluded = (code, index) => {
@@ -375,6 +383,72 @@ export class BlissParser {
             }
           }
           return best;
+        };
+
+        // Per-word-string head resolution (head-marker contract):
+        // rule 2 -- the leftmost written marker (_marker) in this word-string
+        // wins; later ones warn and drop. With no written marker, rule 3
+        // scans for the head position and rule 4 redirects the crown to the
+        // designated head (_designation) of the fragment the scan stopped in.
+        const resolveWordStringHead = (parts, label) => {
+          const markerIndexes = parts.flatMap((p, i) => (p._marker ? [i] : []));
+          for (const laterIndex of markerIndexes.slice(1)) {
+            delete parts[laterIndex]._marker;
+            parseWarnings.push({ code: 'MULTIPLE_HEAD_MARKERS', message: `Multiple head markers (^) found in word: ${label}. Using first marked glyph.`, source: label });
+          }
+          if (markerIndexes.length > 0) {
+            delete parts[markerIndexes[0]]._marker;
+            return { index: markerIndexes[0], isDesignated: true };
+          }
+          const stop = findFallbackHeadIndex(parts);
+          // Designated parts always carry _frag, so a fragment-less stop
+          // (frag === undefined) can never match one.
+          const frag = parts[stop]._frag;
+          const designated = parts.findIndex(p => p._frag === frag && p._designation);
+          if (designated !== -1) return { index: designated, isDesignated: true };
+          return { index: stop, isDesignated: false };
+        };
+
+        // Consume a fragment's resolution into a single upward-facing
+        // designation: an embedded alias contributes its characters plus at
+        // most one designated head (rule 4); deeper bookkeeping is cleared.
+        let fragCounter = 0;
+        const sealFragment = (parts, label) => {
+          if (parts.length === 0) return null;
+          const resolved = resolveWordStringHead(parts, label);
+          const fragId = ++fragCounter;
+          for (const p of parts) {
+            delete p._designation;
+            p._frag = fragId;
+          }
+          if (resolved.isDesignated) parts[resolved.index]._designation = true;
+          return resolved;
+        };
+
+        // Resolve and crown one final word: designated heads are always
+        // marked; fallback heads only when they deviate from the index-0
+        // default that downstream consumers assume.
+        const crownWordChunk = (parts, label) => {
+          if (parts.length === 0) return;
+          const resolved = resolveWordStringHead(parts, label);
+          if (resolved.isDesignated || resolved.index > 0) {
+            parts[resolved.index].isHeadGlyph = true;
+          }
+        };
+
+        // Split expanded parts at word-break markers and crown each word
+        // independently (rule 2: words split by // each have their own head).
+        const crownWordChunks = (parts, label) => {
+          let chunk = [];
+          for (const p of parts) {
+            if (p._wordBreak) {
+              crownWordChunk(chunk, label);
+              chunk = [];
+            } else {
+              chunk.push(p);
+            }
+          }
+          crownWordChunk(chunk, label);
         };
 
         // Helper to get base code from expanded glyph, stripping only indicator parts.
@@ -441,6 +515,9 @@ export class BlissParser {
           // This recursive call handles everything: definitions, ^markers, options, etc.
           const expandedParts = baseCode.split('/').flatMap(strPart => expand(strPart, definitions));
 
+          // Resolve and crown the word before picking the indicator target
+          crownWordChunks(expandedParts, wordCode);
+
           if (expandedParts.length > 1) {
             // Multiple glyphs: Apply indicators to head glyph
             const targetIndex = findHeadGlyphIndex(expandedParts);
@@ -471,11 +548,6 @@ export class BlissParser {
 
             // ;; modified the indicator — update glyph identity to match the new part
             updateGlyphIdentity(expandedParts[targetIndex]);
-
-            // Mark as head glyph if not default (index > 0) and not already marked
-            if (targetIndex > 0 && !expandedParts.some(p => p.isHeadGlyph)) {
-              expandedParts[targetIndex].isHeadGlyph = true;
-            }
           } else if (expandedParts.length === 1) {
             // Single glyph: ;; behaves like ; (attach or strip indicator on the single glyph)
             const existingInds = getIndicatorParts(expandedParts[0]);
@@ -511,17 +583,30 @@ export class BlissParser {
         // isTopLevel: true for user input, false for internal codeString expansion
         // Indicator replacement only applies at top level (user input)
         function expand(str, definitions, isTopLevel = true, depth = 0) {
-          if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
-          let isHeadGlyph = false;
+          let hasMarker = false;
           if (str.endsWith('^')) {
-            if (!headGlyphFound) {
-              isHeadGlyph = true;
-              headGlyphFound = true;
-            } else {
-              parseWarnings.push({ code: 'MULTIPLE_HEAD_MARKERS', message: `Multiple head markers (^) found in word: ${wordCode}. Using first marked glyph.`, source: wordCode });
-            }
+            hasMarker = true;
             str = str.slice(0, -1);
           }
+          const parts = expandSegment(str, definitions, isTopLevel, depth);
+          if (hasMarker) {
+            if (parts.length === 1) {
+              // Rule 1: ^ attaches to a character (one expanded glyph),
+              // including an alias that resolves to a single character.
+              parts[0]._marker = true;
+            } else {
+              parseWarnings.push({
+                code: 'HEAD_MARKER_ON_WORD',
+                message: `Head marker (^) ignored on "${restorePlaceholders(str)}": it expands to multiple characters. Mark a single character instead.`,
+                source: restorePlaceholders(str),
+              });
+            }
+          }
+          return parts;
+        }
+
+        function expandSegment(str, definitions, isTopLevel, depth) {
+          if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
 
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
           const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
@@ -530,7 +615,7 @@ export class BlissParser {
             const definition = definitions[codeForKerning] || {};
             return [{
               part: str,
-              ...(isHeadGlyph && { isHeadGlyph }),
+              _scanCode: partLevelMatch[2].split(';')[0].split(':')[0],
               ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
               ...(definition.char && { char: definition.char }),
               ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
@@ -629,6 +714,7 @@ export class BlissParser {
                 part: isBareEmptyStrip
                   ? optionsPrefix + potentialBaseCode + positionSuffix
                   : str.replace(/;$/, ''),
+                _scanCode: potentialBaseCode,
                 ...(definition.shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace: true }),
                 ...(definition.isIndicator === true && { isIndicator: true }),
                 ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
@@ -636,7 +722,6 @@ export class BlissParser {
                 ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
                 ...(definition.glyphCode && { glyphCode: definition.glyphCode }),
                 ...(definition.isBlissGlyph && { isBlissGlyph: definition.isBlissGlyph }),
-                ...(isHeadGlyph && { isHeadGlyph }),
                 ...(definition.defaultOptions && { defaultOptions: definition.defaultOptions }),
               }];
             }
@@ -649,6 +734,9 @@ export class BlissParser {
                 if (i > 0) allParts.push({ part: '', _wordBreak: true });
                 const segmentParts = wordSegments[i].split('/')
                   .flatMap(s => expand(s, definitions, false, depth + 1));
+                // Rule 2: each //-segment of the codeString is its own
+                // word-string; seal its markers into a fragment designation.
+                sealFragment(segmentParts, potentialBaseCode);
                 allParts.push(...segmentParts);
               }
               // Apply position suffix to first non-break part
@@ -661,9 +749,6 @@ export class BlissParser {
                   }
                   firstReal.part = semiParts.join(';');
                 }
-              }
-              if (isHeadGlyph && allParts.length > 0) {
-                allParts[0].isHeadGlyph = true;
               }
               if (optionsPrefix && allParts.length > 0) {
                 allParts[0].part = optionsPrefix + allParts[0].part;
@@ -702,10 +787,19 @@ export class BlissParser {
                   ...(kerningRules && { kerningRules }),
                   ...(glyphCode && { glyphCode }),
                   ...(isBlissGlyph && { isBlissGlyph }),
-                  ...(expandedSubPart.isHeadGlyph && { isHeadGlyph: expandedSubPart.isHeadGlyph }),
+                  ...(expandedSubPart._marker && { _marker: true }),
+                  ...(expandedSubPart._designation && { _designation: true }),
+                  ...(expandedSubPart._frag !== undefined && { _frag: expandedSubPart._frag }),
+                  ...(expandedSubPart._scanCode !== undefined && { _scanCode: expandedSubPart._scanCode }),
                   ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions })
                 };
               });
+
+            // Rule 2: a definition's codeString is its own word-string.
+            // Resolve its written markers now; the result is carried upward
+            // as at most one designation that only acts when this fragment
+            // occupies the word's head position (rule 4).
+            const fragResolved = sealFragment(expandedParts, potentialBaseCode);
 
             // Handle WORD;INDICATORS syntax (only for multi-glyph words, not single characters)
             // Single characters with indicators are handled by parseParts later
@@ -715,7 +809,7 @@ export class BlissParser {
               // Only use codes that are real indicators
               const validInds = filterToIndicators(filteredIndicators, definitions);
               if (validInds.length > 0) {
-                const targetIndex = findHeadGlyphIndex(expandedParts);
+                const targetIndex = fragResolved.index;
                 const existingInds = getIndicatorParts(expandedParts[targetIndex]);
                 const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
                 const baseCode = getBaseCode(expandedParts[targetIndex]);
@@ -734,7 +828,7 @@ export class BlissParser {
             // Single-char cases are handled by: shouldRemove (if definition has real indicators)
             // or isBareEmptyStrip (if no real indicator in definition, via base case return)
             if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
-              const targetIndex = findHeadGlyphIndex(expandedParts);
+              const targetIndex = fragResolved.index;
               const existingInds = getIndicatorParts(expandedParts[targetIndex]);
               const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
               const baseCode = getBaseCode(expandedParts[targetIndex]);
@@ -742,31 +836,6 @@ export class BlissParser {
               expandedParts[targetIndex].part = semanticRoot
                 ? baseCode + ';' + semanticRoot
                 : baseCode;
-            }
-
-            // Apply isHeadGlyph to the first expanded part only (explicit ^ marker)
-            if (isHeadGlyph && expandedParts.length > 0) {
-              expandedParts[0].isHeadGlyph = true;
-            }
-
-            // For words without explicit marker: set isHeadGlyph only if fallback finds non-default (index > 0)
-            // This keeps data clean for toString() - only mark when deviating from default
-            //
-            // This inner pass is NOT redundant with the top-level pass below
-            // (replaceWithDefinition postprocess): it runs before the outer
-            // position suffix / options prefix is written onto the first
-            // part string. When the first glyph carries no glyphCode (e.g. a
-            // composite like B486;B303), the decorated part string no longer
-            // matches the head-glyph exclusion lists, so the top-level pass
-            // would pick index 0 and mark nothing. Verified 2026-06-10 by
-            // deleting this block: 'keeps the fallback head when the alias
-            // is invoked with a position suffix / an options prefix' in
-            // BlissParser.head-glyph.test.js fail without it.
-            if (!isHeadGlyph && expandedParts.length > 1 && !expandedParts.some(p => p.isHeadGlyph)) {
-              const fallbackIndex = findHeadGlyphIndex(expandedParts);
-              if (fallbackIndex > 0) {
-                expandedParts[fallbackIndex].isHeadGlyph = true;
-              }
             }
 
             // Apply position suffix from outer code (e.g. WORD:2,0) to first glyph's first part
@@ -805,26 +874,21 @@ export class BlissParser {
           const baseStr = stripSemantic ? str.replace(';!', ';') : str;
           return [{
             part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode + positionSuffix : baseStr.replace(/;$/, ''),
+            _scanCode: potentialBaseCode,
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),
             ...(isExternalGlyph && { isExternalGlyph }),
             ...(char && { char }),
             ...(kerningRules && { kerningRules }),
             ...(glyphCode && { glyphCode }),
-            ...(isBlissGlyph && { isBlissGlyph }),
-            ...(isHeadGlyph && { isHeadGlyph })
+            ...(isBlissGlyph && { isBlissGlyph })
           }];
         }
 
         const expandedParts = str.split('/').flatMap(strPart => expand(strPart, definitions));
 
-        // Run head glyph detection on top-level multi-glyph words
-        if (expandedParts.length > 1 && !expandedParts.some(p => p.isHeadGlyph)) {
-          const fallbackIndex = findHeadGlyphIndex(expandedParts);
-          if (fallbackIndex > 0) {
-            expandedParts[fallbackIndex].isHeadGlyph = true;
-          }
-        }
+        // Resolve and crown the head of each final word (head-marker contract)
+        crownWordChunks(expandedParts, wordCode);
 
         return expandedParts;
       }

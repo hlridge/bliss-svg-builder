@@ -99,6 +99,14 @@ When you use `;;`, the library determines which character is the head glyph. It 
 
 *\* Could be useful in rare cases for [predefined words](/reference/api-documentation#define-definitions-options) if the heuristic would pick the wrong head glyph. For manually composed words, you can attach the indicator directly with `;` instead.*
 
+### The Head Marker (`^`)
+
+The head marker belongs to characters. It attaches to a B-code, a composed character, or a predefined code that resolves to a single character (which behaves exactly as that character). Writing `^` on a code that expands to multiple characters has no meaning: the marker is dropped and the parser records a `HEAD_MARKER_ON_WORD` warning.
+
+Each word has one head. The leftmost `^` written in a word wins; later markers in the same word are dropped with a `MULTIPLE_HEAD_MARKERS` warning. Words separated by `//` each resolve their own head independently.
+
+A predefined word resolves any `^` inside its own definition by these same rules. When such a word is embedded inside a larger word, its internal marker stays dormant: the surrounding word's own scan decides the head position. The one courtesy: if the automatic scan stops on the embedded word's characters, the embedded word's marked character takes the head position. In practice this means a definition's head designation holds wherever the definition occupies a word's head position, including standing alone.
+
 ### What Gets Excluded
 
 The following types of concepts are skipped from the start of the word when finding the head glyph:

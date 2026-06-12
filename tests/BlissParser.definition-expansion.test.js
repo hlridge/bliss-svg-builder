@@ -573,14 +573,19 @@ describe('BlissParser definition expansion', () => {
       expect(r.groups[0].glyphs[0].parts[0].y).toBe(0);
     });
 
-    it('prepends glyph options and explicit head marker to the first split word', () => {
+    it('prepends glyph options to the first split word and drops the head marker', () => {
+      // Head-marker contract rule 1: a multi-word definition expands to
+      // multiple characters, so the outer ^ is dropped with a warning.
       const r = BlissParser.parse('[color=red]_C15B_SENTENCE^');
       const firstGlyph = r.groups[0].glyphs[0];
 
       expect(firstGlyph.options).toEqual({ color: 'red' });
-      expect(firstGlyph.isHeadGlyph).toBe(true);
+      expect(Object.hasOwn(firstGlyph, 'isHeadGlyph')).toBe(false);
       expect(r.groups[2].glyphs[0].options).toBeUndefined();
       expect(Object.hasOwn(r.groups[2].glyphs[0], 'isHeadGlyph')).toBe(false);
+      expect(r._parseWarnings).toEqual([
+        expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' }),
+      ]);
     });
 
     it('keeps internal word-segment indicators literal when expanding // definitions', () => {

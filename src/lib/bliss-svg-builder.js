@@ -1290,8 +1290,23 @@ class BlissSVGBuilder {
         }
         continue;
       }
-      const glyphStrs = group.glyphs.flatMap(serializeGlyph).filter(Boolean);
-      let groupStr = glyphStrs.join('/');
+      const glyphArrays = group.glyphs.map(serializeGlyph);
+      let groupStr = glyphArrays.flat().filter(Boolean).join('/');
+      // Re-emit ^ when the bare codes would not re-derive the marked head,
+      // so parse(toString(x)) always crowns the same glyph (head-marker
+      // contract round-trip). Fallback-derivable heads stay unmarked.
+      const headIndex = group.glyphs.findIndex(g => g.isHeadGlyph === true);
+      if (headIndex !== -1 && groupStr) {
+        const reparsedGlyphs = BlissParser.parse(groupStr).groups[0]?.glyphs ?? [];
+        const rederived = Math.max(reparsedGlyphs.findIndex(g => g.isHeadGlyph === true), 0);
+        const headSegments = glyphArrays[headIndex];
+        if (reparsedGlyphs.length === group.glyphs.length
+            && rederived !== headIndex
+            && headSegments[headSegments.length - 1]) {
+          headSegments[headSegments.length - 1] += '^';
+          groupStr = glyphArrays.flat().filter(Boolean).join('/');
+        }
+      }
       // Prefix group-level options with [opts]| syntax
       const groupOptPrefix = serializeOptions(group.options);
       if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
@@ -1690,15 +1705,20 @@ class BlissSVGBuilder {
   // Resolve chained bare aliases in a codeString.
   // Replaces bare alias tokens with their resolved codeString, repeating
   // until no more aliases remain (up to depth 50).
+  // Head-marker contract: marked invocations (ALIAS^) and aliases whose
+  // codeString carries a ^ designation stay as references, so the parser
+  // resolves the marker in its own word-string scope (rules 2 and 4).
+  // Inlining them would silently rebind the marker to a different scope.
   static #resolveBareAliases(codeString) {
     let resolved = codeString;
     for (let depth = 0; depth < 50; depth++) {
       let changed = false;
       resolved = resolved.replace(
-        /(?<=^|[/;])([A-Za-z_][\w]*)(?=$|[/;:^])/g,
+        /(?<=^|[/;])([A-Za-z_][\w]*)(?=$|[/;:])/g,
         (match, token) => {
           const def = blissElementDefinitions[token];
-          if (def && def.codeString && !def.isBlissGlyph && !def.isShape && !def.isExternalGlyph && !def.glyphCode) {
+          if (def && def.codeString && !def.codeString.includes('^')
+              && !def.isBlissGlyph && !def.isShape && !def.isExternalGlyph && !def.glyphCode) {
             changed = true;
             return def.codeString;
           }
