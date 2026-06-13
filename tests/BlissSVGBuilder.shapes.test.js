@@ -156,6 +156,21 @@ describe('BlissSVGBuilder shapes', () => {
         ).toBe(true);
       }
     });
+
+    it('pairs every descending diagonal-line code DL*S with an ascending DL*N', () => {
+      // Mirror of the ascending check; catches an orphan descending code
+      // (e.g. DL5S with no DL5N) that the ascending-only direction misses.
+      const ascendingLines = allShapeCodes.filter(code => code.startsWith('DL') && code.endsWith('N'));
+      const descendingLines = allShapeCodes.filter(code => code.startsWith('DL') && code.endsWith('S'));
+
+      for (const descCode of descendingLines) {
+        const ascCode = descCode.replace(/S$/, 'N');
+        expect(
+          ascendingLines.includes(ascCode),
+          `Descending line ${descCode} should have matching ascending line ${ascCode}`
+        ).toBe(true);
+      }
+    });
   });
 
   describe('when auditing category coverage', () => {
