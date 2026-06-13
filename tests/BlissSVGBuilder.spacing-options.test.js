@@ -230,9 +230,13 @@ describe('BlissSVGBuilder spacing options', () => {
     });
 
     it('defaults to left-aligned when center option not specified', () => {
-      const withDefault = new BlissSVGBuilder('[min-width=20]||H');
-      const withExplicit = new BlissSVGBuilder('[min-width=20]||H');
-      expect(withDefault.svgCode).toBe(withExplicit.svgCode);
+      // Without center, min-width expansion is left-aligned: the viewBox x
+      // stays at the default -0.75 margin instead of shifting to center the
+      // 8-wide content inside the 20-wide min-width.
+      const { x, builder } = getViewBox('[min-width=20]||H');
+
+      expect(builder.composition.width).toBe(8);
+      expect(x).toBeCloseTo(-0.75);
     });
 
     it('centers with indicator overhang (left)', () => {
