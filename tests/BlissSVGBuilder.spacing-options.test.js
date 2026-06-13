@@ -15,8 +15,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - `min-width=N` left-aligned expansion of the viewBox; interaction
  *   with `margin`, `crop`, and `grid`; clamping of negative values.
  * - `min-width=N` with `[center]`: symmetric expansion around content
- *   width or baseWidth (with indicator-overhang awareness), and
- *   interaction with `margin`, `crop`, and `grid`.
+ *   baseWidth, padded by the larger of left/right indicator overhang
+ *   (`Math.max`), and interaction with `margin`, `crop`, and `grid`.
  * - Grid offset shift to follow the centered viewBox under
  *   `[grid;min-width=N;center]`.
  * - Inline `:x,y` coordinate syntax on parts within characters and
@@ -239,17 +239,28 @@ describe('BlissSVGBuilder spacing options', () => {
       expect(x).toBeCloseTo(-0.75);
     });
 
-    it('centers with indicator overhang (left)', () => {
+    it('pads symmetrically for a single indicator overhang', () => {
+      // note: B99:-1 is a left-placed indicator, but #childStartOffset shifts
+      // the whole composition right to absorb it, so in composition coordinates
+      // it reads as rightOverhang=1 (composition.x normalizes to 0). The pad is
+      // that 1 unit on each side: -0.75 - (30 - (8 + 2*1))/2 = -10.75.
       const { x, builder } = getViewBox('[min-width=30;center]||B291;B99:-1');
 
-      const baseWidth = builder.composition.baseWidth;
-      const leftOverhang = -builder.composition.x;
-      const rightOverhang = (builder.composition.x + builder.composition.width) - baseWidth;
-      const maxOverhang = Math.max(leftOverhang, rightOverhang);
-      const symmetricWidth = baseWidth + 2 * maxOverhang;
-      const extraSpace = 30 - symmetricWidth;
-      const expectedX = -0.75 - (extraSpace / 2);
-      expect(x).toBeCloseTo(expectedX);
+      expect(builder.composition.x).toBeCloseTo(0);
+      expect(x).toBeCloseTo(-10.75); // pins the concrete pad, not the source formula
+    });
+
+    it('pads by the larger of two competing overhangs (Math.max)', () => {
+      // Genuine Math.max discrimination: two left indicators (B99:-1, B99:-3)
+      // plus a right one (B99:8). #childStartOffset compensates only the FIRST
+      // indicator part (B99:-1), so the deeper B99:-3 leaves composition.x
+      // negative: a live leftOverhang=2. rightOverhang=1, so Math.max selects
+      // the LEFT branch and pads by 2: -0.75 - (30 - (8 + 2*2))/2 = -9.75.
+      // A rightOverhang-only or Math.min variant would land at -10.75.
+      const { x, builder } = getViewBox('[min-width=30;center]||B291;B99:-1;B99:-3;B99:8');
+
+      expect(builder.composition.x).toBe(-2); // left branch genuinely live
+      expect(x).toBeCloseTo(-9.75); // pads by leftOverhang=2, not rightOverhang=1
     });
 
     it('works with multiple characters', () => {
