@@ -198,6 +198,23 @@ builder.toString();
 
 Passing the resolved output back into the constructor produces an identical result.
 
+### Head Marker Resolution
+
+The head marker (`^`) designates which glyph in a word carries word-level indicators. `toString()` and `toJSON()` preserve the resolved head, but `^` is re-emitted only when the bare codes would not re-derive the same head on their own:
+
+```js
+// The marked head deviates from the automatic pick, so `^` is re-emitted:
+new BlissSVGBuilder('B101/B208^/B303').toString();
+// 'B101/B208^/B303'
+
+// The automatic pick already lands on the same glyph (the leading B486 is
+// skipped), so the redundant `^` is dropped:
+new BlissSVGBuilder('B486/B208^').toString();
+// 'B486/B208'
+```
+
+A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `HEAD_MARKER_ON_WORD` warning and never reappears on export.
+
 Use for: serializing back to DSL format, portable exchange, logging.
 
 ## Navigation

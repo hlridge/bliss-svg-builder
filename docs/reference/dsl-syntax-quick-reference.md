@@ -26,6 +26,8 @@ toString(): B313;B81/B1103     (indicator attached to B313)
 
 The visual output is identical. The difference only matters when inspecting `toString()` output or the element tree.
 
+The head marker (`^`) that explicitly designates the head glyph also survives `toString()`, but is re-emitted only when the automatic head pick would otherwise land on a different glyph (a redundant `^`, or one dropped from a multi-character code, is not re-emitted).
+
 ### The semantic root and `!`
 
 Many Bliss words carry a *semantic root* indicator: `B97` (thing) or `B6436` (abstract). It marks the word's broad part-of-speech category and is preserved by default when you replace indicators with `;` or `;;`. So `B431;B81` keeps the existing thing/abstract root and attaches `B81` alongside it.
