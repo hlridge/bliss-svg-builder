@@ -9,6 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
+import { getSemanticRoot } from "./indicator-utils.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
 // load so BlissElement can clone it without importing BlissParser itself.
@@ -1220,6 +1221,30 @@ class BlissSVGBuilder {
       }).join(';');
     }
 
+    // Under preserve, keep a custom glyph's name but re-emit any per-instance
+    // indicator delta against the definition's baked state, so a glyph whose
+    // indicators were modified (`_X;B81`, `_X;!B81`, `_X;!`) round-trips
+    // instead of collapsing to the bare name. Bare name when state is baked.
+    function serializeCustomGlyphDelta(glyph) {
+      const def = blissElementDefinitions[glyph.codeName];
+      if (!def?.codeString || !glyph.parts) return glyph.codeName;
+      const currentInds = glyph.parts
+        .filter(p => p.isIndicator)
+        .map(p => p.codeName);
+      const bakedInds = def.codeString.split(';').slice(1)
+        .filter(c => blissElementDefinitions[c.split(':')[0]]?.isIndicator);
+      if (currentInds.length === bakedInds.length
+          && currentInds.every((c, i) => c === bakedInds[i])) {
+        return glyph.codeName;
+      }
+      const semanticRoot = getSemanticRoot(bakedInds, blissElementDefinitions);
+      const nonSemantic = currentInds.filter(c => c !== semanticRoot);
+      // `;!` only when the baked semantic was stripped; otherwise `;` re-applies
+      // semantic preservation on re-parse.
+      const semanticStripped = !!semanticRoot && !currentInds.includes(semanticRoot);
+      return glyph.codeName + (semanticStripped ? ';!' : ';') + nonSemantic.join(';');
+    }
+
     // Serialize a glyph: B-codes emit their code, compositions emit parts.
     // Custom glyphs are decomposed to their codeString unless preserve is set.
     // Returns an array (kerning codes are emitted as separate entries).
@@ -1249,6 +1274,8 @@ class BlissSVGBuilder {
               code = BlissSVGBuilder.#decomposeCodeString(def.codeString, 0, 0);
             }
           }
+        } else if (options.preserve && !builtInCodes.has(glyph.codeName)) {
+          code = serializeCustomGlyphDelta(glyph);
         }
         if (!code) code = glyph.codeName;
       } else if (glyph.parts) {
