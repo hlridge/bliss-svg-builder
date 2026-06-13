@@ -11,6 +11,8 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * Covers:
  * - Decimal forms accepted by both RK and AK (0.5, .5, 5., signed, zero).
  * - Multi-digit RK values (RK:25; pins regex \d+ quantifier).
+ * - Decimal-only multi-digit RK values (RK:.55; pins the \.\d+ alternative
+ *   quantifier).
  * - Bare RK defaulting to 0, both between glyphs and at the start of input.
  * - Malformed kerning falling through to general code parsing without
  *   silently emitting a kerning value.
@@ -75,6 +77,15 @@ describe('BlissParser kerning', () => {
       const r = BlissParser.parse('RK:25/H');
       expect(r.groups[0].glyphs).toHaveLength(1);
       expect(r.groups[0].glyphs[0].options.relativeKerning).toBe(25);
+    });
+
+    it('accepts a multi-digit decimal-only RK value like RK:.55', () => {
+      // pins the \.\d+ alternative quantifier; a decimal-only value with two+
+      // fraction digits and no leading integer only matches with the `+`
+      // (killed the \.\d+ -> \.\d mutant, 2026-05-21 stryker survivor)
+      const r = BlissParser.parse('RK:.55/H');
+      expect(r.groups[0].glyphs).toHaveLength(1);
+      expect(r.groups[0].glyphs[0].options.relativeKerning).toBe(0.55);
     });
 
     it('bare RK with no value defaults to 0', () => {

@@ -29,7 +29,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   record an `Invalid format` error on the part.
  * - Built-in glyph identity (glyphCode, isBlissGlyph), indicator metadata,
  *   head markers, and defaultOptions propagate from definitions onto the
- *   parsed glyph; an explicit `isIndicator: false` declared by a definition
+ *   parsed glyph; a non-indicator built-in carries no isIndicator through the
+ *   fast-path; an explicit `isIndicator: false` declared by a definition
  *   is dropped rather than propagated.
  * - Base-case metadata (shrinksPrecedingWordSpace, isIndicator,
  *   isExternalGlyph, char, kerningRules) propagates from no-codeString
@@ -456,6 +457,15 @@ describe('BlissParser definition expansion', () => {
       expect(glyph.isBlissGlyph).toBe(true);
       expect(glyph.isHeadGlyph).toBe(true);
       expect(glyph.options).toEqual({ 'stroke-dasharray': '0 0.777' });
+    });
+
+    it('does not mark a non-indicator built-in glyph as an indicator', () => {
+      // The built-in fast-path spreads isIndicator only when the definition
+      // declares it; B291 (Enclosure) is not an indicator. Killed the
+      // `definition.isIndicator === true` -> true mutant (2026-05-21 stryker).
+      const glyph = BlissParser.parse('B291').groups[0].glyphs[0];
+
+      expect(Object.hasOwn(glyph, 'isIndicator')).toBe(false);
     });
 
     it('propagates glyphCode and defaultOptions from a custom composite definition', () => {

@@ -13,9 +13,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - baseWidth presence on root/group/glyph snapshot nodes (typed as number).
  * - Width-helper math at glyph level (baseGlyphWidth,
  *   rightExtendedGlyphWidth, width, advanceX): indicator-overhang
- *   inclusion, all-indicator glyph edge case, non-indicator part
- *   contribution, positioned-part outer-edge measurement, and
- *   empty-parts early-return (no NaN/-Infinity contamination).
+ *   inclusion, left-overhanging glyph-part inclusion (negative part
+ *   offset preserved by a trailing indicator), all-indicator glyph edge
+ *   case, non-indicator part contribution, positioned-part outer-edge
+ *   measurement, and empty-parts early-return (no NaN/-Infinity contamination).
  * - Width-helper math at group level (baseGroupWidth, baseWidth, width)
  *   when the first glyph carries an explicit base-x offset.
  * - Root-level baseWidth across multiple groups when the first group
@@ -138,6 +139,22 @@ describe('BlissElement baseWidth and width helpers', () => {
       const glyph = element.children[0].children[0];
 
       expect(glyph.rightExtendedGlyphWidth).toBe(0);
+    });
+  });
+
+  describe('when a glyph part extends left of the origin', () => {
+    it('includes the left-overhanging glyph part in baseGlyphWidth and rightExtendedGlyphWidth', () => {
+      // The trailing indicator (B81) suppresses character normalization, so the
+      // explicit -3 glyph-part offset survives into the width getters. Pins that
+      // baseGlyphWidth and rightExtendedGlyphWidth subtract the negative
+      // minRelativeX (left overhang) instead of clamping it to 0; killed the
+      // Math.min->Math.max and -/+ mutants on both getters (2026-05-21 stryker).
+      const glyph = new BlissElement(BlissParser.parse('HL2:-3;HL2:4;B81')).children[0].children[0];
+
+      expect(glyph.baseGlyphWidth).toBe(9);
+      expect(glyph.rightExtendedGlyphWidth).toBe(9);
+      expect(glyph.width).toBe(9);
+      expect(glyph.advanceX).toBe(11);
     });
   });
 

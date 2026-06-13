@@ -16,6 +16,9 @@ import { BlissSVGBuilder } from '../src/index';
  * - The QSP advance-width formula across an H/QSP/H input.
  * - QSP advancing exactly 4 less than TSP at default settings.
  * - Consecutive TSP/TSP and QSP/QSP runs accumulating advance width.
+ * - Per-glyph space advance within a multi-space group: the second space
+ *   glyph is positioned by the first's per-character advanceX, distinct from
+ *   the group-level advance, under a wide word-space.
  * - Recomputation of TSP and QSP advance when `word-space` and/or
  *   `char-space` are overridden via bracket options.
  * - Mixed inputs where explicit space glyphs sit alongside word
@@ -95,6 +98,20 @@ describe('BlissSVGBuilder space glyphs', () => {
       // H(8) + charSpace(2) + QSP(2) + QSP(2) + H(8) = 22
       const builder = new BlissSVGBuilder('H/QSP/QSP/H');
       expect(builder.composition.width).toBe(22);
+    });
+  });
+
+  describe('when consecutive space glyphs share a group under a wide word-space', () => {
+    it('positions the second QSP by the per-glyph QSP advance, not the TSP advance', () => {
+      // The first space glyph's per-character advanceX positions the second
+      // within the group. With word-space=20: QSP = wordSpace/2 - charSpace = 8,
+      // distinct from TSP = wordSpace - charSpace = 18. Pins the per-glyph QSP
+      // branch; killed the `code === 'TSP'` -> true mutant (2026-05-21 stryker).
+      const qspGroup = new BlissSVGBuilder('[word-space=20]||H/QSP/QSP/H').composition.children[1];
+      const tspGroup = new BlissSVGBuilder('[word-space=20]||H/TSP/TSP/H').composition.children[1];
+
+      expect(qspGroup.children[1].x).toBe(8);
+      expect(tspGroup.children[1].x).toBe(18);
     });
   });
 
