@@ -40,6 +40,11 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   part of the leading word (without overwriting an existing one); glyph
  *   options and head marker prepend to the leading word; internal
  *   word-segment indicators stay literal across the split.
+ * - A multi-word definition carrying an internal head marker, referenced
+ *   through another alias, keeps its word break and the designated head of
+ *   its non-first word, rendering identically to the directly-written form;
+ *   a trailing indicator targets the first word's head; adjacent // breaks
+ *   seal into empty word chunks without throwing.
  * - XTXT_ fallback parts mark the enclosing glyph as an external glyph.
  *
  * Does NOT cover:
@@ -595,6 +600,58 @@ describe('BlissParser definition expansion', () => {
       expect(head.parts[0].codeName).toBe('_C15B_SINGLE_WITH_SEMANTIC');
       expect(head.parts[0].parts.map(part => part.codeName)).toEqual(['B291', 'B97']);
       expect(head.parts[1].codeName).toBe('B81');
+    });
+  });
+
+  describe('when a nested alias references a multi-word definition with a designated head', () => {
+    // N6: a multi-word alias carrying an internal ^ head (_N6_INNER) is left
+    // un-inlined by define() to protect marker scope, so it survives to parse
+    // time referenced through _N6_OUTER. The word break and the designated
+    // head of its non-first word must survive nested expansion, matching the
+    // directly-written form.
+    const N6_DEFS = {
+      _N6_INNER: { codeString: 'B291//B303^' },
+      _N6_OUTER: { codeString: 'B208/_N6_INNER' },
+      _N6_DBL_INNER: { codeString: 'B291////B303^' },
+      _N6_DBL_OUTER: { codeString: 'B208/_N6_DBL_INNER' },
+    };
+    beforeAll(() => BlissSVGBuilder.define(N6_DEFS));
+    afterAll(() => Object.keys(N6_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it('splits the nested multi-word alias into separate word groups with a space', () => {
+      const r = BlissParser.parse('_N6_OUTER');
+      expect(r.groups).toHaveLength(3);
+      expect(r.groups[1].glyphs[0].parts[0].codeName).toBe('TSP');
+    });
+
+    it('keeps the designated head of the non-first word through nested expansion', () => {
+      const r = BlissParser.parse('_N6_OUTER');
+      expect(Object.hasOwn(r.groups[0].glyphs[0], 'isHeadGlyph')).toBe(false);
+      expect(r.groups[2].glyphs[0].isHeadGlyph).toBe(true);
+    });
+
+    it('renders the nested form identically to the directly-written multi-word form', () => {
+      const nested = new BlissSVGBuilder('_N6_OUTER').svgCode;
+      const direct = new BlissSVGBuilder('B208/B291//B303^').svgCode;
+      expect(nested).toBe(direct);
+    });
+
+    it('applies a trailing indicator to the head of the first word, not the last', () => {
+      // sealFragment returns the FIRST word chunk's resolution across the
+      // nested break, so ;B81 targets B208 (first word), never B303 (last).
+      const r = BlissParser.parse('_N6_OUTER;B81');
+      expect(r.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B208', 'B81']);
+      expect(r.groups[2].glyphs[0].parts.map(p => p.codeName)).toEqual(['B303']);
+    });
+
+    it('seals empty word chunks from adjacent breaks without throwing', () => {
+      // Adjacent // breaks in a nested alias produce an empty middle chunk;
+      // the chunk guard keeps resolveWordStringHead from running on [], and the
+      // second word's designated head still survives.
+      const r = BlissParser.parse('_N6_DBL_OUTER');
+      expect(r.groups.map(g => g.glyphs[0].parts[0].codeName))
+        .toEqual(['B208', 'TSP', 'TSP', 'B303']);
+      expect(r.groups[3].glyphs[0].isHeadGlyph).toBe(true);
     });
   });
 

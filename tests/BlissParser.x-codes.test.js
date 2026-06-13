@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
  * Pins the parser X-code handling surface: multi-character Xword
@@ -18,6 +19,9 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   part rather than expanded.
  * - Non-semicolon adjacency: an Xword preceded or followed by /
  *   (glyph boundary, not composition) is expanded normally.
+ * - Glyph-boundary anchoring: an X+letters sequence embedded inside
+ *   a longer code token (e.g. a custom code name) is NOT expanded,
+ *   so the token can still be looked up as a definition.
  * - WORD_AS_PART error: multi-character X-text used as a ;-part
  *   carries the documented `errorCode` and message.
  *
@@ -48,9 +52,10 @@ describe('BlissParser X-codes', () => {
 
   describe('when Xword is adjacent to ; (composition boundary)', () => {
     it('does not expand Xword preceded by ;', () => {
-      // B81;Xhello: original keeps Xhello literal as one glyph's part.
-      // If "before" check is broken, Xhello expands into Xh/Xe/Xl/Xl/Xo,
-      // splitting the single glyph across multiple glyphs.
+      // B81;Xhello: Xhello sits after ; (not a glyph boundary), so the
+      // glyph-boundary anchor leaves it literal as one glyph's part. If the
+      // anchor were lost, Xhello would expand into Xh/Xe/Xl/Xl/Xo, splitting
+      // the single glyph across multiple glyphs.
       const result = BlissParser.parse('B81;Xhello');
       expect(result.groups[0].glyphs.length).toBe(1);
       expect(result.groups[0].glyphs[0].parts.map(p => p.codeName))
@@ -76,6 +81,29 @@ describe('BlissParser X-codes', () => {
     it('expands Xword followed by /', () => {
       const result = BlissParser.parse('Xhello/B81');
       expect(result.groups[0].glyphs.length).toBe(6);
+    });
+  });
+
+  describe('when X appears embedded inside a longer code token', () => {
+    // regression: the Xword expander was unanchored and rewrote any X+letters
+    // mid-token, so a custom code like EXTRA became EXT/XR/XA and could never
+    // be looked up (findings doc N5).
+    const EMBED_DEFS = {
+      EXTRA: { codeString: 'B291' },
+      MAXVAL: { codeString: 'B303' },
+    };
+    beforeAll(() => BlissSVGBuilder.define(EMBED_DEFS));
+    afterAll(() => Object.keys(EMBED_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it('looks up a custom code whose name contains X+letters', () => {
+      const result = BlissParser.parse('EXTRA');
+      expect(result.groups[0].glyphs).toHaveLength(1);
+      expect(result.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291']);
+    });
+
+    it('leaves an embedded X unexpanded when a glyph boundary precedes the token', () => {
+      const result = BlissParser.parse('B81/MAXVAL');
+      expect(result.groups[0].glyphs.map(g => g.parts[0].codeName)).toEqual(['B81', 'B303']);
     });
   });
 

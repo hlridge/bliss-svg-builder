@@ -256,12 +256,14 @@ export class BlissParser {
 
       function processXCodes(codeString) {
         // First, expand multi-char X-codes (like Xhello -> Xh/Xe/Xl/Xl/Xo or XTXT_héllo)
-        // Match Latin, Latin Extended, and Cyrillic letters
-        let expanded = codeString.replace(/X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, chars, offset) => {
-          // Skip expansion when adjacent to ; — word expansion would break composition
-          const before = offset > 0 && codeString[offset - 1] === ';';
-          const after = offset + match.length < codeString.length && codeString[offset + match.length] === ';';
-          if (before || after) return match;
+        // Anchor to a glyph boundary (start of string or after /) so an X+letters
+        // sequence embedded in a longer code name (e.g. a custom code EXTRA) is not
+        // rewritten mid-token. Match Latin, Latin Extended, and Cyrillic letters.
+        let expanded = codeString.replace(/(?<=^|\/)X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, chars, offset) => {
+          // Skip expansion when followed by ; (word expansion would break composition).
+          // A past-the-end index reads as undefined, which is never ';', so no bounds guard.
+          const after = codeString[offset + match.length] === ';';
+          if (after) return match;
 
           const allHavePath = [...chars].every(char => hasPathData(char));
           if (allHavePath) {
@@ -413,16 +415,43 @@ export class BlissParser {
         // designation: an embedded alias contributes its characters plus at
         // most one designated head (rule 4); deeper bookkeeping is cleared.
         let fragCounter = 0;
+        // Seal a span into upward-facing designations. A span containing
+        // _wordBreak markers (a nested multi-word alias) is chunked at the
+        // breaks and each word-string is sealed on its own fragment, so a
+        // marker in a non-first word keeps its designation (rule 2: each
+        // // word-string resolves independently). Returns the first word's
+        // resolution in full-span coordinates, for callers that target the
+        // first word's head (WORD;INDICATORS). A break-free span seals as a
+        // single fragment, exactly as before.
         const sealFragment = (parts, label) => {
-          if (parts.length === 0) return null;
-          const resolved = resolveWordStringHead(parts, label);
-          const fragId = ++fragCounter;
-          for (const p of parts) {
-            delete p._designation;
-            p._frag = fragId;
+          let firstResolved = null;
+          const sealChunk = (start, end) => {
+            const chunk = parts.slice(start, end);
+            // Skip empty chunks (adjacent/leading/trailing breaks, or an empty
+            // span) so resolveWordStringHead is never handed []. Also the empty
+            // -span guard: a break-free empty span produces one empty chunk and
+            // returns null.
+            if (chunk.length === 0) return;
+            const resolved = resolveWordStringHead(chunk, label);
+            const fragId = ++fragCounter;
+            for (const p of chunk) {
+              delete p._designation;
+              p._frag = fragId;
+            }
+            if (resolved.isDesignated) chunk[resolved.index]._designation = true;
+            if (firstResolved === null) {
+              firstResolved = { index: start + resolved.index, isDesignated: resolved.isDesignated };
+            }
+          };
+          let chunkStart = 0;
+          for (let i = 0; i < parts.length; i++) {
+            if (parts[i]._wordBreak) {
+              sealChunk(chunkStart, i);
+              chunkStart = i + 1;
+            }
           }
-          if (resolved.isDesignated) parts[resolved.index]._designation = true;
-          return resolved;
+          sealChunk(chunkStart, parts.length);
+          return firstResolved;
         };
 
         // Resolve and crown one final word: designated heads are always
@@ -765,6 +794,10 @@ export class BlissParser {
             const isMultiGlyphWord = rawExpandedParts.length > 1;
 
             const expandedParts = rawExpandedParts.map(expandedSubPart => {
+                // Word-break markers carry no glyph identity; pass them through
+                // untouched so definition props don't attach and the break
+                // survives into final word-chunk crowning (N6).
+                if (expandedSubPart._wordBreak) return expandedSubPart;
                 // Apply properties from the definition, falling back to existing values
                 const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
                 const isExternalGlyph = expandedSubPart.isExternalGlyph;
