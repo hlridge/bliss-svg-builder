@@ -178,6 +178,17 @@ describe('BlissSVGBuilder stroke and color', () => {
       expect(svg).toContain('stroke-width="0.6665"');
     });
 
+    it('feeds element-level stroke-width into the COMMA formula', () => {
+      const builder = new BlissSVGBuilder('[stroke-width=0.5]||[stroke-width=1]|COMMA');
+      const svg = builder.svgCode;
+
+      // Element-level stroke-width=1 overrides the global 0.5 and feeds the
+      // COMMA formula: dot (1 + 0.333) / 2 = 0.6665, tail = dot * 2/3.
+      expect(svg).toMatch(/<g[^>]*stroke-width="1"/);
+      expect(svg).toContain('stroke-width="0.6665"');
+      expect(svg).toContain('stroke-width="0.4443333333333333"');
+    });
+
     it('clamps stroke-width before applying to DOT (max 1.5)', () => {
       const builder = new BlissSVGBuilder('[stroke-width=2]||DOT');
       const svg = builder.svgCode;
