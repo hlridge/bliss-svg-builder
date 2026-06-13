@@ -208,5 +208,12 @@ describe('BlissSVGBuilder indicator round-trip', () => {
       const { str, reStr } = roundTripDefault(input);
       expect(reStr).toBe(str);
     });
+
+    // N9: when the resolved head is a custom glyph baking an indicator, the
+    // semantic doubles on decompose, so this case is NOT green yet. It is
+    // deferred to the R14 word-level indicator model, whose acceptance criteria
+    // require turning it green (findings doc N9 + R14 register row). Tracked as
+    // a todo so it stays visible every run without a red in the green suite.
+    it.todo('round-trips a ;; indicator on a custom-glyph-baked head once the R14 word-level model lands (N9)');
   });
 });
