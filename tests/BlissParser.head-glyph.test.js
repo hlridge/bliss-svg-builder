@@ -392,14 +392,19 @@ describe('BlissParser head-glyph marker', () => {
     });
 
     describe('when multiple skip rules combine', () => {
-      it('parses an input combining skip-sequence and B486 to a 5-glyph word', () => {
-        // NOTE: weak assertion preserved verbatim from pre-migration; this
-        // test asserts only the glyph count, not isHeadGlyph placement.
-        // See findings doc 2026-05-06 for the coverage gap.
+      it('marks the glyph after the combined skip-sequence and B486 as head', () => {
+        // Combined fallback: skip the B1060/B578/B303 sequence, then skip
+        // B486, crowning B208 at index 4. Strengthened from a count-only
+        // assertion (the count stays as a secondary invariant).
         const result = BlissParser.parse('B1060/B578/B303/B486/B208');
 
         const glyphs = result.groups[0].glyphs;
         expect(glyphs.length).toBe(5);
+        expect(glyphs[0].isHeadGlyph).toBeUndefined();
+        expect(glyphs[1].isHeadGlyph).toBeUndefined();
+        expect(glyphs[2].isHeadGlyph).toBeUndefined();
+        expect(glyphs[3].isHeadGlyph).toBeUndefined();
+        expect(glyphs[4].isHeadGlyph).toBe(true);
       });
 
       it('explicit marker anywhere overrides all heuristics', () => {
