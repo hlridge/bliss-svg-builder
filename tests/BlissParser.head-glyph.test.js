@@ -44,9 +44,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   `MULTIPLE_HEAD_MARKERS` (which is per-word).
  *
  * Does NOT cover:
- * - True round-trip serialization through `toString()` or `toJSON()`;
- *   the two `when round-trip serialization is implemented` tests are
- *   placeholders that assert parse only. See findings doc 2026-05-06.
+ * - True round-trip serialization through `toString()` / `toJSON()`
+ *   (export flattens aliases and re-emits `^` on the designated
+ *   character), see `BlissSVGBuilder.head-marker-round-trip.test.js`.
  * - The deeper exclusion-rule heuristics (priority hierarchy across
  *   regular exclusions, low-priority B401/B699, absolute never-head
  *   B233, recursive multi-deep skip, conditional B10/B4 exception),
@@ -326,22 +326,6 @@ describe('BlissParser head-glyph marker', () => {
       const result = BlissParser.parse('B291^');
 
       expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-    });
-  });
-
-  describe('when ^-marked input is parsed for round-trip preservation (placeholder pending toString)', () => {
-    // Note: a real toString/toJSON-then-reparse round-trip is not yet
-    // implemented. These two tests assert the parse step only. The
-    // placeholder status is recorded in the findings doc 2026-05-06.
-    it('preserves the ^ designation on a simple glyph after parsing', () => {
-      const result = BlissParser.parse('B208^');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-    });
-
-    it('preserves the ^ designation on a glyph with multiple indicators after parsing', () => {
-      const result = BlissParser.parse('B208;B97;B81^');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-      expect(result.groups[0].glyphs[0].parts.length).toBe(3);
     });
   });
 
