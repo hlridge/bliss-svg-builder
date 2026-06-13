@@ -29,6 +29,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   and the element-overrides-global visual cascade.
  * - `color` multi-level semantics: option appears at global AND
  *   element levels (not in internalOptions).
+ * - `rgba(...)` / `rgb(...)` color values pass through to the `stroke`
+ *   attribute unchanged (no canonicalization to hex).
  * - Part-level options (`[k=v]>Code:x,y`) wrap each part in a `<g>`;
  *   different colors apply to different parts.
  * - Character-level options (`[k=v]Code:x,y`) wrap the character
@@ -61,8 +63,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Clickable-link wrapping (`href`/`target`) and stroke/fill cascade
  *   through `<a><g>` anchor wrappers, see
  *   `BlissSVGBuilder.clickable-links.test.js`.
- * - Color value normalization beyond named/hex (rgba, opacity
- *   composition); not currently covered anywhere in the suite.
+ * - Alpha compositing of an `rgba` opacity channel with a separate
+ *   `opacity` option (the alpha passes through verbatim, uncomposited);
+ *   not covered anywhere in the suite.
  * - External-glyph rendering for non-X-prefix codes and the
  *   text-fallback boundary, see `BlissSVGBuilder.external-glyphs.test.js`
  *   and `BlissSVGBuilder.text-fallback.test.js`.
@@ -335,6 +338,20 @@ describe('BlissSVGBuilder stroke and color', () => {
 
       expect(globalBuilder.svgCode).toContain('stroke="green"');
       expect(elementBuilder.svgCode).toContain('stroke="green"');
+    });
+
+    it('passes an rgba() color value through to the stroke attribute unchanged', () => {
+      const builder = new BlissSVGBuilder('[color=rgba(255,0,0,0.5)]||H');
+      const svg = builder.svgCode;
+
+      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="rgba\(255,0,0,0\.5\)"/);
+    });
+
+    it('passes an rgb() color value through to the stroke attribute unchanged', () => {
+      const builder = new BlissSVGBuilder('[color=rgb(0,128,255)]||H');
+      const svg = builder.svgCode;
+
+      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="rgb\(0,128,255\)"/);
     });
   });
 
