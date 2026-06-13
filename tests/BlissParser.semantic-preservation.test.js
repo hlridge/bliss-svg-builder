@@ -119,12 +119,14 @@ describe('BlissParser semantic indicator preservation', () => {
     it('does not preserve when the new indicator is compound semantic (B98)', () => {
       // note: B98 carries semanticIndicator='thing', so auto-preserve of the
       // existing B97 is suppressed. B98 stays as a single indicator code at
-      // parser level (not expanded to B97;B99).
+      // parser level (not expanded to B97;B99). The length-2 assertion pins
+      // that B97 is dropped, not merely that B98 is present.
       const result = BlissParser.parse('SemTestThingChar;B98');
       const parts = result.groups[0].glyphs[0].parts;
 
+      expect(parts.length).toBe(2);
       expect(parts[0].codeName).toBe('B291');
-      expect(parts.slice(1).some(p => p.codeName === 'B98')).toBe(true);
+      expect(parts[1].codeName).toBe('B98');
     });
 
     it('preserves the semantic root on an empty strip (;)', () => {
