@@ -28,8 +28,7 @@ import { BlissSVGBuilder } from '../src/index';
  *   `BlissParser.kerning.test.js`.
  * - Suppression across the small-digit↔non-digit boundary as a standalone
  *   case at part-of-word level (covered indirectly inside the mixed-sequence
- *   test); a dedicated word-boundary test exists for regular digits but not
- *   for small digits.
+ *   test).
  */
 
 describe('BlissSVGBuilder digit kerning', () => {
@@ -182,6 +181,16 @@ describe('BlissSVGBuilder digit kerning', () => {
 
       expect(char1.x).toBe(0);
       expect(char2.x).toBe(3); // B19 width (1) + full char-space (2), no kerning
+    });
+
+    it('does not apply kerning across word boundaries', () => {
+      // Two separate small-digit words; only word spacing applies, no kerning.
+      const builder = new BlissSVGBuilder('B19//B20');
+      const comp = builder.composition;
+
+      const word2 = comp.children[2]; // B20 word (index 2, skipping TSP)
+
+      expect(word2.x).toBe(9); // B19 width (1) + word-space (8)
     });
 
     it('stacks the -1 offset on a custom char-space without altering it', () => {
