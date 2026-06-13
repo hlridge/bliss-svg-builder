@@ -10,7 +10,7 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * including the delegation contract and defensive level-validation throws.
  *
  * Covers:
- * - baseWidth presence on root/group/glyph snapshot nodes (typed as number).
+ * - baseWidth presence on root/group/glyph/part snapshot nodes (typed as number).
  * - Width-helper math at glyph level (baseGlyphWidth,
  *   rightExtendedGlyphWidth, width, advanceX): indicator-overhang
  *   inclusion, left-overhanging glyph-part inclusion (negative part
@@ -45,8 +45,6 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   glyphs between valid words, or on an empty groups array.
  *
  * Does NOT cover:
- * - baseWidth presence on part snapshot nodes (snapshot-side coverage
- *   gap; not pinned by this file).
  * - Indicator centering math and Y-anchor subtraction, see
  *   `BlissElement.indicator-positioning.test.js`.
  * - Snapshot tree shape, immutability, and serialization, see
@@ -75,6 +73,15 @@ describe('BlissElement baseWidth and width helpers', () => {
       const b = new BlissSVGBuilder('B291');
       const glyphs = b.snapshot().children[0].children.filter(c => c.isGlyph);
       expect(glyphs[0]).toHaveProperty('baseWidth');
+    });
+
+    it('exposes baseWidth on a part snapshot node', () => {
+      const b = new BlissSVGBuilder('B291');
+      const glyph = b.snapshot().children[0].children.filter(c => c.isGlyph)[0];
+      const part = glyph.children[0];
+      expect(part).toHaveProperty('baseWidth');
+      expect(typeof part.baseWidth).toBe('number');
+      expect(part.baseWidth).toBe(8);
     });
   });
 
