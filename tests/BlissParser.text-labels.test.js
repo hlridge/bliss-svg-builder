@@ -77,15 +77,24 @@ describe('BlissParser text-label placeholder pre-pass', () => {
 
   describe('when {text} content contains brackets, braces, or other delimiters', () => {
     it.each([
-      ['square brackets', 'H//C8{hello [world]}', 'hello [world]'],
-      ['curly brackets', 'H//C8{hello {world}}', 'hello {world}'],
-      ['mixed brackets', 'H//C8{hello [world] and {stuff}}', 'hello [world] and {stuff}'],
-      ['delimiters', 'H//C8{text with []{}():;,/}', 'text with []{}():;,/']
-    ])('preserves %s verbatim in {text} content', (description, input, expectedText) => {
+      ['square brackets', 'H//C8{hello [world]}', 'hello [world]', false],
+      ['curly brackets', 'H//C8{hello {world}}', 'hello {world}', true],
+      ['mixed brackets', 'H//C8{hello [world] and {stuff}}', 'hello [world] and {stuff}', true],
+      ['delimiters', 'H//C8{text with []{}():;,/}', 'text with []{}():;,/', true]
+    ])('preserves %s verbatim in {text} content', (description, input, expectedText, expectsWarning) => {
       const result = BlissParser.parse(input);
 
       // With implicit space groups interleaved as [H, TSP, C8], C8 is at index 2.
       expect(result.groups[2].text).toBe(expectedText);
+
+      // A nested `{` bumps the brace count, so the interim contract fires
+      // MULTIPLE_TEXT_BLOCKS (visible, not silent); the square-bracket row
+      // has no nested brace and parses without a warning.
+      if (expectsWarning) {
+        expect(result._parseWarnings?.[0]?.code).toBe('MULTIPLE_TEXT_BLOCKS');
+      } else {
+        expect(result._parseWarnings).toBeUndefined();
+      }
     });
   });
 
