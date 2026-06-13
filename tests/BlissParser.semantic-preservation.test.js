@@ -5,7 +5,7 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
 /**
  * Pins parser semantic-indicator preservation: when overriding indicators with
  * `;`, `;!`, `;;`, or `;;!`, semantic indicators (B97 = THING, B6436 = ABSTRACT,
- * compound B98) are preserved by default. The `!` prefix force-strips them.
+ * compound B98) are preserved by default. The `!` prefix strips them.
  *
  * Rule:
  * - If any new indicator carries semanticIndicator, no auto-preservation
@@ -17,15 +17,15 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * Covers:
  * - Single-character `;` override: preserves B97 / B6436 unless the replacement
  *   is itself semantic; B98 compound resolves to B97 root on extraction.
- * - Force-strip with `;!` (single character): drops semantic root regardless
+ * - Strip-semantic with `;!` (single character): drops semantic root regardless
  *   of replacement role.
  * - Word-level `;;` override: preserves semantic on the head glyph; `;;!`
- *   force-strips.
+ *   strips it.
  * - Word definitions (codeString with explicit `^` head marker): semantic on
- *   head glyph survives `;` override and is force-stripped by `;!`.
+ *   head glyph survives `;` override and is stripped by `;!`.
  * - Single-glyph word with `;;`: behaves like `;` for indicator override.
  * - Non-indicator composition parts (e.g. B303): preserved across both override
- *   and force-strip; `!` strips indicators only, never composition parts.
+ *   and strip-semantic; `!` strips indicators only, never composition parts.
  * - Explicit semantic in new-indicator list: not duplicated by auto-preserve.
  * - Role-based ordering of preserved semantic alongside new indicators
  *   (semantic first for nominal, last for verbal / adjectival).
@@ -148,7 +148,7 @@ describe('BlissParser semantic indicator preservation', () => {
     });
   });
 
-  describe('when force-stripping indicators on a single character with ;!', () => {
+  describe('when stripping indicators on a single character with ;!', () => {
 
     it('strips the B97 semantic indicator before adding the new one', () => {
       const result = BlissParser.parse('SemTestThingChar;!B81');

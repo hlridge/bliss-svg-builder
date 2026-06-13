@@ -15,7 +15,7 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Semantic-indicator preservation rules (semantic stays last; grammatic replaceable).
  * - Word-definition-carries-indicators behavior across ;X / ; / ;! inputs:
  *   add-with-semantic-preserve, invalid-indicator no-op, empty-; strip
- *   non-semantic, empty-; preserve semantic, ;! force-strip even semantic.
+ *   non-semantic, empty-; preserve semantic, ;! strip even semantic.
  * - Composite-indicator structure preservation (B914 = B928;B86:3,0).
  * - Multi-word sentence context.
  * - Single-glyph character distinction from word-level behavior under ; / ;! /
@@ -447,7 +447,7 @@ describe('BlissParser word-indicator syntax', () => {
       expect(partCodes(preserved.groups[0].glyphs[1])).toEqual(['B291', 'B97']);
     });
 
-    it('force-strips even the semantic root with the ;! marker', () => {
+    it('strips even the semantic root with the ;! marker', () => {
       const stripped = BlissParser.parse('_C15B_WORD_SEMANTIC;!');
 
       expect(partCodes(stripped.groups[0].glyphs[1])).toEqual(['B291']);
@@ -591,7 +591,7 @@ describe('BlissParser word-indicator syntax', () => {
       expect(partCodes(unchanged.groups[0].glyphs[0])).toEqual(['B291', 'B97']);
     });
 
-    it('force-strips a single-glyph character\'s indicators with the ;! marker', () => {
+    it('strips a single-glyph character\'s indicators with the ;! marker', () => {
       const stripped = BlissParser.parse('_C15B_SINGLE_WITH_SEMANTIC;!');
 
       expect(partCodes(stripped.groups[0].glyphs[0])).toEqual(['B291']);
