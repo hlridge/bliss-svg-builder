@@ -193,6 +193,9 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const svg = builder.svgCode;
 
       expect(svg).toContain('stroke="red"');
+      // Exactly one stroke wrapper: the optioned first part (H) is wrapped,
+      // the un-optioned second part (E) renders as a bare sibling <path>.
+      expect(svg.match(/<g stroke="red">/g)).toHaveLength(1);
     });
 
     it('applies part-level color to a DOT part', () => {
