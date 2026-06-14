@@ -73,3 +73,28 @@ export function buildWithSemantic(semanticRoot, newInds, definitions) {
     ? [...newInds, semanticRoot]
     : [semanticRoot, ...newInds];
 }
+
+/**
+ * Resolve the final indicator code list from existing indicators, the
+ * requested new codes, and the stripSemantic flag. Shared decision logic
+ * for both the DSL `;;` parser path and the character-level mutation path:
+ *
+ * - Preserve the existing semantic root (unless stripSemantic) and place it
+ *   relative to the new indicators per the placement rule.
+ * - Replace-all: the new indicators replace any existing grammatical ones.
+ * - Never double a semantic root the new codes already carry.
+ * - Drop non-indicator codes; an empty result keeps the root alone (or [] if
+ *   there is no root to keep).
+ *
+ * Returns an array of code strings (position coordinates preserved).
+ */
+export function resolveIndicatorCodes(existingIndicatorCodes, newCodes, { stripSemantic } = {}, definitions) {
+  const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
+  const validNew = filterToIndicators(newCodes, definitions);
+  if (validNew.length > 0) {
+    return semanticRoot && !hasSemantic(validNew, definitions)
+      ? buildWithSemantic(semanticRoot, validNew, definitions)
+      : validNew;
+  }
+  return semanticRoot ? [semanticRoot] : [];
+}

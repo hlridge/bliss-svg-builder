@@ -6,12 +6,7 @@
 
 import { camelToKebab } from "./bliss-constants.js";
 import { builtInCodes } from "./bliss-element-definitions.js";
-import {
-  getSemanticRoot,
-  hasSemantic,
-  filterToIndicators,
-  buildWithSemantic
-} from "./indicator-utils.js";
+import { resolveIndicatorCodes } from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -752,46 +747,20 @@ export class ElementHandle {
 
     // Extract existing indicator codes for semantic analysis
     const existingIndCodes = indicatorParts.map(p => p.codeName);
-    const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndCodes, definitions) : null;
 
-    // Determine new indicator codes
-    let newIndicatorParts = [];
-    if (code !== null) {
-      const requestedCodes = code.split(';').map(s => s.trim()).filter(Boolean);
-      const validCodes = filterToIndicators(requestedCodes, definitions);
+    // Determine the final indicator code list (replace-all with semantic
+    // preservation; clearIndicators passes no new codes), then parse each
+    // into a proper part node with metadata.
+    const requestedCodes = code !== null
+      ? code.split(';').map(s => s.trim()).filter(Boolean)
+      : [];
+    const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
 
-      if (validCodes.length > 0) {
-        // Build final indicator list with semantic preservation
-        let finalCodes;
-        if (semanticRoot && !hasSemantic(validCodes, definitions)) {
-          finalCodes = buildWithSemantic(semanticRoot, validCodes, definitions);
-        } else {
-          finalCodes = validCodes;
-        }
-
-        // Parse each indicator code to create proper part nodes with metadata
-        for (const indCode of finalCodes) {
-          const parsed = this.#ctx.parse(indCode);
-          const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
-          if (partNode) {
-            newIndicatorParts.push(partNode);
-          }
-        }
-      } else {
-        // All provided codes were non-indicators — preserve semantic if present
-        if (semanticRoot) {
-          const parsed = this.#ctx.parse(semanticRoot);
-          const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
-          if (partNode) newIndicatorParts.push(partNode);
-        }
-      }
-    } else {
-      // clearIndicators: no new codes, just preserve semantic if applicable
-      if (semanticRoot) {
-        const parsed = this.#ctx.parse(semanticRoot);
-        const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
-        if (partNode) newIndicatorParts.push(partNode);
-      }
+    const newIndicatorParts = [];
+    for (const indCode of finalCodes) {
+      const parsed = this.#ctx.parse(indCode);
+      const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
+      if (partNode) newIndicatorParts.push(partNode);
     }
 
     // Reassemble glyph parts
