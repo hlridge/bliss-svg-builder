@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
 import { BlissSVGBuilder } from '../src/index.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
@@ -36,6 +36,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
 describe('BlissParser word-indicator syntax', () => {
 
   const partCodes = glyph => glyph.parts.map(part => part.codeName);
+
+  // Snapshot built-in definition keys so afterAll strips exactly the
+  // test-only definitions registered below, with no key list to maintain.
+  const builtInDefinitionKeys = new Set(Object.keys(blissElementDefinitions));
 
   beforeAll(() => {
     // Add test word definitions
@@ -153,6 +157,12 @@ describe('BlissParser word-indicator syntax', () => {
       isBlissGlyph: true
     };
 
+  });
+
+  afterAll(() => {
+    for (const code of Object.keys(blissElementDefinitions)) {
+      if (!builtInDefinitionKeys.has(code)) delete blissElementDefinitions[code];
+    }
   });
 
   describe('when applying ; to a pre-defined word with explicit ^ marker', () => {

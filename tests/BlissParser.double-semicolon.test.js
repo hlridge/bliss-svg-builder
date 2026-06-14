@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
@@ -37,6 +37,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
 
 describe('BlissParser ;; syntax', () => {
 
+  // Snapshot built-in definition keys so afterAll strips exactly the
+  // test-only definitions registered below, with no key list to maintain.
+  const builtInDefinitionKeys = new Set(Object.keys(blissElementDefinitions));
+
   beforeAll(() => {
     // Pre-defined word fixtures used in the inline-vs-word equivalence tests
     blissElementDefinitions['TestWord1'] = {
@@ -50,6 +54,12 @@ describe('BlissParser ;; syntax', () => {
       glyphCode: 'TestWord3',
       isBlissGlyph: true
     };
+  });
+
+  afterAll(() => {
+    for (const code of Object.keys(blissElementDefinitions)) {
+      if (!builtInDefinitionKeys.has(code)) delete blissElementDefinitions[code];
+    }
   });
 
   describe('when ;; is used on a basic inline expression', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
 import { BlissElement } from '../src/lib/bliss-element.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
@@ -55,6 +55,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * @contract: head-glyph-exclusions
  */
 describe('BlissParser head-glyph exclusions', () => {
+
+  // Snapshot built-in definition keys so afterAll strips exactly the
+  // test-only definitions registered below, with no key list to maintain.
+  const builtInDefinitionKeys = new Set(Object.keys(blissElementDefinitions));
 
   beforeAll(() => {
     // All-exclusions words (both characters are regular exclusions)
@@ -133,6 +137,12 @@ describe('BlissParser head-glyph exclusions', () => {
       glyphCode: 'TestB208Many',
       isBlissGlyph: true
     };
+  });
+
+  afterAll(() => {
+    for (const code of Object.keys(blissElementDefinitions)) {
+      if (!builtInDefinitionKeys.has(code)) delete blissElementDefinitions[code];
+    }
   });
 
   // Returns the index of the character carrying indicators (i.e. the

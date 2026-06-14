@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
@@ -46,6 +46,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
 
 describe('BlissParser semantic indicator preservation', () => {
 
+  // Snapshot built-in definition keys so afterAll strips exactly the
+  // test-only definitions registered below, with no key list to maintain.
+  const builtInDefinitionKeys = new Set(Object.keys(blissElementDefinitions));
+
   beforeAll(() => {
     blissElementDefinitions['SemTestThingChar'] = {
       codeString: 'B291;B97',
@@ -73,6 +77,12 @@ describe('BlissParser semantic indicator preservation', () => {
       glyphCode: 'SemTestNonSemanticChar',
       isBlissGlyph: true
     };
+  });
+
+  afterAll(() => {
+    for (const code of Object.keys(blissElementDefinitions)) {
+      if (!builtInDefinitionKeys.has(code)) delete blissElementDefinitions[code];
+    }
   });
 
   describe('when overriding indicators on a single character with ;', () => {

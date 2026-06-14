@@ -12,6 +12,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Keep vitest's default module isolation (`isolate: true`) on: several
+    // parser/element test files mutate the shared blissElementDefinitions
+    // singleton. Most pair their setup with afterAll cleanup, but do not switch
+    // to `isolate: false` for speed without first auditing tests/ for definition
+    // leaks; an un-cleaned file would then bleed definitions into later files.
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
