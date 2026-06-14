@@ -24,12 +24,13 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   family (`;`, `;!`, `;B81`, `;!B81`) on plain, semantic-rooted, and
  *   non-semantic-baked bases: SVG round-trip identity and toString stability.
  * - Default-mode word-level (`;;`) indicators across a multi-glyph word,
- *   including `^`+`;;`, decomposing onto the resolved head.
+ *   including `^`+`;;`, kept as a reversible overlay across the round-trip
+ *   (R14: default keeps `;;`, names still decompose).
+ * - Word-level (`;;`) round-trip when the resolved head is a custom glyph
+ *   that bakes a semantic indicator: the semantic resolves exactly once, no
+ *   doubling (N9, fixed by the R14 overlay model).
  *
  * Does NOT cover:
- * - Word-level (`;;`) round-trip when the resolved head is a custom glyph
- *   that bakes an indicator: the semantic doubles on decompose. Tracked as
- *   findings N9 / register R14 (word-level indicator model).
  * - General round-trip identity across all input kinds (options, kerning,
  *   spaces, external glyphs) and the toJSON snapshot shape, see
  *   `BlissSVGBuilder.round-trip.test.js`.
@@ -183,13 +184,10 @@ describe('BlissSVGBuilder indicator round-trip', () => {
   });
 
   describe('when round-tripping word-level (;;) indicators across a multi-glyph word through default toString', () => {
-    // `;;` attaches the indicator to the resolved head; default toString
-    // decomposes it onto that head as a character-level `;`, so the word
-    // round-trips. An explicit `^` that deviates from the fallback re-emits on
-    // export (pinned in `BlissSVGBuilder.head-marker-round-trip.test.js`).
-    // Note: when the resolved head is itself a custom glyph that bakes an
-    // indicator, the semantic doubles on decompose; that divergence is tracked
-    // as findings N9 / register R14 (word-level indicator model), not here.
+    // R14: `;;` is stored as a reversible overlay and KEPT in default output
+    // (it is universal grammar, not a local name), so the word round-trips by
+    // re-emitting `;;`. An explicit `^` that deviates from the fallback also
+    // re-emits on export (pinned in `BlissSVGBuilder.head-marker-round-trip.test.js`).
     const wordCases = [
       'B313/B208;;B81',    // ;; routes to the fallback head (index 0)
       'B313/B208;;!B81',   // strip-semantic word-level (no semantic to strip)
@@ -209,11 +207,18 @@ describe('BlissSVGBuilder indicator round-trip', () => {
       expect(reStr).toBe(str);
     });
 
-    // N9: when the resolved head is a custom glyph baking an indicator, the
-    // semantic doubles on decompose, so this case is NOT green yet. It is
-    // deferred to the R14 word-level indicator model, whose acceptance criteria
-    // require turning it green (findings doc N9 + R14 register row). Tracked as
-    // a todo so it stays visible every run without a red in the green suite.
-    it.todo('round-trips a ;; indicator on a custom-glyph-baked head once the R14 word-level model lands (N9)');
+    it('keeps `;;` in default output rather than decomposing it to `;`', () => {
+      expect(new BlissSVGBuilder('B313/B208;;B81').toString()).toBe('B313/B208;;B81');
+    });
+
+    // N9: when the resolved head is a custom glyph baking a semantic root
+    // (_IRT_NOUN = B291;B97), the semantic once doubled on decompose
+    // (B291;B97;B81;B97). The R14 overlay resolves it exactly once.
+    it('round-trips a ;; indicator on a custom-glyph-baked head without doubling the semantic (N9)', () => {
+      const { originalSvg, rebuiltSvg, str, reStr } = roundTripDefault('_IRT_NOUN;;B81');
+      expect(rebuiltSvg).toBe(originalSvg);
+      expect(reStr).toBe(str);
+      expect(str.match(/B97/g) ?? []).toHaveLength(1);
+    });
   });
 });

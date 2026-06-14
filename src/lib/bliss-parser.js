@@ -318,14 +318,6 @@ export class BlissParser {
       function replaceWithDefinition(str, definitions) {
         const wordCode = str;
 
-        // Helper: Find head glyph index (explicit resolution mark or fallback scan)
-        // Used by the ;; handling to find the indicator target after resolution
-        const findHeadGlyphIndex = (parts) => {
-          const explicitIndex = parts.findIndex(p => p.isHeadGlyph);
-          if (explicitIndex !== -1) return explicitIndex;
-          return findFallbackHeadIndex(parts);
-        };
-
         // Rule-3 automatic scan: skip exclusions from the start, stop at the
         // first non-excluded character, or pick by priority tier when the
         // whole word is exclusions. Custom glyph identity (glyphCode) governs
@@ -507,20 +499,6 @@ export class BlissParser {
           });
         };
 
-        // After ;; modifies a glyph's .part, update its identity (isBlissGlyph/glyphCode).
-        // If the new part is a bare known glyph, restore identity; otherwise clear it.
-        const updateGlyphIdentity = (expandedPart) => {
-          const bareCode = expandedPart.part.split(';')[0].split(':')[0];
-          const def = definitions[bareCode];
-          if (!expandedPart.part.includes(';') && def?.isBlissGlyph) {
-            expandedPart.isBlissGlyph = true;
-            if (def.glyphCode) expandedPart.glyphCode = def.glyphCode;
-          } else {
-            delete expandedPart.isBlissGlyph;
-            delete expandedPart.glyphCode;
-          }
-        };
-
         // Helper: resolve codeString through aliases to check if it's a word
         const resolveToFinalCodeString = (code, visited = new Set()) => {
           if (visited.has(code)) return null;
@@ -531,79 +509,33 @@ export class BlissParser {
           return resolveToFinalCodeString(def.codeString, visited);
         };
 
-        // Detect ;; for word-level indicators on inline multi-character expressions
-        // Pattern: baseCode;;indicators where indicators go on head glyph
-        // This enables word-level indicators without pre-defining words
+        // Detect ;; for word-level indicators on inline multi-character expressions.
+        // Pattern: baseCode;;indicators. R14: instead of baking the indicators
+        // onto the head glyph, store them as a reversible overlay on the group.
+        // The base glyphs expand and crown as usual; the overlay is resolved onto
+        // the head at decode time (render + serialize) via
+        // mergeWordIndicatorsOntoHead, so `;;` round-trips and clears non-
+        // destructively. Single ;; on a pre-defined word also becomes an overlay
+        // (scope-fenced: single ; on a word still bakes via replaceWithDefinition).
         const wordLevelMatch = str.match(/^(.+);;(.*)$/);
         if (wordLevelMatch) {
           const [_, baseCode, rawIndicators] = wordLevelMatch;
           const stripSemantic = rawIndicators.startsWith('!');
           const indicators = stripSemantic ? rawIndicators.slice(1) : rawIndicators;
 
-          // Process baseCode using the normal flow (splits on / and expands each part)
-          // This recursive call handles everything: definitions, ^markers, options, etc.
+          // Process baseCode using the normal flow (splits on / and expands each
+          // part): definitions, ^ markers, options, etc.
           const expandedParts = baseCode.split('/').flatMap(strPart => expand(strPart, definitions));
 
-          // Resolve and crown the word before picking the indicator target
+          // Resolve and crown the word so the head is identifiable at decode.
           crownWordChunks(expandedParts, wordCode);
 
-          if (expandedParts.length > 1) {
-            // Multiple glyphs: Apply indicators to head glyph
-            const targetIndex = findHeadGlyphIndex(expandedParts);
-            const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-            const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
-            const bareCode = getBaseCode(expandedParts[targetIndex]);
-
-            if (indicators) {
-              const newInds = filterToIndicators(indicators.split(';'), definitions);
-              if (newInds.length > 0) {
-                if (semanticRoot && !hasSemantic(newInds, definitions)) {
-                  expandedParts[targetIndex].part = bareCode + ';' + buildWithSemantic(semanticRoot, newInds, definitions).join(';');
-                } else {
-                  expandedParts[targetIndex].part = bareCode + ';' + newInds.join(';');
-                }
-              } else {
-                // All provided codes were non-indicators, treat as empty ;;
-                expandedParts[targetIndex].part = semanticRoot
-                  ? bareCode + ';' + semanticRoot
-                  : bareCode;
-              }
-            } else {
-              // Empty ;; or ;;! — preserve semantic root unless stripSemantic is set
-              expandedParts[targetIndex].part = semanticRoot
-                ? bareCode + ';' + semanticRoot
-                : bareCode;
-            }
-
-            // ;; modified the indicator — update glyph identity to match the new part
-            updateGlyphIdentity(expandedParts[targetIndex]);
-          } else if (expandedParts.length === 1) {
-            // Single glyph: ;; behaves like ; (attach or strip indicator on the single glyph)
-            const existingInds = getIndicatorParts(expandedParts[0]);
-            const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
-            const baseCode = getBaseCode(expandedParts[0]);
-
-            if (indicators) {
-              const newInds = filterToIndicators(indicators.split(';'), definitions);
-              if (newInds.length > 0) {
-                if (semanticRoot && !hasSemantic(newInds, definitions)) {
-                  expandedParts[0].part = baseCode + ';' + buildWithSemantic(semanticRoot, newInds, definitions).join(';');
-                } else {
-                  expandedParts[0].part = baseCode + ';' + newInds.join(';');
-                }
-              } else {
-                expandedParts[0].part = semanticRoot
-                  ? baseCode + ';' + semanticRoot
-                  : baseCode;
-              }
-            } else {
-              expandedParts[0].part = semanticRoot
-                ? baseCode + ';' + semanticRoot
-                : baseCode;
-            }
-
-            // ;; modified the indicator — update glyph identity to match the new part
-            updateGlyphIdentity(expandedParts[0]);
+          // Stash the overlay on the first part; the assembly loop lifts it onto
+          // the group. Codes are merged/indicator-filtered at decode, not here;
+          // filter(Boolean) drops empties so a bare `;;` yields an empty list.
+          const codes = indicators.split(';').filter(Boolean);
+          if (expandedParts.length > 0) {
+            expandedParts[0]._wordIndicators = { codes, stripSemantic };
           }
 
           return expandedParts;
@@ -932,7 +864,10 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak, _wordIndicators } of expandedGlyphParts) {
+        // R14: lift a word-level indicator overlay onto its enclosing group.
+        // Stamped on the first expanded part by the ;; handler above.
+        if (_wordIndicators) group.wordIndicators = _wordIndicators;
         // Word break marker from // in bare alias codeString:
         // push current group, add a default space group, start a new group
         if (_wordBreak) {

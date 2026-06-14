@@ -1,6 +1,6 @@
 import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
-import { BlissElement } from '../src/lib/bliss-element.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
@@ -147,11 +147,12 @@ describe('BlissParser head-glyph exclusions', () => {
 
   // Returns the index of the character carrying indicators (i.e. the
   // computed head glyph), or -1 if no character has indicator children.
+  // Built through BlissSVGBuilder so the R14 word-level (`;;`) overlay is
+  // resolved onto the head at render; single-`;` word bakes resolve too.
   const getHeadGlyphIndex = (code) => {
-    const renderStructure = BlissParser.parse(code);
-    const element = new BlissElement(renderStructure);
-    const word = element.children[0];
-    return word.children.findIndex(character =>
+    const word = new BlissSVGBuilder(code).snapshot().children[0];
+    const glyphs = word.children.filter(c => c.isGlyph);
+    return glyphs.findIndex(character =>
       character.children?.some(c => c.isIndicator)
     );
   };

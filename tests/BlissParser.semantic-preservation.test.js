@@ -1,5 +1,6 @@
 import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
@@ -84,6 +85,15 @@ describe('BlissParser semantic indicator preservation', () => {
       if (!builtInDefinitionKeys.has(code)) delete blissElementDefinitions[code];
     }
   });
+
+  // Resolved head-glyph part codes after the R14 `;;` overlay is merged onto
+  // the head at render. (The semantic ordering lives in the merge, not in the
+  // stored overlay, so these end-to-end pins resolve through the builder.)
+  const resolvedHeadParts = (dsl) => {
+    const glyphs = new BlissSVGBuilder(dsl).snapshot().children[0].children.filter(c => c.isGlyph);
+    const head = glyphs.find(g => g.children?.some(p => p.isIndicator)) ?? glyphs[0];
+    return head.children.map(p => p.codeName);
+  };
 
   describe('when overriding indicators on a single character with ;', () => {
 
@@ -188,69 +198,49 @@ describe('BlissParser semantic indicator preservation', () => {
   });
 
   describe('when overriding indicators on a multi-glyph word with ;;', () => {
-    // The semantic-bearing glyph is placed first in these inputs so
-    // findHeadGlyphIndex selects it as head (first non-excluded glyph).
+    // The semantic-bearing glyph is placed first in these inputs so the head
+    // scan selects it as head (first non-excluded glyph). Assertions read the
+    // resolved head (overlay merged at render), not the stored base.
 
     it('preserves B97 on the head glyph when replacing with a grammatic indicator', () => {
-      const result = BlissParser.parse('B291;B97/C;;B81');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B97/C;;B81');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B97');
       expect(partNames).toContain('B81');
     });
 
     it('preserves B6436 on the head glyph when replacing with a grammatic indicator', () => {
-      const result = BlissParser.parse('B291;B6436/C;;B81');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B6436/C;;B81');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B6436');
       expect(partNames).toContain('B81');
     });
 
     it('does not preserve when the new indicator is itself semantic (;;B6436 replaces B97)', () => {
-      const result = BlissParser.parse('B291;B97/C;;B6436');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B97/C;;B6436');
       expect(partNames).toContain('B6436');
       expect(partNames).not.toContain('B97');
     });
 
     it('preserves the semantic root on an empty ;; strip', () => {
-      const result = BlissParser.parse('B291;B97/C;;');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B97/C;;');
       expect(partNames).toContain('B97');
     });
 
     it('strips the semantic root on ;;! before adding the new indicator', () => {
-      const result = BlissParser.parse('B291;B97/C;;!B81');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B97/C;;!B81');
       expect(partNames).toContain('B81');
       expect(partNames).not.toContain('B97');
     });
 
     it('strips all indicators on an empty ;;! strip', () => {
-      const result = BlissParser.parse('B291;B97/C;;!');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B97/C;;!');
       expect(partNames).not.toContain('B97');
     });
 
     it('adds the new indicator directly when no existing semantic root is present', () => {
       // H is the default head (index 0); ;;B99 attaches B99 with no preservation step.
-      const result = BlissParser.parse('H/C;;B99');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('H/C;;B99');
       expect(partNames).toContain('B99');
     });
   });
@@ -298,23 +288,18 @@ describe('BlissParser semantic indicator preservation', () => {
   });
 
   describe('when applying ;; syntax to a single-glyph word', () => {
-    // A single glyph followed by ;; behaves like ; for indicator override.
+    // A single glyph with ;; stores an overlay (kept reversible); the semantic
+    // base is retained so it can be restored. Assertions read the resolved head.
 
     it('preserves the semantic root with ;; on a single glyph', () => {
-      const result = BlissParser.parse('B291;B97;;B81');
-      const parts = result.groups[0].glyphs[0].parts;
-      const partNames = parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B97;;B81');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B97');
       expect(partNames).toContain('B81');
     });
 
     it('strips the semantic root with ;;! on a single glyph', () => {
-      const result = BlissParser.parse('B291;B97;;!B81');
-      const parts = result.groups[0].glyphs[0].parts;
-      const partNames = parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B97;;!B81');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B81');
       expect(partNames).not.toContain('B97');
@@ -326,19 +311,13 @@ describe('BlissParser semantic indicator preservation', () => {
     it('preserves a non-indicator composition part (B303) on an empty ;; strip', () => {
       // B291;B303 is a composite glyph (two stacked shapes); B303 is not an
       // indicator, so an empty ;; must not strip it.
-      const result = BlissParser.parse('B291;B303/B291;;');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B303/B291;;');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B303');
     });
 
     it('preserves the non-indicator composition part when replacing indicators with ;;B81', () => {
-      const result = BlissParser.parse('B291;B303;B97/C;;B81');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B303;B97/C;;B81');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B303');
       expect(partNames).toContain('B97');
@@ -346,10 +325,7 @@ describe('BlissParser semantic indicator preservation', () => {
     });
 
     it('strips indicators with ;;! but preserves the non-indicator composition part', () => {
-      const result = BlissParser.parse('B291;B303;B97/C;;!B81');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
+      const partNames = resolvedHeadParts('B291;B303;B97/C;;!B81');
       expect(partNames).toContain('B291');
       expect(partNames).toContain('B303');
       expect(partNames).toContain('B81');
@@ -361,11 +337,7 @@ describe('BlissParser semantic indicator preservation', () => {
 
     it('does not double-add B97 when ;;B97;B99 is applied to a glyph already carrying B97', () => {
       // Auto-preserve is suppressed because B97 is in the new list, so no duplicate.
-      const result = BlissParser.parse('B291;B97/C;;B97;B99');
-      const glyphs = result.groups[0].glyphs;
-
-      const partNames = glyphs[0].parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B97/C;;B97;B99');
       const b97Count = partNames.filter(n => n === 'B97').length;
       expect(b97Count).toBe(1);
       expect(partNames).toContain('B99');
@@ -375,34 +347,22 @@ describe('BlissParser semantic indicator preservation', () => {
   describe('when the semantic root is preserved alongside new indicators', () => {
 
     it('places the semantic root FIRST when the new indicator is nominal (;;B99)', () => {
-      const result = BlissParser.parse('B291;B97/C;;B99');
-      const parts = result.groups[0].glyphs[0].parts;
-      const partNames = parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B97/C;;B99');
       expect(partNames.indexOf('B97')).toBeLessThan(partNames.indexOf('B99'));
     });
 
     it('places the semantic root LAST when the new indicator is verbal (;;B81)', () => {
-      const result = BlissParser.parse('B291;B97/C;;B81');
-      const parts = result.groups[0].glyphs[0].parts;
-      const partNames = parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B97/C;;B81');
       expect(partNames.indexOf('B81')).toBeLessThan(partNames.indexOf('B97'));
     });
 
     it('places the semantic root LAST when the new indicator is adjectival (;;B86)', () => {
-      const result = BlissParser.parse('B291;B97/C;;B86');
-      const parts = result.groups[0].glyphs[0].parts;
-      const partNames = parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B97/C;;B86');
       expect(partNames.indexOf('B86')).toBeLessThan(partNames.indexOf('B97'));
     });
 
     it('places the abstract semantic root LAST when the new indicator is verbal', () => {
-      const result = BlissParser.parse('B291;B6436/C;;B81');
-      const parts = result.groups[0].glyphs[0].parts;
-      const partNames = parts.map(p => p.codeName);
-
+      const partNames = resolvedHeadParts('B291;B6436/C;;B81');
       expect(partNames.indexOf('B81')).toBeLessThan(partNames.indexOf('B6436'));
     });
 
@@ -418,11 +378,7 @@ describe('BlissParser semantic indicator preservation', () => {
     it('orders B81 before the preserved B97 on the head glyph in a real-world multi-glyph input', () => {
       // B368 is excluded (MANY), so B428 at index 1 is the head glyph carrying B97;
       // ;;B81 (verbal) must place B81 before B97.
-      const result = BlissParser.parse('B368/B428;B97/B232/B391;;B81');
-      const glyphs = result.groups[0].glyphs;
-
-      const headGlyph = glyphs.find(g => g.isHeadGlyph) || glyphs[1];
-      const headParts = headGlyph.parts.map(p => p.codeName);
+      const headParts = resolvedHeadParts('B368/B428;B97/B232/B391;;B81');
       expect(headParts).toContain('B428');
       expect(headParts).toContain('B81');
       expect(headParts).toContain('B97');

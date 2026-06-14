@@ -5,10 +5,18 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
 /**
  * Pins the internal-mechanics behaviors of BlissParser that fall outside
  * the feature-cross-cutting sibling files: parsePartString grammar,
- * head-glyph detection mechanics, the `;;` reattach-and-strip code path
- * through replaceWithDefinitionHelpers, post-expand glyph object
- * construction in fromStringPostprocess, and the small public utility
- * methods (parse caller-options merge, expandParts defensive guards).
+ * head-glyph detection mechanics, the WORD;INDICATORS (`;`) reattach-and-
+ * strip code path through replaceWithDefinitionHelpers (getBaseCode /
+ * getIndicatorParts), post-expand glyph object construction in
+ * fromStringPostprocess, and the small public utility methods (parse
+ * caller-options merge, expandParts defensive guards).
+ *
+ * Note: these getBaseCode / getIndicatorParts mechanics were previously
+ * exercised through the `;;` bake path; after R14 (`;;` is a reversible
+ * overlay, not a bake) they are reached only through the single-`;`
+ * WORD;INDICATORS path, which still uses the same closures, so the inputs
+ * here use `;`. The `;;`-only updateGlyphIdentity restore-after-strip
+ * closure was removed with the bake; its tests are gone.
  *
  * Covers:
  * - parsePartString DSL-fragment parsing: option-bracket extraction with
@@ -18,10 +26,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Head-glyph detection during parse: tie-breaking at priority 0
  *   (absoluteNeverHead); single-char composite code resolution preferring
  *   the outer glyphCode over part-derived bareCodes.
- * - `;;` indicator-strip-and-reattach through replaceWithDefinitionHelpers:
+ * - WORD;INDICATORS (`;`) reattach through replaceWithDefinitionHelpers:
  *   simple-shape glyphCode early return; inline-composite head filtering
  *   with indicator-head and unknown-bareCode guards; multi-segment
- *   indicator scan excluding the head; identity restoration after strips.
+ *   indicator scan excluding the head.
  * - Post-expand glyph construction in fromStringPostprocess: leading
  *   `_wordBreak` guard; empty-part filter; optional-property propagation
  *   (isIndicator, isExternalGlyph, kerningRules, isHeadGlyph); parseParts
@@ -121,16 +129,12 @@ describe('BlissParser', () => {
       isBlissGlyph: true
     };
 
-    // Inline composite (no glyphCode) head whose part is base + indicator.
-    // After `;;` strips, head should restore identity to the bareCode B291.
-    // Used to pin updateGlyphIdentity's identity-restoration if-branch.
-    blissElementDefinitions['_C5_inline_for_strip'] = {
-      codeString: 'B291;B86',
-      isBlissGlyph: true
-    };
-    blissElementDefinitions['_C5_word_for_strip'] = {
-      codeString: '_C5_inline_for_strip/H',
-      glyphCode: '_C5_word_for_strip',
+    // Multi-glyph word whose head bareCode is itself a real indicator (B97).
+    // Used to pin getIndicatorParts' slice(1): the head segment is excluded
+    // from the existing-indicator scan even when it is an indicator.
+    blissElementDefinitions['_C5_b97_word'] = {
+      codeString: 'B97/H',
+      glyphCode: '_C5_b97_word',
       isBlissGlyph: true
     };
 
@@ -241,28 +245,28 @@ describe('BlissParser', () => {
     });
   });
 
-  describe('when ;; targets a simple-shape glyphCode composite', () => {
-    it('returns the outer glyphCode (not part-derived) when ;; reattaches indicators', () => {
+  describe('when WORD; targets a simple-shape glyphCode composite', () => {
+    it('returns the outer glyphCode (not part-derived) when ; reattaches indicators', () => {
       // _C5_simple has glyphCode '_C5_simple' (no `/` and no `;`), so
-      // getBaseCode's simple-path returns it directly. After `;;B86`, the
+      // getBaseCode's simple-path returns it directly. After `;B86`, the
       // head's part becomes '_C5_simple;B86'. Mutations that disable the
       // simple-path send the call through the filter else-branch, returning
       // 'B291;S2', which then concatenates to 'B291;S2;B86' and decomposes
       // into a different parts list ([B291, S2, B86]) on the head glyph.
-      const r = BlissParser.parse('_C5_word;;B86');
+      const r = BlissParser.parse('_C5_word;B86');
       expect(r.groups[0].glyphs[0].parts.map(p => p.codeName))
         .toEqual(['_C5_simple', 'B86']);
     });
   });
 
-  describe('when ;; reattaches indicators on an inline-composite head', () => {
+  describe('when WORD; reattaches indicators on an inline-composite head', () => {
     it('keeps the head segment even when its bareCode is an indicator (i === 0 guard)', () => {
       // _C5_inline_b97_c is an inline composite with no glyphCode and head
-      // bareCode B97 (which IS an indicator). The filter at line 370 returns
+      // bareCode B97 (which IS an indicator). The getBaseCode filter returns
       // true at i === 0 to preserve the head; without that guard, B97 would
       // be filtered out and the head's part would collapse to 'C', losing
       // its semantic identity.
-      const r = BlissParser.parse('_C5_word_inline;;B86');
+      const r = BlissParser.parse('_C5_word_inline;B86');
       expect(r.groups[0].glyphs[0].parts.map(p => p.codeName))
         .toEqual(['B97', 'C', 'B86']);
     });
@@ -271,16 +275,16 @@ describe('BlissParser', () => {
       // The optional chaining `definitions[bareCode]?.isIndicator` shields
       // against undefined defs. Removing `?.` would throw a TypeError when
       // a `;`-segment has an unrecognized code (here `__UNK__`).
-      expect(() => BlissParser.parse('_C5_word_inline_unk;;B86')).not.toThrow();
+      expect(() => BlissParser.parse('_C5_word_inline_unk;B86')).not.toThrow();
     });
   });
 
   describe('when parse scans a multi-segment head for existing indicators', () => {
     it('does not throw on an unknown bareCode after the head segment', () => {
-      // Same defensive `?.` lives at line 381 in getIndicatorParts. The
-      // _C5_unknown_after fixture forces this filter to evaluate
+      // Same defensive `?.` lives in getIndicatorParts. The _C5_unknown_after
+      // fixture forces this filter to evaluate
       // `definitions['__UNKNOWN_CODE__']?.isIndicator`, which must be safe.
-      expect(() => BlissParser.parse('_C5_unknown_word;;B86')).not.toThrow();
+      expect(() => BlissParser.parse('_C5_unknown_word;B86')).not.toThrow();
     });
 
     it('drops the head segment from the indicator scan (slice(1))', () => {
@@ -289,7 +293,7 @@ describe('BlissParser', () => {
       // existingInds (it's the head, not an attached indicator). Without
       // the slice(1), B97 would be detected as an existing semantic root
       // and re-injected by buildWithSemantic, duplicating it in the output.
-      const r = BlissParser.parse('B97/H;;B86');
+      const r = BlissParser.parse('_C5_b97_word;B86');
       const codeNames = r.groups[0].glyphs[0].parts.map(p => p.codeName);
       expect(codeNames.filter(c => c === 'B97').length).toBe(1);
       expect(codeNames).toContain('B86');
@@ -299,38 +303,25 @@ describe('BlissParser', () => {
       // _C5_fake_semantic has semanticIndicator: 'thing' but no
       // isIndicator: true. The strict `=== true` filter (and the filter
       // call itself) excludes it from existingInds, so getSemanticRoot
-      // returns null and ;;B86 produces a clean replacement. If the filter
+      // returns null and ;B86 produces a clean replacement. If the filter
       // admitted everything (or were dropped), _C5_fake_semantic's semantic
       // root B97 would be auto-preserved and appear in the head's parts.
-      const r = BlissParser.parse('_C5_word_with_fake_sem;;B86');
+      const r = BlissParser.parse('_C5_word_with_fake_sem;B86');
       const codeNames = r.groups[0].glyphs[0].parts.map(p => p.codeName);
       expect(codeNames).not.toContain('B97');
     });
   });
 
-  describe('when ;; strips indicators and parse restores the head identity', () => {
-    it('preserves glyphCode and isBlissGlyph when ;; leaves the head as a known simple glyph', () => {
-      // _C5_word;; (empty strip) reduces head.part to '_C5_simple'. The
+  describe('when WORD; strips indicators and parse keeps the head identity', () => {
+    it('preserves glyphCode and isBlissGlyph when ; leaves the head as a known simple glyph', () => {
+      // _C5_word; (empty strip) reduces head.part to '_C5_simple'. The
       // simple-path keeps the existing identity; mutations that wreck the
       // bareCode extraction (split-character substitutions), the if-branch
       // condition, or the `isBlissGlyph = true` literal would all flip
       // glyphCode/isBlissGlyph to undefined on the resulting glyph.
-      const r = BlissParser.parse('_C5_word;;');
+      const r = BlissParser.parse('_C5_word;');
       const head = r.groups[0].glyphs[0];
       expect(head.glyphCode).toBe('_C5_simple');
-      expect(head.isBlissGlyph).toBe(true);
-    });
-
-    it('restores identity when ;; strips an inline-composite head down to its bareCode', () => {
-      // _C5_word_for_strip's head starts as the inline composite `B291;B86`
-      // (no glyphCode). After `;;`, getBaseCode's filter else-branch returns
-      // 'B291' (B86 dropped as indicator). updateGlyphIdentity then enters
-      // the if-branch (no `;` in part, def.isBlissGlyph) and assigns
-      // glyphCode='B291' and isBlissGlyph=true. A no-op mutation of the
-      // if-block leaves the head identity-less.
-      const r = BlissParser.parse('_C5_word_for_strip;;');
-      const head = r.groups[0].glyphs[0];
-      expect(head.glyphCode).toBe('B291');
       expect(head.isBlissGlyph).toBe(true);
     });
   });

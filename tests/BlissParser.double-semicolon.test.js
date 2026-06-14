@@ -1,38 +1,47 @@
 import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
- * Pins ;; (double-semicolon) DSL syntax: word-level indicator attachment
- * applied to ad-hoc inline expressions, equivalent to expanding the inline
- * glyphs as a word and running the head-glyph algorithm.
+ * Pins the ;; (double-semicolon) DSL contract after R14: a word-level
+ * indicator is stored as a reversible OVERLAY on the group
+ * (`group.wordIndicators = { codes, stripSemantic }`) with the base glyphs
+ * left unbaked. The overlay is merged onto the contract-resolved head glyph
+ * at render (and serialize), never at parse, so it round-trips and clears.
  *
- * Single (/) vs double (//) separators recap:
+ * Separator recap:
  *   /  = character separator (character-level)
  *   // = word separator (word-level)
  *   ;  = indicator separator (character-level: attaches to preceding character)
- *   ;; = indicator separator (word-level: attaches to head glyph)
+ *   ;; = word-level indicator (stored as a group overlay; resolves to the head)
  *
  * Covers:
- * - Basic ;;-attachment via explicit ^ marker (B291/B291^/B291;;B86).
- * - Fallback heuristics on inline (modifier exclusion) when no marker is present.
- * - Default-to-first-glyph behaviour when no marker and no exclusions match.
- * - The `targetIndex > 0` guard that leaves the default-index head without an `isHeadGlyph` flag.
- * - Multiple indicators following ;;, including single-glyph inputs where the head/indicator `;` separators must be preserved.
- * - Filtering when ;; supplies only non-indicators: existing indicators drop, bareCode survives, and an existing semantic root is preserved on both multi-glyph and single-glyph inputs.
- * - Empty `;;` with an existing `bareCode;semanticRoot` shape preserves the semantic root.
- * - ;; with positioned glyphs and glyph-level options.
- * - Equivalence between inline ;; and a pre-defined word with ;.
- * - Distinction from ; (character-level fallback) on multi-character inputs.
- * - Edge cases: two-character word, single-character degenerate, empty base.
+ * - Store shape: codes list, stripSemantic flag, empty overlay, and base
+ *   glyphs staying unbaked (no indicator baked into any glyph's parts).
+ * - Head targeting at render via explicit ^ marker, modifier-exclusion
+ *   fallback, and the index-0 default (which carries no isHeadGlyph flag).
+ * - Multiple indicators resolving onto the head in one overlay.
+ * - Non-indicator codes filtered at resolve (render unchanged), with an
+ *   existing grammatical indicator dropped and a semantic root preserved.
+ * - Single-character ;; storing an overlay (kept reversible).
+ * - Positioning and glyph-level options surviving alongside the overlay.
+ * - Pre-defined words: ;; stores an overlay and renders identically to the
+ *   single-; bake (render parity, not tree parity, since ; still bakes).
+ * - The ; (character-level) vs ;; (word-level) target distinction.
+ * - Overlay scoping to its own word group in a multi-word sentence.
+ * - Degenerate inputs (no base, two-glyph default).
+ * - Scope fence: single ; on a pre-defined word still bakes (no overlay).
  *
  * Does NOT cover:
- * - The ; (single-semicolon) syntax on pre-defined words and characters, see
- *   `BlissParser.word-indicators.test.js`.
+ * - The semantic-root placement/preservation rules, see
+ *   `BlissParser.semantic-preservation.test.js`.
  * - Head-glyph algorithm internals, see `BlissParser.head-glyph.test.js`
  *   and `BlissParser.head-glyph-exclusions.test.js`.
- * - Rendered SVG output for word-level indicator attachment, see
- *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
+ * - The single-; WORD;INDICATORS bake path, see
+ *   `BlissParser.word-indicators.test.js`.
+ * - toString/toJSON re-emission and round-trip, see
+ *   `BlissSVGBuilder.indicator-round-trip.test.js`.
  */
 
 describe('BlissParser ;; syntax', () => {
@@ -42,15 +51,13 @@ describe('BlissParser ;; syntax', () => {
   const builtInDefinitionKeys = new Set(Object.keys(blissElementDefinitions));
 
   beforeAll(() => {
-    // Pre-defined word fixtures used in the inline-vs-word equivalence tests
     blissElementDefinitions['TestWord1'] = {
       codeString: 'H^/C',
       glyphCode: 'TestWord1',
       isBlissGlyph: true
     };
-
     blissElementDefinitions['TestWord3'] = {
-      codeString: 'B486/H',  // Uses modifier, NO explicit marker - tests fallback heuristics
+      codeString: 'B486/H',  // modifier, NO explicit marker - tests fallback heuristics
       glyphCode: 'TestWord3',
       isBlissGlyph: true
     };
@@ -62,362 +69,206 @@ describe('BlissParser ;; syntax', () => {
     }
   });
 
-  describe('when ;; is used on a basic inline expression', () => {
-    it('attaches the indicator to the head glyph using the ^ marker', () => {
-      const result = BlissParser.parse('B291/B291^/B291;;B86');
+  // Stored overlay on the first group.
+  const overlay = (dsl) => BlissParser.parse(dsl).groups[0].wordIndicators;
+  // Per-glyph base part codes from the parse tree (unbaked, reliable for all
+  // glyph kinds, unlike the snapshot which omits children for some shapes).
+  const baseGlyphParts = (dsl) =>
+    BlissParser.parse(dsl).groups[0].glyphs.map(g => g.parts.map(p => p.codeName));
+  // The resolved head glyph (the one carrying an indicator after the overlay
+  // merge at render): its index and its part codes.
+  const resolvedHead = (dsl) => {
+    const glyphs = new BlissSVGBuilder(dsl).snapshot().children[0].children.filter(c => c.isGlyph);
+    const index = glyphs.findIndex(g => g.children?.some(p => p.isIndicator));
+    return { index, parts: index === -1 ? [] : glyphs[index].children.map(p => p.codeName) };
+  };
+  const svgEq = (a, b) => new BlissSVGBuilder(a).svgCode === new BlissSVGBuilder(b).svgCode;
 
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // First B291 should not have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
-
-      // Middle B291 (head glyph via ^) should have indicator
-      // When indicator is attached, the character code is preserved
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
-
-      // Last B291 should not have indicator
-      expect(result.groups[0].glyphs[2].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[2].parts.length).toBe(1);
+  describe('when ;; stores a word-level overlay on the group', () => {
+    it('stores the indicator codes and leaves the base glyphs unbaked', () => {
+      expect(overlay('B291/B291^/B291;;B86')).toEqual({ codes: ['B86'], stripSemantic: false });
+      // No glyph's parts carry the overlay code; the head is base-only.
+      expect(baseGlyphParts('B291/B291^/B291;;B86')).toEqual([['B291'], ['B291'], ['B291']]);
     });
 
-    it('attaches the indicator to the head glyph via fallback heuristics', () => {
-      // B486 is in exclusion list, so head glyph should be B291
-      const result = BlissParser.parse('B486/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // B486 (modifier) should not have indicator
-      expect(result.groups[0].glyphs[0].glyphCode).toBe('B486');
-      expect(result.groups[0].glyphs[0].parts.every(p => p.codeName !== 'B86')).toBe(true);
-
-      // B291 (head glyph via heuristics) should have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
+    it('stores an overlay on a single-character base (kept reversible)', () => {
+      expect(overlay('B291;;B86')).toEqual({ codes: ['B86'], stripSemantic: false });
+      expect(baseGlyphParts('B291;;B86')).toEqual([['B291']]);
     });
 
-    it('defaults to the first glyph when no marker and no exclusions apply', () => {
-      const result = BlissParser.parse('B291/B291/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // First B291 (default head) should have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
-      // No isHeadGlyph flag when using default (index 0)
-
-      // Other B291s should not have indicator (expanded to S8)
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
-      expect(result.groups[0].glyphs[2].parts.length).toBe(1);
+    it('stores multiple indicator codes in one overlay', () => {
+      expect(overlay('B291/B291^/B291;;B86;B97')).toEqual({ codes: ['B86', 'B97'], stripSemantic: false });
     });
 
-    it('does not set isHeadGlyph on the default-index head', () => {
-      // No explicit ^ marker, no exclusions, so targetIndex falls back to 0.
-      // The `targetIndex > 0` guard prevents marking the default head.
-      // Mutations that widen the guard (always-true, >=0, ||) would set
-      // glyphs[0].isHeadGlyph=true.
-      const r = BlissParser.parse('H/C;;B81');
-      expect(r.groups[0].glyphs[0].isHeadGlyph).toBeUndefined();
+    it('stores an empty overlay for a bare ;;, retaining the base semantic', () => {
+      expect(overlay('B291;B97;;')).toEqual({ codes: [], stripSemantic: false });
+      expect(baseGlyphParts('B291;B97;;')).toEqual([['B291', 'B97']]);
+    });
+
+    it('sets stripSemantic for ;;! and retains the base semantic for reversal', () => {
+      expect(overlay('B291;B97;;!B81')).toEqual({ codes: ['B81'], stripSemantic: true });
+      // The base keeps B97 so clearing the overlay restores it.
+      expect(baseGlyphParts('B291;B97;;!B81')).toEqual([['B291', 'B97']]);
     });
   });
 
-  describe('when ;; is followed by multiple indicators', () => {
-    it('attaches all indicators to the head glyph', () => {
-      const result = BlissParser.parse('B291/B291^/B291;;B86;B97');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // Middle B291 (head glyph) should have both indicators
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[1].parts[2].codeName).toBe('B97');
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
+  describe('when the overlay resolves onto the head at render', () => {
+    it('targets the glyph marked with ^', () => {
+      const head = resolvedHead('B291/B291^/B291;;B86');
+      expect(head.index).toBe(1);
+      expect(head.parts).toEqual(['B291', 'B86']);
     });
 
-    it('separates the head from multiple new indicators with `;` on a single-glyph input', () => {
-      // Single B291 with ;;B81;B82 (two real indicators). The single-glyph
-      // attach line builds part = baseCode + ';' + newInds.join(';'). A
-      // string mutation of either `;` literal would either lose the head/
-      // first-indicator boundary ('B291B81;B82') or fuse the indicators
-      // ('B291;B81B82'); both surface as a missing or merged codeName.
-      const r = BlissParser.parse('B291;;B81;B82');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['B291', 'B81', 'B82']);
+    it('targets the first non-excluded glyph via fallback heuristics', () => {
+      // B486 is a modifier exclusion, so B291 at index 1 is the head.
+      const head = resolvedHead('B486/B291;;B86');
+      expect(head.index).toBe(1);
+      expect(head.parts).toEqual(['B291', 'B86']);
+      expect(BlissParser.parse('B486/B291;;B86').groups[0].glyphs[1].isHeadGlyph).toBe(true);
+    });
+
+    it('defaults to the first glyph with no isHeadGlyph flag', () => {
+      const head = resolvedHead('B291/B291/B291;;B86');
+      expect(head.index).toBe(0);
+      // The targetIndex > 0 guard leaves the default head unmarked.
+      expect(BlissParser.parse('B291/B291/B291;;B86').groups[0].glyphs[0].isHeadGlyph).toBeUndefined();
+    });
+
+    it('resolves multiple indicators onto the head together', () => {
+      const head = resolvedHead('B291/B291^/B291;;B86;B97');
+      expect(head.index).toBe(1);
+      expect(head.parts).toEqual(['B291', 'B86', 'B97']);
+    });
+
+    it('resolves multiple indicators onto a single-glyph head', () => {
+      expect(resolvedHead('B291;;B81;B82').parts).toEqual(['B291', 'B81', 'B82']);
     });
   });
 
   describe('when ;; supplies only non-indicators', () => {
-    it('reduces a multi-glyph head to bareCode when no semantic root exists', () => {
-      // H/C with ;;C8 (C8 is a shape, not an indicator). Head is H (index 0,
-      // default). No existing indicator on H, no semantic root. The outer-else
-      // path assigns part = bareCode. A `newInds.length > 0` mutation (always
-      // true / >= 0) would route through the inner-else and produce 'H;'
-      // instead, surfacing as an extra empty part on the head glyph.
-      const r = BlissParser.parse('H/C;;C8');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['H']);
+    it('filters them out at resolve, leaving the render unchanged', () => {
+      // C8 is a shape, not an indicator; it stores but renders as nothing.
+      expect(overlay('H/C;;C8')).toEqual({ codes: ['C8'], stripSemantic: false });
+      expect(svgEq('H/C;;C8', 'H/C')).toBe(true);
     });
 
-    it('drops a real existing indicator from a multi-glyph head', () => {
-      // B291;B81 has real indicator B81 (non-semantic verb). With ;;C8, newInds
-      // is empty, semanticRoot is null, so the outer-else assigns part='B291'
-      // and B81 is dropped. A block-statement mutation that voids the else
-      // would leave part='B291;B81' (B81 still attached).
-      const r = BlissParser.parse('B291;B81/C;;C8');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['B291']);
+    it('drops an existing grammatical indicator from the head at resolve', () => {
+      // B81 lives in the base; the empty-effect overlay clears it at render.
+      expect(baseGlyphParts('B291;B81/C;;C8')[0]).toEqual(['B291', 'B81']);
+      expect(svgEq('B291;B81/C;;C8', 'B291/C')).toBe(true);
     });
 
-    it('preserves an existing semantic root on a multi-glyph head', () => {
-      // B291;B97 has the semantic-thing indicator B97. With ;;C8, newInds is
-      // empty, semanticRoot is preserved, so part stays 'B291;B97'. A string
-      // mutation of the `;` separator in `bareCode + ';' + semanticRoot`
-      // would collapse the parts to a single 'B291B97' codeName.
-      const r = BlissParser.parse('B291;B97/C;;C8');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['B291', 'B97']);
-    });
-
-    it('drops an existing indicator on a single-glyph input', () => {
-      // Single B291;B81 with ;;C8. newInds is empty, semanticRoot null, so
-      // the inner-else (single-glyph "indicators non-empty but all filtered
-      // out") assigns part='B291'. Three mutations diverge here:
-      //   - `newInds.length > 0` always-true / >=0 routes through the
-      //     inner-else to produce 'B291;'.
-      //   - block-statement-empty on the inner-else leaves 'B291;B81'.
-      const r = BlissParser.parse('B291;B81;;C8');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['B291']);
-    });
-
-    it('preserves an existing semantic root on a single-glyph input', () => {
-      // Single B291;B97 (semantic) with ;;C8. The inner-else assigns
-      // 'B291;B97'. A string mutation of the `;` separator in
-      // `baseCode + ';' + semanticRoot` would collapse to 'B291B97'.
-      const r = BlissParser.parse('B291;B97;;C8');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['B291', 'B97']);
+    it('preserves an existing semantic root on the head at resolve', () => {
+      expect(svgEq('B291;B97/C;;C8', 'B291;B97/C')).toBe(true);
     });
   });
 
-  describe('when ;; is used on a single character', () => {
-    it('degenerates to ; behavior', () => {
-      // When only one glyph, ;; behaves like ;
-      const result = BlissParser.parse('B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+  describe('when ;; combines with positioning and glyph options', () => {
+    it('preserves glyph positioning while resolving the overlay onto the head', () => {
+      const head = resolvedHead('B291/B291:2,3^/B291;;B86');
+      expect(head.index).toBe(1);
+      expect(head.parts).toEqual(['B291', 'B86']);
     });
-  });
 
-  describe('when the inline expression has positioned glyphs', () => {
-    it('attaches the indicator while preserving glyph positioning', () => {
-      const result = BlissParser.parse('B291/B291:2,3^/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // Middle B291 with positioning should have indicator
-      // Note: positioning is on the character, indicator attached to character code
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
-    });
-  });
-
-  describe('when the inline expression has glyph-level options', () => {
-    it('preserves the options on the first glyph and attaches the indicator to the head', () => {
-      const result = BlissParser.parse('[color=red]B291/B291^/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // First glyph should have options
-      expect(result.groups[0].glyphs[0].options.color).toBe('red');
-
-      // Middle B291 (head glyph) should have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
+    it('keeps glyph-level options on the first glyph alongside the overlay', () => {
+      const parsed = BlissParser.parse('[color=red]B291/B291^/B291;;B86');
+      expect(parsed.groups[0].glyphs[0].options.color).toBe('red');
+      expect(parsed.groups[0].wordIndicators).toEqual({ codes: ['B86'], stripSemantic: false });
     });
   });
 
   describe('when ;; is used on a pre-defined word', () => {
-    it('attaches the indicator to the head glyph (same as single ;)', () => {
-      // TestWord1 = 'H^/C', ;; should work the same as ; for pre-defined words
-      const result = BlissParser.parse('TestWord1;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // H (head glyph via ^) should have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-
-      // C should not have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+    it('stores an overlay and resolves onto the designated head', () => {
+      // TestWord1 = 'H^/C': H is the designated head.
+      expect(overlay('TestWord1;;B86')).toEqual({ codes: ['B86'], stripSemantic: false });
+      const head = resolvedHead('TestWord1;;B86');
+      expect(head.index).toBe(0);
+      expect(head.parts).toEqual(['H', 'B86']);
     });
 
-    it('produces the same result as single ; for a pre-defined word', () => {
-      const resultSingle = BlissParser.parse('TestWord1;B86');
-      const resultDouble = BlissParser.parse('TestWord1;;B86');
-
-      // Both should produce identical structure
-      expect(resultDouble.groups[0].glyphs.length).toBe(resultSingle.groups[0].glyphs.length);
-      expect(resultDouble.groups[0].glyphs[0].parts[1].codeName).toBe(resultSingle.groups[0].glyphs[0].parts[1].codeName);
+    it('renders identically to the single-; bake (render parity, not tree parity)', () => {
+      // Single ; still bakes (scope fence); ;; overlays. Same render.
+      expect(svgEq('TestWord1;;B86', 'TestWord1;B86')).toBe(true);
     });
   });
 
   describe('when comparing inline ;; to a pre-defined word with the same expansion', () => {
-    it('parses inline H^/C;;B86 to the same shape as TestWord1;;B86', () => {
-      // TestWord1 has codeString 'H^/C'
-      const inlineResult = BlissParser.parse('H^/C;;B86');
-      const wordResult = BlissParser.parse('TestWord1;;B86');
-
-      // Both should have 2 glyphs
-      expect(inlineResult.groups[0].glyphs.length).toBe(2);
-      expect(wordResult.groups[0].glyphs.length).toBe(2);
-
-      // H should have indicator in both
-      expect(inlineResult.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
-      expect(wordResult.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
-
-      // C should not have indicator in both
-      expect(inlineResult.groups[0].glyphs[1].parts.length).toBe(1);
-      expect(wordResult.groups[0].glyphs[1].parts.length).toBe(1);
+    it('renders inline H^/C;;B86 identically to TestWord1;;B86', () => {
+      expect(svgEq('H^/C;;B86', 'TestWord1;;B86')).toBe(true);
     });
 
-    it('applies modifier-skip heuristics on inline B486/H;;B86 the same as on TestWord3;B86', () => {
-      // TestWord3 has codeString 'B486/H' (no explicit marker)
-      const inlineResult = BlissParser.parse('B486/H;;B86');
-      const wordResult = BlissParser.parse('TestWord3;B86');
-
-      // Both should have 2 glyphs
-      expect(inlineResult.groups[0].glyphs.length).toBe(2);
-      expect(wordResult.groups[0].glyphs.length).toBe(2);
-
-      // H should have indicator in both (B486 is excluded)
-      expect(inlineResult.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      expect(wordResult.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
+    it('applies modifier-skip heuristics on inline B486/H;;B86 like TestWord3;B86', () => {
+      expect(svgEq('B486/H;;B86', 'TestWord3;B86')).toBe(true);
     });
   });
 
   describe('when distinguishing ; from ;;', () => {
-    it('attaches ; to the last character (character-level)', () => {
-      const result = BlissParser.parse('B291/B291^/B291;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // B86 should be on last B291 (character-level), not middle B291 (head glyph)
-      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1); // No indicator despite ^
-      expect(result.groups[0].glyphs[2].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[2].parts[1].codeName).toBe('B86');
+    it('attaches ; to the last character (character-level), not the head', () => {
+      // ;B86 bakes onto the last glyph (character-level), not the ^-marked head.
+      expect(baseGlyphParts('B291/B291^/B291;B86')).toEqual([['B291'], ['B291'], ['B291', 'B86']]);
+      expect(BlissParser.parse('B291/B291^/B291;B86').groups[0].wordIndicators).toBeUndefined();
     });
 
-    it('attaches ;; to the head glyph (word-level)', () => {
-      const result = BlissParser.parse('B291/B291^/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // B86 should be on middle B291 (head glyph), not last B291
-      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[2].parts.length).toBe(1);
+    it('stores ;; as a word-level overlay resolving to the marked head', () => {
+      expect(overlay('B291/B291^/B291;;B86')).toEqual({ codes: ['B86'], stripSemantic: false });
+      expect(resolvedHead('B291/B291^/B291;;B86').index).toBe(1);
     });
   });
 
   describe('when the inline expression has complex modifier patterns', () => {
-    it('handles a multi-glyph modifier pattern with ;;', () => {
-      // B1060/B578/B303 is a multi-glyph modifier pattern ("looks similar to")
-      const result = BlissParser.parse('B1060/B578/B303/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(4);
-
-      // First 3 glyphs are modifiers, no indicator
-      expect(result.groups[0].glyphs[0].parts.every(p => p.codeName !== 'B86')).toBe(true);
-      expect(result.groups[0].glyphs[1].parts.every(p => p.codeName !== 'B86')).toBe(true);
-      expect(result.groups[0].glyphs[2].parts.every(p => p.codeName !== 'B86')).toBe(true);
-
-      // B291 (head glyph via heuristics) should have indicator
-      expect(result.groups[0].glyphs[3].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[3].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[3].isHeadGlyph).toBe(true);
+    it('resolves the overlay onto the head past a multi-glyph modifier pattern', () => {
+      // B1060/B578/B303 is a modifier pattern; B291 at index 3 is the head.
+      const head = resolvedHead('B1060/B578/B303/B291;;B86');
+      expect(head.index).toBe(3);
+      expect(head.parts).toEqual(['B291', 'B86']);
     });
 
-    it('respects an explicit ^ marker over heuristics', () => {
-      // Explicit ^ on B486 overrides exclusion list
-      const result = BlissParser.parse('B486^/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // B486 (explicit ^ marker) should have indicator
-      // ;; changes glyph identity; glyphCode is cleared since it's no longer just B486
-      expect(result.groups[0].glyphs[0].glyphCode).toBeUndefined();
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-      expect(result.groups[0].glyphs[0].parts.some(p => p.codeName === 'B86')).toBe(true);
-
-      // B291 should not have indicator
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+    it('respects an explicit ^ marker over the exclusion heuristics', () => {
+      // B486 is normally excluded, but ^ marks it as the head. Its base
+      // identity is untouched (overlay does not bake), so glyphCode stays.
+      const parsed = BlissParser.parse('B486^/B291;;B86');
+      expect(parsed.groups[0].glyphs[0].isHeadGlyph).toBe(true);
+      expect(parsed.groups[0].glyphs[0].glyphCode).toBe('B486');
+      const head = resolvedHead('B486^/B291;;B86');
+      expect(head.index).toBe(0);
+      expect(head.parts).toEqual(['B486', 'B86']);
     });
   });
 
   describe('when ;; is used in a multi-word sentence', () => {
-    it('applies the indicator only within its enclosing word group', () => {
-      const result = BlissParser.parse('B291//B291/B291^/B291;;B86//B291');
-
-      expect(result.groups.length).toBe(5); // word, space, word, space, word
-
-      // Middle word (B291/B291^/B291;;B86)
-      const wordGroup = result.groups[2];
-      expect(wordGroup.glyphs.length).toBe(3);
-
-      // Middle B291 (head glyph) should have indicator
-      expect(wordGroup.glyphs[1].parts[0].codeName).toBe('B291');
-      expect(wordGroup.glyphs[1].parts[1].codeName).toBe('B86');
-      expect(wordGroup.glyphs[1].isHeadGlyph).toBe(true);
+    it('scopes the overlay to its own word group', () => {
+      const parsed = BlissParser.parse('B291//B291/B291^/B291;;B86//B291');
+      expect(parsed.groups.length).toBe(5); // word, space, word, space, word
+      expect(parsed.groups[2].wordIndicators).toEqual({ codes: ['B86'], stripSemantic: false });
+      expect(parsed.groups[0].wordIndicators).toBeUndefined();
+      expect(parsed.groups[4].wordIndicators).toBeUndefined();
+      expect(resolvedHead('B291//B291/B291^/B291;;B86//B291' )).toBeDefined();
     });
   });
 
-  describe('when ;; is empty (no new indicators follow)', () => {
-    it('preserves the existing `bareCode;semanticRoot` shape', () => {
-      // Single B291;B97 with empty ;;. indicators is falsy, semanticRoot is
-      // 'B97', so the outer-else assigns part='B291;B97'. A string mutation
-      // of the `;` separator on the single-glyph outer-else would emit
-      // 'B291B97' as a single fused codeName. The multi-glyph counterpart is
-      // already covered by BlissParser.semanticPreservation tests.
-      const r = BlissParser.parse('B291;B97;;');
-      const head = r.groups[0].glyphs[0];
-      expect(head.parts.map(p => p.codeName)).toEqual(['B291', 'B97']);
-    });
-  });
-
-  describe('when the input is a degenerate or two-glyph case', () => {
-    it('attaches the indicator to the first glyph by default in a two-glyph inline word', () => {
-      const result = BlissParser.parse('B291/B291;;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-      // First B291 should be head (default)
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+  describe('when the input is degenerate or two-glyph', () => {
+    it('defaults the overlay to the first glyph in a two-glyph word', () => {
+      expect(overlay('B291/B291;;B86')).toEqual({ codes: ['B86'], stripSemantic: false });
+      expect(resolvedHead('B291/B291;;B86').index).toBe(0);
     });
 
     it('does not crash on ;;B86 with no preceding base', () => {
-      // Edge case: ;;IND with no base code
       const result = BlissParser.parse(';;B86');
-
       expect(result).toBeDefined();
-      // Should not crash
     });
 
     it('attaches a single non-default indicator (B81) when only one follows ;;', () => {
-      const result = BlissParser.parse('B291/B291;;B81');
+      expect(overlay('B291/B291;;B81')).toEqual({ codes: ['B81'], stripSemantic: false });
+      expect(resolvedHead('B291/B291;;B81').parts).toEqual(['B291', 'B81']);
+    });
+  });
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B81');
+  describe('scope fence: single ; on a pre-defined word still bakes', () => {
+    it('bakes the indicator onto the head with no overlay (TestWord1;B86)', () => {
+      // The single-; WORD;INDICATORS path is out of R14 scope and unchanged.
+      const parsed = BlissParser.parse('TestWord1;B86');
+      expect(parsed.groups[0].wordIndicators).toBeUndefined();
+      expect(parsed.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['H', 'B86']);
     });
   });
 });

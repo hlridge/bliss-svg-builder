@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
-import { getSemanticRoot } from "./indicator-utils.js";
+import { getSemanticRoot, mergeWordIndicatorsOntoHead } from "./indicator-utils.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
 // load so BlissElement can clone it without importing BlissParser itself.
@@ -459,6 +459,21 @@ class BlissSVGBuilder {
 
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
     const blissObj = structuredClone(this.#rawBlissObj);
+
+    // R14 resolve site 1 (render): merge each group's word-level indicator
+    // overlay onto its head glyph, on the clone only so #rawBlissObj (and the
+    // handles that reference it) stay base-only. The head is the marked glyph
+    // (isHeadGlyph) or the first glyph (fallback 0), mirroring parser crowning.
+    for (const group of blissObj.groups ?? []) {
+      if (group.wordIndicators && group.glyphs?.length) {
+        const headIndex = Math.max(group.glyphs.findIndex(g => g.isHeadGlyph === true), 0);
+        const head = group.glyphs[headIndex];
+        head.parts = mergeWordIndicatorsOntoHead(
+          head, group.wordIndicators, blissElementDefinitions, (code) => BlissParser.parse(code)
+        );
+      }
+    }
+
     this.#processAllOptions(blissObj, true);
 
     const { charSpace, wordSpace, externalGlyphSpace, errorPlaceholder, ...remainingOptions } = blissObj.options ?? {};
@@ -570,7 +585,14 @@ class BlissSVGBuilder {
         const parts = glyphs[gi].children;
         for (let pi = 0; pi < parts.length; pi++) {
           if (parts[pi].key === key) {
-            return new ElementHandle(this.#mutationCtx, 3, rawGlyph.parts[pi], { group: rawGroup, glyph: rawGlyph });
+            // Match the raw part by key, not snapshot position: a `;;` head's
+            // snapshot carries an extra overlay-injected indicator part with no
+            // raw node. Match-by-key keeps base parts addressable and returns
+            // null for the overlay part (it lives only in the resolved tree).
+            const rawPart = rawGlyph.parts.find(rp => rp.key === key);
+            return rawPart
+              ? new ElementHandle(this.#mutationCtx, 3, rawPart, { group: rawGroup, glyph: rawGlyph })
+              : null;
           }
         }
       }
@@ -1333,6 +1355,12 @@ class BlissSVGBuilder {
           headSegments[headSegments.length - 1] += '^';
           groupStr = glyphArrays.flat().filter(Boolean).join('/');
         }
+      }
+      // R14: re-emit a word-level indicator overlay as trailing `;;` (kept by
+      // default; `flatten` collapses it onto the head as `;` instead).
+      if (group.wordIndicators && groupStr) {
+        const { codes = [], stripSemantic } = group.wordIndicators;
+        groupStr += ';;' + (stripSemantic ? '!' : '') + codes.join(';');
       }
       // Prefix group-level options with [opts]| syntax
       const groupOptPrefix = serializeOptions(group.options);

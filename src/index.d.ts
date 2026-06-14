@@ -395,6 +395,12 @@ export interface BlissJSON {
   options?: Record<string, string>;
   groups: Array<{
     options?: Record<string, string>;
+    /**
+     * Word-level indicator overlay (the DSL `;;` form): stored on the word and
+     * resolved onto the head glyph at render. Present in default output (kept
+     * by default); absent when there is no word-level indicator.
+     */
+    wordIndicators?: { codes: string[]; stripSemantic: boolean };
     glyphs?: Array<{
       codeName?: string;
       options?: Record<string, string>;

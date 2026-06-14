@@ -60,6 +60,13 @@ describe('BlissParser head-marker matrix', () => {
   const markedIndexes = (parsed, groupIndex = 0) =>
     parsed.groups[groupIndex].glyphs.flatMap((g, i) => (g.isHeadGlyph === true ? [i] : []));
 
+  // Resolved per-glyph part codes (first group) after the R14 `;;` overlay is
+  // merged onto the contract-resolved head at render.
+  const resolvedGlyphParts = (dsl) =>
+    new BlissSVGBuilder(dsl).snapshot().children[0].children
+      .filter(c => c.isGlyph)
+      .map(g => g.children.map(p => p.codeName));
+
   describe('when ^ rides a single-character alias chain', () => {
     it('honors the marker through a two-level chain to a single character', () => {
       const r = BlissParser.parse('B101/_HMM_CHAIN2^');
@@ -191,23 +198,23 @@ describe('BlissParser head-marker matrix', () => {
 
   describe('when word-level indicators attach via the resolved head', () => {
     it('attaches ;; indicators to the designated character of a standalone alias', () => {
-      const r = BlissParser.parse('_HMM_CDH;;B86');
+      const glyphs = resolvedGlyphParts('_HMM_CDH;;B86');
 
-      expect(r.groups[0].glyphs[1].parts.map(p => p.codeName)).toEqual(['B208', 'B86']);
-      expect(r.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B313']);
+      expect(glyphs[1]).toEqual(['B208', 'B86']);
+      expect(glyphs[0]).toEqual(['B313']);
     });
 
     it('attaches ;; indicators to the redirect target behind an exclusion', () => {
-      const r = BlissParser.parse('B486/_HMM_CDH;;B86');
+      const glyphs = resolvedGlyphParts('B486/_HMM_CDH;;B86');
 
-      expect(r.groups[0].glyphs[2].parts.map(p => p.codeName)).toEqual(['B208', 'B86']);
+      expect(glyphs[2]).toEqual(['B208', 'B86']);
     });
 
     it('attaches ;; indicators to the scan stop when the designation is dormant', () => {
-      const r = BlissParser.parse('B291/_HMM_CDH;;B86');
+      const glyphs = resolvedGlyphParts('B291/_HMM_CDH;;B86');
 
-      expect(r.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'B86']);
-      expect(r.groups[0].glyphs[2].parts.map(p => p.codeName)).toEqual(['B208']);
+      expect(glyphs[0]).toEqual(['B291', 'B86']);
+      expect(glyphs[2]).toEqual(['B208']);
     });
 
     it('attaches ; indicators to the designated character of an alias invocation', () => {

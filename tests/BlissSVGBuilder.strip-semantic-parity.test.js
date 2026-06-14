@@ -2,28 +2,36 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
- * Pins three-way parity of the strip-semantic indicator-attachment contract:
- * the char-level DSL `;!`, the word-level DSL `;;!`, and the API call
- * `handle.applyIndicators(IND, { stripSemantic: true })` produce byte-identical
- * `toString` output, byte-identical `svgCode` output, and empty `warnings`
- * arrays for every input where all three surfaces are applicable.
+ * Pins the strip-semantic indicator-attachment contract across surfaces: the
+ * char-level DSL `;!`, the word-level DSL `;;!`, and the API call
+ * `handle.applyIndicators(IND, { stripSemantic: true })`.
+ *
+ * After R14 the word-level `;;!` is stored as a reversible overlay, so its
+ * serialization KEEPS the `;;!` form rather than decomposing. The behavioral
+ * contract is unchanged: all applicable surfaces render byte-identical
+ * `svgCode` and emit no warnings. The baking surfaces (char `;!`, glyph API)
+ * still serialize identically; the word-level overlay serializes to its kept
+ * `;;!` form. The flatten serialization parity (word-level `;;!` decomposing to
+ * match the baking surfaces) is covered with the `flatten` option in Task 2.
  *
  * Covers:
- * - Single-character bases (no baked indicator): all three surfaces produce
- *   identical output, parameterized over a simple base (B313) and a composite
+ * - Single-character bases (no baked indicator): byte-identical svgCode across
+ *   all three surfaces; char `;!` ≡ glyph-API toString; word `;;!` keeps its
+ *   overlay form. Parameterized over a simple base (B313) and a composite
  *   base (B431).
- * - Compound-indicator bases (B85, itself an indicator): char-level ≡
- *   word-level DSL parity only; the API is intentionally a no-op on bases
- *   that are themselves indicators (DSL `;` at part level is generic
- *   part-superimposition, not indicator-attachment).
+ * - Compound-indicator bases (B85, itself an indicator): char `;!` and word
+ *   `;;!` render identically; the word overlay adds onto the indicator base
+ *   (the base part is never dropped) and keeps its `;;!` serialization.
  * - Custom definitions with a baked semantic root: all three surfaces strip
- *   the baked B97 semantic root and the resulting toString matches the
- *   expected post-strip form.
- * - Multi-glyph words: word-level `;;!` ≡ API on the head glyph
- *   (`headGlyph().applyIndicators(...)`); char-level `;!` is excluded
- *   because it follows the last glyph (different target).
+ *   the baked B97 and render identically; the baking surfaces serialize to
+ *   `B291;B86`, the word overlay keeps `B291;B97;;!B86`.
+ * - Multi-glyph words: word-level `;;!` and the head-glyph API render
+ *   identically; char-level `;!` is excluded because it follows the last
+ *   glyph (different target).
  *
  * Does NOT cover:
+ * - The flatten serialization parity (word `;;!` collapsing to the baked
+ *   form), see Task 2 / the indicator round-trip tests.
  * - Parser grammar for `;` (part-superimposition) and `;;` (word-level
  *   indicator marker), see `BlissParser.double-semicolon.test.js` and
  *   `BlissParser.semantic-preservation.test.js`.
@@ -42,7 +50,7 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
     it.each([
       ['simple character (B313)', 'B313', 'B81'],
       ['composite character (B431)', 'B431', 'B81'],
-    ])('produces byte-identical output across char-level (;!), word-level (;;!), and API surfaces (%s)', (_label, base, newInd) => {
+    ])('renders byte-identically across char-level (;!), word-level (;;!), and API surfaces (%s)', (_label, base, newInd) => {
       const charLevel = new BlissSVGBuilder(`${base};!${newInd}`);
       const wordLevel = new BlissSVGBuilder(`${base};;!${newInd}`);
 
@@ -53,11 +61,13 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
       expect(wordLevel.warnings).toEqual([]);
       expect(apiBuilder.warnings).toEqual([]);
 
-      expect(charLevel.toString()).toBe(wordLevel.toString());
-      expect(charLevel.toString()).toBe(apiBuilder.toString());
-
+      // Render parity holds across all three surfaces.
       expect(charLevel.svgCode).toBe(wordLevel.svgCode);
       expect(charLevel.svgCode).toBe(apiBuilder.svgCode);
+
+      // The baking surfaces serialize identically; the word overlay keeps `;;!`.
+      expect(charLevel.toString()).toBe(apiBuilder.toString());
+      expect(wordLevel.toString()).toBe(`${base};;!${newInd}`);
     });
   });
 
@@ -66,20 +76,22 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
      * B85 is itself an indicator (isIndicator: true). The DSL `;` separator
      * at part level is generic part-superimposition, not indicator-attachment,
      * so `B85;B81` produces two parts overlaid at the same position (the
-     * same way `B999;B998` would. The applyIndicators API has narrower scope
-     * (it only operates on actual indicator-supporting bases) and is
-     * intentionally a no-op here. So we can only assert DSL ≡ DSL parity
-     * for this case; API parity does not apply.
+     * same way `B999;B998` would). The word-level overlay treats B85 as the
+     * base (never dropping it) and adds B81, so the two DSL forms render
+     * identically. The applyIndicators API has narrower scope (it no-ops on
+     * bases that are themselves indicators), so API parity does not apply.
      */
-    it('produces byte-identical output across char-level (;!) and word-level (;;!) DSL forms', () => {
+    it('renders byte-identically across char-level (;!) and word-level (;;!) DSL forms', () => {
       const charLevel = new BlissSVGBuilder('B85;!B81');
       const wordLevel = new BlissSVGBuilder('B85;;!B81');
 
       expect(charLevel.warnings).toEqual([]);
       expect(wordLevel.warnings).toEqual([]);
 
-      expect(charLevel.toString()).toBe(wordLevel.toString());
       expect(charLevel.svgCode).toBe(wordLevel.svgCode);
+      // The char form bakes (B85;B81); the word overlay keeps its `;;!` form.
+      expect(charLevel.toString()).toBe('B85;B81');
+      expect(wordLevel.toString()).toBe('B85;;!B81');
     });
   });
 
@@ -105,7 +117,7 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
       BlissSVGBuilder.removeDefinition('TEST_THING');
     });
 
-    it('produces byte-identical output across all three surfaces and strips the baked B97 semantic root', () => {
+    it('strips the baked B97 across all three surfaces, rendering identically', () => {
       const charLevel = new BlissSVGBuilder('TEST_THING;!B86');
       const wordLevel = new BlissSVGBuilder('TEST_THING;;!B86');
 
@@ -116,13 +128,14 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
       expect(wordLevel.warnings).toEqual([]);
       expect(apiBuilder.warnings).toEqual([]);
 
-      expect(charLevel.toString()).toBe(wordLevel.toString());
-      expect(charLevel.toString()).toBe(apiBuilder.toString());
-
       expect(charLevel.svgCode).toBe(wordLevel.svgCode);
       expect(charLevel.svgCode).toBe(apiBuilder.svgCode);
 
+      // Baking surfaces decompose to the stripped form; the word overlay keeps
+      // the authored `;;!` (the base retains B97 so the strip stays reversible).
       expect(charLevel.toString()).toBe('B291;B86');
+      expect(apiBuilder.toString()).toBe('B291;B86');
+      expect(wordLevel.toString()).toBe('B291;B97;;!B86');
     });
   });
 
@@ -130,7 +143,7 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
     // note: char-level `;!` follows the last glyph (different target), so the
     // char-level surface is excluded from this case; only word-level `;;!`
     // and the head-glyph API call target the head glyph.
-    it('produces byte-identical output between word-level (;;!) and headGlyph().applyIndicators({stripSemantic: true})', () => {
+    it('renders identically between word-level (;;!) and headGlyph().applyIndicators({stripSemantic: true})', () => {
       const wordLevel = new BlissSVGBuilder('B431/B1103;;!B81');
 
       const apiBuilder = new BlissSVGBuilder('B431/B1103');
@@ -139,8 +152,10 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
       expect(wordLevel.warnings).toEqual([]);
       expect(apiBuilder.warnings).toEqual([]);
 
-      expect(wordLevel.toString()).toBe(apiBuilder.toString());
       expect(wordLevel.svgCode).toBe(apiBuilder.svgCode);
+      // The API bakes onto the head; the word overlay keeps its `;;!` form.
+      expect(apiBuilder.toString()).toBe('B431;B81/B1103');
+      expect(wordLevel.toString()).toBe('B431/B1103;;!B81');
     });
   });
 });
