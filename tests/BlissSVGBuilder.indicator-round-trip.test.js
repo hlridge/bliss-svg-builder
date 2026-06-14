@@ -191,8 +191,9 @@ describe('BlissSVGBuilder indicator round-trip', () => {
     const wordCases = [
       'B313/B208;;B81',    // ;; routes to the fallback head (index 0)
       'B313/B208;;!B81',   // strip-semantic word-level (no semantic to strip)
-      'B313/B208;;',       // bare word-level marker decomposes away
+      'B313/B208;;',       // bare word-level marker, kept and re-emitted as ;;
       'B486/B313;;B81',    // ;; routes past the B486 exclusion
+      'B291/B291;;B86;B97', // multiple indicators in one overlay (separator pin)
       'B313^/B208;;B81',   // ^ marks the fallback head; ;; routes to it
       'B313/B208^;;B81',   // ^ marks a deviating head; export re-emits ^
     ];
@@ -209,6 +210,12 @@ describe('BlissSVGBuilder indicator round-trip', () => {
 
     it('keeps `;;` in default output rather than decomposing it to `;`', () => {
       expect(new BlissSVGBuilder('B313/B208;;B81').toString()).toBe('B313/B208;;B81');
+    });
+
+    it('re-emits a multi-code overlay with `;`-separated codes', () => {
+      // pins the codes.join(';') separator: a single-code overlay is blind to
+      // the separator, so the multi-code case is what kills a join-char mutant.
+      expect(new BlissSVGBuilder('B291/B291;;B86;B97').toString()).toBe('B291/B291;;B86;B97');
     });
 
     // N9: when the resolved head is a custom glyph baking a semantic root

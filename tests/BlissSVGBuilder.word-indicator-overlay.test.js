@@ -67,6 +67,18 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
     });
   });
 
+  describe('when ingesting a malformed object with an overlay but no glyphs', () => {
+    it('does not throw (the resolve site guards on a non-empty glyph list)', () => {
+      // The parser never emits a group with wordIndicators and empty glyphs,
+      // but the constructor accepts hand-built objects; the site-1 guard must
+      // skip the merge rather than index an empty glyph list.
+      expect(() => new BlissSVGBuilder({
+        groups: [{ glyphs: [], wordIndicators: { codes: ['B81'], stripSemantic: false } }],
+        options: {},
+      })).not.toThrow();
+    });
+  });
+
   describe('when addressing parts of a ;; head by key', () => {
     it('resolves a base part to a live handle', () => {
       const builder = new BlissSVGBuilder('B313/B1103;;B81');
