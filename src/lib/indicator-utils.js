@@ -98,3 +98,48 @@ export function resolveIndicatorCodes(existingIndicatorCodes, newCodes, { stripS
   }
   return semanticRoot ? [semanticRoot] : [];
 }
+
+/**
+ * Resolve a word-level indicator overlay onto a head glyph's parts at decode
+ * time. The single merge used by render (#rebuild) and, under flatten, by
+ * serialize, so the DSL `;;` path and the API word-level path cannot drift.
+ *
+ * Splits the head's parts into base parts and trailing indicator parts, runs
+ * resolveIndicatorCodes against the overlay (replace-all with semantic-root
+ * preservation), and returns a new array of [...baseParts, ...resolved] with
+ * each resolved indicator appended strictly after every base part and tagged
+ * `_indicatorOrigin: 'word'`. The input glyph is not mutated. A head whose
+ * parts hold a non-indicator after an indicator is returned unchanged.
+ *
+ * @param {{parts: Array}} headGlyph - the head glyph node (has .parts)
+ * @param {{codes: string[], stripSemantic?: boolean}} overlay
+ * @param {Object} definitions
+ * @param {(code: string) => Object} parse - parser used to build part nodes
+ * @returns {Array} the resolved parts array
+ */
+export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, parse) {
+  const parts = headGlyph?.parts ?? [];
+  const firstIndicatorIndex = parts.findIndex(p => p.isIndicator === true);
+  const baseParts = firstIndicatorIndex === -1 ? parts.slice() : parts.slice(0, firstIndicatorIndex);
+  const existingIndicatorParts = firstIndicatorIndex === -1 ? [] : parts.slice(firstIndicatorIndex);
+
+  // A non-indicator after the first indicator is not a clean base+indicator
+  // shape; leave the glyph untouched rather than guess where the boundary is.
+  if (!existingIndicatorParts.every(p => p.isIndicator === true)) return parts.slice();
+
+  const existingIndicatorCodes = existingIndicatorParts.map(p => p.codeName);
+  const finalCodes = resolveIndicatorCodes(
+    existingIndicatorCodes,
+    overlay?.codes ?? [],
+    { stripSemantic: overlay?.stripSemantic === true },
+    definitions
+  );
+
+  const indicatorParts = [];
+  for (const code of finalCodes) {
+    const node = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts?.[0];
+    if (node) indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
+  }
+
+  return [...baseParts, ...indicatorParts];
+}
