@@ -439,11 +439,15 @@ describe('BlissSVGBuilder stroke and color', () => {
     });
   });
 
-  describe('when dot-extra-width is wired through to DOT and COMMA rendering', () => {
-    // dot-extra-width is currently parsed and stored but not used at the option
-    // level; DOT/COMMA elements read the hardcoded extraDotWidth from their
-    // element definitions. Activating this contract requires wiring the builder
-    // option through to override DOT/COMMA rendering while leaving SDOT unaffected.
-    it.todo('wires dot-extra-width through to DOT/COMMA rendering');
+  describe('when dot-extra-width controls dot-family rendering', () => {
+    // CORRECTED 2026-06-13 (burndown D5): dot-extra-width is ALREADY wired.
+    // #getInheritedOption('dotExtraWidth') overrides the baked extraDotWidth on
+    // DOT, COMMA, AND SDOT (the SDOT case contrary to the original "leave SDOT
+    // unaffected" intent; at =1 SDOT and DOT become the same size). The
+    // remaining work is the dot sizing system (per-type width control, SDOT
+    // default = half DOT, indicators -> SDOT); design + acceptance criteria in
+    // .claude/backlog/dot-sizing-system.md. The current uniform wiring ships
+    // as-is until that lands.
+    it.todo('applies independent DOT and SDOT width control');
   });
 });

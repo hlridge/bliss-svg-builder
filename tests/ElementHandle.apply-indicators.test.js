@@ -231,6 +231,13 @@ describe('ElementHandle apply indicators', () => {
       // B303 (non-indicator) after B86 (indicator) violates the valid pattern rule
       expect(partCodes(b)).toEqual(['B291', 'B86', 'B303']);
     });
+
+    // Deferred (burndown D4, folds into R14): these silent no-ops should surface
+    // a warning so a caller knows the call did nothing. Needs a mutation-time
+    // warning channel (the mutation API has none today; #warnings resets on each
+    // rebuild). Spec: .claude/backlog/applyindicators-warn-on-noop.md; gated as an
+    // R14 acceptance criterion (findings doc N8).
+    it.todo('warns when applyIndicators is called out of scope instead of silently no-opping');
   });
 
   describe('when applyIndicators is chained', () => {

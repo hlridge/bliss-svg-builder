@@ -330,8 +330,12 @@ describe('BlissParser head-glyph exclusions', () => {
     });
 
     it('falls back to position 0 when B233 is the entire word', () => {
-      // Edge case: B233 is purely structural and cannot really receive
-      // an indicator, but the parser does not crash and returns position 0.
+      // Provisional behavior, NOT a settled contract: a lone absolute-never-head
+      // glyph still receives the indicator at index 0 (something must be the
+      // head). The principled contract for indicators on an atypical base (and
+      // the relocation-ordering divergence behind it) is under review in
+      // .claude/backlog/indicator-on-atypical-base.md (burndown T7). Do not treat
+      // this 0 as decided.
       expect(getHeadGlyphIndex('B233;;B86')).toBe(0);
     });
   });
