@@ -263,6 +263,49 @@ describe('BlissParser ;; syntax', () => {
     });
   });
 
+  describe('when ;; is malformed (a glyph follows the indicators, or ;; repeats)', () => {
+    // A word-level indicator list must be the trailing part of a word. When a
+    // `/`-separated glyph follows the indicators, or a second `;;` appears, the
+    // parser warns MALFORMED_WORD_INDICATOR and falls back to a character-level
+    // (`;`) reading so nothing is dropped and no null part leaks into the tree.
+    const warningCodes = (dsl) => new BlissSVGBuilder(dsl).warnings.map((w) => w.code);
+    const allParts = (dsl) =>
+      BlissParser.parse(dsl).groups.flatMap((g) => g.glyphs ?? []).flatMap((g) => g.parts ?? []);
+    const allCodeNames = (dsl) => allParts(dsl).map((p) => p.codeName);
+
+    it('warns and drops nothing when a glyph follows the indicators (B313;;B81/B431)', () => {
+      expect(warningCodes('B313;;B81/B431')).toContain('MALFORMED_WORD_INDICATOR');
+      expect(allCodeNames('B313;;B81/B431')).toEqual(expect.arrayContaining(['B313', 'B81', 'B431']));
+      expect(allParts('B313;;B81/B431').every((p) => p != null)).toBe(true);
+    });
+
+    it('warns and produces no null part for a repeated ;; (B313;;B84;;B97)', () => {
+      expect(warningCodes('B313;;B84;;B97')).toContain('MALFORMED_WORD_INDICATOR');
+      expect(allCodeNames('B313;;B84;;B97')).toEqual(expect.arrayContaining(['B313', 'B84', 'B97']));
+      expect(allParts('B313;;B84;;B97').every((p) => p != null)).toBe(true);
+    });
+
+    it('warns and does not leak ;; for non-trailing + repeated (B313;;B81/B431;;B86)', () => {
+      expect(warningCodes('B313;;B81/B431;;B86')).toContain('MALFORMED_WORD_INDICATOR');
+      expect(allCodeNames('B313;;B81/B431;;B86')).toEqual(expect.arrayContaining(['B313', 'B81', 'B431', 'B86']));
+      expect(allParts('B313;;B81/B431;;B86').every((p) => p != null)).toBe(true);
+    });
+
+    it('does not warn for a well-formed trailing ;; (B313/B1103;;B81)', () => {
+      expect(warningCodes('B313/B1103;;B81')).not.toContain('MALFORMED_WORD_INDICATOR');
+    });
+
+    it('parses a malformed ;; identically to its character-level (;) collapse', () => {
+      // The fallback must equal a fresh parse of the collapsed string, including
+      // head crowning (B486 is excluded, so the collapse crowns index 1), so the
+      // malformed reading is a faithful character-level one.
+      const malformed = BlissParser.parse('B486/B291;;B81/B431');
+      const collapsed = BlissParser.parse('B486/B291;B81/B431');
+      delete malformed._parseWarnings;
+      expect(malformed).toEqual(collapsed);
+    });
+  });
+
   describe('scope fence: single ; on a pre-defined word still bakes', () => {
     it('bakes the indicator onto the head with no overlay (TestWord1;B86)', () => {
       // The single-; WORD;INDICATORS path is out of R14 scope and unchanged.

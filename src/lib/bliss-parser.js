@@ -520,6 +520,27 @@ export class BlissParser {
         const wordLevelMatch = str.match(/^(.+);;(.*)$/);
         if (wordLevelMatch) {
           const [_, baseCode, rawIndicators] = wordLevelMatch;
+
+          // A word-level indicator list must be the trailing part of the word:
+          // exactly one `;;`, and no `/`-separated glyph after the indicators
+          // (greedy match means rawIndicators holds everything after the last
+          // `;;`). Otherwise warn and fall back to a character-level (`;`)
+          // reading so no glyph is dropped and no stray `;;` leaks into the
+          // glyph expansion as a null part (N11/N11c).
+          // str is inside the wordLevelMatch guard, so it always contains `;;`
+          // (match is non-null).
+          const isMalformed = str.match(/;;/g).length > 1 || rawIndicators.includes('/');
+          if (isMalformed) {
+            parseWarnings.push({
+              code: 'MALFORMED_WORD_INDICATOR',
+              message: `Malformed word-level indicator in "${str}": ;; indicators must be the trailing part of a word. Reading ;; as character-level ;.`,
+              source: str,
+            });
+            const fallbackParts = str.replace(/;;/g, ';').split('/').flatMap(strPart => expand(strPart, definitions));
+            crownWordChunks(fallbackParts, wordCode);
+            return fallbackParts;
+          }
+
           const stripSemantic = rawIndicators.startsWith('!');
           const indicators = stripSemantic ? rawIndicators.slice(1) : rawIndicators;
 
