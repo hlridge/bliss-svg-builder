@@ -17,6 +17,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   the semantic; glyph identity restored when the cleared part list
  *   matches a known bare-glyph code; mutation-built output equals the
  *   DSL-built bare glyph byte-for-byte.
+ * - Tripwire for a known pre-existing serialization bug: clearing an
+ *   indicator from a relocated built-in base drops its :x,y from toString
+ *   (render is unaffected), see
+ *   `.claude/backlog/relocation-offset-dropped-on-serialization.md`.
  *
  * Does NOT cover:
  * - applyIndicators on its own surface, see
@@ -83,6 +87,25 @@ describe('ElementHandle clear indicators', () => {
       const mut = new BlissSVGBuilder('B291;B86');
       mut.group(0).glyph(0).clearIndicators({ stripSemantic: true });
       expect(mut.svgCode).toBe(dsl.svgCode);
+    });
+  });
+
+  describe('when the cleared glyph has a relocated base', () => {
+    // Known pre-existing serialization bug (NOT a clearIndicators contract):
+    // clearing the indicator reduces the glyph to a single base part, which
+    // re-stamps its built-in identity (codeName='B291'); serializeGlyph then
+    // emits the bare codeName and never consults the part's x/y, so toString
+    // silently drops the :2,3 offset. The offset survives in the raw part and
+    // still drives the render, so the loss is toString/round-trip only.
+    // Surfaced by the R14 Task 4 review; gated here so the future fix is visible.
+    // see .claude/backlog/relocation-offset-dropped-on-serialization.md
+    it('keeps the rendered offset but drops it from toString (round-trip lossy)', () => {
+      const b = new BlissSVGBuilder('B291:2,3;B86/B303');
+      b.group(0).glyph(0).clearIndicators();
+      const renderedBare = new BlissSVGBuilder('B291:2,3/B303');
+      expect(b.svgCode).toBe(renderedBare.svgCode);
+      expect(b.toString()).toBe('B291/B303'); // BUG: offset lost; should be B291:2,3/B303
+      expect(b.toJSON().groups[0].glyphs[0].parts[0]).toMatchObject({ x: 2, y: 3 });
     });
   });
 });
