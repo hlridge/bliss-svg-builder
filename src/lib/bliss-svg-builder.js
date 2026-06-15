@@ -1191,12 +1191,13 @@ class BlissSVGBuilder {
    *
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
+   * @param {boolean} [options.flattenIndicators=false] - Collapse word-level (`;;`) indicators onto the head as character-level `;`
    * @returns {string}
    */
   toString(options = {}) {
     // toString always needs nested parts so serializeParts can decompose
     // custom codes. The string output itself stays flat (;-delimited).
-    const obj = this.toJSON({ preserve: options.preserve, deep: true });
+    const obj = this.toJSON({ preserve: options.preserve, deep: true, flattenIndicators: options.flattenIndicators });
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
 
@@ -1391,6 +1392,7 @@ class BlissSVGBuilder {
    *
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
+   * @param {boolean} [options.flattenIndicators=false] - Bake word-level (`;;`) indicators onto the head and omit the wordIndicators field
    * @returns {Object} Plain object with groups/glyphs/options structure
    */
   toJSON(options = {}) {
@@ -1407,6 +1409,9 @@ class BlissSVGBuilder {
       const stripParts = (parts) => {
         for (const part of parts) {
           delete part.key;
+          // Internal origin tag from the word-indicator merge (flatten path):
+          // not composition data, never surfaced in serialized output.
+          delete part._indicatorOrigin;
           if (part.options) delete part.options.key;
           // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
           if (part.codeName?.startsWith('XTXT_')) {
@@ -1423,6 +1428,28 @@ class BlissSVGBuilder {
       for (const group of obj.groups) {
         delete group.key;
         if (group.options) delete group.options.key;
+
+        // R14: flattenIndicators bakes the word-level overlay onto the head as
+        // character-level parts and drops the field, reproducing the pre-overlay
+        // (primitive) serialization. Default keeps the overlay (resolved at
+        // render, re-emitted as `;;`).
+        if (options.flattenIndicators && group.wordIndicators && group.glyphs?.length) {
+          const headIndex = Math.max(group.glyphs.findIndex(g => g.isHeadGlyph === true), 0);
+          const head = group.glyphs[headIndex];
+          head.parts = mergeWordIndicatorsOntoHead(
+            head, group.wordIndicators, blissElementDefinitions, (code) => BlissParser.parse(code)
+          );
+          // A built-in head with baked indicator parts is no longer a bare code:
+          // clear its single-code identity so serialization decomposes the parts
+          // (serializeGlyph emits the bare codeName for built-ins otherwise).
+          // Custom glyphs keep their identity for the name/delta serialization.
+          if (head.glyphCode && builtInCodes.has(head.glyphCode) && head.parts.some(p => p.isIndicator)) {
+            delete head.glyphCode;
+            delete head.isBlissGlyph;
+          }
+          delete group.wordIndicators;
+        }
+
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
             delete glyph.key;

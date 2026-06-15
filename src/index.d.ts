@@ -556,14 +556,23 @@ export declare class BlissSVGBuilder {
   /**
    * Returns a portable DSL string. Custom codes are decomposed to built-in
    * codes by default; pass `{ preserve: true }` to keep custom names.
+   *
+   * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
+   * glyph as character-level `;`, reproducing the pre-overlay output. It is the
+   * same concept as `applyIndicators(code, { flatten })`; the name is qualified
+   * here only because `toString`/`toJSON` lack the "indicator" context the
+   * method name provides.
    */
-  toString(options?: { preserve?: boolean }): string;
+  toString(options?: { preserve?: boolean; flattenIndicators?: boolean }): string;
 
   /**
    * Returns a normalized parsed structure (plain object). Custom glyph codes
    * are resolved to built-in codes by default; pass `{ preserve: true }` to keep them.
+   *
+   * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
+   * omits the `wordIndicators` field (see `toString`).
    */
-  toJSON(options?: { preserve?: boolean; deep?: boolean }): BlissJSON;
+  toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean }): BlissJSON;
 
   // --- Static: definition management ---
 
