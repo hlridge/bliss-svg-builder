@@ -283,11 +283,38 @@ export declare class ElementHandle {
 
   // --- Mutation: indicators ---
 
-  /** Replaces all indicators on this glyph with the given indicator codes. Preserves semantic indicators by default. Only valid on glyph handles. */
-  applyIndicators(code: string, opts?: { stripSemantic?: boolean }): this;
+  /**
+   * Replaces all indicators on this element with the given indicator codes,
+   * preserving an existing semantic indicator unless `{ stripSemantic: true }`.
+   *
+   * Polymorphic by handle level:
+   * - **Glyph handle** — character-level: bakes the indicators into the
+   *   glyph's parts. `flatten` has no effect (glyph indicators are already flat).
+   * - **Group handle** — word-level: sets the reversible `wordIndicators`
+   *   overlay (the DSL `;;` channel), leaving the base glyphs intact so a later
+   *   `clearIndicators()` restores them. `{ flatten: true }` opts out of the
+   *   overlay and bakes onto the head glyph as character-level parts instead
+   *   (the pre-overlay shape; mirrors the deprecated `applyHeadIndicators`).
+   *
+   * The per-surface `flatten` asymmetry is deliberate: it applies only to the
+   * group/word-level overlay, the only surface with a portable `;;` form to
+   * collapse.
+   */
+  applyIndicators(code: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
-  /** Removes all grammatical indicators from this glyph. Preserves semantic indicators by default. Only valid on glyph handles. */
-  clearIndicators(opts?: { stripSemantic?: boolean }): this;
+  /**
+   * Removes indicators, preserving an existing semantic indicator unless
+   * `{ stripSemantic: true }`.
+   *
+   * Polymorphic by handle level (see `applyIndicators`):
+   * - **Glyph handle** — removes the glyph's grammatical indicator parts.
+   * - **Group handle** — removes the word-level `wordIndicators` overlay,
+   *   restoring the base. `{ stripSemantic: true }` keeps a reversible
+   *   empty-codes strip overlay (suppresses the base semantic at render but
+   *   keeps it recoverable). `{ flatten: true }` bakes the cleared state onto
+   *   the head glyph instead of leaving an overlay.
+   */
+  clearIndicators(opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
   /** Applies indicators to the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
   applyHeadIndicators(code: string, opts?: { stripSemantic?: boolean }): this;

@@ -24,8 +24,7 @@ import { BlissSVGBuilder } from '../src/index';
  * - Invalid handle or input: missing/empty codes throw; non-indicator-only
  *   inputs no-op (semantic preserved); apply on an all-indicator glyph or
  *   on a glyph with indicator parts preceding base parts is a no-op; apply
- *   on a non-glyph handle (group, part) is a no-op that still returns
- *   the handle.
+ *   on a part handle is a no-op that still returns the handle.
  * - Chaining: applyIndicators followed by applyIndicators replaces;
  *   clearIndicators({stripSemantic:true}).applyIndicators(...) yields a
  *   single new indicator over the bare base.
@@ -38,6 +37,9 @@ import { BlissSVGBuilder } from '../src/index';
  * Does NOT cover:
  * - clearIndicators on its own surface, see
  *   `ElementHandle.clear-indicators.test.js`.
+ * - The word-level overlay API: applyIndicators / clearIndicators on a GROUP
+ *   handle now set `group.wordIndicators` rather than no-opping, see
+ *   `ElementHandle.word-indicators.test.js`.
  * - isIndicator detection at part level, see
  *   `ElementHandle.indicator-api.test.js`.
  * - Indicator-utility primitives (getBareCode, getSemanticRoot,
@@ -176,16 +178,6 @@ describe('ElementHandle apply indicators', () => {
   });
 
   describe('when applyIndicators is called on an invalid handle or input', () => {
-    it('is a no-op on a group-level handle and returns the handle', () => {
-      const b = new BlissSVGBuilder('B291');
-      const group = b.group(0);
-      const result = group.applyIndicators('B86');
-      // Should return this without error
-      expect(result.level).toBe(1);
-      // Glyph should be unchanged
-      expect(partCodes(b)).toEqual(['B291']);
-    });
-
     it('is a no-op on a part-level handle and returns the handle', () => {
       const b = new BlissSVGBuilder('B291;B86');
       const part = b.group(0).glyph(0).part(0);

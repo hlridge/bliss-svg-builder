@@ -690,11 +690,15 @@ export class ElementHandle {
     if (code === undefined || code === null || code === '') {
       throw new Error('applyIndicators() requires a code argument. Use clearIndicators() to remove indicators.');
     }
+    // Group handle (level 1): word-level overlay channel. Glyph handle
+    // (level 2): character-level parts. Other levels: no-op via the level-2 path.
+    if (this.#level === 1) return this.#applyOrClearWordIndicators(code, opts);
     return this.#applyOrClearIndicators(code, opts);
   }
 
   clearIndicators(opts) {
     this.#assertReachable();
+    if (this.#level === 1) return this.#applyOrClearWordIndicators(null, opts);
     return this.#applyOrClearIndicators(null, opts);
   }
 
@@ -802,6 +806,50 @@ export class ElementHandle {
       delete glyph.codeName;
       delete glyph.glyphCode;
     }
+  }
+
+  // Word-level indicator channel for a group handle. Sets/clears the reversible
+  // `group.wordIndicators` overlay (the DSL `;;` form), leaving the base glyphs
+  // intact so a later clear restores them (N12). `flatten` opts out of the
+  // overlay and bakes onto the head as character-level parts instead (the
+  // pre-overlay shape; the deprecated applyHeadIndicators behavior). `code` is
+  // null for clear. Mirrors the parser overlay store so the API and the `;;`
+  // DSL marker produce byte-identical state (DSL/API parity).
+  #applyOrClearWordIndicators(code, opts) {
+    const group = this.#nodeRef;
+    if (!group?.glyphs?.length) return this;
+    const stripSemantic = opts?.stripSemantic === true;
+
+    if (opts?.flatten === true) {
+      // Bake onto the head; drop any overlay so the indicator is not applied
+      // twice (once baked, once re-merged at render).
+      const head = this.headGlyph();
+      const hadOverlay = group.wordIndicators !== undefined;
+      delete group.wordIndicators;
+      if (head) {
+        if (code === null) head.clearIndicators({ stripSemantic });
+        else head.applyIndicators(code, { stripSemantic });
+      } else if (hadOverlay) {
+        this.#ctx.rebuild();
+      }
+      this.#syncGeneration();
+      return this;
+    }
+
+    if (code === null) {
+      // Clear: removing the overlay fully restores the base. With stripSemantic,
+      // keep an empty-codes strip overlay so the base semantic is suppressed at
+      // render yet stays recoverable in the base parts (reversible, == `;;!`).
+      if (stripSemantic) group.wordIndicators = { codes: [], stripSemantic: true };
+      else delete group.wordIndicators;
+    } else {
+      const codes = code.split(';').map(s => s.trim()).filter(Boolean);
+      group.wordIndicators = { codes, stripSemantic };
+    }
+
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
   }
 
   // --- Mutation: word structure ---
