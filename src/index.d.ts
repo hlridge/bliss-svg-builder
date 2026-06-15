@@ -316,10 +316,25 @@ export declare class ElementHandle {
    */
   clearIndicators(opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
-  /** Applies indicators to the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
+  /**
+   * Applies indicators to the head glyph of this group. Preserves semantic
+   * indicators by default. Only valid on group handles.
+   *
+   * @deprecated Alias for `applyIndicators(code, { ...opts, flatten: true })`.
+   * Bakes onto the head glyph and drops any `;;` word-level overlay. For the
+   * reversible word-level overlay, use `applyIndicators(code)` without `flatten`.
+   */
   applyHeadIndicators(code: string, opts?: { stripSemantic?: boolean }): this;
 
-  /** Removes grammatical indicators from the head glyph of this group. Preserves semantic indicators by default. Only valid on group handles. */
+  /**
+   * Removes grammatical indicators from the head glyph of this group. Preserves
+   * semantic indicators by default. Only valid on group handles.
+   *
+   * @deprecated Alias for `clearIndicators({ ...opts, flatten: true })`. Clears
+   * both the head glyph's baked indicator parts and any `;;` word-level overlay.
+   * For the reversible word-level overlay only, use `clearIndicators()` without
+   * `flatten`.
+   */
   clearHeadIndicators(opts?: { stripSemantic?: boolean }): this;
 
   // --- Mutation: space/word structure ---

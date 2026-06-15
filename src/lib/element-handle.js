@@ -702,24 +702,30 @@ export class ElementHandle {
     return this.#applyOrClearIndicators(null, opts);
   }
 
+  /**
+   * @deprecated Use `applyIndicators(code, { flatten: true })`. This is now an
+   * alias for the flatten variant: it bakes onto the head glyph AND drops any
+   * `;;` word-level overlay (so a `;;`-authored word no longer keeps a stale
+   * overlay beside the baked indicator). For the reversible word-level overlay,
+   * use `applyIndicators(code)` without `flatten`.
+   */
   applyHeadIndicators(code, opts) {
     this.#assertReachable();
     if (this.#level !== 1) return this;
-    const head = this.headGlyph();
-    if (!head) return this;
-    head.applyIndicators(code, opts);
-    this.#syncGeneration();
-    return this;
+    return this.applyIndicators(code, { ...opts, flatten: true });
   }
 
+  /**
+   * @deprecated Use `clearIndicators({ flatten: true })`. This is now an alias
+   * for the flatten variant: it clears both the head glyph's baked indicator
+   * parts AND any `;;` word-level overlay (so a `;;`-authored word is actually
+   * cleared rather than silently no-opped). For the reversible word-level
+   * overlay only, use `clearIndicators()` without `flatten`.
+   */
   clearHeadIndicators(opts) {
     this.#assertReachable();
     if (this.#level !== 1) return this;
-    const head = this.headGlyph();
-    if (!head) return this;
-    head.clearIndicators(opts);
-    this.#syncGeneration();
-    return this;
+    return this.clearIndicators({ ...opts, flatten: true });
   }
 
   #applyOrClearIndicators(code, opts) {
