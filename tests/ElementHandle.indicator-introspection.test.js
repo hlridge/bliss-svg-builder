@@ -107,5 +107,59 @@ describe('ElementHandle indicator introspection', () => {
       expect(builder.part(1).indicatorLevel).toBeNull(); // B1103 base
       expect(builder.part(2)).toBeNull(); // only two raw parts; no word part
     });
+
+    it('classifies every part of a multi-indicator overlay on the snapshot', () => {
+      // helper "last child" alone would miss the first overlay part; classify all.
+      const head = new BlissSVGBuilder('B313/B1103;;B86;B97')
+        .snapshot().children[0].children.filter(c => c.isGlyph)[0];
+      const overlay = head.children.filter(c => c.indicatorLevel === 'word');
+      expect(overlay.map(c => c.codeName)).toEqual(['B86', 'B97']);
+      expect(overlay.map(c => c.indicatorKind)).toEqual(['grammatical', 'semantic']);
+    });
+
+    it('leaves the base part unclassified on the snapshot', () => {
+      // pins the snapshot classifier directly (the handle reads the raw node,
+      // so a handle test cannot exercise the snapshot's non-indicator branch).
+      const head = new BlissSVGBuilder('B313/B1103;;B86')
+        .snapshot().children[0].children.filter(c => c.isGlyph)[0];
+      const base = head.children[0];
+      expect(base.codeName).toBe('B313');
+      expect(base.isIndicator).toBe(false);
+      expect(base.indicatorLevel).toBeNull();
+      expect(base.indicatorKind).toBeNull();
+    });
+  });
+
+  describe('when the head carries both a character indicator and a word overlay', () => {
+    it('reports the handle by its own raw node, never the reordered overlay', () => {
+      // regression: the head 'B313;B97;;B81' resolves to [B313, B81(word),
+      // B97(word)] (semantic root B97 preserved + reordered), but the raw
+      // handle part(1) IS B97 and must read its own classification, not the
+      // positionally-mapped snapshot part B81. Reading the raw node honors OQ1
+      // (never 'word' on a handle) and keeps identity and introspection aligned.
+      const part = new BlissSVGBuilder('B313;B97;;B81').part(1);
+      expect(part.codeName).toBe('B97');
+      expect(part.indicatorLevel).toBe('character');
+      expect(part.indicatorKind).toBe('semantic');
+    });
+  });
+
+  describe('when the handle is a nested sub-part', () => {
+    it('returns null without throwing for a non-indicator sub-part', () => {
+      // regression: part().part() yields a level-3 nested handle the snapshot
+      // index cannot resolve; the getters must read the raw node, not throw.
+      const sub = new BlissSVGBuilder('B303;B86').part(1).part(0);
+      expect(sub.codeName).toBe('AA2S');
+      expect(sub.isIndicator).toBe(false);
+      expect(sub.indicatorLevel).toBeNull();
+      expect(sub.indicatorKind).toBeNull();
+    });
+
+    it('classifies an indicator sub-part of a composite indicator', () => {
+      const sub = new BlissSVGBuilder('B303;B84').part(1).part(0);
+      expect(sub.codeName).toBe('B86');
+      expect(sub.indicatorLevel).toBe('character');
+      expect(sub.indicatorKind).toBe('grammatical');
+    });
   });
 });

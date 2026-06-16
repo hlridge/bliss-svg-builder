@@ -100,6 +100,23 @@ export function resolveIndicatorCodes(existingIndicatorCodes, newCodes, { stripS
 }
 
 /**
+ * Classify an indicator code's kind for introspection: 'semantic' when its
+ * definition carries a semanticIndicator flag (e.g. THING), 'grammatical'
+ * otherwise, or null when the definition cannot be resolved. The caller gates
+ * on the node's `isIndicator` first; this only reads the definition, so the
+ * handle (raw node) and the snapshot classify identically (DSL/API parity).
+ *
+ * @param {string|null} code - the indicator's bare codeName
+ * @param {Object} definitions
+ * @returns {'semantic'|'grammatical'|null}
+ */
+export function classifyIndicatorKind(code, definitions) {
+  const definition = definitions[code];
+  if (!definition) return null;
+  return definition.semanticIndicator ? 'semantic' : 'grammatical';
+}
+
+/**
  * Resolve a word-level indicator overlay onto a head glyph's parts at decode
  * time. The single merge used by render (#rebuild) and, under flatten, by
  * serialize, so the DSL `;;` path and the API word-level path cannot drift.

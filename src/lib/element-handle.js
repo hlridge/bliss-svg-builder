@@ -5,8 +5,8 @@
  */
 
 import { camelToKebab } from "./bliss-constants.js";
-import { builtInCodes } from "./bliss-element-definitions.js";
-import { resolveIndicatorCodes } from "./indicator-utils.js";
+import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
+import { resolveIndicatorCodes, classifyIndicatorKind } from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -156,27 +156,33 @@ export class ElementHandle {
   }
 
   /**
-   * Indicator origin level for a part handle: 'character' for a single-`;`
-   * indicator part (lives in the raw tree) or null for a non-indicator.
-   * A word-level overlay indicator (`;;`) has no raw node, so no part handle
-   * can reference one (OQ1) — it is introspected on `snapshot()` instead,
-   * where it reads as 'word'. Null on non-part handles.
+   * Indicator origin level for a part handle: 'character' for an indicator
+   * part, or null for a non-indicator or non-part handle. Read off the raw
+   * node (like isIndicator), NOT via the snapshot: a handle references a raw
+   * node, and a word-level overlay (`;;`) has no raw node (OQ1), so a handle
+   * can only ever surface 'character' here — 'word' is introspected on
+   * `snapshot()`. Reading the node also avoids the snapshot's positional
+   * lookup, which an overlay-merged head reorders and which cannot resolve a
+   * nested sub-part (so this never throws and always describes THIS node).
    * @returns {'character'|'word'|null}
    */
   get indicatorLevel() {
-    if (this.#level !== 3) return null;
-    return this.#findSnapshot().indicatorLevel ?? null;
+    this.#assertReachable();
+    if (this.#level !== 3 || this.#nodeRef?.isIndicator !== true) return null;
+    return 'character';
   }
 
   /**
    * Indicator kind for a part handle: 'semantic' (the definition carries a
-   * semanticIndicator) or 'grammatical', null for a non-indicator part or a
-   * part whose definition cannot be resolved. Null on non-part handles.
+   * semanticIndicator) or 'grammatical', null for a non-indicator part, a
+   * non-part handle, or a part whose definition cannot be resolved. Read off
+   * the raw node via the shared classifier (same logic as the snapshot).
    * @returns {'semantic'|'grammatical'|null}
    */
   get indicatorKind() {
-    if (this.#level !== 3) return null;
-    return this.#findSnapshot().indicatorKind ?? null;
+    this.#assertReachable();
+    if (this.#level !== 3 || this.#nodeRef?.isIndicator !== true) return null;
+    return classifyIndicatorKind(this.#nodeRef.codeName, blissElementDefinitions);
   }
 
   // --- Dimensions (read-only, from snapshot) ---

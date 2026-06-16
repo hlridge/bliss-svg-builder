@@ -128,7 +128,9 @@ export interface ElementSnapshot {
    * `'word'`). `null` for a non-indicator, a non-part level, or an indicator
    * whose definition cannot be resolved. The `'word'` value appears only on
    * the resolved snapshot: a word overlay has no raw node, so a part handle
-   * can never reach one.
+   * can never reach one. Like `isIndicator`, a composite indicator's internal
+   * sub-parts also classify (as `'character'`), so an enumeration that
+   * recurses `children` should de-duplicate by depth.
    */
   readonly indicatorLevel: 'character' | 'word' | null;
   /**

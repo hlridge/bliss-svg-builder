@@ -7,6 +7,7 @@
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { INTERNAL_OPTIONS, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
+import { classifyIndicatorKind } from "./indicator-utils.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -868,21 +869,22 @@ export class BlissElement {
    * `indicatorLevel` separates a word-level overlay indicator (tagged
    * `_indicatorOrigin: 'word'` when merged onto the head at decode) from a
    * character-level one; `indicatorKind` reads the definition's
-   * `semanticIndicator` flag. Both null for a non-indicator part and for an
-   * indicator whose definition cannot be resolved (never throws): the `code`
-   * gate routes a non-indicator through the same `!definition` return, and
-   * the definition is otherwise always present for a genuine indicator part
-   * (the parser only sets `isIndicator` from a definition, and built-in codes
-   * cannot be removed).
+   * `semanticIndicator` flag via the shared `classifyIndicatorKind` (so the
+   * snapshot and the handle classify identically). Both null for a
+   * non-indicator and for an indicator whose definition cannot be resolved
+   * (never throws): the `code` gate maps a non-indicator to null, and
+   * `classifyIndicatorKind(null)` is null, so both fall through one return.
+   * A composite indicator's internal sub-parts (level >= 3, `isIndicator`
+   * inherited) also classify here, mirroring the `isIndicator` field.
    * @returns {{ indicatorLevel: ('word'|'character'|null), indicatorKind: ('semantic'|'grammatical'|null) }}
    */
   #classifyIndicator() {
     const code = this.isIndicator ? this.#blissObj.codeName : null;
-    const definition = blissElementDefinitions[code];
-    if (!definition) return { indicatorLevel: null, indicatorKind: null };
+    const indicatorKind = classifyIndicatorKind(code, blissElementDefinitions);
+    if (indicatorKind === null) return { indicatorLevel: null, indicatorKind: null };
     return {
       indicatorLevel: this.#blissObj._indicatorOrigin === 'word' ? 'word' : 'character',
-      indicatorKind: definition.semanticIndicator ? 'semantic' : 'grammatical',
+      indicatorKind,
     };
   }
 
