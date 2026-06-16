@@ -30,6 +30,10 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Explicit y coordinate on a plural indicator: across Line, Enclosure,
  *   and God-extended bases; explicit y matching the default; explicit
  *   y combined with explicit x.
+ * - Order-independent base anchor: a multi-part base renders its
+ *   indicator identically under base-part reordering (uses the default
+ *   anchor, no single owner); a single base part still uses its own
+ *   anchorOffset.
  *
  * Does NOT cover:
  * - Multi-indicator stacking math, see
@@ -96,6 +100,10 @@ describe('BlissElement indicator positioning', () => {
   // negative x values to zero, masking the pre-normalization offsets these
   // tests pin.
   const indicatorOf = (input) => new BlissElement(BlissParser.parse(input)).children[0].children[0].children[1];
+  const lastIndicatorOf = (input) => {
+    const parts = new BlissElement(BlissParser.parse(input)).children[0].children[0].children;
+    return parts[parts.length - 1];
+  };
 
   describe('when an indicator has no explicit x coordinate (centered on base)', () => {
     it('centers a plural indicator on a Line base (B428;B99 → x=-1)', () => {
@@ -186,6 +194,33 @@ describe('BlissElement indicator positioning', () => {
 
     it('accepts explicit y offset on God-extended base (B355;B99:3,0 → y=0)', () => {
       expect(indicatorOf('B355;B99:3,0').y).toBe(0);
+    });
+  });
+
+  describe('when a multi-part base is reordered', () => {
+    // regression: the base anchor offset was read from the positionally-first
+    // base part (glyphParts[0]), so reordering equivalent base parts moved the
+    // indicator. The anchor is now order-independent: a multi-part base has no
+    // single owner, so it uses the default (0,0) anchor (coordinate ownership).
+    // A single base part still uses its own anchorOffset (pinned by the
+    // God-extended cases above).
+    //
+    // note: only the indicator's position is order-independent, NOT the full
+    // SVG. The base parts keep their source order in the output (we do not
+    // reorder a user's parts), so the two svgCode strings are not byte-identical
+    // even though they render the same shapes at the same coordinates.
+    const indicatorPosition = (input) => {
+      const ind = lastIndicatorOf(input);
+      return { x: ind.x, y: ind.y };
+    };
+
+    it('positions the indicator identically regardless of base-part order', () => {
+      expect(indicatorPosition('C8:0,8;B233:0,-3;B84'))
+        .toEqual(indicatorPosition('B233:0,-3;C8:0,8;B84'));
+    });
+
+    it('anchors the indicator at the default height on a multi-part base (y=-8)', () => {
+      expect(lastIndicatorOf('B233:0,-3;C8:0,8;B84').y).toBe(-8);
     });
   });
 });

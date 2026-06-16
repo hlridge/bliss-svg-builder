@@ -250,9 +250,15 @@ export class BlissElement {
     const glyphWidth = glyphMaxX - glyphMinX;
     const glyphCenterX = glyphMinX + glyphWidth / 2;
 
-    // Get anchor offset from first glyph part (or default to 0)
-    const baseAnchorOffsetX = glyphParts[0]?.anchorOffset?.x || 0;
-    const baseAnchorOffsetY = glyphParts[0]?.anchorOffset?.y || 0;
+    // Anchor offset belongs to the base only when there is a single base part.
+    // A multi-part / atypical base has no single owner, so it uses the default
+    // (0,0) anchor, which keeps the indicator order-independent under base-part
+    // reordering (coordinate ownership). A single base part uses its own
+    // anchorOffset. The geometric center (glyphCenterX) is already
+    // order-independent and is kept above.
+    const baseAnchor = glyphParts.length === 1 ? glyphParts[0].anchorOffset : undefined;
+    const baseAnchorOffsetX = baseAnchor?.x || 0;
+    const baseAnchorOffsetY = baseAnchor?.y || 0;
     const anchorX = glyphCenterX + baseAnchorOffsetX;
 
     // Calculate total indicator group width (including gaps)
