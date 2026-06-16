@@ -334,6 +334,8 @@ builder.group(0).splitAt(2);
 
 The handle stays on the first half (the original group). Access the second half via `builder.group(1)`. The first half retains the original options object. The second half receives a shallow copy with the same values.
 
+A word-level (`;;`) indicator overlay follows the head: it stays with whichever half keeps the head glyph, and the other half gets none.
+
 ### Merging Words
 
 `mergeWithNext()` absorbs the next word group into the current one, removing spaces in between:
@@ -345,6 +347,8 @@ builder.group(0).mergeWithNext();
 ```
 
 The merged word keeps the first word's options. The absorbed word's options are discarded. If there is no next word group, `mergeWithNext()` is a no-op.
+
+Likewise, the merged word keeps the first word's word-level (`;;`) indicator overlay. A `;;` overlay on the absorbed word is dropped, and a `DROPPED_WORD_INDICATOR` entry is added to `builder.warnings` so the loss is visible.
 
 ## Indicator Operations
 

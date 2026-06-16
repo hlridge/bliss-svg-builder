@@ -881,6 +881,17 @@ export class ElementHandle {
     const rawIndex = groups.indexOf(this.#nodeRef);
     if (rawIndex < 0) return this;
 
+    // Locate the head before splitting so the word-level overlay can follow it.
+    // The overlay is group-scoped and floats to the current head (the marked
+    // glyph, else glyph 0), so it must travel with whichever half keeps that
+    // head. The Math.max(..., 0) fallback mirrors the render-side resolution in
+    // #rebuild for clarity; here it is inert, since glyphIndex is always >= 1
+    // (splitAt rejects <= 0) so neither -1 nor 0 satisfies headIndex >=
+    // glyphIndex — the fallback can never change which half keeps the overlay.
+    const headIndex = group.wordIndicators
+      ? Math.max(group.glyphs.findIndex(g => g.isHeadGlyph === true), 0)
+      : -1;
+
     // Splice trailing glyphs from the original group (mutate in-place)
     const rightGlyphs = group.glyphs.splice(glyphIndex);
 
@@ -888,6 +899,12 @@ export class ElementHandle {
     const rightGroup = { glyphs: rightGlyphs };
     if (group.options) {
       rightGroup.options = { ...group.options };
+    }
+    // The overlay follows the head: when the head moved into the right half,
+    // hand the overlay over and clear it from the left; otherwise it stays put.
+    if (group.wordIndicators && headIndex >= glyphIndex) {
+      rightGroup.wordIndicators = group.wordIndicators;
+      delete group.wordIndicators;
     }
 
     const spaceGroup = this.#ctx.makeSpaceGroup();
@@ -937,6 +954,19 @@ export class ElementHandle {
 
     // Absorb the next word group's glyphs
     group.glyphs.push(...nextGroup.glyphs);
+
+    // The merged word keeps THIS group's word-level overlay; the absorbed
+    // group's overlay is dropped (one head governs the merged word, and it is
+    // this group's). Data loss must be loud, so warn rather than drop silently.
+    if (nextGroup.wordIndicators) {
+      const { codes = [], stripSemantic } = nextGroup.wordIndicators;
+      const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+      this.#ctx.addMutationWarning({
+        code: 'DROPPED_WORD_INDICATOR',
+        message: `mergeWithNext() dropped the absorbed word's word-level indicator overlay (${dropped}). The merged word keeps only the first word's overlay.`,
+        source: dropped,
+      });
+    }
 
     // Remove everything from rawIndex+1 through nextWordIndex (spaces + absorbed word)
     groups.splice(rawIndex + 1, nextWordIndex - rawIndex);

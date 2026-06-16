@@ -339,10 +339,19 @@ export declare class ElementHandle {
 
   // --- Mutation: space/word structure ---
 
-  /** Splits this word group into two at the glyph boundary, inserting a space between. Only valid on group handles. */
+  /**
+   * Splits this word group into two at the glyph boundary, inserting a space
+   * between. Only valid on group handles. A word-level (`;;`) indicator overlay
+   * follows the head: it stays with whichever half keeps the head glyph.
+   */
   splitAt(glyphIndex: number): this;
 
-  /** Merges this word group with the next one, removing spaces between them. Only valid on group handles. */
+  /**
+   * Merges this word group with the next one, removing spaces between them.
+   * Only valid on group handles. The merged word keeps this group's word-level
+   * (`;;`) indicator overlay; an overlay on the absorbed word is dropped and a
+   * `DROPPED_WORD_INDICATOR` warning is added to `warnings`.
+   */
   mergeWithNext(): this;
 
   // --- Mutation: options ---

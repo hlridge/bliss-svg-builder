@@ -24,6 +24,11 @@ class BlissSVGBuilder {
   #sharedOptions;
   #mutationCtx;
   #warnings = [];
+  // Warnings raised by mutation operations (e.g. mergeWithNext dropping an
+  // absorbed word-level overlay). Unlike #warnings, these are NOT reset by
+  // #rebuild — they record one-time data-loss events for the builder's
+  // lifetime, since the lost data leaves no trace in the rebuilt tree.
+  #mutationWarnings = [];
   #generation = 0;
 
   // Processes raw options (kebab-case) into internal options (camelCase).
@@ -394,6 +399,7 @@ class BlissSVGBuilder {
       getSnapshot: () => this.snapshot(),
       getGeneration: () => this.#generation,
       getDefinitions: () => blissElementDefinitions,
+      addMutationWarning: (warning) => this.#mutationWarnings.push(warning),
       // Build a temporary element tree for layout computation (e.g. addGlyph word expansion)
       computeLayout: (code) => {
         const parsed = BlissParser.parse(code);
@@ -505,12 +511,13 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Returns warnings generated during parsing/rendering.
+   * Returns warnings generated during parsing/rendering, followed by any
+   * one-time mutation warnings (e.g. an overlay dropped by mergeWithNext).
    * Each warning has { code, message, source } describing the issue.
    * @returns {Array<{ code: string, message: string, source: string }>}
    */
   get warnings() {
-    return this.#warnings;
+    return [...this.#warnings, ...this.#mutationWarnings];
   }
 
   #elementsCache;
