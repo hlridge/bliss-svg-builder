@@ -214,13 +214,28 @@ describe('BlissElement indicator positioning', () => {
       return { x: ind.x, y: ind.y };
     };
 
-    it('positions the indicator identically regardless of base-part order', () => {
+    it('positions the indicator identically across a y-divergent base reorder', () => {
+      // C8 and B233 differ in anchorOffset.y (0 vs -4); both have anchorOffset.x=0,
+      // so this pair isolates the Y dimension.
       expect(indicatorPosition('C8:0,8;B233:0,-3;B84'))
         .toEqual(indicatorPosition('B233:0,-3;C8:0,8;B84'));
     });
 
     it('anchors the indicator at the default height on a multi-part base (y=-8)', () => {
       expect(lastIndicatorOf('B233:0,-3;C8:0,8;B84').y).toBe(-8);
+    });
+
+    it('positions the indicator identically across an x-divergent base reorder', () => {
+      // B101 carries anchorOffset.x=1 (B8 has 0), so this pair diverges purely in
+      // x and pins the X dimension non-vacuously (the C8/B233 pair above diverges
+      // only in y). X is the larger surface: more glyphs carry a nonzero
+      // anchorOffset.x than .y, so the default-anchor rule must apply on X too.
+      expect(indicatorPosition('B101;B8;B99'))
+        .toEqual(indicatorPosition('B8;B101;B99'));
+    });
+
+    it('anchors the indicator x at the geometric center on a multi-part base (x=4)', () => {
+      expect(lastIndicatorOf('B101;B8;B99').x).toBe(4);
     });
   });
 });
