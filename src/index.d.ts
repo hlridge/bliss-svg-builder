@@ -122,6 +122,21 @@ export interface ElementSnapshot {
   readonly isPart: boolean;
   readonly bounds: ElementBounds;
   readonly isIndicator: boolean;
+  /**
+   * For an indicator part, whether it originates from a character-level
+   * marker (single `;`, `'character'`) or a word-level overlay (`;;`,
+   * `'word'`). `null` for a non-indicator, a non-part level, or an indicator
+   * whose definition cannot be resolved. The `'word'` value appears only on
+   * the resolved snapshot: a word overlay has no raw node, so a part handle
+   * can never reach one.
+   */
+  readonly indicatorLevel: 'character' | 'word' | null;
+  /**
+   * For an indicator part, `'semantic'` when its definition carries a
+   * semantic indicator (e.g. THING), otherwise `'grammatical'`. `null` for a
+   * non-indicator, a non-part level, or an unresolved definition.
+   */
+  readonly indicatorKind: 'semantic' | 'grammatical' | null;
   readonly isShape: boolean;
   readonly isBlissGlyph: boolean;
   readonly isExternalGlyph: boolean;
@@ -177,6 +192,21 @@ export declare class ElementHandle {
 
   /** Whether this part is an indicator. Only true on part-level handles. */
   readonly isIndicator: boolean;
+
+  /**
+   * Indicator origin level: `'character'` for a single-`;` indicator part, or
+   * `null` for a non-indicator or non-part handle. A word-level overlay (`;;`)
+   * has no raw node, so a part handle can never reference one — it reads as
+   * `'word'` on `snapshot()` instead.
+   */
+  readonly indicatorLevel: 'character' | 'word' | null;
+
+  /**
+   * Indicator kind: `'semantic'` when the definition carries a semantic
+   * indicator, `'grammatical'` otherwise, or `null` for a non-indicator part,
+   * a non-part handle, or an unresolved definition.
+   */
+  readonly indicatorKind: 'semantic' | 'grammatical' | null;
 
   /** Whether this part is a shape primitive. */
   readonly isShape: boolean;

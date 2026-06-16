@@ -155,6 +155,30 @@ export class ElementHandle {
     return this.#nodeRef?.isIndicator === true;
   }
 
+  /**
+   * Indicator origin level for a part handle: 'character' for a single-`;`
+   * indicator part (lives in the raw tree) or null for a non-indicator.
+   * A word-level overlay indicator (`;;`) has no raw node, so no part handle
+   * can reference one (OQ1) — it is introspected on `snapshot()` instead,
+   * where it reads as 'word'. Null on non-part handles.
+   * @returns {'character'|'word'|null}
+   */
+  get indicatorLevel() {
+    if (this.#level !== 3) return null;
+    return this.#findSnapshot().indicatorLevel ?? null;
+  }
+
+  /**
+   * Indicator kind for a part handle: 'semantic' (the definition carries a
+   * semanticIndicator) or 'grammatical', null for a non-indicator part or a
+   * part whose definition cannot be resolved. Null on non-part handles.
+   * @returns {'semantic'|'grammatical'|null}
+   */
+  get indicatorKind() {
+    if (this.#level !== 3) return null;
+    return this.#findSnapshot().indicatorKind ?? null;
+  }
+
   // --- Dimensions (read-only, from snapshot) ---
 
   #findSnapshot() {

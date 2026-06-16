@@ -863,6 +863,29 @@ export class BlissElement {
     return this.#blissObj.isIndicator || false;
   }
 
+  /**
+   * Classifies an indicator part for introspection (R14 Task 6).
+   * `indicatorLevel` separates a word-level overlay indicator (tagged
+   * `_indicatorOrigin: 'word'` when merged onto the head at decode) from a
+   * character-level one; `indicatorKind` reads the definition's
+   * `semanticIndicator` flag. Both null for a non-indicator part and for an
+   * indicator whose definition cannot be resolved (never throws): the `code`
+   * gate routes a non-indicator through the same `!definition` return, and
+   * the definition is otherwise always present for a genuine indicator part
+   * (the parser only sets `isIndicator` from a definition, and built-in codes
+   * cannot be removed).
+   * @returns {{ indicatorLevel: ('word'|'character'|null), indicatorKind: ('semantic'|'grammatical'|null) }}
+   */
+  #classifyIndicator() {
+    const code = this.isIndicator ? this.#blissObj.codeName : null;
+    const definition = blissElementDefinitions[code];
+    if (!definition) return { indicatorLevel: null, indicatorKind: null };
+    return {
+      indicatorLevel: this.#blissObj._indicatorOrigin === 'word' ? 'word' : 'character',
+      indicatorKind: definition.semanticIndicator ? 'semantic' : 'grammatical',
+    };
+  }
+
   get isShape() {
     return this.#isShape;
   }
@@ -925,6 +948,8 @@ export class BlissElement {
 
     const children = Object.freeze(childSnapshots);
 
+    const { indicatorLevel, indicatorKind } = this.#classifyIndicator();
+
     return Object.freeze({
       key: this.#key,
       codeName: this.#codeName || '',
@@ -944,6 +969,8 @@ export class BlissElement {
       isPart: this.#level >= 3,
       bounds: Object.freeze(this.#calculateBounds(parentOffsetX, parentOffsetY)),
       isIndicator: this.isIndicator,
+      indicatorLevel,
+      indicatorKind,
       isShape: !!this.#isShape,
       isBlissGlyph: !!this.#isBlissGlyph,
       isExternalGlyph: !!this.#isExternalGlyph,
