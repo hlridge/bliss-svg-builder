@@ -162,4 +162,14 @@ describe('ElementHandle indicator introspection', () => {
       expect(sub.indicatorKind).toBe('grammatical');
     });
   });
+
+  describe('when a handle sits on an overlay-reordered head', () => {
+    // tripwire (N14): a head carrying BOTH a ';' char indicator and a ';;'
+    // overlay reorders its resolved parts (semantic-root preservation), so the
+    // positional #findSnapshot mapping returns the WRONG part's geometry/key.
+    // The introspection getters dodge this by reading the raw node (above);
+    // the measure()/x/y/key fix folds into the N13/R15 coordinate-ownership
+    // work. See the plan's "Task 6 review" / N14 entry.
+    it.todo("measure() returns the handle's own part geometry, not the reordered overlay part");
+  });
 });
