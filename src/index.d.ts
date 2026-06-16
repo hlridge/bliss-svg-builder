@@ -331,6 +331,11 @@ export declare class ElementHandle {
    * The per-surface `flatten` asymmetry is deliberate: it applies only to the
    * group/word-level overlay, the only surface with a portable `;;` form to
    * collapse.
+   *
+   * On a glyph handle, a call that cannot apply any indicator (the requested
+   * codes are not indicators, or the glyph has no base part to carry one) adds
+   * an `INDICATOR_MUTATION_NOOP` warning to `warnings` instead of silently
+   * doing nothing.
    */
   applyIndicators(code: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
@@ -345,6 +350,9 @@ export declare class ElementHandle {
    *   empty-codes strip overlay (suppresses the base semantic at render but
    *   keeps it recoverable). `{ flatten: true }` bakes the cleared state onto
    *   the head glyph instead of leaving an overlay.
+   *
+   * On a glyph handle, a clear that finds no indicators to remove adds an
+   * `INDICATOR_MUTATION_NOOP` warning to `warnings`.
    */
   clearIndicators(opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 

@@ -6,7 +6,7 @@
 
 import { camelToKebab } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
-import { resolveIndicatorCodes, classifyIndicatorKind } from "./indicator-utils.js";
+import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators } from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -765,6 +765,11 @@ export class ElementHandle {
 
     const definitions = this.#ctx.getDefinitions();
     const stripSemantic = opts?.stripSemantic === true;
+    // The flatten branch sets this when it has already removed a `;;` overlay:
+    // the overlay removal is the real effect, so a char-level no-op here is not
+    // an overall no-op and must not be reported (see #applyOrClearWordIndicators).
+    const suppressNoop = opts?._suppressNoopWarning === true;
+    const targetCode = glyph.codeName || glyph.parts[0]?.codeName || '';
 
     // Classify parts: separate base parts from trailing indicator parts
     const firstIndicatorIndex = glyph.parts.findIndex(p => p.isIndicator === true);
@@ -779,11 +784,32 @@ export class ElementHandle {
     }
 
     // Must have base parts (indicators without a base are just normal combined parts)
-    if (baseParts.length === 0) return this;
+    if (baseParts.length === 0) {
+      // D4: an indicator-only glyph has nothing to carry the indicator, so the
+      // call does nothing. Surface it (this also catches the flatten path's
+      // lone-indicator-head data loss) rather than dropping it silently.
+      if (!suppressNoop) {
+        const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
+        this.#warnIndicatorNoop(
+          `${verb} had no effect: the target glyph '${targetCode}' is indicator-only, so it has no base part to carry an indicator.`,
+          code ?? targetCode,
+        );
+      }
+      return this;
+    }
 
     // Validate pattern: no non-indicators after the first indicator
     const isValidPattern = indicatorParts.every(p => p.isIndicator === true);
-    if (!isValidPattern) return this;
+    if (!isValidPattern) {
+      if (!suppressNoop) {
+        const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
+        this.#warnIndicatorNoop(
+          `${verb} had no effect: the target glyph '${targetCode}' has a non-indicator part after an indicator part (an invalid indicator pattern).`,
+          code ?? targetCode,
+        );
+      }
+      return this;
+    }
 
     // Extract existing indicator codes for semantic analysis
     const existingIndCodes = indicatorParts.map(p => p.codeName);
@@ -794,6 +820,24 @@ export class ElementHandle {
     const requestedCodes = code !== null
       ? code.split(';').map(s => s.trim()).filter(Boolean)
       : [];
+
+    // D4: report the no-op cases that still reach this far. An apply whose codes
+    // contain no recognized indicator applied nothing the caller asked for; a
+    // clear with no indicator parts had nothing to remove.
+    if (!suppressNoop) {
+      if (code !== null && filterToIndicators(requestedCodes, definitions).length === 0) {
+        this.#warnIndicatorNoop(
+          `applyIndicators('${code}') applied no indicator: none of the requested codes is a recognized indicator.`,
+          code,
+        );
+      } else if (code === null && indicatorParts.length === 0) {
+        this.#warnIndicatorNoop(
+          `clearIndicators() had no effect: the target glyph '${targetCode}' has no indicators to clear.`,
+          targetCode,
+        );
+      }
+    }
+
     const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
 
     const newIndicatorParts = [];
@@ -812,6 +856,17 @@ export class ElementHandle {
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
+  }
+
+  // D4: emit a one-time mutation warning when an indicator apply/clear had no
+  // effect. Uses the persistent mutation-warning channel (survives #rebuild),
+  // not the parse `#warnings` (which resets each rebuild).
+  #warnIndicatorNoop(message, source) {
+    this.#ctx.addMutationWarning({
+      code: 'INDICATOR_MUTATION_NOOP',
+      message,
+      source,
+    });
   }
 
   #updateGlyphIdentityAfterIndicatorChange(glyph, definitions) {
@@ -863,7 +918,11 @@ export class ElementHandle {
       const hadOverlay = group.wordIndicators !== undefined;
       delete group.wordIndicators;
       if (head) {
-        if (code === null) head.clearIndicators({ stripSemantic });
+        // When an overlay was removed, that removal IS the effect, so the
+        // delegated char-level clear-nothing must not warn as a no-op. An apply
+        // is left unsuppressed so a dropped bake (lone-indicator head) still
+        // surfaces (D4 / DECIDED 2-A).
+        if (code === null) head.clearIndicators({ stripSemantic, _suppressNoopWarning: hadOverlay });
         else head.applyIndicators(code, { stripSemantic });
       } else if (hadOverlay) {
         this.#ctx.rebuild();

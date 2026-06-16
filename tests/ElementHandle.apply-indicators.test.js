@@ -47,6 +47,8 @@ import { BlissSVGBuilder } from '../src/index';
  * - Visual regression of mutation-built vs DSL-built SVG output beyond the
  *   `svgCode` byte-for-byte parity tests, see
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
+ * - The full INDICATOR_MUTATION_NOOP warning matrix across apply / clear /
+ *   flatten no-op cases, see `ElementHandle.indicator-noop-warning.test.js`.
  */
 
 // Helper: extract part codeNames from first glyph
@@ -224,12 +226,17 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B86', 'B303']);
     });
 
-    // Deferred (burndown D4, folds into R14): these silent no-ops should surface
-    // a warning so a caller knows the call did nothing. Needs a mutation-time
-    // warning channel (the mutation API has none today; #warnings resets on each
-    // rebuild). Spec: .claude/backlog/applyindicators-warn-on-noop.md; gated as an
-    // R14 acceptance criterion (findings doc N8).
-    it.todo('warns when applyIndicators is called out of scope instead of silently no-opping');
+    // regression: burndown D4 (folds into R14). The silent no-ops above now
+    // surface an INDICATOR_MUTATION_NOOP warning on the persistent mutation
+    // channel so a caller knows the call did nothing. The full warning matrix
+    // (apply / clear / flatten variants) lives in
+    // ElementHandle.indicator-noop-warning.test.js; this pins the named gate.
+    it('warns when applyIndicators is called out of scope instead of silently no-opping', () => {
+      const b = new BlissSVGBuilder('B86');
+      b.group(0).glyph(0).applyIndicators('B81');
+      const noop = b.warnings.filter(w => w.code === 'INDICATOR_MUTATION_NOOP');
+      expect(noop).toHaveLength(1);
+    });
   });
 
   describe('when applyIndicators is chained', () => {
