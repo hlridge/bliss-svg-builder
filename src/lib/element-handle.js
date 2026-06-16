@@ -758,18 +758,19 @@ export class ElementHandle {
     return this.clearIndicators({ ...opts, flatten: true });
   }
 
-  #applyOrClearIndicators(code, opts) {
+  // `suppressNoop` is set by the flatten-clear delegation when it has already
+  // removed a `;;` overlay: that removal is the real effect, so a char-level
+  // no-op here is not an overall no-op and must not be reported. It is a private
+  // positional argument (not an opts key) so it is unreachable from the public
+  // applyIndicators/clearIndicators surface.
+  #applyOrClearIndicators(code, opts, suppressNoop = false) {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
 
     const definitions = this.#ctx.getDefinitions();
     const stripSemantic = opts?.stripSemantic === true;
-    // The flatten branch sets this when it has already removed a `;;` overlay:
-    // the overlay removal is the real effect, so a char-level no-op here is not
-    // an overall no-op and must not be reported (see #applyOrClearWordIndicators).
-    const suppressNoop = opts?._suppressNoopWarning === true;
-    const targetCode = glyph.codeName || glyph.parts[0]?.codeName || '';
+    const targetCode = glyph.codeName || glyph.parts[0]?.codeName || 'unknown';
 
     // Classify parts: separate base parts from trailing indicator parts
     const firstIndicatorIndex = glyph.parts.findIndex(p => p.isIndicator === true);
@@ -821,11 +822,19 @@ export class ElementHandle {
       ? code.split(';').map(s => s.trim()).filter(Boolean)
       : [];
 
-    // D4: report the no-op cases that still reach this far. An apply whose codes
-    // contain no recognized indicator applied nothing the caller asked for; a
-    // clear with no indicator parts had nothing to remove.
+    const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
+
+    // D4: report the no-op cases that still reach this far, gated on the ACTUAL
+    // effect (finalCodes vs the existing list) so a non-indicator code that
+    // legitimately strips existing indicators is NOT mis-reported as a no-op.
+    // An apply whose codes contain no recognized indicator AND leaves the
+    // indicator list unchanged applied nothing the caller asked for; a clear
+    // with no indicator parts had nothing to remove. (A clear that preserves a
+    // semantic root is a documented no-op and is intentionally not warned.)
     if (!suppressNoop) {
-      if (code !== null && filterToIndicators(requestedCodes, definitions).length === 0) {
+      const unchanged = finalCodes.length === existingIndCodes.length
+        && finalCodes.every((c, i) => c === existingIndCodes[i]);
+      if (code !== null && unchanged && filterToIndicators(requestedCodes, definitions).length === 0) {
         this.#warnIndicatorNoop(
           `applyIndicators('${code}') applied no indicator: none of the requested codes is a recognized indicator.`,
           code,
@@ -837,8 +846,6 @@ export class ElementHandle {
         );
       }
     }
-
-    const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
 
     const newIndicatorParts = [];
     for (const indCode of finalCodes) {
@@ -858,9 +865,9 @@ export class ElementHandle {
     return this;
   }
 
-  // D4: emit a one-time mutation warning when an indicator apply/clear had no
-  // effect. Uses the persistent mutation-warning channel (survives #rebuild),
-  // not the parse `#warnings` (which resets each rebuild).
+  // D4: emit a mutation warning (one per no-op call) when an indicator
+  // apply/clear had no effect. Uses the persistent mutation-warning channel
+  // (survives #rebuild), not the parse `#warnings` (which resets each rebuild).
   #warnIndicatorNoop(message, source) {
     this.#ctx.addMutationWarning({
       code: 'INDICATOR_MUTATION_NOOP',
@@ -919,10 +926,12 @@ export class ElementHandle {
       delete group.wordIndicators;
       if (head) {
         // When an overlay was removed, that removal IS the effect, so the
-        // delegated char-level clear-nothing must not warn as a no-op. An apply
-        // is left unsuppressed so a dropped bake (lone-indicator head) still
-        // surfaces (D4 / DECIDED 2-A).
-        if (code === null) head.clearIndicators({ stripSemantic, _suppressNoopWarning: hadOverlay });
+        // delegated char-level clear-nothing must not warn as a no-op. The
+        // suppress signal is passed as a private positional arg (not an opts
+        // key), so it goes through the private method, not public clearIndicators.
+        // An apply is left unsuppressed so a dropped bake (lone-indicator head)
+        // still surfaces (D4 / DECIDED 2-A).
+        if (code === null) head.#applyOrClearIndicators(null, { stripSemantic }, hadOverlay);
         else head.applyIndicators(code, { stripSemantic });
       } else if (hadOverlay) {
         this.#ctx.rebuild();

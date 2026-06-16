@@ -8,18 +8,26 @@ import { BlissSVGBuilder } from '../src/index';
  * channel, so it survives later rebuilds and reads through `warnings`.
  *
  * Covers:
- * - apply whose requested codes contain no recognized indicator (a plain
- *   character code).
+ * - apply whose requested codes contain no recognized indicator AND leaves the
+ *   indicator list unchanged (a plain character code). The trigger gates on the
+ *   actual effect: a non-indicator code that strips an existing indicator
+ *   (replace-all / stripSemantic) is a real mutation and is NOT warned.
  * - apply on a glyph with no base part to carry an indicator (an
  *   indicator-only glyph), including the flatten path's lone-indicator-head
  *   data loss (a word-level flatten that drops the requested code).
  * - apply on an invalid part pattern (a non-indicator part after an indicator).
  * - clear that finds no indicators to remove, including stripSemantic clearing
  *   a glyph that has no semantic.
- * - Negative controls: a real apply / real clear does NOT warn; a flatten clear
- *   that removes a `;;` overlay does NOT warn (the overlay removal is the
- *   effect, so the delegated char-level clear-nothing is suppressed), yet a
- *   flatten clear with no overlay and no baked indicators DOES warn.
+ * - The warning source falls back to a placeholder when the target part has no
+ *   resolvable code name (malformed input).
+ * - Negative controls: a real apply / real clear does NOT warn; a default clear
+ *   that only preserves a semantic root is a documented no-op and is NOT warned;
+ *   a flatten clear that removes a `;;` overlay does NOT warn at any of the three
+ *   char-level warning sites (the overlay removal is the effect, so the
+ *   delegated clear is suppressed), yet a flatten clear with no overlay and no
+ *   baked indicators DOES warn.
+ * - Tripwire: a flatten apply of an unrecognized code over a valid `;;` overlay
+ *   warns about the dropped code but does not yet report the lost overlay.
  *
  * Does NOT cover:
  * - The no-op behaviour itself (parts left unchanged), see
@@ -51,6 +59,35 @@ describe('ElementHandle indicator no-op warning', () => {
       const b = new BlissSVGBuilder('B291');
       b.group(0).glyph(0).applyIndicators('H;B86');
       expect(noopWarnings(b)).toHaveLength(0);
+    });
+  });
+
+  describe('when a non-indicator code changes the existing indicators', () => {
+    // regression: the warning gates on the ACTUAL effect, not merely on whether
+    // the requested codes are indicators. A non-indicator input that strips an
+    // existing indicator (replace-all / stripSemantic) is a real mutation, not a
+    // no-op, so it must NOT warn.
+    it('does not warn when a non-indicator code strips an existing grammatical indicator', () => {
+      const b = new BlissSVGBuilder('B291;B97;B81');
+      b.group(0).glyph(0).applyIndicators('H');
+      expect(b.toString()).toBe('B291;B97');
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+
+    it('does not warn when stripSemantic removes the semantic via a non-indicator code', () => {
+      const b = new BlissSVGBuilder('B291;B97');
+      b.group(0).glyph(0).applyIndicators('B303', { stripSemantic: true });
+      expect(b.toString()).toBe('B291');
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+
+    it('warns when a non-indicator code leaves the indicators unchanged', () => {
+      // B97 (semantic) is preserved and there is no grammatical to strip, so the
+      // call is a genuine no-op.
+      const b = new BlissSVGBuilder('B291;B97');
+      b.group(0).glyph(0).applyIndicators('H');
+      expect(b.toString()).toBe('B291;B97');
+      expect(noopWarnings(b)).toHaveLength(1);
     });
   });
 
@@ -127,6 +164,26 @@ describe('ElementHandle indicator no-op warning', () => {
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
       expect(noopWarnings(b)).toHaveLength(0);
     });
+
+    it('does not warn on a semantic-only glyph cleared without stripSemantic', () => {
+      // A plain clearIndicators() preserves the semantic by default, so on a
+      // semantic-only glyph it changes nothing. That is documented behavior, not
+      // a surprising no-op, so it is intentionally not warned.
+      const b = new BlissSVGBuilder('B291;B97');
+      b.group(0).glyph(0).clearIndicators();
+      expect(b.toString()).toBe('B291;B97');
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+  });
+
+  describe('when the target part has no resolvable code name', () => {
+    it('uses a placeholder name rather than an empty name in the clear warning', () => {
+      const b = new BlissSVGBuilder('@@@');
+      b.group(0).glyph(0).clearIndicators();
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('unknown');
+    });
   });
 
   describe('when a flatten clear removes a word-level overlay', () => {
@@ -143,6 +200,41 @@ describe('ElementHandle indicator no-op warning', () => {
       const b = new BlissSVGBuilder('B291/B303');
       b.group(0).clearHeadIndicators();
       expect(noopWarnings(b)).toHaveLength(1);
+    });
+
+    it('does not warn when the overlay head is a lone indicator (suppressed at the no-base site)', () => {
+      // The suppress signal must reach the baseParts-empty site, not just the
+      // clear-nothing site. Head B81 is a lone indicator (no base part).
+      const b = new BlissSVGBuilder('B81;;B86');
+      b.group(0).clearHeadIndicators();
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+
+    it('does not warn when the overlay head has an invalid part pattern (suppressed at the pattern site)', () => {
+      // The suppress signal must also reach the invalid-pattern site. Head
+      // B291;B86;B303 has a non-indicator (B303) after an indicator (B86).
+      const b = new BlissSVGBuilder('B291;B86;B303;;B85');
+      b.group(0).clearHeadIndicators();
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+  });
+
+  describe('when a flatten apply drops a valid overlay for an unrecognized code', () => {
+    // Tripwire pinning TODAY's behavior (gated backlog item
+    // .claude/backlog/indicator-on-atypical-base.md): a flatten apply deletes the
+    // pre-existing valid `;;` overlay BEFORE baking, so applying a non-indicator
+    // code loses BOTH the overlay and the code. Only the dropped code is warned
+    // today; the lost overlay is not separately reported. A future fix that warns
+    // about (or preserves) the dropped overlay must update this test.
+    it('warns about the dropped code but not yet the lost overlay', () => {
+      const b = new BlissSVGBuilder('B291;;B86');
+      b.group(0).applyIndicators('B303', { flatten: true });
+      expect(b.toString()).toBe('B291');
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B303');
     });
   });
 });
