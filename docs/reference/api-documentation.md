@@ -153,9 +153,22 @@ new BlissSVGBuilder('LOVE').toJSON();                     // codeName: 'B431'
 new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // codeName: 'LOVE'
 ```
 
+Word-level indicator behavior:
+- A word-level indicator (`;;`) is carried as a reversible `wordIndicators: { codes, stripSemantic }` field on its group, not baked onto a glyph's parts. The round-trip keeps it.
+- Pass `{ flattenIndicators: true }` to bake the overlay onto the head glyph's parts and omit the `wordIndicators` field (the decomposed primitive form). `flattenIndicators` is independent of `preserve` and composes with it.
+
+```js
+new BlissSVGBuilder('B313/B1103;;B81').toJSON().groups[0].wordIndicators;
+// { codes: ['B81'], stripSemantic: false }
+
+const flat = new BlissSVGBuilder('B313/B1103;;B81').toJSON({ flattenIndicators: true });
+flat.groups[0].wordIndicators;                            // undefined
+flat.groups[0].glyphs[0].parts.map(p => p.codeName);      // ['B313', 'B81']
+```
+
 ### Indicators in the tree
 
-Indicators always appear as parts within their parent glyph, marked with `isIndicator: true`. Word-level indicator syntax (`;;`) is resolved during parsing, so the tree always shows indicators attached to a specific glyph, never to a group.
+Character-level indicators (`;`) appear as parts within their parent glyph, marked with `isIndicator: true`. A word-level indicator (`;;`) is stored on its group as a `wordIndicators` overlay and resolved onto the head glyph only at render time, so by default the parts tree shows the base glyphs unchanged and the overlay lives in the group's `wordIndicators` field. Flatten it onto the head with `{ flattenIndicators: true }` if you need the indicator as an actual part.
 
 Use for: inspecting parsed structure, storing snapshots, server-side processing.
 
@@ -186,17 +199,31 @@ new BlissSVGBuilder('SMILEY').toString({ preserve: true });
 // 'SMILEY'
 ```
 
-### Indicator Resolution
+### Word-level indicators in the output
 
-`toString()` returns the resolved form of the composition. Word-level indicator syntax (`;;`) resolves to character-level syntax (`;`), with indicators attached directly to the head glyph:
+A word-level indicator (`;;`) is kept in `toString()` output by default, because `;;` is universal DSL grammar (every builder parses it and it resolves to the same render), so keeping it is portable and lossless:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103;;B81');
 builder.toString();
-// 'B313;B81/B1103' — indicator moved to head glyph
+// 'B313/B1103;;B81' — the ;; overlay is preserved
 ```
 
-Passing the resolved output back into the constructor produces an identical result.
+Pass `{ flattenIndicators: true }` to collapse `;;` onto the head glyph as character-level `;` (the decomposed primitive form, which is what the builder used to emit by default before the overlay model):
+
+```js
+builder.toString({ flattenIndicators: true });
+// 'B313;B81/B1103' — indicator baked onto the head glyph
+```
+
+Both forms render an identical image; passing either back into the constructor reproduces the same result. `flattenIndicators` governs word *structure* (`;;`) and `preserve` governs local *names* (aliases / custom glyphs); they are independent and compose:
+
+| `preserve` | `flattenIndicators` | local names | `;;` |
+|---|---|---|---|
+| off *(default)* | off *(default)* | decomposed | kept |
+| off | on | decomposed | flattened to `;` |
+| on | off | kept | kept |
+| on | on | kept | flattened to `;` |
 
 ### Head Marker Resolution
 
@@ -644,6 +671,33 @@ On a part handle, returns `true` if this part is an indicator. Returns `false` o
 builder.glyph(0).part(1).isIndicator; // true for indicator parts
 ```
 
+#### `.indicatorLevel` / `.indicatorKind`
+
+On a part handle, classify an indicator part. Both return `null` (never throw) for a non-indicator part, and on glyph or group handles:
+
+- `indicatorLevel` — `'character'` for a `;` indicator, otherwise `null`. A part handle references a node in the raw tree, and a word-level (`;;`) overlay indicator has no raw node, so a handle never returns `'word'`. The `'word'` level is surfaced on the resolved [`snapshot()`](#snapshot) tree, where the overlay part exists.
+- `indicatorKind` — `'semantic'` for a thing/abstract root (e.g. `B97`, `B6436`), `'grammatical'` for an action/description/etc. indicator (e.g. `B81`, `B86`).
+
+```js
+const b = new BlissSVGBuilder('B303;B97');
+b.part(1).indicatorLevel; // 'character'
+b.part(1).indicatorKind;  // 'semantic'  (B97 is a thing root)
+b.part(0).indicatorLevel; // null         (B303 is a base, not an indicator)
+
+// A composite indicator's internal sub-parts are classified too:
+new BlissSVGBuilder('B303;B84').part(1).part(0).indicatorKind; // 'grammatical'
+```
+
+For a word-level (`;;`) indicator, read the resolved snapshot instead of a part handle:
+
+```js
+const head = new BlissSVGBuilder('B313/B1103;;B86')
+  .snapshot().children[0].children.find(c => c.isGlyph);
+const overlay = head.children.find(c => c.indicatorLevel === 'word');
+overlay.codeName;        // 'B86'
+overlay.indicatorKind;   // 'grammatical'
+```
+
 #### `.key`
 
 Stable across mutations. Use with `getElementByKey(key)` to recover a handle to this same node later:
@@ -913,11 +967,14 @@ builder.glyph(0).removeOptions('color', 'strokeWidth');
 
 ### Indicator Mutation
 
-Indicator methods manage the grammatical indicator parts on a glyph. Unlike other mutation methods, the `opts` parameter accepts `{ stripSemantic?: boolean }`, not `BlissOptions`.
+`applyIndicators` / `clearIndicators` manage indicators and are **polymorphic by handle level**. Unlike other mutation methods, the `opts` parameter accepts `{ stripSemantic?: boolean, flatten?: boolean }`, not `BlissOptions`.
+
+- On a **glyph handle**, they operate character-level: the indicator is baked into the glyph's parts (the `;` channel).
+- On a **group handle**, they operate word-level on the reversible `;;` overlay (`group.wordIndicators`), leaving the base glyphs intact.
 
 #### `.applyIndicators(code, opts?)`
 
-On a glyph handle, replaces all existing indicators with the given code. `code` is required (throws if missing; use `clearIndicators()` to remove). Semantic indicators are preserved unless the new code includes one or `{ stripSemantic: true }` is passed:
+On a **glyph handle**, replaces all existing indicators with the given code. `code` is required (throws if missing; use `clearIndicators()` to remove). Semantic indicators are preserved unless the new code includes one or `{ stripSemantic: true }` is passed:
 
 ```js
 builder.glyph(0).applyIndicators('B86');
@@ -925,28 +982,45 @@ builder.glyph(0).applyIndicators('B81;B86');
 builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 ```
 
-Non-indicator codes are silently filtered out.
+Non-indicator codes are silently filtered out. If the call cannot apply any indicator (the codes are not indicators and the indicator list is left unchanged, or the glyph has no base part to carry one), it adds an `INDICATOR_MUTATION_NOOP` warning to `warnings` instead of silently doing nothing.
+
+On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
+
+```js
+builder.group(0).applyIndicators('B86');                 // == DSL ;;B86
+builder.group(0).applyIndicators('B86', { stripSemantic: true }); // == ;;!B86
+builder.group(0).applyIndicators('B86', { flatten: true });       // bake onto the head instead
+```
+
+`{ flatten: true }` opts out of the overlay and bakes the indicator onto the head glyph's parts (the pre-overlay shape).
 
 #### `.clearIndicators(opts?)`
 
-On a glyph handle, removes all grammatical indicators. Semantic indicators are preserved by default:
+On a **glyph handle**, removes all grammatical indicators. Semantic indicators are preserved by default; `{ stripSemantic: true }` removes them too:
 
 ```js
 builder.glyph(0).clearIndicators();
 builder.glyph(0).clearIndicators({ stripSemantic: true });
 ```
 
-#### `.applyHeadIndicators(code, opts?)`
+On a **group handle**, removes the word-level `;;` overlay and restores the base (including a semantic that a `;;!` strip had suppressed). `{ stripSemantic: true }` keeps a reversible empty-codes strip overlay; `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
 
-On a group handle, applies indicators to the head glyph. Equivalent to the `;;` DSL syntax:
+#### `.applyHeadIndicators(code, opts?)` <Badge type="warning" text="deprecated" />
+
+::: warning Deprecated
+Alias for `applyIndicators(code, { ...opts, flatten: true })` on a group handle. It bakes onto the head glyph and drops any `;;` overlay. For the reversible word-level overlay, use `applyIndicators(code)` without `flatten`.
+:::
 
 ```js
 builder.group(0).applyHeadIndicators('B86');
+// same as builder.group(0).applyIndicators('B86', { flatten: true });
 ```
 
-#### `.clearHeadIndicators(opts?)`
+#### `.clearHeadIndicators(opts?)` <Badge type="warning" text="deprecated" />
 
-On a group handle, clears indicators from the head glyph:
+::: warning Deprecated
+Alias for `clearIndicators({ ...opts, flatten: true })` on a group handle. It clears both the head glyph's baked indicator parts and any `;;` overlay. For the reversible word-level overlay only, use `clearIndicators()` without `flatten`.
+:::
 
 ```js
 builder.group(0).clearHeadIndicators();

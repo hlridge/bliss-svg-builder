@@ -408,20 +408,26 @@ builder.glyph(0).clearIndicators({ stripSemantic: true });
 
 ### Word-Level Indicators
 
-Apply indicators to a group's head glyph with `applyHeadIndicators()` and `clearHeadIndicators()`. These are the mutation API equivalent of the `;;` DSL syntax:
+Call `applyIndicators()` / `clearIndicators()` on a **group** handle to manage a word-level (`;;`) indicator. The group-level call stores a reversible overlay on the word rather than baking onto a glyph, so the base glyphs stay intact and a later clear restores them:
 
 ```js
 const builder = new BlissSVGBuilder('B291/B303');
-builder.group(0).applyHeadIndicators('B86');
-// equivalent to 'B291/B303;;B86'
+builder.group(0).applyIndicators('B86');
+// equivalent to the DSL 'B291/B303;;B86'
 ```
 
 ```js
-builder.group(0).clearHeadIndicators();
-// equivalent to 'B291/B303;;'
+builder.group(0).clearIndicators();
+// removes the overlay, back to 'B291/B303'
 ```
 
-Both accept `{ stripSemantic: true }` (equivalent to `;;!`).
+Pass `{ stripSemantic: true }` for the `;;!` strip form, or `{ flatten: true }` to bake the indicator onto the head glyph's parts instead of keeping the reversible overlay.
+
+::: warning Deprecated
+`applyHeadIndicators()` / `clearHeadIndicators()` are deprecated aliases for the `{ flatten: true }` variant (`applyIndicators(code, { flatten: true })` and `clearIndicators({ flatten: true })`). Prefer `applyIndicators` / `clearIndicators` without `flatten` for the reversible overlay.
+:::
+
+If an indicator call cannot apply or remove anything (for example, applying a non-indicator code, or clearing a glyph that has no indicators), it records an `INDICATOR_MUTATION_NOOP` entry in `builder.warnings` rather than failing silently.
 
 ### Inspecting Indicators
 
@@ -432,6 +438,15 @@ const builder = new BlissSVGBuilder('B291;B86');
 builder.glyph(0).part(0).isIndicator; // false (B291 is base)
 builder.glyph(0).part(1).isIndicator; // true  (B86 is indicator)
 ```
+
+`indicatorLevel` and `indicatorKind` classify an indicator part (both `null` for non-indicators):
+
+```js
+builder.glyph(0).part(1).indicatorLevel; // 'character'   (a ; indicator)
+builder.glyph(0).part(1).indicatorKind;  // 'grammatical' (vs 'semantic' for a thing/abstract root)
+```
+
+A part handle never reports `'word'`: a `;;` overlay has no raw part node, so word-level indicators are classified on the resolved `snapshot()` tree instead. See the [API reference](/reference/api-documentation#indicatorlevel-indicatorkind).
 
 ## Chaining
 

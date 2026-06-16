@@ -15,16 +15,23 @@ Pattern: Single = character level, Double = word level
 | `;` | Character-level indicators | `B431;B81` | Indicator on character, keeps thing/abstract |
 | `;!` | Strip-semantic indicators | `B431;!B81` | Strips all indicators including the semantic root, then adds B81 |
 
-### Indicator Resolution
+### How `;;` is stored and serialized
 
-The `;;` separator is an input convenience for attaching indicators to a word's head glyph. During parsing, the indicator resolves to character-level `;` syntax on the head glyph. This resolved form is what `toString()` returns:
+`;;` attaches an indicator to a word's head glyph, but it is **not** baked onto that glyph at parse time. It is stored as a reversible *word-level overlay* on the word and resolved onto the head only when the SVG is rendered. So `;;` is preserved through a round-trip by default:
 
 ```
-Input:      B313/B1103;;B81    (indicator targets head glyph)
-toString(): B313;B81/B1103     (indicator attached to B313)
+Input:       B313/B1103;;B81
+toString():  B313/B1103;;B81                                   (the ;; overlay is kept)
+toJSON():    groups[0].wordIndicators = { codes: ['B81'], stripSemantic: false }
 ```
 
-The visual output is identical. The difference only matters when inspecting `toString()` output or the element tree.
+To collapse `;;` onto the head as character-level `;` (the decomposed "primitive" form), pass `{ flattenIndicators: true }`:
+
+```
+toString({ flattenIndicators: true }):  B313;B81/B1103         (indicator baked onto the head)
+```
+
+Both forms render the same image; the difference is only in the serialized text and the element tree. `flattenIndicators` (word structure) and `preserve` (local names) are independent and compose freely, see the [serialization reference](/reference/api-documentation#serialization).
 
 The head marker (`^`) that explicitly designates the head glyph also survives `toString()`, but is re-emitted only when the automatic head pick would otherwise land on a different glyph (a redundant `^`, or one dropped from a multi-character code, is not re-emitted).
 

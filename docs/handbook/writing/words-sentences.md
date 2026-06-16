@@ -83,6 +83,8 @@ Use `;;` to attach an indicator to the **head glyph** of the word:
 
 The head glyph is determined automatically. You don't need to know which character is the head. The library figures it out using the rules below.
 
+`;;` is a reversible *overlay*, not a parse-time rewrite: the indicator is stored on the word and resolved onto the head only when the image is rendered. So `toString()` and `toJSON()` keep the `;;` form by default and round-trip it unchanged (`B313/B1103;;B81` stays `B313/B1103;;B81`). Pass `{ flattenIndicators: true }` to collapse it onto the head as character-level `;`. See the [serialization reference](/reference/api-documentation#word-level-indicators-in-the-output).
+
 ### When to Use Each
 
 **Use `;`** when you want the indicator on a specific character, or when working with single characters.
