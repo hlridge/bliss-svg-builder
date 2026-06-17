@@ -270,6 +270,21 @@ describe('BlissSVGBuilder round-trip identity', () => {
       const roundTripped = new BlissSVGBuilder(original.toJSON());
       expect(roundTripped.svgCode).toBe(original.svgCode);
     });
+
+    it('leading-semicolon (baseless) custom glyph round-trips as a nested part', () => {
+      // R15 Task 2 follow-up: a custom glyph whose codeString begins with ';'
+      // (an empty base). Used as a nested ;-part, default toJSON strips the
+      // sub-parts to {codeName}, so reconstruction re-expands the codeString
+      // through the second split site (#parseCodeStringToParts), which must
+      // also drop the empty leading segment. Otherwise the round-trip injects a
+      // failed empty part: spurious UNKNOWN_CODE + divergent render.
+      customCodes.push('MY_BASELESS');
+      BlissSVGBuilder.define({ MY_BASELESS: { type: 'glyph', codeString: ';B86;B97' } });
+      const original = new BlissSVGBuilder('B291;MY_BASELESS');
+      const roundTripped = new BlissSVGBuilder(original.toJSON());
+      expect(roundTripped.warnings.filter(w => w.code === 'UNKNOWN_CODE')).toEqual([]);
+      expect(roundTripped.svgCode).toBe(original.svgCode);
+    });
   });
 
   describe('when round-tripping external glyphs and text fallback', () => {

@@ -1110,7 +1110,11 @@ export class BlissParser {
    */
   static #parseCodeStringToParts(codeString, depth = 0) {
     if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
-    const segments = codeString.split(';');
+    // Drop empty segments, mirroring parseParts: a definition codeString with a
+    // leading ';' (an empty base) must expand to an indicator-only glyph here too,
+    // so a custom baseless glyph round-trips identically when re-expanded from a
+    // toJSON-stripped nested part instead of injecting a failed empty part.
+    const segments = codeString.split(';').filter(s => s !== '');
     const parts = [];
 
     for (const segment of segments) {
