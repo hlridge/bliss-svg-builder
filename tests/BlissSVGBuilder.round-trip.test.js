@@ -285,6 +285,19 @@ describe('BlissSVGBuilder round-trip identity', () => {
       expect(roundTripped.warnings.filter(w => w.code === 'UNKNOWN_CODE')).toEqual([]);
       expect(roundTripped.svgCode).toBe(original.svgCode);
     });
+
+    it('custom glyph with a trailing-empty codeString round-trips as a nested part', () => {
+      // Pins the drop-ALL-empties scope of the nested-expansion site (not just a
+      // leading ';'): a definition codeString with a trailing ';' must also
+      // re-expand cleanly from a toJSON-stripped nested part. A leading-only
+      // filter would inject a failed empty part here (UNKNOWN_CODE + divergence).
+      customCodes.push('MY_TRAILING');
+      BlissSVGBuilder.define({ MY_TRAILING: { type: 'glyph', codeString: 'B86;B97;' } });
+      const original = new BlissSVGBuilder('B291;MY_TRAILING');
+      const roundTripped = new BlissSVGBuilder(original.toJSON());
+      expect(roundTripped.warnings.filter(w => w.code === 'UNKNOWN_CODE')).toEqual([]);
+      expect(roundTripped.svgCode).toBe(original.svgCode);
+    });
   });
 
   describe('when round-tripping external glyphs and text fallback', () => {

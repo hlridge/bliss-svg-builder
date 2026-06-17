@@ -47,4 +47,16 @@ describe('BlissSVGBuilder baseless indicator', () => {
         .toBe(new BlissSVGBuilder('B86;B97').svgCode);
     });
   });
+
+  describe('when redundant leading semicolons precede an indicator', () => {
+    // pins the drop-ALL-empties filter scope (parseParts): a leading-only filter
+    // would leave one empty part and warn. ';;B86' is two empty leading segments,
+    // NOT the word-level ';;' path (that needs a head glyph before ';;'), so it
+    // is purely char-level and inert.
+    it('treats ;;B86 as inert: no UNKNOWN_CODE, renders identically to B86', () => {
+      expect(unknownCodeWarnings(';;B86')).toEqual([]);
+      expect(new BlissSVGBuilder(';;B86').svgCode)
+        .toBe(new BlissSVGBuilder('B86').svgCode);
+    });
+  });
 });
