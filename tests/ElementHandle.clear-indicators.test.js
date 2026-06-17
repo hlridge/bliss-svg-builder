@@ -127,5 +127,15 @@ describe('ElementHandle clear indicators', () => {
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
       expect(b.toJSON().groups[0].glyphs[0].parts[0]).toMatchObject({ x: 2, y: 3 });
     });
+
+    it('re-emits a single-axis base offset where one coordinate is zero', () => {
+      // pins the OR in the offset guard (x !== 0 || y !== 0): a single-axis
+      // offset must still emit when the other axis is 0. Kills the ||->&& mutant
+      // on the relocation re-emit (which would drop the offset for x=0 or y=0).
+      const b = new BlissSVGBuilder('B291:0,3;B86/B303');
+      b.group(0).glyph(0).clearIndicators();
+      expect(b.toString()).toBe('B291:0,3/B303');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
   });
 });
