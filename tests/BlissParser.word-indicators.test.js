@@ -651,16 +651,19 @@ describe('BlissParser word-indicator syntax', () => {
   });
 
   describe('when the input is malformed or has options', () => {
-    it('parses ;B86 with no preceding base as a glyph with undefined base and the indicator attached', () => {
+    it('parses ;B86 with no preceding base as an indicator-only glyph', () => {
       const result = BlissParser.parse(';B86');
 
-      // Edge case - should not crash
+      // R15 contract change (Decision Log #2): a leading ';' (empty base) is
+      // inert and yields an indicator-only glyph, NOT a glyph with an undefined
+      // failed base part. Previously parts[0].codeName was undefined and an
+      // UNKNOWN_CODE warning fired. See BlissSVGBuilder.baseless-indicator.test.js
+      // for the no-warning render contract.
       expect(result).toBeDefined();
       expect(result.groups.length).toBe(1);
       expect(result.groups[0].glyphs.length).toBe(1);
-      // Empty base results in undefined code, indicator is B86
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBeUndefined();
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
+      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B86');
     });
 
     it('attaches the indicator at character level when the code is not a defined word', () => {

@@ -104,6 +104,7 @@ describe('BlissElement indicator positioning', () => {
     const parts = new BlissElement(BlissParser.parse(input)).children[0].children[0].children;
     return parts[parts.length - 1];
   };
+  const partsOf = (input) => new BlissElement(BlissParser.parse(input)).children[0].children[0].children;
 
   describe('when an indicator has no explicit x coordinate (centered on base)', () => {
     it('centers a plural indicator on a Line base (B428;B99 → x=-1)', () => {
@@ -236,6 +237,36 @@ describe('BlissElement indicator positioning', () => {
 
     it('anchors the indicator x at the geometric center on a multi-part base (x=4)', () => {
       expect(lastIndicatorOf('B101;B8;B99').x).toBe(4);
+    });
+  });
+
+  describe('when the base is empty (a baseless indicator stack)', () => {
+    // A stack with no base part (every part is an indicator) has nothing to
+    // center over, so it lays its parts out left-to-right from the origin with
+    // the standard 1-unit gap. A single standalone indicator stays at origin.
+    // See BlissSVGBuilder.baseless-indicator.test.js for the leading-';' /
+    // no-UNKNOWN_CODE rendering contract.
+    it('lays out a two-indicator baseless stack from origin with a gap (B97;B99)', () => {
+      // pins the length-0 path through #positionIndicatorGroup; kills the
+      // length<=1 / length<2 boundary mutants on the base-anchor line that the
+      // based-only suite cannot reach (the call gate forbade length 0 pre-R15).
+      const [first, second] = partsOf('B97;B99');
+      expect(first.codeName).toBe('B97');
+      expect(first.x).toBe(0);
+      expect(second.codeName).toBe('B99');
+      expect(second.x).toBe(3);
+    });
+
+    it('leaves a standalone grammatical indicator at the origin (B86 → x=0)', () => {
+      expect(partsOf('B86')[0].x).toBe(0);
+    });
+
+    it('leaves a standalone composite indicator glyph at the origin (B98 → x=0)', () => {
+      expect(partsOf('B98')[0].x).toBe(0);
+    });
+
+    it('leaves a standalone verbal indicator at the origin (B81 → x=0)', () => {
+      expect(partsOf('B81')[0].x).toBe(0);
     });
   });
 });

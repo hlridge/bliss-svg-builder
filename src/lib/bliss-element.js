@@ -298,8 +298,13 @@ export class BlissElement {
         - firstAnchorOffsetX / 2 - lastAnchorOffsetX / 2
       : -firstAnchorOffsetX;
 
-    // Position indicators
-    let currentX = anchorX - totalIndicatorWidth / 2 + anchorShift;
+    // Position indicators. A baseless stack (no base part) has nothing to
+    // center over, so it lays its parts out left-to-right from the origin; a
+    // based stack centers the group over the base anchor. Either way explicit
+    // :x,y overrides below.
+    let currentX = glyphParts.length === 0
+      ? 0
+      : anchorX - totalIndicatorWidth / 2 + anchorShift;
 
     for (const indicator of indicatorParts) {
       // X positioning: only override if no explicit x was provided
@@ -544,20 +549,21 @@ export class BlissElement {
         this.#classifiedParts = BlissElement.#classifyParts(this.#children);
         const { glyphParts, indicatorParts, isValidPattern } = this.#classifiedParts;
 
-        // Position indicators as a centered group above the glyph
-        // Only apply when:
-        // - We have BOTH glyph parts AND indicator parts
-        // - The pattern is valid (no non-indicators after the first indicator)
-        // Invalid patterns (e.g., B291;B99;H) are treated as default combination, not special indicator positioning
-        // All-indicator composites (e.g., B98) keep their internal positioning
-        const hasGlyphWithIndicators = glyphParts.length > 0 && indicatorParts.length > 0 && isValidPattern;
-        if (hasGlyphWithIndicators) {
+        // Position the indicator group. Runs whenever there are indicator parts
+        // in a valid pattern, with or without a base: a based stack centers over
+        // the base anchor; a baseless stack (every part an indicator) lays out
+        // from origin (#positionIndicatorGroup branches on glyphParts.length).
+        // Invalid patterns (e.g., B291;B99;H) fall through to default combination.
+        // A single-part all-indicator composite (e.g., B98) lays out at origin,
+        // unchanged, keeping its baked internal positioning.
+        const hasPositionedIndicators = indicatorParts.length > 0 && isValidPattern;
+        if (hasPositionedIndicators) {
           this.#positionIndicatorGroup(glyphParts, indicatorParts);
         }
 
         // Normalize: shift parts right only if any child extends left of origin (negative x)
         // Skip normalization for characters with indicators above glyph (they have their own positioning)
-        if (!hasGlyphWithIndicators && this.#children.length > 0) {
+        if (!hasPositionedIndicators && this.#children.length > 0) {
           const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
           if (minX < 0) {
             for (const child of this.#children) {

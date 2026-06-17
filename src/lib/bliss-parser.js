@@ -949,8 +949,11 @@ export class BlissParser {
           if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
           const parts = [];
 
-          // Split on ; (brackets are already replaced with placeholders at this point)
-          const twoPartPartStrings = partsString.split(';');
+          // Split on ; (brackets are already replaced with placeholders at this point).
+          // Drop empty segments so a leading ';' (an empty base, e.g. ';B86')
+          // yields an indicator-only glyph instead of a failed empty part.
+          // Word-level ';;' is resolved upstream and never reaches here.
+          const twoPartPartStrings = partsString.split(';').filter(s => s !== '');
           for (const twoPartPartString of twoPartPartStrings) {
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
 
