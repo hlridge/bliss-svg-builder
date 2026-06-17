@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { BlissSVGBuilder } from '../src/index';
 
 /**
@@ -17,10 +17,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   the semantic; glyph identity restored when the cleared part list
  *   matches a known bare-glyph code; mutation-built output equals the
  *   DSL-built bare glyph byte-for-byte.
- * - Tripwire for a known pre-existing serialization bug: clearing an
- *   indicator from a relocated built-in base drops its :x,y from toString
- *   (render is unaffected), see
- *   `.claude/backlog/relocation-offset-dropped-on-serialization.md`.
+ * - Relocated base offset round-trips: clearing an indicator from a
+ *   relocated base (built-in or custom) keeps its :x,y in toString, so the
+ *   round-trip is lossless (R15 Task 3; the offset was previously dropped
+ *   from toString while still driving the render).
  *
  * Does NOT cover:
  * - applyIndicators on its own surface, see
@@ -40,6 +40,14 @@ function partCodes(builder, groupIdx = 0, glyphIdx = 0) {
 }
 
 describe('ElementHandle clear indicators', () => {
+  const customCodes = [];
+  afterEach(() => {
+    for (const code of customCodes) {
+      try { BlissSVGBuilder.removeDefinition(code); } catch {}
+    }
+    customCodes.length = 0;
+  });
+
   describe('when clearing without stripping the semantic', () => {
     it('removes grammatical indicators and preserves the semantic indicator', () => {
       const b = new BlissSVGBuilder('B291;B86;B97');
@@ -80,6 +88,9 @@ describe('ElementHandle clear indicators', () => {
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
       expect(b.toJSON().groups[0].glyphs[0].isBlissGlyph).toBe(true);
       expect(b.toJSON().groups[0].glyphs[0].codeName).toBe('B291');
+      // pins the zero-offset boundary of the relocation re-emit (R15 Task 3):
+      // a restored built-in with no offset stays bare, never B291:0,0.
+      expect(b.toString()).toBe('B291');
     });
 
     it('matches DSL-built output for the equivalent bare glyph', () => {
@@ -91,20 +102,29 @@ describe('ElementHandle clear indicators', () => {
   });
 
   describe('when the cleared glyph has a relocated base', () => {
-    // Known pre-existing serialization bug (NOT a clearIndicators contract):
-    // clearing the indicator reduces the glyph to a single base part, which
-    // re-stamps its built-in identity (codeName='B291'); serializeGlyph then
-    // emits the bare codeName and never consults the part's x/y, so toString
-    // silently drops the :2,3 offset. The offset survives in the raw part and
-    // still drives the render, so the loss is toString/round-trip only.
-    // Surfaced by the R14 Task 4 review; gated here so the future fix is visible.
-    // see .claude/backlog/relocation-offset-dropped-on-serialization.md
-    it('keeps the rendered offset but drops it from toString (round-trip lossy)', () => {
+    // Clearing the indicator reduces the glyph to a single base part, which
+    // re-stamps its built-in identity (codeName='B291'). serializeGlyph must
+    // still consult the part's x/y and re-emit :x,y so the relocation offset
+    // round-trips through toString instead of collapsing to the bare code.
+    // The offset always drove the render; before R15 Task 3 it was lost from
+    // toString only (round-trip lossy). Surfaced by the R14 Task 4 review.
+    it('re-emits the base offset in toString so the round-trip is lossless', () => {
       const b = new BlissSVGBuilder('B291:2,3;B86/B303');
       b.group(0).glyph(0).clearIndicators();
-      const renderedBare = new BlissSVGBuilder('B291:2,3/B303');
-      expect(b.svgCode).toBe(renderedBare.svgCode);
-      expect(b.toString()).toBe('B291/B303'); // BUG: offset lost; should be B291:2,3/B303
+      expect(b.toString()).toBe('B291:2,3/B303');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+      expect(b.toJSON().groups[0].glyphs[0].parts[0]).toMatchObject({ x: 2, y: 3 });
+    });
+
+    it('round-trips a custom relocated base through decomposition', () => {
+      // A custom base never re-stamps a built-in identity, so it serializes
+      // via the decompose path (already offset-correct) rather than the
+      // identityful-built-in fall-through. Pins the contract for both paths.
+      customCodes.push('RELO_COMP');
+      BlissSVGBuilder.define({ RELO_COMP: { codeString: 'H;E:10,0' } });
+      const b = new BlissSVGBuilder('RELO_COMP:2,3;B86/B303');
+      b.group(0).glyph(0).clearIndicators();
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
       expect(b.toJSON().groups[0].glyphs[0].parts[0]).toMatchObject({ x: 2, y: 3 });
     });
   });

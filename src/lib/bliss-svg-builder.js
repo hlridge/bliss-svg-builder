@@ -1307,7 +1307,18 @@ class BlissSVGBuilder {
         } else if (options.preserve && !builtInCodes.has(glyph.codeName)) {
           code = serializeCustomGlyphDelta(glyph);
         }
-        if (!code) code = glyph.codeName;
+        if (!code) {
+          code = glyph.codeName;
+          // A built-in glyph can re-acquire identity while keeping a relocated
+          // base offset on its sole part (e.g. clearIndicators on `B291:2,3;B86`
+          // restores codeName 'B291' but parts[0] still holds x/y). Re-emit that
+          // offset so toString round-trips the render instead of dropping it.
+          if (glyph.parts?.length === 1) {
+            const x = glyph.parts[0].x ?? 0;
+            const y = glyph.parts[0].y ?? 0;
+            if (x !== 0 || y !== 0) code += `:${x},${y}`;
+          }
+        }
       } else if (glyph.parts) {
         code = serializeParts(glyph.parts);
       } else {
