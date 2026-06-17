@@ -137,5 +137,17 @@ describe('ElementHandle clear indicators', () => {
       expect(b.toString()).toBe('B291:0,3/B303');
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
+
+    it('drops a part-level option on the restored base in toString (known gap, gated for rc.4)', () => {
+      // KNOWN GAP (gated): the identityful-built-in fall-through in serializeGlyph re-emits
+      // the codeName + offset but NOT parts[0].options, so a part-level option on a restored
+      // base is lost from toString (the render and the raw part both keep it). A serializeParts
+      // re-route would fix this and DRY the offset path; this tripwire flips when that lands.
+      // see .claude/backlog/part-options-dropped-on-restored-base.md
+      const b = new BlissSVGBuilder('[color=red]>B291:2,3;B86/B303');
+      b.group(0).glyph(0).clearIndicators();
+      expect(b.toString()).toBe('B291:2,3/B303'); // option dropped (current behavior)
+      expect(b.toJSON().groups[0].glyphs[0].parts[0].options).toMatchObject({ color: 'red' });
+    });
   });
 });
