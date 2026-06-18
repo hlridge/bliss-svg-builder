@@ -22,8 +22,15 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - A clean-base alias is NOT promoted (stays plain `;`, no overlay).
  * - A `!`-stripped applied indicator routes to a `;;!` overlay.
  * - Round-trip svg-identity for the promoted form.
+ * - A base+indicator alias that is NOT the sole glyph in its word-string keeps
+ *   the destructive char-level replace (no promotion); the indicator stays on
+ *   its own glyph and two aliases in one word do not collide. Promotion is
+ *   word-head-scoped, so it only applies to a lone-glyph word.
  *
  * Does NOT cover:
+ * - Reversibility of an applied indicator in a multi-glyph word (a deliberate
+ *   non-goal: the `;;` overlay is word-scoped; per-glyph reversibility would
+ *   need a glyph-level overlay, out of scope for R15 Task 3b-1).
  * - The define-time guard rejecting base+indicator glyph definitions (D-S1a,
  *   Task 3b-2), see `BlissSVGBuilder.define.test.js`.
  * - The buried-indicator warning for an alias used as a non-leading `;`-part
@@ -98,6 +105,27 @@ describe('BlissSVGBuilder indicator promotion', () => {
       const b = new BlissSVGBuilder('NOUN_S;!B81');
       expect(b.toString()).toBe('B291;B97;;!B81');
       expect(b.svgCode).toBe(svg('B291;B81'));
+    });
+  });
+
+  describe('when the alias is not the sole glyph in its word-string', () => {
+    // note: the ;; overlay is word-scoped (it resolves onto the word HEAD), so
+    // promotion only applies when the alias is the lone glyph in its word. A
+    // base+indicator alias used alongside other glyphs keeps the destructive
+    // char-level replace (parent behavior) instead of moving its indicator to
+    // the head. Multi-glyph reversibility is a deliberate non-goal (plan 3b-1).
+    it('keeps the applied indicator on its own glyph instead of the word head', () => {
+      const b = new BlissSVGBuilder('H/NOUN_BI;B97');
+      expect(b.toString()).toBe('H/B291;B97');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(b.svgCode).toBe(svg('H/B291;B97'));
+    });
+
+    it('does not collide two aliases applied in the same word', () => {
+      const b = new BlissSVGBuilder('NOUN_BI;B97/NOUN_BI;B86');
+      expect(b.toString()).toBe('B291;B97/B291;B86');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(b.svgCode).toBe(svg('B291;B97/B291;B86'));
     });
   });
 });

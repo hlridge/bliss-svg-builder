@@ -564,13 +564,13 @@ export class BlissParser {
 
         // isTopLevel: true for user input, false for internal codeString expansion
         // Indicator replacement only applies at top level (user input)
-        function expand(str, definitions, isTopLevel = true, depth = 0) {
+        function expand(str, definitions, isTopLevel = true, depth = 0, isSoleGlyph = false) {
           let hasMarker = false;
           if (str.endsWith('^')) {
             hasMarker = true;
             str = str.slice(0, -1);
           }
-          const parts = expandSegment(str, definitions, isTopLevel, depth);
+          const parts = expandSegment(str, definitions, isTopLevel, depth, isSoleGlyph);
           if (hasMarker) {
             if (parts.length === 1) {
               // Rule 1: ^ attaches to a character (one expanded glyph),
@@ -587,7 +587,7 @@ export class BlissParser {
           return parts;
         }
 
-        function expandSegment(str, definitions, isTopLevel, depth) {
+        function expandSegment(str, definitions, isTopLevel, depth, isSoleGlyph = false) {
           if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
 
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
@@ -658,8 +658,11 @@ export class BlissParser {
           const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
           // Promotion: route the applied indicator into the reversible ;; overlay
           // rather than the destructive char-level replace, but only for a
-          // base+indicator alias, so the baked indicator stays recoverable.
-          const shouldPromote = shouldReplace && baseIsBareAlias;
+          // base+indicator alias that is the SOLE glyph in its word-string. The
+          // ;; overlay is word-scoped (resolves onto the word head), so promoting
+          // a non-sole glyph would move the indicator to the head and collide
+          // between glyphs (F1/F2); a non-sole alias keeps the char-level replace.
+          const shouldPromote = shouldReplace && baseIsBareAlias && isSoleGlyph;
           const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
           // Bare empty strip: trailing ; with no indicator, on any code (even without a known indicator in its definition).
           // The user has no way to know if a B-code has a baked-in indicator, so empty ; must never warn.
@@ -896,7 +899,13 @@ export class BlissParser {
           }];
         }
 
-        const expandedParts = str.split('/').flatMap(strPart => expand(strPart, definitions));
+        // A char-level applied indicator may only promote to the reversible ;;
+        // overlay when its alias is the sole glyph in this word-string (so the
+        // word head IS that glyph); otherwise promotion would target the wrong
+        // glyph. Thread that down to gate promotion (R15 Task 3b-1, F1/F2 fix).
+        const wordGlyphSegments = str.split('/');
+        const isSoleGlyph = wordGlyphSegments.length === 1;
+        const expandedParts = wordGlyphSegments.flatMap(strPart => expand(strPart, definitions, true, 0, isSoleGlyph));
 
         // Resolve and crown the head of each final word (head-marker contract)
         crownWordChunks(expandedParts, wordCode);
