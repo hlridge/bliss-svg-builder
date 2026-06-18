@@ -564,13 +564,13 @@ export class BlissParser {
 
         // isTopLevel: true for user input, false for internal codeString expansion
         // Indicator replacement only applies at top level (user input)
-        function expand(str, definitions, isTopLevel = true, depth = 0, isSoleGlyph = false) {
+        function expand(str, definitions, isTopLevel = true, depth = 0) {
           let hasMarker = false;
           if (str.endsWith('^')) {
             hasMarker = true;
             str = str.slice(0, -1);
           }
-          const parts = expandSegment(str, definitions, isTopLevel, depth, isSoleGlyph);
+          const parts = expandSegment(str, definitions, isTopLevel, depth);
           if (hasMarker) {
             if (parts.length === 1) {
               // Rule 1: ^ attaches to a character (one expanded glyph),
@@ -587,7 +587,7 @@ export class BlissParser {
           return parts;
         }
 
-        function expandSegment(str, definitions, isTopLevel, depth, isSoleGlyph = false) {
+        function expandSegment(str, definitions, isTopLevel, depth) {
           if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
 
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
@@ -657,12 +657,12 @@ export class BlissParser {
           const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement && !baseIsCompoundIndicator;
           const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
           // Promotion: route the applied indicator into the reversible ;; overlay
-          // rather than the destructive char-level replace, but only for a
-          // base+indicator alias that is the SOLE glyph in its word-string. The
-          // ;; overlay is word-scoped (resolves onto the word head), so promoting
-          // a non-sole glyph would move the indicator to the head and collide
-          // between glyphs (F1/F2); a non-sole alias keeps the char-level replace.
-          const shouldPromote = shouldReplace && baseIsBareAlias && isSoleGlyph;
+          // rather than the destructive char-level replace, for any base+indicator
+          // alias. The ;; overlay is the word-level slot; when several glyphs in
+          // one word promote, the assembly loop keeps the first glyph's slot and
+          // drops the rest (first-wins, mirrors mergeWithNext). See the word-slot
+          // model: 2026-06-18-word-indicator-slot-and-head-model-design.md.
+          const shouldPromote = shouldReplace && baseIsBareAlias;
           const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
           // Bare empty strip: trailing ; with no indicator, on any code (even without a known indicator in its definition).
           // The user has no way to know if a B-code has a baked-in indicator, so empty ; must never warn.
@@ -899,13 +899,7 @@ export class BlissParser {
           }];
         }
 
-        // A char-level applied indicator may only promote to the reversible ;;
-        // overlay when its alias is the sole glyph in this word-string (so the
-        // word head IS that glyph); otherwise promotion would target the wrong
-        // glyph. Thread that down to gate promotion (R15 Task 3b-1, F1/F2 fix).
-        const wordGlyphSegments = str.split('/');
-        const isSoleGlyph = wordGlyphSegments.length === 1;
-        const expandedParts = wordGlyphSegments.flatMap(strPart => expand(strPart, definitions, true, 0, isSoleGlyph));
+        const expandedParts = str.split('/').flatMap(strPart => expand(strPart, definitions));
 
         // Resolve and crown the head of each final word (head-marker contract)
         crownWordChunks(expandedParts, wordCode);
@@ -920,9 +914,24 @@ export class BlissParser {
       let pendingAbsoluteKerning;
 
       for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak, _wordIndicators } of expandedGlyphParts) {
-        // R14: lift a word-level indicator overlay onto its enclosing group.
-        // Stamped on the first expanded part by the ;; handler above.
-        if (_wordIndicators) group.wordIndicators = _wordIndicators;
+        // R14/R15: lift a word-level indicator overlay onto its enclosing group.
+        // The word-level ;; slot is a WORD property owned by the FIRST glyph:
+        // the first glyph (group.glyphs still empty) claims it; a later glyph's
+        // promoted overlay is dropped + DROPPED_WORD_INDICATOR (first-wins, so
+        // `/`-composition matches mergeWithNext). An empty first slot still wins.
+        if (_wordIndicators) {
+          if (group.glyphs.length === 0) {
+            group.wordIndicators = _wordIndicators;
+          } else {
+            const { codes = [], stripSemantic } = _wordIndicators;
+            const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+            parseWarnings.push({
+              code: 'DROPPED_WORD_INDICATOR',
+              message: `Composing glyphs into one word dropped a later glyph's word-level indicator overlay (${dropped}). The word keeps only the first glyph's overlay.`,
+              source: dropped,
+            });
+          }
+        }
         // Word break marker from // in bare alias codeString:
         // push current group, add a default space group, start a new group
         if (_wordBreak) {

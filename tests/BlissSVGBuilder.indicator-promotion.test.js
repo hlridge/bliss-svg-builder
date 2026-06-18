@@ -22,15 +22,20 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - A clean-base alias is NOT promoted (stays plain `;`, no overlay).
  * - A `!`-stripped applied indicator routes to a `;;!` overlay.
  * - Round-trip svg-identity for the promoted form.
- * - A base+indicator alias that is NOT the sole glyph in its word-string keeps
- *   the destructive char-level replace (no promotion); the indicator stays on
- *   its own glyph and two aliases in one word do not collide. Promotion is
- *   word-head-scoped, so it only applies to a lone-glyph word.
+ * - An indicator applied to a base+indicator alias in a multi-glyph word: the
+ *   word-level `;;` slot is a word property owned by the FIRST glyph
+ *   (first-wins), so a later glyph's promoted overlay is dropped with a
+ *   `DROPPED_WORD_INDICATOR` warning while every glyph keeps its own baked
+ *   character-level indicator. Composing with `/` is byte-identical to
+ *   `mergeWithNext`.
+ * - Single-glyph promotion records no `DROPPED_WORD_INDICATOR` (nothing to drop).
  *
  * Does NOT cover:
- * - Reversibility of an applied indicator in a multi-glyph word (a deliberate
- *   non-goal: the `;;` overlay is word-scoped; per-glyph reversibility would
- *   need a glyph-level overlay, out of scope for R15 Task 3b-1).
+ * - Per-glyph (glyph-scoped) reversibility: the `;;` slot is word-scoped and
+ *   first-glyph-owned, so a non-first glyph's applied indicator is dropped, not
+ *   given its own reversible slot (a deliberate non-goal).
+ * - Split/merge round-trip of the word-slot and query-time head resolution
+ *   (WS-2…WS-4), see the `ElementHandle.*` suites.
  * - The define-time guard rejecting base+indicator glyph definitions (D-S1a,
  *   Task 3b-2), see `BlissSVGBuilder.define.test.js`.
  * - The buried-indicator warning for an alias used as a non-leading `;`-part
@@ -52,7 +57,9 @@ describe('BlissSVGBuilder indicator promotion', () => {
 
   describe('when an indicator is applied to a grammatical base+indicator alias', () => {
     it('routes the applied indicator into a reversible ;; overlay', () => {
-      expect(new BlissSVGBuilder('NOUN_BI;B97').toString()).toBe('B291;B81;;B97');
+      const b = new BlissSVGBuilder('NOUN_BI;B97');
+      expect(b.toString()).toBe('B291;B81;;B97');
+      expect(b.warnings.map((w) => w.code)).not.toContain('DROPPED_WORD_INDICATOR');
     });
 
     it('leaves the render unchanged from the char-level result', () => {
@@ -108,24 +115,45 @@ describe('BlissSVGBuilder indicator promotion', () => {
     });
   });
 
-  describe('when the alias is not the sole glyph in its word-string', () => {
-    // note: the ;; overlay is word-scoped (it resolves onto the word HEAD), so
-    // promotion only applies when the alias is the lone glyph in its word. A
-    // base+indicator alias used alongside other glyphs keeps the destructive
-    // char-level replace (parent behavior) instead of moving its indicator to
-    // the head. Multi-glyph reversibility is a deliberate non-goal (plan 3b-1).
-    it('keeps the applied indicator on its own glyph instead of the word head', () => {
+  describe('when an indicator is applied to an alias in a multi-glyph word', () => {
+    // note: the word-level ;; slot is a WORD property owned by the first glyph
+    // (first-wins), so composing glyphs with `/` behaves byte-identically to
+    // mergeWithNext: a later glyph's promoted overlay is dropped + warned, and
+    // every glyph keeps its own baked character-level indicator (R15 word-slot
+    // model, supersedes the 85b67a7 single-glyph gate).
+    it('drops a later glyph overlay when the first glyph has an empty word-slot', () => {
       const b = new BlissSVGBuilder('H/NOUN_BI;B97');
-      expect(b.toString()).toBe('H/B291;B97');
+      expect(b.toString()).toBe('H/B291;B81');
+      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
       expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
-      expect(b.svgCode).toBe(svg('H/B291;B97'));
+      expect(b.svgCode).toBe(svg('H/B291;B81'));
     });
 
-    it('does not collide two aliases applied in the same word', () => {
+    it('keeps a first-glyph overlay with no warning when later glyphs are plain', () => {
+      const b = new BlissSVGBuilder('NOUN_BI;B97/E');
+      expect(b.toString()).toBe('B291;B81/E;;B97');
+      expect(b.warnings.map((w) => w.code)).not.toContain('DROPPED_WORD_INDICATOR');
+      expect(svg(b.toString())).toBe(b.svgCode);
+    });
+
+    it('keeps the first glyph overlay and drops the second when two aliases promote', () => {
       const b = new BlissSVGBuilder('NOUN_BI;B97/NOUN_BI;B86');
-      expect(b.toString()).toBe('B291;B97/B291;B86');
-      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
-      expect(b.svgCode).toBe(svg('B291;B97/B291;B86'));
+      expect(b.toString()).toBe('B291;B81/B291;B81;;B97');
+      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
+      expect(svg(b.toString())).toBe(b.svgCode);
+    });
+
+    it('describes the dropped overlay with a ;;B86 source', () => {
+      const b = new BlissSVGBuilder('NOUN_BI;B97/NOUN_BI;B86');
+      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(dropped?.source).toBe(';;B86');
+    });
+
+    it('preserves the ! marker in a dropped strip-semantic overlay source', () => {
+      const b = new BlissSVGBuilder('NOUN_S;!B86/NOUN_S;!B81');
+      expect(b.toString()).toBe('B291;B97/B291;B97;;!B86');
+      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(dropped?.source).toBe(';;!B81');
     });
   });
 });
