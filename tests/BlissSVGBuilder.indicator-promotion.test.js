@@ -155,5 +155,37 @@ describe('BlissSVGBuilder indicator promotion', () => {
       const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
       expect(dropped?.source).toBe(';;!B81');
     });
+
+    it('keeps every applied code in a multi-indicator dropped source', () => {
+      const b = new BlissSVGBuilder('E/NOUN_BI;B97;B81');
+      expect(b.toString()).toBe('E/B291;B81');
+      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(dropped?.source).toBe(';;B97;B81');
+    });
+
+    it('warns once per dropped overlay when several later glyphs promote', () => {
+      const b = new BlissSVGBuilder('E/NOUN_BI;B97/NOUN_BI;B86');
+      const drops = b.warnings.filter((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(drops.map((w) => w.source)).toEqual([';;B97', ';;B86']);
+    });
+  });
+
+  describe('when an explicit ;; overlay follows a promoted glyph in the same word', () => {
+    // KNOWN GAP (R15 WS-1 review, Finding A) — gated tripwire, awaiting a user
+    // decision. The `;;` handler overwrites the first glyph's PROMOTED overlay
+    // with the explicit `;;` BEFORE the assembly loop's first-wins logic runs,
+    // so the promoted indicator (B97) is dropped SILENTLY — no
+    // DROPPED_WORD_INDICATOR — contradicting the "data loss must be loud" rule
+    // (Decision Log #7; mergeWithNext warns in the same situation). This is a
+    // WS-1 regression: pre-WS-1 the `;B97` survived as a char-level bake.
+    // Resolution pending (make the clobber loud + explicit `;;` wins, vs reject
+    // as malformed). WHEN RESOLVED, flip these assertions to expect the warning.
+    // NOTE: the stray trailing `;;` on an empty `;;` (`NOUN_BI;B97/E;;`) is a
+    // SEPARATE pre-existing issue — `H/E;;` emits it too, no promotion involved.
+    it('currently drops the promoted overlay silently (gated, Finding A)', () => {
+      const b = new BlissSVGBuilder('NOUN_BI;B97/E;;B86');
+      expect(b.toString()).toBe('B291;B81/E;;B86');
+      expect(b.warnings.map((w) => w.code)).not.toContain('DROPPED_WORD_INDICATOR');
+    });
   });
 });
