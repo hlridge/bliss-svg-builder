@@ -29,6 +29,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   character-level indicator. Composing with `/` is byte-identical to
  *   `mergeWithNext`.
  * - Single-glyph promotion records no `DROPPED_WORD_INDICATOR` (nothing to drop).
+ * - A promoted overlay colliding with an explicit `;;` in one word: the leftmost
+ *   glyph's word-overlay wins and the later one is dropped + `DROPPED_WORD_INDICATOR`
+ *   (the same first-wins rule as `mergeWithNext`, so `/`-composition stays
+ *   byte-identical to it).
  *
  * Does NOT cover:
  * - Per-glyph (glyph-scoped) reversibility: the `;;` slot is word-scoped and
@@ -170,22 +174,43 @@ describe('BlissSVGBuilder indicator promotion', () => {
     });
   });
 
-  describe('when an explicit ;; overlay follows a promoted glyph in the same word', () => {
-    // KNOWN GAP (R15 WS-1 review, Finding A) — gated tripwire, awaiting a user
-    // decision. The `;;` handler overwrites the first glyph's PROMOTED overlay
-    // with the explicit `;;` BEFORE the assembly loop's first-wins logic runs,
-    // so the promoted indicator (B97) is dropped SILENTLY — no
-    // DROPPED_WORD_INDICATOR — contradicting the "data loss must be loud" rule
-    // (Decision Log #7; mergeWithNext warns in the same situation). This is a
-    // WS-1 regression: pre-WS-1 the `;B97` survived as a char-level bake.
-    // Resolution pending (make the clobber loud + explicit `;;` wins, vs reject
-    // as malformed). WHEN RESOLVED, flip these assertions to expect the warning.
-    // NOTE: the stray trailing `;;` on an empty `;;` (`NOUN_BI;B97/E;;`) is a
-    // SEPARATE pre-existing issue — `H/E;;` emits it too, no promotion involved.
-    it('currently drops the promoted overlay silently (gated, Finding A)', () => {
+  describe('when a promoted overlay and an explicit ;; collide in one word', () => {
+    // note: an explicit `;;` does NOT automatically win; the leftmost glyph's
+    // word-overlay wins and the later one is dropped + warned, whether the
+    // leftmost is promoted or explicit. This is the same first-wins rule as
+    // mergeWithNext, which keeps `/`-composition byte-identical to it (R15
+    // Finding A: the ;;-handler now respects an already-promoted slot instead
+    // of silently clobbering it). The stray trailing `;;` on an empty `;;`
+    // (`NOUN_BI;B97/E;;`) is a SEPARATE pre-existing issue (`H/E;;` emits it
+    // too, no promotion involved).
+    it('keeps the leading promoted overlay and drops the trailing explicit ;;', () => {
       const b = new BlissSVGBuilder('NOUN_BI;B97/E;;B86');
-      expect(b.toString()).toBe('B291;B81/E;;B86');
-      expect(b.warnings.map((w) => w.code)).not.toContain('DROPPED_WORD_INDICATOR');
+      expect(b.toString()).toBe('B291;B81/E;;B97');
+      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(dropped?.source).toBe(';;B86');
+    });
+
+    it('keeps the leading promoted overlay when an explicit ;; trails a plain glyph', () => {
+      const b = new BlissSVGBuilder('NOUN_BI;B97/H;;B86');
+      expect(b.toString()).toBe('B291;B81/H;;B97');
+      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
+    });
+
+    it('keeps a leading explicit overlay and drops a later promoted glyph', () => {
+      const b = new BlissSVGBuilder('E/NOUN_BI;B97;;B86');
+      expect(b.toString()).toBe('E/B291;B81;;B86');
+      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(dropped?.source).toBe(';;B97');
+    });
+
+    it('preserves the ! marker and every code in a dropped explicit overlay source', () => {
+      // pins the dropped-source build in the ;;-handler collision path; a
+      // multi-code strip-semantic explicit overlay distinguishes join(';') from
+      // join('') and the '!' branch from ''
+      const b = new BlissSVGBuilder('NOUN_BI;B97/E;;!B86;B81');
+      expect(b.toString()).toBe('B291;B81/E;;B97');
+      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
+      expect(dropped?.source).toBe(';;!B86;B81');
     });
   });
 });

@@ -556,7 +556,21 @@ export class BlissParser {
           // filter(Boolean) drops empties so a bare `;;` yields an empty list.
           const codes = indicators.split(';').filter(Boolean);
           if (expandedParts.length > 0) {
-            expandedParts[0]._wordIndicators = { codes, stripSemantic };
+            if (expandedParts[0]._wordIndicators) {
+              // The leading glyph already promoted an applied indicator into the
+              // single word-level slot; this explicit `;;` is a later contender.
+              // First-wins (mirrors mergeWithNext): keep the promoted overlay and
+              // drop the explicit one loudly (Decision Log #7), so `/`-composition
+              // stays byte-identical to mergeWithNext.
+              const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+              parseWarnings.push({
+                code: 'DROPPED_WORD_INDICATOR',
+                message: `An explicit word-level indicator overlay (${dropped}) collided with the leading glyph's promoted overlay. The word keeps only the first overlay.`,
+                source: dropped,
+              });
+            } else {
+              expandedParts[0]._wordIndicators = { codes, stripSemantic };
+            }
           }
 
           return expandedParts;
