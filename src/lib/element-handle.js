@@ -979,30 +979,22 @@ export class ElementHandle {
     const rawIndex = groups.indexOf(this.#nodeRef);
     if (rawIndex < 0) return this;
 
-    // Locate the head before splitting so the word-level overlay can follow it.
-    // The overlay is group-scoped and floats to the current head (the marked
-    // glyph, else glyph 0), so it must travel with whichever half keeps that
-    // head. The Math.max(..., 0) fallback mirrors the render-side resolution in
-    // #rebuild for clarity; here it is inert, since glyphIndex is always >= 1
-    // (splitAt rejects <= 0) so neither -1 nor 0 satisfies headIndex >=
-    // glyphIndex — the fallback can never change which half keeps the overlay.
-    const headIndex = group.wordIndicators
-      ? Math.max(group.glyphs.findIndex(g => g.isHeadGlyph === true), 0)
-      : -1;
-
     // Splice trailing glyphs from the original group (mutate in-place)
     const rightGlyphs = group.glyphs.splice(glyphIndex);
+
+    // The word-level overlay is a WORD property, not head-bound, so the first
+    // (left) part always keeps it; the left group already retains
+    // group.wordIndicators here, so there is nothing to move. The `^` head
+    // marker obeys first-wins on a structural split: a marked glyph that lands
+    // in the second part loses its marker (that part re-derives its head from
+    // glyph 0), while a marker that stays in the first part is kept. This keeps
+    // split -> merge lossless for the word-slot and matches mergeWithNext.
+    for (const g of rightGlyphs) delete g.isHeadGlyph;
 
     // Build right-half group with copied options
     const rightGroup = { glyphs: rightGlyphs };
     if (group.options) {
       rightGroup.options = { ...group.options };
-    }
-    // The overlay follows the head: when the head moved into the right half,
-    // hand the overlay over and clear it from the left; otherwise it stays put.
-    if (group.wordIndicators && headIndex >= glyphIndex) {
-      rightGroup.wordIndicators = group.wordIndicators;
-      delete group.wordIndicators;
     }
 
     const spaceGroup = this.#ctx.makeSpaceGroup();
