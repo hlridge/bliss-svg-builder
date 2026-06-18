@@ -23,8 +23,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `;;!` render identically; the word overlay adds onto the indicator base
  *   (the base part is never dropped) and keeps its `;;!` serialization.
  * - Custom definitions with a baked semantic root: all three surfaces strip
- *   the baked B97 and render identically; the baking surfaces serialize to
- *   `B291;B86`, the word overlay keeps `B291;B97;;!B86`.
+ *   the baked B97 and render identically; the char-level `;!` and word-level
+ *   `;;!` DSL forms both serialize to the reversible `B291;B97;;!B86` overlay
+ *   (R15 promotion: a base+indicator alias keeps the baked root recoverable),
+ *   while the API char-path still bakes to `B291;B86` (a serialization
+ *   divergence gated to Task 5; render parity holds).
  * - Multi-glyph words: word-level `;;!` and the head-glyph API render
  *   identically; char-level `;!` is excluded because it follows the last
  *   glyph (different target).
@@ -131,9 +134,13 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
       expect(charLevel.svgCode).toBe(wordLevel.svgCode);
       expect(charLevel.svgCode).toBe(apiBuilder.svgCode);
 
-      // Baking surfaces decompose to the stripped form; the word overlay keeps
-      // the authored `;;!` (the base retains B97 so the strip stays reversible).
-      expect(charLevel.toString()).toBe('B291;B86');
+      // R15 promotion: applying an indicator to a base+indicator alias (here
+      // TEST_THING = B291;B97) routes it into the reversible `;;` overlay, so the
+      // char-level `;!` DSL now matches the word-level `;;!` form and keeps B97
+      // recoverable. The API char-path still bakes destructively to `B291;B86`:
+      // a DSL/API serialization divergence gated to Task 5 (symmetric
+      // applyIndicators). Render parity across all three surfaces still holds.
+      expect(charLevel.toString()).toBe('B291;B97;;!B86');
       expect(apiBuilder.toString()).toBe('B291;B86');
       expect(wordLevel.toString()).toBe('B291;B97;;!B86');
     });

@@ -642,10 +642,24 @@ export class BlissParser {
           // These are indicators composed of multiple indicator parts, not characters with replaceable indicators
           const baseIsCompoundIndicator = baseCodeDef?.isIndicator === true;
 
+          // A base+indicator *alias* (a bare definition: has a codeString but is
+          // not a glyph, shape, or external glyph) promotes an applied indicator
+          // into the reversible word-level ;; overlay instead of destroying the
+          // baked indicator via char-level replace-all. User glyphs keep
+          // replace-all. Mirrors the bare-alias test in #resolveBareAliases.
+          // See [[feedback_no_indicator_of_a_part]] (R15 Task 3b-1).
+          const baseIsBareAlias = !!baseCodeDef && baseCodeDef.codeString !== undefined
+            && !baseCodeDef.isBlissGlyph && !baseCodeDef.isShape
+            && !baseCodeDef.isExternalGlyph && !baseCodeDef.glyphCode;
+
           // Indicator replacement: only for top-level, non-words, with matching indicator types
           // Skip if the base code itself is an indicator (compound indicators should keep their structure)
           const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement && !baseIsCompoundIndicator;
           const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
+          // Promotion: route the applied indicator into the reversible ;; overlay
+          // rather than the destructive char-level replace, but only for a
+          // base+indicator alias, so the baked indicator stays recoverable.
+          const shouldPromote = shouldReplace && baseIsBareAlias;
           const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
           // Bare empty strip: trailing ; with no indicator, on any code (even without a known indicator in its definition).
           // The user has no way to know if a B-code has a baked-in indicator, so empty ; must never warn.
@@ -663,8 +677,10 @@ export class BlissParser {
           if (definition.codeString) {
             let codeStringToExpand = definition.codeString;
 
-            // Modify codeString for indicator replacement/removal
-            if (shouldReplace || shouldRemove) {
+            // Modify codeString for indicator replacement/removal. Promotion (a
+            // base+indicator alias) skips this so the baked indicator stays in
+            // the codeString; the applied indicator becomes a ;; overlay below.
+            if ((shouldReplace || shouldRemove) && !shouldPromote) {
               const codeStringParts = definition.codeString.split(';');
               const existingIndicatorCodes = codeStringParts.slice(1).map(p => p.split(':')[0]);
               const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
@@ -843,6 +859,15 @@ export class BlissParser {
             // Prepend options to the first expanded part
             if (optionsPrefix && expandedParts.length > 0) {
               expandedParts[0].part = optionsPrefix + expandedParts[0].part;
+            }
+
+            // Promotion (R15 Task 3b-1): stash the applied indicators as a
+            // reversible ;; overlay on the head part; the assembly loop lifts it
+            // onto group.wordIndicators (mirrors the ;; handler ~L559). The
+            // alias's baked indicator stays on the character and reappears when
+            // the overlay is cleared. See [[feedback_no_indicator_of_a_part]].
+            if (shouldPromote && expandedParts.length > 0) {
+              expandedParts[0]._wordIndicators = { codes: filteredIndicators, stripSemantic };
             }
             return expandedParts;
           }
