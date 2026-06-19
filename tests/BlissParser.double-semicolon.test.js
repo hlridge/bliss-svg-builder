@@ -19,8 +19,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * Covers:
  * - Store shape: codes list, stripSemantic flag, empty overlay, and base
  *   glyphs staying unbaked (no indicator baked into any glyph's parts).
- * - Head targeting at render via explicit ^ marker, modifier-exclusion
- *   fallback, and the index-0 default (which carries no isHeadGlyph flag).
+ * - Head targeting at render via explicit ^ marker and the query-time
+ *   fallback scan (modifier-exclusion and index-0 defaults; fallback heads
+ *   carry no parser isHeadGlyph flag, resolved at render instead).
  * - Multiple indicators resolving onto the head in one overlay.
  * - Non-indicator codes filtered at resolve (render unchanged), with an
  *   existing grammatical indicator dropped and a semantic root preserved.
@@ -124,7 +125,9 @@ describe('BlissParser ;; syntax', () => {
       const head = resolvedHead('B486/B291;;B86');
       expect(head.index).toBe(1);
       expect(head.parts).toEqual(['B291', 'B86']);
-      expect(BlissParser.parse('B486/B291;;B86').groups[0].glyphs[1].isHeadGlyph).toBe(true);
+      // R15 WS-4: the parser leaves a fallback head unstamped; the resolved
+      // head above (index 1) is derived at query time, not from a parse stamp.
+      expect(BlissParser.parse('B486/B291;;B86').groups[0].glyphs[1].isHeadGlyph).toBeUndefined();
     });
 
     it('defaults to the first glyph with no isHeadGlyph flag', () => {

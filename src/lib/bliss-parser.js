@@ -7,10 +7,7 @@
 import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import {
-  blissHeadGlyphExclusions,
-  absoluteNeverHead,
-  lowPriorityExclusions,
-  conditionalExceptions
+  resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import {
   getSemanticRoot,
@@ -327,56 +324,7 @@ export class BlissParser {
         // decorations written onto part strings by outer expansion levels.
         const findFallbackHeadIndex = (parts) => {
           const getCode = (i) => parts[i].glyphCode ?? parts[i]._scanCode ?? parts[i].part.split(';')[0];
-
-          // Check if exclusion applies (handles conditional exceptions like B10/B4)
-          const isExcluded = (code, index) => {
-            for (const [excl, notWhenFollowedBy] of conditionalExceptions) {
-              if (code === excl && index + 1 < parts.length && getCode(index + 1) === notWhenFollowedBy) {
-                return false;
-              }
-            }
-            return true;
-          };
-
-          // Skip modifier patterns from start
-          let startIndex = 0;
-          let foundMatch = true;
-          while (foundMatch && startIndex < parts.length) {
-            foundMatch = false;
-            for (const pattern of blissHeadGlyphExclusions) {
-              const codes = pattern.split('/');
-              if (startIndex + codes.length <= parts.length) {
-                let matches = true;
-                for (let i = 0; i < codes.length; i++) {
-                  const code = getCode(startIndex + i);
-                  if (code !== codes[i] || (codes.length === 1 && !isExcluded(code, startIndex + i))) {
-                    matches = false;
-                    break;
-                  }
-                }
-                if (matches) {
-                  startIndex += codes.length;
-                  foundMatch = true;
-                  break;
-                }
-              }
-            }
-          }
-
-          if (startIndex < parts.length) return startIndex;
-
-          // All exclusions: find best head by priority (regular > low-priority > never-head)
-          let best = 0;
-          let bestPriority = absoluteNeverHead.includes(getCode(0)) ? 0 : lowPriorityExclusions.includes(getCode(0)) ? 1 : 2;
-          for (let i = 1; i < parts.length; i++) {
-            const code = getCode(i);
-            const priority = absoluteNeverHead.includes(code) ? 0 : lowPriorityExclusions.includes(code) ? 1 : 2;
-            if (priority > bestPriority || (priority === bestPriority && priority > 0)) {
-              best = i;
-              bestPriority = priority;
-            }
-          }
-          return best;
+          return resolveHeadIndex(parts.map((_, i) => getCode(i)));
         };
 
         // Per-word-string head resolution (head-marker contract):
@@ -446,13 +394,14 @@ export class BlissParser {
           return firstResolved;
         };
 
-        // Resolve and crown one final word: designated heads are always
-        // marked; fallback heads only when they deviate from the index-0
-        // default that downstream consumers assume.
+        // Resolve and crown one final word: only an explicit `^`/designation
+        // is stamped. Fallback heads stay unstamped and are resolved at query
+        // time (render/serialize/snapshot) via resolveHeadIndex, so the stamp
+        // can never go stale after a structural mutation reorders the word.
         const crownWordChunk = (parts, label) => {
           if (parts.length === 0) return;
           const resolved = resolveWordStringHead(parts, label);
-          if (resolved.isDesignated || resolved.index > 0) {
+          if (resolved.isDesignated) {
             parts[resolved.index].isHeadGlyph = true;
           }
         };

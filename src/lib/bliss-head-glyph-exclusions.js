@@ -161,3 +161,70 @@ export const blissHeadGlyphExclusions = [
   'B17', // eight
   'B18', // nine
 ];
+
+/**
+ * Resolve which glyph index of a word is the fallback head, given each
+ * glyph's head-scan code (its base character code, or a custom glyph's own
+ * identity). Skips leading exclusion patterns (single- and multi-code, plus
+ * the conditional B10/B4 exception); when every code is an exclusion, picks by
+ * priority tier (regular > low-priority > absolute-never-head). This is the
+ * single source of truth for fallback head selection, shared by the parser
+ * (parse-time crowning) and the builder/element layers (query-time
+ * resolution), so an explicit `^`/designation stays the only persistent
+ * override.
+ *
+ * @param {string[]} headCodes - one head-scan code per glyph, in word order
+ * @returns {number} index of the fallback head (0 for an empty list)
+ */
+export const resolveHeadIndex = (headCodes) => {
+  // Conditional exception (e.g. B10/B4): an otherwise-excluded code is not
+  // excluded when immediately followed by its paired code.
+  const isExcluded = (code, index) => {
+    for (const [excl, notWhenFollowedBy] of conditionalExceptions) {
+      if (code === excl && index + 1 < headCodes.length && headCodes[index + 1] === notWhenFollowedBy) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Skip leading exclusion patterns from the start.
+  let startIndex = 0;
+  let foundMatch = true;
+  while (foundMatch && startIndex < headCodes.length) {
+    foundMatch = false;
+    for (const pattern of blissHeadGlyphExclusions) {
+      const codes = pattern.split('/');
+      if (startIndex + codes.length <= headCodes.length) {
+        let matches = true;
+        for (let i = 0; i < codes.length; i++) {
+          const code = headCodes[startIndex + i];
+          if (code !== codes[i] || (codes.length === 1 && !isExcluded(code, startIndex + i))) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) {
+          startIndex += codes.length;
+          foundMatch = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (startIndex < headCodes.length) return startIndex;
+
+  // All exclusions: find best head by priority (regular > low-priority > never-head).
+  let best = 0;
+  let bestPriority = absoluteNeverHead.includes(headCodes[0]) ? 0 : lowPriorityExclusions.includes(headCodes[0]) ? 1 : 2;
+  for (let i = 1; i < headCodes.length; i++) {
+    const code = headCodes[i];
+    const priority = absoluteNeverHead.includes(code) ? 0 : lowPriorityExclusions.includes(code) ? 1 : 2;
+    if (priority > bestPriority || (priority === bestPriority && priority > 0)) {
+      best = i;
+      bestPriority = priority;
+    }
+  }
+  return best;
+};

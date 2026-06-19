@@ -226,8 +226,9 @@ describe('BlissParser word-indicator syntax', () => {
       // Second glyph (H) should have indicator attached via fallback heuristics
       expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('H');
       expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      // Parser sets isHeadGlyph for non-default fallback (index > 0)
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
+      // R15 WS-4: the parser no longer stamps a fallback head; the attached
+      // B86 above confirms it resolves here at render.
+      expect(result.groups[0].glyphs[1].isHeadGlyph).toBeUndefined();
     });
 
     it('skips a multi-glyph modifier pattern and attaches the indicator after it', () => {
@@ -240,10 +241,11 @@ describe('BlissParser word-indicator syntax', () => {
       expect(result.groups[0].glyphs[1].glyphCode).toBe('B578');
       expect(result.groups[0].glyphs[2].glyphCode).toBe('B303');
 
-      // Fourth glyph (H) should have indicator and isHeadGlyph (fallback index > 0)
+      // Fourth glyph (H) carries the indicator; the parser no longer stamps a
+      // fallback head (R15 WS-4), so the attached B86 confirms it resolves here.
       expect(result.groups[0].glyphs[3].parts[0].codeName).toBe('H');
       expect(result.groups[0].glyphs[3].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[3].isHeadGlyph).toBe(true);
+      expect(result.groups[0].glyphs[3].isHeadGlyph).toBeUndefined();
     });
 
     it('skips multiple B486 modifiers in sequence', () => {
@@ -257,10 +259,11 @@ describe('BlissParser word-indicator syntax', () => {
       expect(result.groups[0].glyphs[1].glyphCode).toBe('B486');
       expect(result.groups[0].glyphs[1].isHeadGlyph).toBeUndefined();
 
-      // Third glyph (H) should have indicator and isHeadGlyph
+      // Third glyph (H) carries the indicator; the parser no longer stamps a
+      // fallback head (R15 WS-4), so the attached B86 confirms it resolves here.
       expect(result.groups[0].glyphs[2].parts[0].codeName).toBe('H');
       expect(result.groups[0].glyphs[2].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[2].isHeadGlyph).toBe(true);
+      expect(result.groups[0].glyphs[2].isHeadGlyph).toBeUndefined();
     });
 
     it('honors an explicit ^ marker on a modifier (overrides fallback)', () => {
@@ -292,10 +295,11 @@ describe('BlissParser word-indicator syntax', () => {
       expect(result.groups[0].glyphs[2].glyphCode).toBe('B578');
       expect(result.groups[0].glyphs[3].glyphCode).toBe('B303');
 
-      // Fifth glyph (H) should have indicator and isHeadGlyph (fallback index > 0)
+      // Fifth glyph (H) carries the indicator; the parser no longer stamps a
+      // fallback head (R15 WS-4), so the attached B86 confirms it resolves here.
       expect(result.groups[0].glyphs[4].parts[0].codeName).toBe('H');
       expect(result.groups[0].glyphs[4].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[4].isHeadGlyph).toBe(true);
+      expect(result.groups[0].glyphs[4].isHeadGlyph).toBeUndefined();
     });
   });
 
@@ -433,7 +437,8 @@ describe('BlissParser word-indicator syntax', () => {
       const glyphs = r.groups[0].glyphs;
 
       expect(partCodes(glyphs[1])).toEqual(['B291', 'B81', 'B97']);
-      expect(glyphs[1].isHeadGlyph).toBe(true);
+      // R15 WS-4: fallback head unstamped; the partCodes above confirm it resolves here.
+      expect(glyphs[1].isHeadGlyph).toBeUndefined();
     });
 
     it('leaves the existing word indicators unchanged when the provided indicator is not a real indicator', () => {
@@ -448,7 +453,8 @@ describe('BlissParser word-indicator syntax', () => {
       const head = r.groups[0].glyphs[1];
 
       expect(partCodes(head)).toEqual(['B291']);
-      expect(head.isHeadGlyph).toBe(true);
+      // R15 WS-4: fallback head unstamped; the partCodes above confirm it resolves here.
+      expect(head.isHeadGlyph).toBeUndefined();
     });
 
     it('preserves the semantic root on empty ;', () => {

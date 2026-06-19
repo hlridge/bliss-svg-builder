@@ -1,13 +1,15 @@
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
  * Pins BlissParser head-glyph marker (`^`): the explicit DSL postfix
  * that designates which glyph in a word receives grammatical indicators
- * (part-of-speech markers rendered above the character), and the
- * fallback heuristics that decide head-glyph designation when no `^`
- * marker is present.
+ * (part-of-speech markers rendered above the character). The parser stamps
+ * isHeadGlyph only for an explicit `^`/designation (R15 WS-4); when no usable
+ * marker is present every glyph is left unstamped and the element layer
+ * resolves the fallback head at query time (verified here via the snapshot).
  *
  * Covers:
  * - `^` marker detection at the end of a glyph token (simple, with
@@ -22,9 +24,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   a `MULTIPLE_HEAD_MARKERS` warning.
  * - Edge cases: lone `^`, whitespace surrounding `^`, external glyph
  *   codes (`Xa^`), composite-definition codes (`B291^`).
- * - Fallback heuristics when no `^` marker is present: skip the
- *   `B1060/B578/B303` sequence at start, skip `B486`, default to the
- *   first character.
+ * - Fallback head resolution when no `^` marker is present: the parser
+ *   leaves every glyph unstamped and the element layer crowns the head
+ *   (skip the `B1060/B578/B303` sequence, skip `B486`, default to index 0).
  * - The head-glyph algorithm running over a definition's recursive
  *   expansion: fallback heuristics applied to the expanded glyph
  *   list, an explicit `^` carried inside a codeString, an outer `^`
@@ -61,6 +63,16 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * @contract: head-glyph-marker
  */
 describe('BlissParser head-glyph marker', () => {
+
+  // The parser stamps isHeadGlyph only for an explicit `^`/designation
+  // (R15 WS-4); a fallback head is resolved downstream. These read the head the
+  // element layer resolves, so the fallback-heuristic coverage moves with it.
+  const glyphsOf = (dsl, groupIndex = 0) =>
+    new BlissSVGBuilder(dsl).elements.children[groupIndex].children.filter(c => c.isGlyph);
+  const crownIndex = (dsl, groupIndex = 0) =>
+    glyphsOf(dsl, groupIndex).findIndex(g => g.isHeadGlyph);
+  const crownCount = (dsl, groupIndex = 0) =>
+    glyphsOf(dsl, groupIndex).filter(g => g.isHeadGlyph).length;
 
   describe('when ^ marks a glyph at the end of its token', () => {
     it('detects ^ on a simple glyph', () => {
@@ -345,15 +357,17 @@ describe('BlissParser head-glyph marker', () => {
     });
 
     describe('when the input begins with the B1060/B578/B303 skip sequence', () => {
-      it('marks the glyph after the skip sequence as head (no explicit marker)', () => {
+      it('crowns the glyph after the skip sequence downstream, leaving the parser stamp clear', () => {
         const result = BlissParser.parse('B1060/B578/B303/B208');
 
-        // Parser applies fallback: skips excluded prefix, marks B208 as head
+        // R15 WS-4: the parser stamps no fallback head; the element layer skips
+        // the excluded prefix and crowns B208 (index 3) at query time.
         const glyphs = result.groups[0].glyphs;
         expect(glyphs[0].isHeadGlyph).toBeUndefined();
         expect(glyphs[1].isHeadGlyph).toBeUndefined();
         expect(glyphs[2].isHeadGlyph).toBeUndefined();
-        expect(glyphs[3].isHeadGlyph).toBe(true);
+        expect(glyphs[3].isHeadGlyph).toBeUndefined();
+        expect(crownIndex('B1060/B578/B303/B208')).toBe(3);
       });
 
       it('explicit marker overrides skip sequence', () => {
@@ -365,13 +379,15 @@ describe('BlissParser head-glyph marker', () => {
     });
 
     describe('when the input contains B486 characters', () => {
-      it('marks the glyph after the B486 as head (no explicit marker)', () => {
+      it('crowns the glyph after the B486 downstream, leaving the parser stamp clear', () => {
         const result = BlissParser.parse('B486/B208');
 
-        // Parser applies fallback: skips B486, marks B208 as head
+        // R15 WS-4: no parser fallback stamp; the element layer skips B486 and
+        // crowns B208 (index 1) at query time.
         const glyphs = result.groups[0].glyphs;
         expect(glyphs[0].isHeadGlyph).toBeUndefined();
-        expect(glyphs[1].isHeadGlyph).toBe(true);
+        expect(glyphs[1].isHeadGlyph).toBeUndefined();
+        expect(crownIndex('B486/B208')).toBe(1);
       });
 
       it('explicit marker on B486 overrides skip rule', () => {
@@ -380,31 +396,30 @@ describe('BlissParser head-glyph marker', () => {
         expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
       });
 
-      it('marks the glyph after multiple consecutive B486 as head', () => {
+      it('crowns the glyph after multiple consecutive B486 downstream', () => {
         const result = BlissParser.parse('B486/B486/B208');
 
-        // Parser applies fallback: skips both B486, marks B208 as head
+        // R15 WS-4: no parser fallback stamp; the element layer skips both B486
+        // and crowns B208 (index 2) at query time.
         const glyphs = result.groups[0].glyphs;
         expect(glyphs[0].isHeadGlyph).toBeUndefined();
         expect(glyphs[1].isHeadGlyph).toBeUndefined();
-        expect(glyphs[2].isHeadGlyph).toBe(true);
+        expect(glyphs[2].isHeadGlyph).toBeUndefined();
+        expect(crownIndex('B486/B486/B208')).toBe(2);
       });
     });
 
     describe('when multiple skip rules combine', () => {
       it('marks the glyph after the combined skip-sequence and B486 as head', () => {
         // Combined fallback: skip the B1060/B578/B303 sequence, then skip
-        // B486, crowning B208 at index 4. Strengthened from a count-only
-        // assertion (the count stays as a secondary invariant).
+        // B486, crowning B208 at index 4. R15 WS-4: the parser stamps no
+        // fallback head; the element layer resolves the combined skip.
         const result = BlissParser.parse('B1060/B578/B303/B486/B208');
 
         const glyphs = result.groups[0].glyphs;
         expect(glyphs.length).toBe(5);
-        expect(glyphs[0].isHeadGlyph).toBeUndefined();
-        expect(glyphs[1].isHeadGlyph).toBeUndefined();
-        expect(glyphs[2].isHeadGlyph).toBeUndefined();
-        expect(glyphs[3].isHeadGlyph).toBeUndefined();
-        expect(glyphs[4].isHeadGlyph).toBe(true);
+        expect(glyphs.every(g => g.isHeadGlyph === undefined)).toBe(true);
+        expect(crownIndex('B1060/B578/B303/B486/B208')).toBe(4);
       });
 
       it('explicit marker anywhere overrides all heuristics', () => {
@@ -446,9 +461,10 @@ describe('BlissParser head-glyph marker', () => {
       const r = BlissParser.parse('_C15B_WORD_SEMANTIC');
       const glyphs = r.groups[0].glyphs;
 
-      expect(Object.hasOwn(glyphs[0], 'isHeadGlyph')).toBe(false);
-      expect(glyphs[1].isHeadGlyph).toBe(true);
-      expect(Object.hasOwn(glyphs[2], 'isHeadGlyph')).toBe(false);
+      // R15 WS-4: a fallback head over an alias expansion is unstamped; the
+      // element layer crowns the non-first head (B291, index 1) at query time.
+      expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
+      expect(crownIndex('_C15B_WORD_SEMANTIC')).toBe(1);
     });
 
     it('keeps an explicit marker on the first expanded glyph instead of falling through to the heuristic', () => {
@@ -466,9 +482,10 @@ describe('BlissParser head-glyph marker', () => {
       const r = BlissParser.parse('_C15B_WORD_SEMANTIC^');
       const glyphs = r.groups[0].glyphs;
 
-      expect(Object.hasOwn(glyphs[0], 'isHeadGlyph')).toBe(false);
-      expect(glyphs[1].isHeadGlyph).toBe(true);
-      expect(Object.hasOwn(glyphs[2], 'isHeadGlyph')).toBe(false);
+      // The dropped ^ leaves no designation; R15 WS-4 keeps the fallback head
+      // unstamped and the element layer crowns B291 (index 1).
+      expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
+      expect(crownIndex('_C15B_WORD_SEMANTIC^')).toBe(1);
       expect(r._parseWarnings).toEqual([
         expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' }),
       ]);
@@ -494,10 +511,11 @@ describe('BlissParser head-glyph marker', () => {
       const r = BlissParser.parse('_HG_NESTED_OUTER');
       const glyphs = r.groups[0].glyphs;
 
-      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
-      expect(glyphs[1].isHeadGlyph).toBe(true);
-      expect(Object.hasOwn(glyphs[0], 'isHeadGlyph')).toBe(false);
-      expect(Object.hasOwn(glyphs[2], 'isHeadGlyph')).toBe(false);
+      // R15 WS-4: no parser fallback stamp anywhere; the element layer crowns
+      // exactly one head (B291, index 1) across the nested alias expansion.
+      expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
+      expect(crownCount('_HG_NESTED_OUTER')).toBe(1);
+      expect(crownIndex('_HG_NESTED_OUTER')).toBe(1);
     });
 
     it('keeps the fallback head when the alias is invoked with a position suffix', () => {
@@ -508,8 +526,11 @@ describe('BlissParser head-glyph marker', () => {
       const glyphs = r.groups[0].glyphs;
 
       expect(glyphs[0].parts[0].x).toBe(2);
-      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
-      expect(glyphs[1].isHeadGlyph).toBe(true);
+      // R15 WS-4: no parser fallback stamp; the element layer crowns exactly
+      // one head (index 1) after the composite-first scan.
+      expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
+      expect(crownCount('_HG_COMPOSITE_FIRST:2,0')).toBe(1);
+      expect(crownIndex('_HG_COMPOSITE_FIRST:2,0')).toBe(1);
     });
 
     it('keeps the fallback head when the alias is invoked with an options prefix', () => {
@@ -519,8 +540,11 @@ describe('BlissParser head-glyph marker', () => {
       const glyphs = r.groups[0].glyphs;
 
       expect(glyphs[0].options.color).toBe('red');
-      expect(glyphs.filter(g => g.isHeadGlyph === true)).toHaveLength(1);
-      expect(glyphs[1].isHeadGlyph).toBe(true);
+      // R15 WS-4: no parser fallback stamp; the element layer crowns exactly
+      // one head (index 1) after the composite-first scan.
+      expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
+      expect(crownCount('[color=red]_HG_COMPOSITE_FIRST')).toBe(1);
+      expect(crownIndex('[color=red]_HG_COMPOSITE_FIRST')).toBe(1);
     });
   });
 });

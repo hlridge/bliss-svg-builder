@@ -67,6 +67,14 @@ describe('BlissParser head-marker matrix', () => {
       .filter(c => c.isGlyph)
       .map(g => g.children.map(p => p.codeName));
 
+  // Index of the query-time resolved head in the first word. A fallback head
+  // carries no parser stamp post-R15-WS-4, so the scan result is read from the
+  // snapshot (where bliss-element resolves it) rather than from markedIndexes.
+  const crownIndex = (dsl) =>
+    new BlissSVGBuilder(dsl).snapshot().children[0].children
+      .filter(c => c.isGlyph)
+      .findIndex(g => g.isHeadGlyph);
+
   describe('when ^ rides a single-character alias chain', () => {
     it('honors the marker through a two-level chain to a single character', () => {
       const r = BlissParser.parse('B101/_HMM_CHAIN2^');
@@ -118,8 +126,10 @@ describe('BlissParser head-marker matrix', () => {
 
     it('keeps an inner designation dormant when the outer alias resolves to a plain fallback head', () => {
       // _HMM_NEST_PLAIN's own scan stops on plain B291, so the alias
-      // contributes no designation; the inner B208 marker never surfaces.
-      expect(markedIndexes(BlissParser.parse('B486/_HMM_NEST_PLAIN'))).toEqual([1]);
+      // contributes no designation; the inner B208 marker never surfaces. The
+      // fallback head (B291, index 1) resolves at query time, not stamped.
+      expect(markedIndexes(BlissParser.parse('B486/_HMM_NEST_PLAIN'))).toEqual([]);
+      expect(crownIndex('B486/_HMM_NEST_PLAIN')).toBe(1);
     });
   });
 
@@ -133,7 +143,10 @@ describe('BlissParser head-marker matrix', () => {
     });
 
     it('crowns the transparent alias characters by plain scan when nothing is designated', () => {
-      expect(markedIndexes(BlissParser.parse('B486/_HMM_CD'))).toEqual([1]);
+      // Nothing designated, so the plain scan crowns B313 (index 1) at query
+      // time (R15 WS-4); the parser stamps no fallback head.
+      expect(markedIndexes(BlissParser.parse('B486/_HMM_CD'))).toEqual([]);
+      expect(crownIndex('B486/_HMM_CD')).toBe(1);
     });
 
     it('redirects inside an all-exclusion fragment to its marked exclusion', () => {
@@ -147,8 +160,10 @@ describe('BlissParser head-marker matrix', () => {
     });
 
     it('applies the B10/B4 conditional exception across the fragment boundary', () => {
-      // B10 is not excluded when followed by B4, so the scan stops at B10.
-      expect(markedIndexes(BlissParser.parse('B486/_HMM_COND'))).toEqual([1]);
+      // B10 is not excluded when followed by B4, so the scan stops at B10
+      // (index 1), resolved at query time (R15 WS-4) with no parser stamp.
+      expect(markedIndexes(BlissParser.parse('B486/_HMM_COND'))).toEqual([]);
+      expect(crownIndex('B486/_HMM_COND')).toBe(1);
     });
 
     it('redirects from the conditional-exception stop to the fragment designation', () => {
@@ -271,12 +286,16 @@ describe('BlissParser head-marker matrix', () => {
   });
 
   describe('when the scan meets decorated characters', () => {
+    // The scan now runs at query time (R15 WS-4), so the resolved head reads
+    // from the snapshot; the parser stamps no fallback head (markedIndexes []).
     it('skips a part-level-optioned exclusion character', () => {
-      expect(markedIndexes(BlissParser.parse('[color=red]>B486/B208'))).toEqual([1]);
+      expect(markedIndexes(BlissParser.parse('[color=red]>B486/B208'))).toEqual([]);
+      expect(crownIndex('[color=red]>B486/B208')).toBe(1);
     });
 
     it('skips an options-prefixed composite exclusion character', () => {
-      expect(markedIndexes(BlissParser.parse('[color=red]B486;B303/B291'))).toEqual([1]);
+      expect(markedIndexes(BlissParser.parse('[color=red]B486;B303/B291'))).toEqual([]);
+      expect(crownIndex('[color=red]B486;B303/B291')).toBe(1);
     });
   });
 });

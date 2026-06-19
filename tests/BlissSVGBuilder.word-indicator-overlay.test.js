@@ -18,6 +18,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - getElementByKey on a `;;` head: base parts stay addressable by key; the
  *   overlay-injected indicator part returns null (lives only in the resolved
  *   tree, no raw node to mutate).
+ * - Query-time head re-derivation: after a structural glyph insert the overlay
+ *   floats onto the freshly-resolved head (no stale parse-time stamp), and an
+ *   explicit `^` head survives the same insert.
  *
  * Does NOT cover:
  * - Parser store shape and head targeting, see
@@ -93,6 +96,30 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
       const parts = headGlyphSnap(builder).children;
       const overlayPart = parts.find(p => p.isIndicator);
       expect(builder.getElementByKey(overlayPart.key)).toBeNull();
+    });
+  });
+
+  describe('when the head is re-derived after a structural mutation', () => {
+    it('floats the overlay onto the re-derived head, not the parse-time stale one', () => {
+      // B233 is absolute never-head, so a fresh parse crowns H. Prepending a
+      // non-excluded glyph must re-derive the head to it at render and serialize.
+      const mutated = new BlissSVGBuilder('B233/H;;B97');
+      mutated.group(0).insertGlyph(0, 'B303');
+      const fresh = new BlissSVGBuilder('B303/B233/H;;B97');
+      expect(mutated.svgCode).toBe(fresh.svgCode);
+      expect(mutated.toString()).toBe('B303/B233/H;;B97');
+      // pins query-time head resolution (R15 WS-4): no stale isHeadGlyph stamp
+      // mis-routes the overlay or emits a spurious ^ after the insert.
+    });
+
+    it('keeps an explicit ^ head through the same insertion', () => {
+      // ^ is a per-word authoring marker: it survives a per-glyph mutation, so
+      // the overlay stays on the marked glyph even as a glyph is prepended.
+      const mutated = new BlissSVGBuilder('B233/H^;;B97');
+      mutated.group(0).insertGlyph(0, 'B303');
+      const fresh = new BlissSVGBuilder('B303/B233/H^;;B97');
+      expect(mutated.svgCode).toBe(fresh.svgCode);
+      expect(mutated.toString()).toBe('B303/B233/H^;;B97');
     });
   });
 });

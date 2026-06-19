@@ -37,8 +37,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   positive width/height; advanceX advances the cursor for sibling glyphs.
  * - Content-kind flags: isBlissGlyph for B-codes, isExternalGlyph for
  *   X-prefix glyphs, isShape for leaf shape elements.
- * - isHeadGlyph: the first glyph of every group; single-glyph words
- *   self-head.
+ * - isHeadGlyph: the query-time resolved head of every group (first
+ *   non-excluded glyph; single-glyph words self-head), exactly one per group.
  * - Immutability: throws on direct assignment to any snapshot property,
  *   push to the children array, or assignment to a bounds property.
  * - Element-instance navigation: `parentElement` back-references the
@@ -274,6 +274,15 @@ describe('BlissElement snapshots', () => {
       const word = root.children[0];
       expect(word.children[0].isHeadGlyph).toBe(true);
       expect(word.children[1].isHeadGlyph).toBe(false);
+    });
+
+    it('resolves the head past an excluded base via the exclusion scan', () => {
+      // B486 (opposite-to) is a head-glyph exclusion, so the head is B368 at
+      // index 1, resolved here at query time (R15 WS-4) rather than defaulting
+      // to index 0. Pins the snapshot's resolveHeadIndex use against a revert.
+      const word = new BlissSVGBuilder('B486/B368').elements.children[0];
+      expect(word.children[0].isHeadGlyph).toBe(false);
+      expect(word.children[1].isHeadGlyph).toBe(true);
     });
 
     it('has exactly one head glyph per group across multi-word inputs', () => {

@@ -4,7 +4,8 @@
   "plugins": ["@stryker-mutator/vitest-runner"],
   "mutate": [
     "src/lib/bliss-element.js",
-    "src/lib/bliss-parser.js"
+    "src/lib/bliss-parser.js",
+    "src/lib/bliss-head-glyph-exclusions.js"
   ],
   "testRunner": "vitest",
   "vitest": {

@@ -90,7 +90,10 @@ describe('BlissParser head-marker contract', () => {
     it('crowns the post-exclusion scan stop after dropping the marker ((B486 W)^)', () => {
       const r = BlissParser.parse('_HMC_XW^');
 
-      expect(markedIndexes(r)).toEqual([1]);
+      // The dropped ^ leaves no designation; the post-exclusion scan stop
+      // (B313, index 1) is now resolved at query time (R15 WS-4), not stamped.
+      expect(markedIndexes(r)).toEqual([]);
+      expect(crownOf('_HMC_XW^')).toBe(1);
       expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
     });
   });
