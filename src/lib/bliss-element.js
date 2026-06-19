@@ -646,7 +646,23 @@ export class BlissElement {
         this.#relativeToParentX = this.#blissObj.x ?? 0;
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
-        if (!isPredefinedElement && !isCompositeElement) {
+        if (this.#blissObj.errorCode === 'BURIED_INDICATOR') {
+          // A base+indicator alias buried as a non-leading ;-part (D-S1b). The
+          // part is a composite, so it never reaches the leaf-fail branch below;
+          // record the warning and render invisible so the level-2 character
+          // fails (placeholder per error-placeholder), mirroring WORD_AS_PART.
+          if (!this.#sharedOptions?.warnings) {
+            throw new Error(`Unable to create Bliss element: ${this.#blissObj.error || this.#blissObj.codeName || 'unknown'}`);
+          }
+          this.#sharedOptions.warnings.push({
+            code: 'BURIED_INDICATOR',
+            message: this.#blissObj.error,
+            source: this.#blissObj.codeName || 'unknown',
+          });
+          this.#leafWidth = 0;
+          this.#leafHeight = 0;
+          this.getSvgContent = () => '';
+        } else if (!isPredefinedElement && !isCompositeElement) {
           // When constructed directly (no builder), throw to preserve existing behaviour
           if (!this.#sharedOptions?.warnings) {
             const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';

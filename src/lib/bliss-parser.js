@@ -960,7 +960,7 @@ export class BlissParser {
           // yields an indicator-only glyph instead of a failed empty part.
           // Word-level ';;' is resolved upstream and never reaches here.
           const twoPartPartStrings = partsString.split(';').filter(s => s !== '');
-          for (const twoPartPartString of twoPartPartStrings) {
+          for (const [partIndex, twoPartPartString] of twoPartPartStrings.entries()) {
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
 
             const definition = part.codeName?.startsWith('XTXT_')
@@ -987,6 +987,7 @@ export class BlissParser {
             }
 
             BlissParser.#applyDefinitionMetadata(part, definition);
+            BlissParser.#flagBuriedIndicator(part, partIndex);
 
             this.#extractPositionFromOptions(part);
             parts.push(part);
@@ -1057,12 +1058,39 @@ export class BlissParser {
       if (!group.glyphs) continue;
       for (const glyph of group.glyphs) {
         if (!glyph.parts) continue;
-        for (const part of glyph.parts) {
+        for (const [partIndex, part] of glyph.parts.entries()) {
           BlissParser.#expandPartRecursive(part);
+          BlissParser.#flagBuriedIndicator(part, partIndex);
         }
       }
     }
     return blissObj;
+  }
+
+  /**
+   * D-S1b: flag a part that buries an indicator. A base+indicator alias used as
+   * a NON-leading ;-part (index > 0) turns its baked indicator into an
+   * indicator-of-a-part, which is forbidden (indicators attach to characters,
+   * not parts). It must look like a base FOLLOWED BY an indicator:
+   * - the part is not itself a flagged indicator (excludes a built-in compound
+   *   indicator such as B85 = B270;B86 or B98 = B97;B99, whose first sub-part is
+   *   a non-indicator shape — only its isIndicator flag distinguishes it);
+   * - its first sub-part is not an indicator (excludes an all-indicator alias
+   *   such as B97;B81 — define() strips a custom isIndicator flag, so this
+   *   indicator-first shape is the only signal left);
+   * - a later sub-part IS an indicator (the baked indicator being buried).
+   * Literal inline parts have no recursive sub-parts and are skipped. Must run
+   * AFTER #applyDefinitionMetadata stamps part.isIndicator. The element layer
+   * then fails the whole character to render with a BURIED_INDICATOR warning.
+   * Shared by parseParts (DSL input) and expandParts (object input).
+   */
+  static #flagBuriedIndicator(part, index) {
+    if (index > 0 && part.isIndicator !== true && part.parts?.length &&
+        part.parts[0]?.isIndicator !== true &&
+        part.parts.some(p => p.isIndicator === true)) {
+      part.error = `"${part.codeName}" carries an indicator and cannot be a non-leading part; indicators attach to characters, not parts`;
+      part.errorCode = 'BURIED_INDICATOR';
+    }
   }
 
   /**
