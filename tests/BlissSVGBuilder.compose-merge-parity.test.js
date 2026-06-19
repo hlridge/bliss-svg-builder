@@ -52,7 +52,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
     builder.warnings.filter(w => w.code === 'DROPPED_WORD_INDICATOR').map(w => w.source);
 
   describe('when a word-level slot is built by composition versus merge', () => {
-    it('matches when two promoted slots collide and the second is dropped', () => {
+    it('holds for two promoted slots colliding (second dropped)', () => {
       const { composed, merged } = composeVsMerge(
         'NOUN_BI;B97/NOUN_BI;B86', 'NOUN_BI;B97//NOUN_BI;B86');
       expect(composed.toString()).toBe('B291;B81/B291;B81;;B97');
@@ -62,7 +62,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
       expect(dropSources(composed)).toEqual([';;B86']);
     });
 
-    it('matches when a leading empty slot drops a later overlay', () => {
+    it('holds for a leading empty slot dropping a later overlay', () => {
       const { composed, merged } = composeVsMerge(
         'H/NOUN_BI;B97', 'H//NOUN_BI;B97');
       expect(composed.toString()).toBe('H/B291;B81');
@@ -72,7 +72,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
       expect(dropSources(composed)).toEqual([';;B97']);
     });
 
-    it('matches when a single promoted slot survives with no collision', () => {
+    it('holds for a single promoted slot surviving with no collision', () => {
       const { composed, merged } = composeVsMerge(
         'NOUN_BI;B97/E', 'NOUN_BI;B97//E');
       expect(composed.toString()).toBe('B291;B81/E;;B97');
@@ -82,7 +82,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
       expect(dropSources(composed)).toEqual([]);
     });
 
-    it('matches when the surviving slot strips the semantic root', () => {
+    it('holds for a surviving slot that strips the semantic root', () => {
       const { composed, merged } = composeVsMerge(
         'NOUN_S;!B81/NOUN_S;B86', 'NOUN_S;!B81//NOUN_S;B86');
       expect(composed.toString()).toBe('B291;B97/B291;B97;;!B81');
@@ -94,7 +94,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
   });
 
   describe('when a head marker is built by composition versus merge', () => {
-    it('matches when two head markers collide and the first wins', () => {
+    it('holds for two head markers colliding (first wins)', () => {
       // `^` is word-scoped and first-wins like the slot, but its drop is silent
       // (a structural re-derive, not lost data), so no DROPPED_WORD_INDICATOR.
       const { composed, merged } = composeVsMerge('B313^/B431^', 'B313^//B431^');
@@ -105,7 +105,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
       expect(dropSources(merged)).toEqual([]);
     });
 
-    it('matches when only the first word carries the head marker', () => {
+    it('holds for a lone first-word head marker', () => {
       const { composed, merged } = composeVsMerge('B313^/B431', 'B313^//B431');
       expect(composed.toString()).toBe('B313/B431');
       expect(merged.toString()).toBe(composed.toString());
