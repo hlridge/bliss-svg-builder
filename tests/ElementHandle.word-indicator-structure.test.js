@@ -15,7 +15,9 @@ import { BlissSVGBuilder } from '../src/index';
  *   split -> merge round-trips the word-slot losslessly.
  * - mergeWithNext: the merged word keeps the first word's overlay; an absorbed
  *   word's overlay is dropped with a loud DROPPED_WORD_INDICATOR warning,
- *   whether or not the first word also carried one.
+ *   whether or not the first word also carried one. The first word's `^` head
+ *   marker is kept and the absorbed word's `^` is dropped silently (the merged
+ *   word re-derives a single head), mirroring splitAt's first-wins rule.
  * - Glyph-list edits that keep the group (addGlyph, removeGlyph, replaceGlyph)
  *   and head base-part edits (addPart) leave the overlay floating onto the
  *   current head, with no per-op overlay handling needed.
@@ -153,14 +155,43 @@ describe('ElementHandle word indicators under structural mutation', () => {
     });
   });
 
-  describe('when the merged head comes from the absorbed word', () => {
-    it('floats the kept overlay onto the absorbed-origin head', () => {
-      // settled float-to-current-head consequence: the first word's overlay
-      // resolves onto the head marker carried by the second (absorbed) word
+  describe('when the absorbed word carries the head marker', () => {
+    it('drops the absorbed head marker and re-derives the merged head', () => {
+      // WS-3 word-slot model: `^` is word-scoped and first-wins, so the absorbed
+      // (second) word's head marker is dropped silently and the merged word
+      // re-derives its head from glyph 0; the first word's overlay then floats
+      // onto that re-derived head. Supersedes the R14 "float onto the
+      // absorbed-origin head" (which kept B431^).
       const b = new BlissSVGBuilder('B303;;B86//B313/B431^');
       b.group(0).mergeWithNext();
-      expect(b.toString()).toBe('B303/B313/B431^;;B86');
+      expect(b.toString()).toBe('B303/B313/B431;;B86');
+      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
       expect(dropWarnings(b)).toHaveLength(0);
+    });
+
+    it('keeps the first word head marker and drops only the absorbed one', () => {
+      // pins clear-absorbed-only (not clear-all): the first word's `^` on a
+      // non-zero glyph survives the merge while the absorbed word's `^` is
+      // dropped, leaving a single head. A clear-all mutant would drop B304^;
+      // a clear-none mutant would keep B431^.
+      const b = new BlissSVGBuilder('B303/B304^;;B86//B313/B431^');
+      b.group(0).mergeWithNext();
+      expect(b.toString()).toBe('B303/B304^/B313/B431;;B86');
+      expect(dropWarnings(b)).toHaveLength(0);
+    });
+  });
+
+  describe('when a merged-away head marker could resurface after a later edit', () => {
+    it('clears the absorbed head stamp so removing the first head re-derives glyph 0', () => {
+      // F1 (WS-3 review): merging two `^`-words must DE-DUPE the head stamps,
+      // not just mask the second one behind the first. Without clearing the
+      // absorbed `^`, removing the first word's head later surfaces B431 as a
+      // stale head; clearing it lets the merged word re-derive glyph 0.
+      const b = new BlissSVGBuilder('B303/B304^;;B86//B313/B431^');
+      b.group(0).mergeWithNext();
+      b.group(0).removeGlyph(1);
+      expect(b.toString()).toBe('B303/B313/B431;;B86');
+      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
     });
   });
 

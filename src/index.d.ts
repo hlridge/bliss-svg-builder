@@ -392,7 +392,9 @@ export declare class ElementHandle {
    * Merges this word group with the next one, removing spaces between them.
    * Only valid on group handles. The merged word keeps this group's word-level
    * (`;;`) indicator overlay; an overlay on the absorbed word is dropped and a
-   * `DROPPED_WORD_INDICATOR` warning is added to `warnings`.
+   * `DROPPED_WORD_INDICATOR` warning is added to `warnings`. The absorbed
+   * word's `^` head marker is also dropped (silently); the merged word
+   * resolves a single head.
    */
   mergeWithNext(): this;
 

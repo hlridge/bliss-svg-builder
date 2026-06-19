@@ -1012,7 +1012,9 @@ export class ElementHandle {
    * space groups between them. Only valid on group-level handles.
    * No-op if no next word group exists or if this is a space group.
    * The absorbed group's options are discarded; only this group's
-   * options apply to the merged result.
+   * options apply to the merged result. Its word-level (`;;`) overlay is
+   * dropped with a `DROPPED_WORD_INDICATOR` warning, and its `^` head marker
+   * is dropped silently (the merged word resolves a single head).
    * @returns {this}
    */
   mergeWithNext() {
@@ -1044,6 +1046,12 @@ export class ElementHandle {
 
     // Absorb the next word group's glyphs
     group.glyphs.push(...nextGroup.glyphs);
+
+    // R15 WS-3: `^` is word-scoped and first-wins, so the absorbed word's head
+    // marker is dropped silently (a re-derived head is not data loss). Clear it
+    // on the absorbed glyphs so the merged word keeps at most the first word's
+    // `^`; mirrors splitAt's right-side clear and keeps merge ≡ `/`-compose.
+    for (const g of nextGroup.glyphs) delete g.isHeadGlyph;
 
     // The merged word keeps THIS group's word-level overlay; the absorbed
     // group's overlay is dropped (one head governs the merged word, and it is
