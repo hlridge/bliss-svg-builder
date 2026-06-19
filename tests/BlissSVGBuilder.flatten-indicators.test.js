@@ -15,6 +15,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Covers:
  * - toString flatten of a word-additive, a strip-semantic, and a multi-code
  *   overlay, byte-identical to the equivalent explicitly-baked input.
+ * - Flatten onto the query-time-resolved head for an excluded base (the head
+ *   is not index 0), pinning the WS-4 head resolution at the flatten site.
  * - toJSON flatten: the indicator is baked onto the head parts and the
  *   `group.wordIndicators` field is omitted.
  * - Default (flag off) keeps `;;` and the overlay field.
@@ -36,6 +38,15 @@ describe('BlissSVGBuilder flattenIndicators', () => {
       ['multi-code', 'B291/B291;;B86;B97', 'B291;B86;B97/B291'],
     ])('toString flattens %s to the baked form', (_label, input, baked) => {
       expect(new BlissSVGBuilder(input).toString({ flattenIndicators: true })).toBe(baked);
+    });
+
+    it('bakes onto the exclusion-resolved head, not index 0, for an excluded base', () => {
+      // B486 (opposite-to) is a head-glyph exclusion, so the head is B368 at
+      // index 1; the overlay must flatten onto it, not the leading excluded glyph.
+      expect(new BlissSVGBuilder('B486/B368;;B86').toString({ flattenIndicators: true }))
+        .toBe('B486/B368;B86');
+      // pins query-time head resolution at the flatten site (R15 WS-4); kills
+      // the Math.max(findIndex,0) -> index-0 mutant on bliss-svg-builder.js.
     });
 
     it('matches the toString of the equivalent explicitly-baked input', () => {
