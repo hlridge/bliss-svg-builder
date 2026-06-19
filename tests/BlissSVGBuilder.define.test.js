@@ -170,6 +170,15 @@ describe('BlissSVGBuilder.define', () => {
       BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B291' } });
       expect(BlissSVGBuilder.getDefinition(code).type).toBe('glyph');
     });
+
+    it('rejects an indicator part in any position, not only trailing', () => {
+      // pins the position-independent .some scan: a leading indicator part is
+      // rejected too (a .some -> findIndex===last or trailing-only check would miss this).
+      const code = trackCode('GLYPH_LEADING_INDICATOR');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B86;B291' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
   });
 
   describe(`when called with type 'shape'`, () => {

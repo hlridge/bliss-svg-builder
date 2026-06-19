@@ -301,14 +301,18 @@ describe('BlissSVGBuilder custom glyphs', () => {
     });
 
     it('rejects a circular glyph chain A -> B -> A', () => {
+      // note: chain links use a base second part (B313), not an indicator, so
+      // the R15 D-S1a guard (no baked indicator in a glyph def) does not reject
+      // the links before the loop forms; the assertion pins the *circular* error
+      // so a non-circular rejection can't pass this test (3b-2 review).
       defineAndTrack({ 'GLYPHA': { type: 'glyph', codeString: 'H:0,8' } });
-      defineAndTrack({ 'GLYPHB': { type: 'glyph', codeString: 'GLYPHA;B81' } });
+      defineAndTrack({ 'GLYPHB': { type: 'glyph', codeString: 'GLYPHA;B313' } });
       // Now redefine GLYPHA to reference GLYPHB, closing the loop.
       const result = BlissSVGBuilder.define(
-        { 'GLYPHA': { type: 'glyph', codeString: 'GLYPHB;B81' } },
+        { 'GLYPHA': { type: 'glyph', codeString: 'GLYPHB;B313' } },
         { overwrite: true }
       );
-      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.errors.some(e => e.includes('circular'))).toBe(true);
     });
 
     it('rejects an indirect circular reference A -> B -> C -> A', () => {

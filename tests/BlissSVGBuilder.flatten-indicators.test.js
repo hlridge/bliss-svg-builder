@@ -106,4 +106,22 @@ describe('BlissSVGBuilder flattenIndicators', () => {
         .toBe('B291;B81;B97');
     });
   });
+
+  describe('when flattening a ;; overlay onto a base-only custom glyph (R3b2-2 tripwire)', () => {
+    // TRIPWIRE for finding R3b2-2 (the gate for the parked name-kept orthogonality
+    // assertions above): a base-only custom-glyph head loses its `;;` overlay under
+    // flattenIndicators -- toJSON's decompose-to-bare-code path discards the parts
+    // mergeWordIndicatorsOntoHead baked, because the identity-clear is built-in-only.
+    // A built-in base bakes correctly (`B291;;B81` flatten -> `B291;B81`). This pins
+    // the CURRENT (buggy) output so the fix flips it RED; when it does, switch _LOVE
+    // above back to a base-only `type:'glyph'` and restore the name-kept assertions.
+    const DEFS = { _BASEONLY_R3B2: { type: 'glyph', codeString: 'B291' } };
+    beforeAll(() => BlissSVGBuilder.define(DEFS));
+    afterAll(() => Object.keys(DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it('drops the overlay today (flip to B291;B81 when R3b2-2 is fixed)', () => {
+      expect(new BlissSVGBuilder('_BASEONLY_R3B2;;B81').toString({ flattenIndicators: true }))
+        .toBe('B291');
+    });
+  });
 });
