@@ -47,6 +47,7 @@ describe('BlissSVGBuilder buried indicator', () => {
     it('records a BURIED_INDICATOR warning naming the alias', () => {
       const warning = new BlissSVGBuilder('H;NOUN_BI').warnings.find((w) => w.code === 'BURIED_INDICATOR');
       expect(warning?.source).toBe('NOUN_BI');
+      expect(warning?.message).toMatch(/indicator/i); // pins the message literal (Stryker survivor)
     });
 
     it('fails to render the character when error-placeholder is off', () => {
@@ -84,6 +85,16 @@ describe('BlissSVGBuilder buried indicator', () => {
       const b = new BlissSVGBuilder('H');
       b.glyph(0).addPart('NOUN_BI');
       expect(b.warnings.map((w) => w.code)).toContain('BURIED_INDICATOR');
+    });
+
+    it('does not fire when an alias is inserted as the LEADING part', () => {
+      // insertPart parses the new part through an `H;<code>` scaffold (index 1),
+      // which stamps a position-dependent BURIED flag; landing it at index 0 must
+      // clear that stale flag so the result matches the DSL alias-then-base form
+      const b = new BlissSVGBuilder('B291');
+      b.glyph(0).insertPart(0, 'NOUN_BI');
+      expect(b.warnings.map((w) => w.code)).not.toContain('BURIED_INDICATOR');
+      expect(b.toString()).toBe(new BlissSVGBuilder('NOUN_BI;B291').toString());
     });
   });
 

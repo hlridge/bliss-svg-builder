@@ -473,6 +473,11 @@ class BlissSVGBuilder {
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
     const blissObj = structuredClone(this.#rawBlissObj);
 
+    // Re-derive position-dependent buried-indicator flags on the rebuilt
+    // structure: a mutation (insertPart via its `H;<code>` scaffold, removePart)
+    // can move a part to/from the leading slot, so a parse-time flag may be stale.
+    BlissParser.reflagBuriedIndicators(blissObj);
+
     // R14 resolve site 1 (render): merge each group's word-level indicator
     // overlay onto its head glyph, on the clone only so #rawBlissObj (and the
     // handles that reference it) stay base-only. The head is the explicitly

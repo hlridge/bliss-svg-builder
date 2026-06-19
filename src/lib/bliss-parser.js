@@ -1068,6 +1068,29 @@ export class BlissParser {
   }
 
   /**
+   * Re-derive the BURIED_INDICATOR flag on every (already-expanded) part of a
+   * structure, in place. The flag is position-dependent (a part buries an
+   * indicator only when non-leading), so it must be recomputed whenever the
+   * mutation API reassembles a glyph: insertPart parses a new part through an
+   * `H;<code>` scaffold (index 1) and may then place it at index 0, and
+   * removePart can shift a non-leading part to the leading slot. Unlike
+   * expandParts this does not expand, so it is safe to run on every rebuild.
+   */
+  static reflagBuriedIndicators(blissObj) {
+    if (!blissObj?.groups) return blissObj;
+    for (const group of blissObj.groups) {
+      if (!group.glyphs) continue;
+      for (const glyph of group.glyphs) {
+        if (!glyph.parts) continue;
+        for (const [partIndex, part] of glyph.parts.entries()) {
+          BlissParser.#flagBuriedIndicator(part, partIndex);
+        }
+      }
+    }
+    return blissObj;
+  }
+
+  /**
    * D-S1b: flag a part that buries an indicator. A base+indicator alias used as
    * a NON-leading ;-part (index > 0) turns its baked indicator into an
    * indicator-of-a-part, which is forbidden (indicators attach to characters,
@@ -1090,6 +1113,13 @@ export class BlissParser {
         part.parts.some(p => p.isIndicator === true)) {
       part.error = `"${part.codeName}" carries an indicator and cannot be a non-leading part; indicators attach to characters, not parts`;
       part.errorCode = 'BURIED_INDICATOR';
+    } else if (part.errorCode === 'BURIED_INDICATOR') {
+      // The flag is position-dependent, so it is authoritative at the CURRENT
+      // index: clear a stale one stamped elsewhere. The mutation API parses a
+      // new part through an `H;<code>` scaffold (index 1) and may then insert it
+      // at index 0; re-evaluation here on rebuild must un-bury it.
+      delete part.errorCode;
+      delete part.error;
     }
   }
 
