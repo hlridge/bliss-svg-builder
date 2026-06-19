@@ -306,17 +306,22 @@ describe('BlissParser definition expansion', () => {
     });
   });
 
-  describe('when replacing indicators on custom glyph definitions', () => {
-    it('ignores the base part when detecting semantic roots to preserve', () => {
-      const code = 'SEMANTIC_BASE_REPLACEMENT_PIN';
-      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B97;B81' } }, { overwrite: true });
+  describe('when an indicator is applied to a compound-indicator glyph', () => {
+    it('keeps the compound indicator whole instead of replacing its parts', () => {
+      const code = 'COMPOUND_INDICATOR_PASSTHROUGH_PIN';
+      // R15 D-S1a: B97;B81 is all-indicator, so it must be a compound indicator
+      // (isIndicator:true). Applying an indicator to a compound indicator does
+      // NOT decompose+replace its parts; the base-vs-indicator replace path is
+      // for base+indicator characters, which are aliases now, not glyphs.
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B97;B81', isIndicator: true } }, { overwrite: true });
 
       try {
         const parsed = BlissParser.parse(`${code};B86`);
         const partCodes = parsed.groups[0].glyphs[0].parts.map(part => part.codeName);
 
-        expect(partCodes).toEqual(['B97', 'B86']);
-        // pins base-vs-indicator split; killed line 602 slice-to-identity mutant in 2026-05 Stryker run.
+        expect(partCodes).toEqual([code, 'B86']);
+        // pins the compound-indicator replace guard (bliss-parser.js
+        // baseIsCompoundIndicator): dropping it would decompose to ['B97','B86'].
       } finally {
         BlissSVGBuilder.removeDefinition(code);
       }

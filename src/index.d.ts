@@ -414,10 +414,18 @@ export interface ShapeContext {
   [key: string]: any;
 }
 
-/** Definition for a custom glyph (composed from existing codes). */
+/**
+ * Definition for a custom glyph: a base character or a compound indicator,
+ * composed from existing codes. A glyph definition may not bake in an indicator
+ * part unless it is itself a compound indicator (`isIndicator: true`); define a
+ * base+indicator combination as a {@link BareDefinition} alias instead (the
+ * indicator attaches at the use site). `define()` reports a violation in its
+ * `errors` result rather than throwing.
+ */
 export interface GlyphDefinition {
   type?: 'glyph';
   codeString: string;
+  /** Marks an all-indicator definition as a compound indicator. */
   isIndicator?: boolean;
   anchorOffsetX?: number;
   anchorOffsetY?: number;

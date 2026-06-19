@@ -2,60 +2,62 @@ import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
- * Pins indicator round-trips on custom glyphs across both toString modes.
- * Under { preserve: true } a per-instance indicator delta (via the `;` DSL or
- * applyIndicators) re-emits against the definition's baked indicator state
- * (`_X;B81`, `_X;!B81`, `_X;!`, bare `_X` when unchanged) instead of
- * collapsing to the bare name; under default toString the same glyph fully
- * decomposes to primitives. Either way parse(toString(x)) renders identically
- * to parse(x), and the DSL and applyIndicators paths emit the same string and
- * the same SVG for the same operation.
+ * Pins indicator round-trips on base+indicator alias definitions across both
+ * toString modes. R15 D-S1a makes a base+indicator combo a bare ALIAS (not a
+ * glyph); applying a `;` indicator to it promotes into the reversible word-level
+ * `;;` overlay (3b-1). An alias carries no local glyph identity, so under
+ * { preserve: true } it decomposes and the promoted form serializes as the
+ * primitive `BASE;SEMANTIC;;APPLIED`; under default toString the same holds.
+ * Either way parse(toString(x)) renders identically to parse(x).
  *
  * Covers:
- * - Preserve-mode exact toString for the four canonical delta forms (added,
- *   strip-semantic-plus-added, strip-semantic-only, unchanged/bare).
- * - Preserve-mode round-trip SVG parity for the delta family.
- * - DSL vs applyIndicators parity: identical preserve string, retained
- *   custom-glyph identity, identical SVG.
- * - A delta-bearing custom glyph embedded in a multi-glyph word.
- * - Negative control: a typeless multi-glyph alias still decomposes under
- *   preserve (no glyph identity to retain).
- * - Default-mode toString decomposing the character-level indicator delta
- *   family (`;`, `;!`, `;B81`, `;!B81`) on plain, semantic-rooted, and
- *   non-semantic-baked bases: SVG round-trip identity and toString stability.
+ * - Preserve-mode toString for the promotion delta forms (added -> ;;,
+ *   strip-semantic added -> ;;!, bare strip-semantic -> semantic removed,
+ *   empty/absent delta -> bare decomposed alias).
+ * - Preserve-mode round-trip SVG parity for the promotion family.
+ * - DSL vs applyIndicators: identical SVG (render parity) but divergent
+ *   serialization pending Task 5 (the DSL promotes, the API char-path bakes).
+ * - A promoted alias in a non-leading word position: first-wins drops the
+ *   overlay with a DROPPED_WORD_INDICATOR warning.
+ * - Negative control: a typeless multi-glyph alias decomposes under preserve.
+ * - A built-in glyph modified via applyIndicators decomposes under preserve.
+ * - Default-mode round-trip of the character-level delta family (`;`, `;!`,
+ *   `;B81`, `;!B81`) on plain, semantic-rooted, and non-semantic-baked bases:
+ *   SVG identity and toString stability.
  * - Default-mode word-level (`;;`) indicators across a multi-glyph word,
- *   including `^`+`;;`, kept as a reversible overlay across the round-trip
- *   (R14: default keeps `;;`, names still decompose).
- * - Word-level (`;;`) round-trip when the resolved head is a custom glyph
- *   that bakes a semantic indicator: the semantic resolves exactly once, no
- *   doubling (N9, fixed by the R14 overlay model).
+ *   including `^`+`;;`, kept as a reversible overlay across the round-trip.
+ * - Word-level (`;;`) round-trip when the resolved head is an alias baking a
+ *   semantic indicator: the semantic resolves exactly once, no doubling (N9).
  *
  * Does NOT cover:
- * - General round-trip identity across all input kinds (options, kerning,
- *   spaces, external glyphs) and the toJSON snapshot shape, see
- *   `BlissSVGBuilder.round-trip.test.js`.
+ * - The render-neutral promotion mechanics in default toString, see
+ *   `BlissSVGBuilder.indicator-promotion.test.js`.
+ * - Programmatic applyIndicators char-path promotion parity (Task 5), gated in
+ *   `BlissSVGBuilder.strip-semantic-parity.test.js`.
+ * - The define-time guard rejecting base+indicator glyph definitions (D-S1a),
+ *   see `BlissSVGBuilder.define.test.js`.
+ * - General round-trip identity across all input kinds and the toJSON snapshot
+ *   shape, see `BlissSVGBuilder.round-trip.test.js`.
  * - Which indicators attach and in what order (semantic preservation), see
- *   `tests/indicator-utils.semantic-goes-last.test.js` and
- *   `tests/ElementHandle.apply-indicators.test.js`.
+ *   `tests/indicator-utils.semantic-goes-last.test.js`.
  * - Bare-name preserve of unmodified custom glyphs, see
  *   `BlissSVGBuilder.custom-glyphs.test.js`.
  */
 describe('BlissSVGBuilder indicator round-trip', () => {
   const IRT_DEFS = {
-    // Custom glyph that bakes B97 (the 'thing'/nominal semantic indicator)
-    // into its definition, so per-instance `;` deltas have a baked state to
-    // differ from. Doubles as the semantic-rooted base for the default-mode
-    // family below.
-    _IRT_NOUN: { type: 'glyph', codeString: 'B291;B97' },
+    // Base+indicator alias baking B97 (the 'thing'/nominal semantic indicator).
+    // R15 D-S1a: a base+indicator combo is an alias, not a glyph; applying a `;`
+    // indicator to it promotes into the reversible `;;` overlay (3b-1).
+    _IRT_NOUN: { codeString: 'B291;B97' },
     // Typeless multi-glyph alias: decomposes at parse, carries no glyph
-    // identity. Negative control for the preserve fix.
+    // identity. Negative control for preserve-mode name scoping.
     _IRT_WORD: { codeString: 'B313/B208' },
-    // Default-mode family bases: the same B291 body with no baked indicator
-    // and with a non-semantic one (B86 'description', adjectival). Together
-    // with _IRT_NOUN they form the plain / semantic-rooted / non-semantic-baked
-    // trio that the strip-semantic (`;!`) delta has to treat differently.
+    // Default-mode family bases: a plain base-only glyph, plus base+indicator
+    // aliases with a semantic (B97) and a non-semantic (B86 'description',
+    // adjectival) baked indicator. The strip-semantic (`;!`) delta treats the
+    // three differently (plain / semantic-rooted / non-semantic-baked).
     _IRT_PLAIN: { type: 'glyph', codeString: 'B291' },
-    _IRT_NONSEM: { type: 'glyph', codeString: 'B291;B86' },
+    _IRT_NONSEM: { codeString: 'B291;B86' },
   };
   beforeAll(() => BlissSVGBuilder.define(IRT_DEFS));
   afterAll(() => Object.keys(IRT_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
@@ -79,24 +81,24 @@ describe('BlissSVGBuilder indicator round-trip', () => {
     };
   };
 
-  describe('when a custom glyph carries per-instance indicator deltas via the ; DSL', () => {
-    it('re-emits an added indicator against the baked semantic', () => {
-      expect(roundTripPreserve('_IRT_NOUN;B81').str).toBe('_IRT_NOUN;B81');
+  describe('when an indicator is applied to a base+indicator alias via the ; DSL', () => {
+    it('routes an added indicator into the reversible ;; overlay', () => {
+      expect(roundTripPreserve('_IRT_NOUN;B81').str).toBe('B291;B97;;B81');
     });
 
-    it('re-emits strip-semantic with a replacement indicator', () => {
-      // note: ;! strips the baked semantic (B97); the ! survives in the delta
+    it('routes a strip-semantic added indicator into a ;;! overlay', () => {
+      // note: ;! strips the baked semantic (B97); the ! survives in the overlay
       // so the re-parse re-strips rather than re-preserving the semantic.
-      expect(roundTripPreserve('_IRT_NOUN;!B81').str).toBe('_IRT_NOUN;!B81');
+      expect(roundTripPreserve('_IRT_NOUN;!B81').str).toBe('B291;B97;;!B81');
     });
 
-    it('re-emits a bare strip-semantic', () => {
-      expect(roundTripPreserve('_IRT_NOUN;!').str).toBe('_IRT_NOUN;!');
+    it('strips the semantic entirely for a bare strip-semantic', () => {
+      expect(roundTripPreserve('_IRT_NOUN;!').str).toBe('B291');
     });
 
-    it('emits the bare name when indicators match the baked state', () => {
-      expect(roundTripPreserve('_IRT_NOUN').str).toBe('_IRT_NOUN');
-      expect(roundTripPreserve('_IRT_NOUN;').str).toBe('_IRT_NOUN');
+    it('decomposes the alias when the applied delta is empty or absent', () => {
+      expect(roundTripPreserve('_IRT_NOUN').str).toBe('B291;B97');
+      expect(roundTripPreserve('_IRT_NOUN;').str).toBe('B291;B97');
     });
 
     it.each([
@@ -110,34 +112,38 @@ describe('BlissSVGBuilder indicator round-trip', () => {
     });
   });
 
-  describe('when the indicator delta is applied through applyIndicators', () => {
+  describe('when the same indicator is applied through applyIndicators', () => {
     const applyOnNoun = (code) => {
       const b = new BlissSVGBuilder('_IRT_NOUN');
       b.group(0).glyph(0).applyIndicators(code);
       return b;
     };
 
-    it('emits the same preserve string as the ; DSL', () => {
-      const api = applyOnNoun('B81').toString({ preserve: true });
-      const dsl = new BlissSVGBuilder('_IRT_NOUN;B81').toString({ preserve: true });
-      expect(api).toBe(dsl);
-      expect(api).toBe('_IRT_NOUN;B81');
-    });
-
-    it('keeps the custom-glyph identity after the change', () => {
-      const glyph = applyOnNoun('B81').toJSON({ preserve: true }).groups[0].glyphs[0];
-      expect(glyph.isBlissGlyph).toBe(true);
-      expect(glyph.codeName).toBe('_IRT_NOUN');
-    });
-
     it('renders identically to the ; DSL', () => {
       expect(applyOnNoun('B81').svgCode).toBe(new BlissSVGBuilder('_IRT_NOUN;B81').svgCode);
     });
+
+    it('serializes differently from the ; DSL pending Task 5 parity', () => {
+      // T3b1-2 gate: the DSL promotes the applied indicator into the reversible
+      // `;;` overlay, while the programmatic char-path still bakes it onto the
+      // character. Render parity holds (asserted above); only serialization
+      // diverges. Task 5 resolves this (make applyIndicators promote on a
+      // base+indicator alias, or document the divergence) -- flip when it lands.
+      const api = applyOnNoun('B81').toString({ preserve: true });
+      const dsl = new BlissSVGBuilder('_IRT_NOUN;B81').toString({ preserve: true });
+      expect(api).toBe('B291;B81;B97');
+      expect(dsl).toBe('B291;B97;;B81');
+      expect(api).not.toBe(dsl);
+    });
   });
 
-  describe('when a delta-bearing custom glyph sits inside a multi-glyph word', () => {
-    it('re-emits the delta on the embedded custom glyph', () => {
-      expect(roundTripPreserve('B313/_IRT_NOUN;B81').str).toBe('B313/_IRT_NOUN;B81');
+  describe('when an indicator is applied to an alias in a non-leading word position', () => {
+    it('drops the promoted overlay with a warning (first-wins word slot)', () => {
+      // The leading glyph (B313) owns the empty word-level slot, so the alias's
+      // promoted overlay is dropped + warned (first-wins, mirrors mergeWithNext).
+      const b = new BlissSVGBuilder('B313/_IRT_NOUN;B81');
+      expect(b.toString({ preserve: true })).toBe('B313/B291;B97');
+      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
     });
 
     it('renders the word identically after a preserve round-trip', () => {
@@ -218,10 +224,10 @@ describe('BlissSVGBuilder indicator round-trip', () => {
       expect(new BlissSVGBuilder('B291/B291;;B86;B97').toString()).toBe('B291/B291;;B86;B97');
     });
 
-    // N9: when the resolved head is a custom glyph baking a semantic root
+    // N9: when the resolved head is an alias baking a semantic root
     // (_IRT_NOUN = B291;B97), the semantic once doubled on decompose
     // (B291;B97;B81;B97). The R14 overlay resolves it exactly once.
-    it('round-trips a ;; indicator on a custom-glyph-baked head without doubling the semantic (N9)', () => {
+    it('round-trips a ;; indicator on an alias-baked head without doubling the semantic (N9)', () => {
       const { originalSvg, rebuiltSvg, str, reStr } = roundTripDefault('_IRT_NOUN;;B81');
       expect(rebuiltSvg).toBe(originalSvg);
       expect(reStr).toBe(str);

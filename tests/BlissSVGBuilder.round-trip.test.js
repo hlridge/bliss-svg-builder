@@ -279,7 +279,8 @@ describe('BlissSVGBuilder round-trip identity', () => {
       // also drop the empty leading segment. Otherwise the round-trip injects a
       // failed empty part: spurious UNKNOWN_CODE + divergent render.
       customCodes.push('MY_BASELESS');
-      BlissSVGBuilder.define({ MY_BASELESS: { type: 'glyph', codeString: ';B86;B97' } });
+      // R15 D-S1a: an all-indicator glyph is a compound indicator (isIndicator).
+      BlissSVGBuilder.define({ MY_BASELESS: { type: 'glyph', codeString: ';B86;B97', isIndicator: true } });
       const original = new BlissSVGBuilder('B291;MY_BASELESS');
       const roundTripped = new BlissSVGBuilder(original.toJSON());
       expect(roundTripped.warnings.filter(w => w.code === 'UNKNOWN_CODE')).toEqual([]);
@@ -292,7 +293,8 @@ describe('BlissSVGBuilder round-trip identity', () => {
       // re-expand cleanly from a toJSON-stripped nested part. A leading-only
       // filter would inject a failed empty part here (UNKNOWN_CODE + divergence).
       customCodes.push('MY_TRAILING');
-      BlissSVGBuilder.define({ MY_TRAILING: { type: 'glyph', codeString: 'B86;B97;' } });
+      // R15 D-S1a: an all-indicator glyph is a compound indicator (isIndicator).
+      BlissSVGBuilder.define({ MY_TRAILING: { type: 'glyph', codeString: 'B86;B97;', isIndicator: true } });
       const original = new BlissSVGBuilder('B291;MY_TRAILING');
       const roundTripped = new BlissSVGBuilder(original.toJSON());
       expect(roundTripped.warnings.filter(w => w.code === 'UNKNOWN_CODE')).toEqual([]);

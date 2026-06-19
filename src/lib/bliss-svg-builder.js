@@ -1746,6 +1746,16 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): circular reference detected`);
     }
 
+    // D-S1a: a glyph is a base character or a compound indicator, never a
+    // base+indicator combo. Reject a glyph def (not flagged isIndicator) that
+    // bakes in an indicator part; define such combos as bare aliases instead.
+    if (definition.isIndicator !== true) {
+      const refs = BlissSVGBuilder.#extractReferencedCodes(definition.codeString);
+      if (refs.some(ref => blissElementDefinitions[ref]?.isIndicator === true)) {
+        throw new Error(`define("${code}"): a glyph definition cannot bake in an indicator. Define a base+indicator combination as a bare alias (omit type:"glyph"), attach the indicator at the use site (BASE;INDICATOR), or flag a compound indicator with isIndicator:true.`);
+      }
+    }
+
     if (blissElementDefinitions[code] && !options.overwrite) {
       throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
     }

@@ -79,21 +79,31 @@ describe('BlissSVGBuilder flattenIndicators', () => {
   });
 
   describe('when flattenIndicators composes with preserve (orthogonality)', () => {
-    const DEFS = { _LOVE: { type: 'glyph', codeString: 'B291;B97' } };
+    // R15 D-S1a: a base+indicator combo is a bare alias, not a glyph. An alias
+    // has no LOCAL name to retain (it decomposes under preserve regardless), so
+    // the orthogonality shown here is the flatten on/off axis (;; kept vs baked)
+    // with preserve a no-op. NOTE (finding R3b2-3, backlog): the name-preserving
+    // half of this demo is parked. The only D-S1a-legal name-preserving subject
+    // is a base-only custom glyph, but `<base-only-glyph>;;<ind>` with
+    // flattenIndicators currently DROPS the overlay (the decompose-to-bare-code
+    // path in toJSON discards the merged head parts). Restore the name-kept
+    // assertions (preserve keeps the glyph name, flatten still bakes ;;) once
+    // that flatten bug is fixed.
+    const DEFS = { _LOVE: { codeString: 'B291;B97' } };
     beforeAll(() => BlissSVGBuilder.define(DEFS));
     afterAll(() => Object.keys(DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
 
-    it('preserve alone keeps the name and ;;', () => {
-      expect(new BlissSVGBuilder('_LOVE;;B81').toString({ preserve: true })).toBe('_LOVE;;B81');
+    it('keeps ;; and decomposes the alias when flatten is off', () => {
+      expect(new BlissSVGBuilder('_LOVE;;B81').toString({ preserve: true })).toBe('B291;B97;;B81');
     });
 
-    it('flattenIndicators alone decomposes the name and flattens ;;', () => {
+    it('flattens ;; onto the head and decomposes the alias name', () => {
       expect(new BlissSVGBuilder('_LOVE;;B81').toString({ flattenIndicators: true })).toBe('B291;B81;B97');
     });
 
-    it('preserve + flattenIndicators keeps the name but flattens ;;', () => {
+    it('flattens ;; even with preserve, since an alias has no name to retain', () => {
       expect(new BlissSVGBuilder('_LOVE;;B81').toString({ preserve: true, flattenIndicators: true }))
-        .toBe('_LOVE;B81');
+        .toBe('B291;B81;B97');
     });
   });
 });

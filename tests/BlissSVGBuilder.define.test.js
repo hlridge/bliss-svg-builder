@@ -134,6 +134,44 @@ describe('BlissSVGBuilder.define', () => {
     });
   });
 
+  describe('when a glyph definition references an indicator part', () => {
+    // note: a glyph is a base character or a compound indicator, never a
+    // base+indicator combo (R15 D-S1a). Combos are bare aliases; the indicator
+    // attaches at the use site. The guard keys off each part's isIndicator flag.
+    it('rejects a base+indicator glyph definition', () => {
+      const code = trackCode('GLYPH_BASE_INDICATOR');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B291;B86' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('names the indicator and the alias alternative in the rejection message', () => {
+      const code = trackCode('GLYPH_BASE_INDICATOR_MSG');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B291;B86' } });
+      expect(result.errors[0]).toContain('indicator');
+      expect(result.errors[0]).toContain('alias');
+    });
+
+    it('accepts an all-indicator definition flagged as a compound indicator', () => {
+      const code = trackCode('COMPOUND_INDICATOR');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B97;B81', isIndicator: true } });
+      expect(result.errors).toEqual([]);
+      expect(BlissSVGBuilder.getDefinition(code).isIndicator).toBe(true);
+    });
+
+    it('accepts a base+indicator combination defined as a bare alias', () => {
+      const code = trackCode('COMBO_ALIAS');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B291;B86' } });
+      expect(BlissSVGBuilder.getDefinition(code).type).toBe('bare');
+    });
+
+    it('accepts a base-only glyph definition', () => {
+      const code = trackCode('BASE_ONLY_GLYPH');
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B291' } });
+      expect(BlissSVGBuilder.getDefinition(code).type).toBe('glyph');
+    });
+  });
+
   describe(`when called with type 'shape'`, () => {
     it('creates a primitive shape from a getPath function', () => {
       const code = trackCode('TYPESHAPE1');
