@@ -99,6 +99,31 @@ describe('ElementHandle word indicators under structural mutation', () => {
       expect(overlay(b, 0)).toEqual({ codes: ['B97'], stripSemantic: false });
       expect(dropWarnings(b)).toHaveLength(0);
     });
+
+    it('restores the word byte-identically when no head marker moves', () => {
+      // The strongest form of the guarantee: with no `^` to relocate, split then
+      // merge returns the exact input (serialize and render), so the word-slot
+      // is lossless, not merely surviving.
+      const b = new BlissSVGBuilder('B313/B1103;;B86');
+      const originalSvg = b.svgCode;
+      b.group(0).splitAt(1);
+      b.group(0).mergeWithNext();
+      expect(b.toString()).toBe('B313/B1103;;B86');
+      expect(b.svgCode).toBe(originalSvg);
+      expect(dropWarnings(b)).toHaveLength(0);
+    });
+
+    it('restores the word and its head marker when the marker stays in the first part', () => {
+      // The `^` glyph lands in the first part, so first-wins keeps it: the merge
+      // reconstructs the input byte-for-byte, marker included.
+      const b = new BlissSVGBuilder('B303/B313^/B431;;B86');
+      const originalSvg = b.svgCode;
+      b.group(0).splitAt(2);
+      b.group(0).mergeWithNext();
+      expect(b.toString()).toBe('B303/B313^/B431;;B86');
+      expect(b.svgCode).toBe(originalSvg);
+      expect(dropWarnings(b)).toHaveLength(0);
+    });
   });
 
   describe('when merging two words that both carry an overlay', () => {
