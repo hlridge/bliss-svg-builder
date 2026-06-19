@@ -382,7 +382,9 @@ export declare class ElementHandle {
   /**
    * Splits this word group into two at the glyph boundary, inserting a space
    * between. Only valid on group handles. A word-level (`;;`) indicator overlay
-   * follows the head: it stays with whichever half keeps the head glyph.
+   * is a word property: the first (left) part always keeps it. A `^` head
+   * marker is kept only if its glyph lands in the first part; otherwise the
+   * second part re-derives its head.
    */
   splitAt(glyphIndex: number): this;
 
