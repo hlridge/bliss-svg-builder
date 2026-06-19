@@ -11,8 +11,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - DSL `H;NOUN_BI` (NOUN_BI = B291;B81) warns BURIED_INDICATOR with the alias
  *   as source, and fails to render (empty by default; REFSQUARE/B699 placeholder
  *   under error-placeholder).
- * - The equivalent hand-built object input warns and fails the same way, so the
- *   guard holds on both surfaces (matching WORD_AS_PART).
+ * - The equivalent hand-built object input warns and fails the same way, and an
+ *   alias added as a non-leading part via the mutation API (addPart) warns too,
+ *   so the guard holds on the DSL, object, and programmatic surfaces (object
+ *   input keeps a leading alias composite, which pins the index>0 rule that the
+ *   DSL path flattens away). Matches the WORD_AS_PART dual-surface precedent.
  * - Negatives that must NOT fire: the alias leading (`NOUN_BI;B81`) or standalone
  *   (`NOUN_BI`); a compound-indicator alias as a part (`H;COMPOUND`); a multi-base
  *   alias with no indicator (`H;MULTIBASE`); a base-only alias (`H;BASEAL`);
@@ -71,6 +74,16 @@ describe('BlissSVGBuilder buried indicator', () => {
       // flattens it), so the leading base+indicator alias must not warn here
       const obj = { groups: [{ glyphs: [{ parts: [{ codeName: 'NOUN_BI' }, { codeName: 'H' }] }] }] };
       expect(new BlissSVGBuilder(obj).warnings.map((w) => w.code)).not.toContain('BURIED_INDICATOR');
+    });
+  });
+
+  describe('when the buried part is added through the mutation API', () => {
+    it('warns when an alias is added as a non-leading part', () => {
+      // pins the object/programmatic surface: addPart rebuilds through
+      // expandParts, so the guard must fire on mutation too, not only on parse
+      const b = new BlissSVGBuilder('H');
+      b.glyph(0).addPart('NOUN_BI');
+      expect(b.warnings.map((w) => w.code)).toContain('BURIED_INDICATOR');
     });
   });
 
