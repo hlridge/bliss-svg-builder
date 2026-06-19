@@ -464,6 +464,7 @@ describe('BlissParser head-glyph marker', () => {
       // R15 WS-4: a fallback head over an alias expansion is unstamped; the
       // element layer crowns the non-first head (B291, index 1) at query time.
       expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
+      expect(crownCount('_C15B_WORD_SEMANTIC')).toBe(1);
       expect(crownIndex('_C15B_WORD_SEMANTIC')).toBe(1);
     });
 

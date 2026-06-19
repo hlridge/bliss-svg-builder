@@ -285,6 +285,26 @@ describe('BlissElement snapshots', () => {
       expect(word.children[1].isHeadGlyph).toBe(true);
     });
 
+    it('flips the head after addPart on a custom glyph wrapping an exclusion (R15 F2 tripwire)', () => {
+      // TRIPWIRE for review finding F2 (gated to RR3-2 / GitHub #30, the
+      // insertPart/addPart identity-loss bug). MYG's identity is non-excluded so
+      // it heads `MYG/B208` (index 0); addPart deletes its glyphCode, so query-time
+      // head resolution (R15 WS-4) then falls through to the inner B486 (an
+      // exclusion) and the crown flips to B208 (index 1). Pre-WS-4 it stayed at 0.
+      // When RR3-2 makes part mutation preserve head identity, flip the post-addPart
+      // expectation back to 0 and delete this note.
+      const headOf = (b) => b.elements.children[0].children.filter(c => c.isGlyph).findIndex(g => g.isHeadGlyph);
+      BlissSVGBuilder.define({ MYG_F2: { type: 'glyph', codeString: 'B486;B303' } });
+      try {
+        const b = new BlissSVGBuilder('MYG_F2/B208');
+        expect(headOf(b)).toBe(0);
+        b.group(0).glyph(0).addPart('B303');
+        expect(headOf(b)).toBe(1);
+      } finally {
+        BlissSVGBuilder.removeDefinition('MYG_F2');
+      }
+    });
+
     it('has exactly one head glyph per group across multi-word inputs', () => {
       const root = new BlissSVGBuilder('B291/B292//B293/B294').elements;
       for (const group of root.children) {
