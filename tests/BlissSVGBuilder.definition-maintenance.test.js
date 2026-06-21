@@ -301,6 +301,17 @@ describe('BlissSVGBuilder definition maintenance', () => {
         .toThrow();
     });
 
+    it('rejects patching a bare codeString to use a composed alias as a ; part', () => {
+      // mirrors define()'s part-merge guard so both definition surfaces agree
+      // (otherwise patch is a "way in" the design forbids)
+      const alias = trackCode('PatchNoun');
+      const code = trackCode('PATCHCOMP1');
+      BlissSVGBuilder.define({ [alias]: { codeString: 'B291;B81' } });
+      BlissSVGBuilder.define({ [code]: { codeString: 'B431' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: `H;${alias}` }))
+        .toThrow(/composition/i);
+    });
+
     it('patches the codeString of a bare definition and keeps its type bare', () => {
       const code = trackCode('PATCHBARE1');
       BlissSVGBuilder.define({ [code]: { codeString: 'B431' } });

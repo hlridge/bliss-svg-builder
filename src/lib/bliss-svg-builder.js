@@ -2135,6 +2135,12 @@ class BlissSVGBuilder {
       if (BlissSVGBuilder.#hasCircularReference(code, newCodeString)) {
         throw new Error(`patchDefinition("${code}"): circular reference detected`);
       }
+      // Part-merge operand rule, mirroring #defineBare so both definition
+      // surfaces agree: a bare codeString cannot use a composed unflagged alias
+      // as a ;-part (checked on the raw codeString, before bare-alias resolution).
+      if (type === 'bare' && BlissSVGBuilder.#hasCompositePartViolation(newCodeString)) {
+        throw new Error(`patchDefinition("${code}"): a ; part cannot be a composition ("${newCodeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
+      }
     }
 
     // For bare definitions, resolve chained aliases in codeString
