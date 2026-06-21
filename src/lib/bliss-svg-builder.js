@@ -1275,7 +1275,12 @@ class BlissSVGBuilder {
       const currentInds = glyph.parts
         .filter(p => p.isIndicator)
         .map(p => p.codeName);
-      const bakedInds = def.codeString.split(';').slice(1)
+      // Baked indicators are identified by isIndicator, not by position: a
+      // baseless compound indicator (e.g. 'B86;B97') has no base segment to
+      // skip, so its first segment counts too. A real base is non-indicator and
+      // the filter excludes it anyway, so skipping the first segment is wrong
+      // for the baseless case and redundant otherwise.
+      const bakedInds = def.codeString.split(';')
         .filter(c => blissElementDefinitions[c.split(':')[0]]?.isIndicator);
       if (currentInds.length === bakedInds.length
           && currentInds.every((c, i) => c === bakedInds[i])) {

@@ -204,6 +204,19 @@ describe('BlissSVGBuilder custom glyphs', () => {
       const str = new BlissSVGBuilder('B431').toString({ preserve: true });
       expect(str).toBe('B431');
     });
+
+    it('keeps the bare name on an unmodified baseless compound-indicator glyph', () => {
+      // R15 Task 3b-4 (D-S2): an all-indicator (baseless) glyph has no base
+      // segment, so the baked-indicator scan must not skip the first one.
+      // Skipping it emitted a spurious `BASELESS_C;B86` delta that re-parsed to
+      // a doubled indicator (divergent render). isIndicator:true is the D-S1a
+      // gate for an all-indicator definition.
+      defineAndTrack({ BASELESS_C: { type: 'glyph', codeString: 'B86;B97', isIndicator: true } });
+      const original = new BlissSVGBuilder('BASELESS_C');
+      const str = original.toString({ preserve: true });
+      expect(str).toBe('BASELESS_C');
+      expect(new BlissSVGBuilder(str).svgCode).toBe(original.svgCode);
+    });
   });
 
   describe('when serializing a custom glyph via toJSON', () => {
