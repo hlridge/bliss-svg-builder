@@ -8,7 +8,7 @@ import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitio
 import { INTERNAL_OPTIONS, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { classifyIndicatorKind } from "./indicator-utils.js";
-import { resolveHeadIndex } from "./bliss-head-glyph-exclusions.js";
+import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 export class BlissElement {
   //#region Private Properties
@@ -975,7 +975,7 @@ export class BlissElement {
       const marked = childSnapshots.findIndex(c => c.isHeadGlyph);
       if (marked === -1) {
         const headIndex = resolveHeadIndex(
-          childSnapshots.map(c => c.codeName || c.children?.[0]?.codeName)
+          childSnapshots.map(c => headScanCode(c.codeName, c.children?.length ?? 0, c.children?.[0]?.codeName))
         );
         childSnapshots[headIndex] = Object.freeze({ ...childSnapshots[headIndex], isHeadGlyph: true });
       }

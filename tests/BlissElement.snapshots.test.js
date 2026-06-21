@@ -285,23 +285,45 @@ describe('BlissElement snapshots', () => {
       expect(word.children[1].isHeadGlyph).toBe(true);
     });
 
-    it('flips the head after addPart on a custom glyph wrapping an exclusion (R15 F2 tripwire)', () => {
-      // TRIPWIRE for review finding F2 (gated to RR3-2 / GitHub #30, the
-      // insertPart/addPart identity-loss bug). MYG's identity is non-excluded so
-      // it heads `MYG/B208` (index 0); addPart deletes its glyphCode, so query-time
-      // head resolution (R15 WS-4) then falls through to the inner B486 (an
-      // exclusion) and the crown flips to B208 (index 1). Pre-WS-4 it stayed at 0.
-      // When RR3-2 makes part mutation preserve head identity, flip the post-addPart
-      // expectation back to 0 and delete this note.
+    it('heads a word led by a fused multi-part character (exclusion applies only to lone glyphs)', () => {
+      // B486 ("opposite-to") excludes only when it stands alone as a glyph.
+      // Fused into one character (B486;B303) it is a character, not a leading
+      // operator, so it heads the word. Contrast B486/B368 above (separate
+      // glyphs), where the lone B486 is correctly skipped.
+      const word = new BlissSVGBuilder('B486;B303/B208').elements.children[0];
+      expect(word.children[0].isHeadGlyph).toBe(true);
+      expect(word.children[1].isHeadGlyph).toBe(false);
+    });
+
+    it('keeps the head on a custom glyph wrapping an exclusion after addPart', () => {
+      // @regression: RR3-2 / GitHub #30 (part-mutation identity loss + head)
+      // MYG's identity is non-excluded, so it heads `MYG/B208` (index 0). addPart
+      // clears its glyphCode, leaving a fused multi-part character (B486;B303;B303);
+      // a fused character is never a head-exclusion, so the crown stays at index 0
+      // instead of falling through to the inner B486.
       const headOf = (b) => b.elements.children[0].children.filter(c => c.isGlyph).findIndex(g => g.isHeadGlyph);
       BlissSVGBuilder.define({ MYG_F2: { type: 'glyph', codeString: 'B486;B303' } });
       try {
         const b = new BlissSVGBuilder('MYG_F2/B208');
         expect(headOf(b)).toBe(0);
         b.group(0).glyph(0).addPart('B303');
-        expect(headOf(b)).toBe(1);
+        expect(headOf(b)).toBe(0);
       } finally {
         BlissSVGBuilder.removeDefinition('MYG_F2');
+      }
+    });
+
+    it('heads a single-part custom glyph by its identity even when its only part is an exclusion', () => {
+      // A custom glyph named non-excluded but defined as a lone exclusion code
+      // (MYLONE = B486) heads its word by its own identity; the scan reads the
+      // glyph code, not its inner part. Pins the identity arg of the head scan.
+      BlissSVGBuilder.define({ MYLONE: { type: 'glyph', codeString: 'B486' } });
+      try {
+        const word = new BlissSVGBuilder('MYLONE/B208').elements.children[0];
+        expect(word.children[0].isHeadGlyph).toBe(true);
+        expect(word.children[1].isHeadGlyph).toBe(false);
+      } finally {
+        BlissSVGBuilder.removeDefinition('MYLONE');
       }
     });
 

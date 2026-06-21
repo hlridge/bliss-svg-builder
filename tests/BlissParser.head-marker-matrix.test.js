@@ -293,9 +293,12 @@ describe('BlissParser head-marker matrix', () => {
       expect(crownIndex('[color=red]>B486/B208')).toBe(1);
     });
 
-    it('skips an options-prefixed composite exclusion character', () => {
+    it('heads an options-prefixed composite character', () => {
+      // B486;B303 is one fused character, not a lone B486 operator, so the
+      // [color=red] prefix decorates the composite head at index 0 (an exclusion
+      // code excludes only when it stands alone as a glyph).
       expect(markedIndexes(BlissParser.parse('[color=red]B486;B303/B291'))).toEqual([]);
-      expect(crownIndex('[color=red]B486;B303/B291')).toBe(1);
+      expect(crownIndex('[color=red]B486;B303/B291')).toBe(0);
     });
   });
 });

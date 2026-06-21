@@ -163,6 +163,23 @@ export const blissHeadGlyphExclusions = [
 ];
 
 /**
+ * Head-scan code for one glyph: the value fed per-glyph to resolveHeadIndex.
+ * A head-exclusion code (e.g. B486 "opposite-to") excludes only when it stands
+ * alone as a single glyph; a fused multi-part character is a character, not a
+ * leading operator, so it is non-excludable (returns undefined). A named glyph
+ * (custom code or single built-in) is classified by its own identity code.
+ * Shared by the builder render path and the element snapshot so the two
+ * head-resolution sites cannot drift apart.
+ *
+ * @param {string|undefined} identityCode - the glyph's own code (glyphCode / codeName), if any
+ * @param {number} partCount - number of parts composing the glyph
+ * @param {string|undefined} firstPartCode - codeName of the first part
+ * @returns {string|undefined} the head-scan code, or undefined when non-excludable
+ */
+export const headScanCode = (identityCode, partCount, firstPartCode) =>
+  identityCode || (partCount > 1 ? undefined : firstPartCode);
+
+/**
  * Resolve which glyph index of a word is the fallback head, given each
  * glyph's head-scan code (its base character code, or a custom glyph's own
  * identity). Skips leading exclusion patterns (single- and multi-code, plus

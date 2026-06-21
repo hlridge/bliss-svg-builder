@@ -21,6 +21,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Query-time head re-derivation: after a structural glyph insert the overlay
  *   floats onto the freshly-resolved head (no stale parse-time stamp), and an
  *   explicit `^` head survives the same insert.
+ * - Fused-character head: a multi-part composite leading a word is the head
+ *   (a head-exclusion code excludes only as a lone glyph), and both
+ *   head-resolution copies (render merge and the isHeadGlyph flag) agree.
  *
  * Does NOT cover:
  * - Parser store shape and head targeting, see
@@ -120,6 +123,22 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
       const fresh = new BlissSVGBuilder('B303/B233/H^;;B97');
       expect(mutated.svgCode).toBe(fresh.svgCode);
       expect(mutated.toString()).toBe('B303/B233/H^;;B97');
+    });
+  });
+
+  describe('when the word is led by a fused multi-part character', () => {
+    it('merges the overlay onto the composite head, consistent with isHeadGlyph', () => {
+      // B486 ("opposite-to") excludes only as a lone glyph; B486;B303 is one
+      // fused character, so it heads the word and the ;;B86 overlay lands on it
+      // (index 0). Pins both head-resolution copies (render merge in
+      // bliss-svg-builder.js and the isHeadGlyph flag in bliss-element.js) in
+      // agreement, the divergence a single-site fix would introduce.
+      const glyphs = new BlissSVGBuilder('B486;B303/B208;;B86')
+        .elements.children[0].children.filter(c => c.isGlyph);
+      const headIdx = glyphs.findIndex(g => g.isHeadGlyph);
+      const overlayIdx = glyphs.findIndex(g => (g.children ?? []).some(p => p.codeName === 'B86'));
+      expect(headIdx).toBe(0);
+      expect(overlayIdx).toBe(0);
     });
   });
 });

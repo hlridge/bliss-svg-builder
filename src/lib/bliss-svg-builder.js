@@ -10,17 +10,19 @@ import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
 import { getSemanticRoot, mergeWordIndicatorsOntoHead } from "./indicator-utils.js";
-import { resolveHeadIndex } from "./bliss-head-glyph-exclusions.js";
+import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
 // load so BlissElement can clone it without importing BlissParser itself.
 const ERROR_PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].glyphs[0].parts;
 
 // Head-scan code for a raw blissObj glyph: a custom glyph's own identity, else
-// its base part's codeName (indicators and coords live on later parts / separate
-// fields). Mirrors the parser's getCode so resolveHeadIndex picks the same head
-// at query time as the parser does at parse time.
-const getHeadCode = (glyph) => glyph.glyphCode ?? glyph.parts?.[0]?.codeName;
+// its base part's codeName when single-part. A fused multi-part character is a
+// character (not a leading operator), so an exclusion code among its parts does
+// not exclude it: headScanCode is the single source shared with the element
+// snapshot so the two query-time head sites stay in lockstep.
+const getHeadCode = (glyph) =>
+  headScanCode(glyph.glyphCode, glyph.parts?.length ?? 0, glyph.parts?.[0]?.codeName);
 
 // Note: BlissSVGBuilder.LIB_VERSION is attached at the public entry point
 // (src/index.js), not declared here. Code that imports the class directly

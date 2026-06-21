@@ -520,32 +520,34 @@ describe('BlissParser head-glyph marker', () => {
     });
 
     it('keeps the fallback head when the alias is invoked with a position suffix', () => {
-      // First glyph is a composite (B486;B303) so it carries no glyphCode;
-      // the head pick must run on the clean expanded parts before the outer
-      // :2,0 suffix lands on the first part string.
+      // First glyph is a composite (B486;B303), a fused character that heads
+      // the word (an exclusion code excludes only as a lone glyph). The head
+      // pick must run on the clean expanded parts before the :2,0 suffix lands
+      // on the first part string, so the composite still crowns at index 0.
       const r = BlissParser.parse('_HG_COMPOSITE_FIRST:2,0');
       const glyphs = r.groups[0].glyphs;
 
       expect(glyphs[0].parts[0].x).toBe(2);
       // R15 WS-4: no parser fallback stamp; the element layer crowns exactly
-      // one head (index 1) after the composite-first scan.
+      // one head (index 0, the fused composite) after the composite-first scan.
       expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
       expect(crownCount('_HG_COMPOSITE_FIRST:2,0')).toBe(1);
-      expect(crownIndex('_HG_COMPOSITE_FIRST:2,0')).toBe(1);
+      expect(crownIndex('_HG_COMPOSITE_FIRST:2,0')).toBe(0);
     });
 
     it('keeps the fallback head when the alias is invoked with an options prefix', () => {
       // Same composite-first word; the [color=red] prefix lands on the first
-      // part string after expansion, so the head pick must already be done.
+      // part string after expansion, so the head pick must already be done. The
+      // fused composite heads the word at index 0.
       const r = BlissParser.parse('[color=red]_HG_COMPOSITE_FIRST');
       const glyphs = r.groups[0].glyphs;
 
       expect(glyphs[0].options.color).toBe('red');
       // R15 WS-4: no parser fallback stamp; the element layer crowns exactly
-      // one head (index 1) after the composite-first scan.
+      // one head (index 0, the fused composite) after the composite-first scan.
       expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
       expect(crownCount('[color=red]_HG_COMPOSITE_FIRST')).toBe(1);
-      expect(crownIndex('[color=red]_HG_COMPOSITE_FIRST')).toBe(1);
+      expect(crownIndex('[color=red]_HG_COMPOSITE_FIRST')).toBe(0);
     });
   });
 });
