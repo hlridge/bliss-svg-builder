@@ -1858,11 +1858,44 @@ class BlissSVGBuilder {
     return resolved;
   }
 
+  /**
+   * Part-merge operand check (reuses the runtime predicate via the parser):
+   * true if the codeString uses a composed unflagged alias as a non-leading
+   * ;-part, which the parser flags COMPOSITE_AS_PART. Run on the RAW codeString,
+   * before bare-alias resolution would flatten it to the legal explicit form.
+   * Parse failures (e.g. a circular reference) are not this check's concern.
+   */
+  static #hasCompositePartViolation(codeString) {
+    let parsed;
+    try {
+      parsed = BlissParser.parse(codeString);
+    } catch {
+      return false;
+    }
+    for (const group of parsed.groups ?? []) {
+      for (const glyph of group.glyphs ?? []) {
+        for (const part of glyph.parts ?? []) {
+          if (part.errorCode === 'COMPOSITE_AS_PART') return true;
+        }
+      }
+    }
+    return false;
+  }
+
   static #defineBare(code, definition, options = {}) {
     BlissSVGBuilder.#validateCode(code);
 
     if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
       throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
+    }
+
+    // Part-merge operand rule: a ; part must be a part (a primitive or a flagged
+    // glyph/indicator), never a composition. Reject a codeString that uses a
+    // composed unflagged alias as a ;-part (checked on the raw codeString, before
+    // #resolveBareAliases flattens it to the legal explicit form), so define() is
+    // consistent with the use-site failure.
+    if (BlissSVGBuilder.#hasCompositePartViolation(definition.codeString)) {
+      throw new Error(`define("${code}"): a ; part cannot be a composition ("${definition.codeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
     }
 
     if (blissElementDefinitions[code] && !options.overwrite) {

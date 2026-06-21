@@ -17,6 +17,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   codeString), missing shape dimensions, missing externalGlyph char,
  *   empty codeString, empty code key, null input, duplicate codes
  *   (skipped without overwrite, replaced with overwrite: true).
+ * - Content guards: a glyph definition cannot bake in an indicator part (D-S1a);
+ *   a definition cannot use a composed unflagged alias as a ; part (part-merge
+ *   operand rule) - a word-member via / or a flagged glyph part is fine.
  * - Acceptance of finite numeric fields on a typed glyph definition
  *   (negative anchorOffsetX, positive width).
  * - Batch define iterates own keys only, not properties inherited via
@@ -178,6 +181,50 @@ describe('BlissSVGBuilder.define', () => {
       const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B86;B291' } });
       expect(result.errors.length).toBeGreaterThan(0);
       expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+  });
+
+  describe('when a definition uses a composed alias as a ; part', () => {
+    // note: ; is part-merge, so a ;-part operand must be a part (a primitive or a
+    // flagged glyph/indicator). A composed unflagged alias (B291;B81) is a
+    // character, not a part; using it as a non-leading ;-part inside a definition
+    // is rejected, matching the use-site failure. The check runs on the raw
+    // codeString before bare-alias resolution would flatten H;<alias> to the
+    // legal explicit H;B291;B81 (a glyph def's composed-alias part is already
+    // rejected upstream: a glyph cannot reference a bare alias).
+    it('rejects a bare definition that uses a composed alias as a ; part', () => {
+      BlissSVGBuilder.define({ [trackCode('CompAlias')]: { codeString: 'B291;B81' } });
+      const result = BlissSVGBuilder.define({ [trackCode('CompWrap')]: { codeString: 'H;CompAlias' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition('CompWrap')).toBeNull();
+    });
+
+    it('names the part-merge rule in the rejection message', () => {
+      BlissSVGBuilder.define({ [trackCode('CompAliasMsg')]: { codeString: 'B291;B81' } });
+      const result = BlissSVGBuilder.define({ [trackCode('CompWrapMsg')]: { codeString: 'H;CompAliasMsg' } });
+      expect(result.errors[0]).toMatch(/cannot be a composition/i);
+    });
+
+    it('accepts a composed alias as a word-member via /', () => {
+      BlissSVGBuilder.define({ [trackCode('CompAliasWord')]: { codeString: 'B291;B81' } });
+      const result = BlissSVGBuilder.define({ [trackCode('CompWord')]: { codeString: 'B313/CompAliasWord' } });
+      expect(result.errors).toEqual([]);
+      expect(BlissSVGBuilder.getDefinition('CompWord')).not.toBeNull();
+    });
+
+    it('accepts a flagged glyph as a ; part', () => {
+      BlissSVGBuilder.define({ [trackCode('FlagGlyph')]: { type: 'glyph', codeString: 'HL8;HL8:0,8' } });
+      const result = BlissSVGBuilder.define({ [trackCode('FlagWrap')]: { codeString: 'H;FlagGlyph' } });
+      expect(result.errors).toEqual([]);
+      expect(BlissSVGBuilder.getDefinition('FlagWrap')).not.toBeNull();
+    });
+
+    it('still defines a base+indicator alias on its own', () => {
+      // the guard fires on a composed alias used AS a ; part, never on defining
+      // the alias itself (a bare base+indicator alias is the supported form)
+      const result = BlissSVGBuilder.define({ [trackCode('CompAliasSolo')]: { codeString: 'B291;B81' } });
+      expect(result.errors).toEqual([]);
+      expect(BlissSVGBuilder.getDefinition('CompAliasSolo').type).toBe('bare');
     });
   });
 
