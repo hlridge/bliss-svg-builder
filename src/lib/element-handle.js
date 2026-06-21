@@ -451,6 +451,16 @@ export class ElementHandle {
     return this;
   }
 
+  // A glyph recomposed by part mutation is no longer the single code it was
+  // parsed from, so drop its glyph-level identity and let toString() serialize
+  // the individual parts instead of the stale code. No-op on a glyph that never
+  // had identity (an inline composite carries no glyphCode to begin with).
+  #clearGlyphIdentity(glyph) {
+    delete glyph.isBlissGlyph;
+    delete glyph.codeName;
+    delete glyph.glyphCode;
+  }
+
   addPart(code, opts) {
     this.#assertReachable();
     // Group level: delegate to last glyph
@@ -490,11 +500,7 @@ export class ElementHandle {
     }
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.splice(index, 0, ...newParts);
-    // Adding parts changes the glyph's composition, so clear its identity
-    // so toString() serializes the individual parts instead of the old code.
-    delete glyph.isBlissGlyph;
-    delete glyph.codeName;
-    delete glyph.glyphCode;
+    this.#clearGlyphIdentity(glyph);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
@@ -673,6 +679,7 @@ export class ElementHandle {
     const newPart = this.#parsePart(code);
     this.#applyDefaultsOverrides(newPart, opts);
     glyph.parts[index] = newPart;
+    this.#clearGlyphIdentity(glyph);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
@@ -704,6 +711,7 @@ export class ElementHandle {
       const newPart = this.#parsePart(code);
       this.#applyDefaultsOverrides(newPart, opts);
       glyph.parts[partIndex] = newPart;
+      this.#clearGlyphIdentity(glyph);
       this.#nodeRef = newPart;
       this.#ctx.rebuild();
       this.#syncGeneration();

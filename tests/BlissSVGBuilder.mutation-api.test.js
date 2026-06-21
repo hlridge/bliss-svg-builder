@@ -448,6 +448,44 @@ describe('BlissSVGBuilder mutation API', () => {
     });
   });
 
+  describe('when replacePart replaces an identity-bearing glyph\'s part', () => {
+    it('emits the replacement code from toString instead of the stale glyph identity', () => {
+      // @issue: #30 — replacePart left glyphCode='B291' on a glyph whose only
+      // part is now B86, so toString emitted the stale 'B291:5,7' and the
+      // string stopped round-tripping to the live render. addPart/insertPart
+      // already cleared identity; replacePart did not.
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).glyph(0).replacePart(0, 'B86:5,7');
+      const direct = new BlissSVGBuilder('B86:5,7');
+      expect(b.toString()).toBe(direct.toString());
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('clears codeName, isBlissGlyph, and glyphCode like addPart does', () => {
+      const b = new BlissSVGBuilder('B313');
+      expect(b.glyph(0).codeName).toBe('B313');
+      expect(b.glyph(0).isBlissGlyph).toBe(true);
+
+      b.glyph(0).replacePart(0, 'H');
+
+      expect(b.glyph(0).codeName).toBe('');
+      expect(b.glyph(0).isBlissGlyph).toBe(false);
+      const jsonGlyph = b.toJSON().groups[0].glyphs[0];
+      expect(jsonGlyph.codeName).toBeUndefined();
+      expect(jsonGlyph.parts.map(p => p.codeName)).toEqual(['H']);
+    });
+
+    it('refreshes identity through the part-handle replace() path too', () => {
+      // The level-3 part().replace() path replaced the part without refreshing
+      // the parent glyph's identity, the same #30 stale-code bug as replacePart.
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).glyph(0).part(0).replace('B86:5,7');
+      const direct = new BlissSVGBuilder('B86:5,7');
+      expect(b.toString()).toBe(direct.toString());
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+  });
+
   describe('when mutations chain or cross surfaces', () => {
     it('chains addGroup → addGlyph → group.addPart', () => {
       const b = new BlissSVGBuilder('');
