@@ -27,6 +27,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   alias (`H;SIMPLE`), explicit literal parts (`H;B291;B81`), a flagged built-in
  *   indicator (`H;B85`), a custom `type:'glyph'` (`H;CGLYPH`), a custom
  *   `type:'shape'` (`H;CSHAPE`), and a built-in composite character (`H;B1`).
+ * - toString of a failed composite part decomposes to the explicit literal form
+ *   (`H;NOUN_BI` -> `H;B291;B81`), which re-parses clean (review F2, by-design).
  *
  * Does NOT cover:
  * - The define-time guards (a composed-alias `;`-operand inside a definition's
@@ -182,6 +184,21 @@ describe('BlissSVGBuilder composite part', () => {
       // (parts.length>1) and isBlissGlyph; reading the flag from the definition
       // keeps them legal as ; parts. A part.isBlissGlyph check would break all of them.
       expect(warningCodes('H;B1')).not.toContain('COMPOSITE_AS_PART');
+    });
+  });
+
+  describe('when a failed composite part is serialized', () => {
+    it('decomposes to the explicit literal form on toString, which round-trips clean', () => {
+      // pins review F2 (accepted by-design): the guard is an authoring-layer check;
+      // toString export is NFD decompose, so H;NOUN_BI (which fails) serializes to
+      // the explicit H;B291;B81 - a legitimate character, NOT a surviving
+      // composite-as-part - and that re-parses without the warning and renders.
+      const failed = new BlissSVGBuilder('H;NOUN_BI');
+      expect(failed.warnings.map((w) => w.code)).toContain('COMPOSITE_AS_PART');
+      expect(failed.toString()).toBe('H;B291;B81');
+      const roundTripped = new BlissSVGBuilder(failed.toString());
+      expect(roundTripped.warnings.map((w) => w.code)).not.toContain('COMPOSITE_AS_PART');
+      expect(roundTripped.svgCode.length).toBeGreaterThan(0);
     });
   });
 });
