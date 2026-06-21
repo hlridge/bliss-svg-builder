@@ -30,9 +30,12 @@ import { MAX_RECURSION_DEPTH } from '../src/lib/bliss-constants.js';
  *   function throws on construction.
  * - Maximum nesting depth: composite recursion past MAX_RECURSION_DEPTH
  *   throws the documented depth-exceeded error.
- * - Circular definitions (A → B → A) throw "Maximum recursion depth
- *   exceeded" in both the expand() and parseParts() code paths;
- *   legitimate deeply-nested built-in composites (B291) do not throw.
+ * - Circular definitions (A → B → A) are rejected at define() so the builder
+ *   constructs without recursing, for both the single-code (expand) and
+ *   composite (parseParts) cycle shapes; legitimate deeply-nested built-in
+ *   composites (B291) do not throw.
+ * - A deep non-circular custom glyph chain still trips the parser
+ *   MAX_RECURSION_DEPTH guard ("Maximum recursion depth exceeded").
  *
  * Does NOT cover:
  * - Snapshot tree shape (level/index/key/parentKey/bounds, immutability),
@@ -273,26 +276,34 @@ describe('BlissElement', () => {
   });
 
   describe('when a definition forms a circular reference', () => {
-    test('throws "Maximum recursion depth exceeded" for a cycle in expand() (CircularA ↔ CircularB)', () => {
-      BlissSVGBuilder.define({
+    // R15 part-merge hardening: a circular definition is now rejected at define()
+    // (one side fails to register, see define.test.js), so it can no longer be
+    // stored and crash at render with "Maximum recursion depth exceeded" - the
+    // chain terminates at the unregistered code. These pin that the builder
+    // constructs without recursing for the single-code (expand) and composite
+    // (parseParts) cycle shapes.
+    test('rejects a single-code cycle so the builder does not recurse (CircularA / CircularB)', () => {
+      const result = BlissSVGBuilder.define({
         CircularA: { codeString: 'CircularB' },
         CircularB: { codeString: 'CircularA' },
       }, { overwrite: true });
       try {
-        expect(() => new BlissSVGBuilder('CircularA')).toThrow('Maximum recursion depth exceeded');
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(() => new BlissSVGBuilder('CircularA')).not.toThrow();
       } finally {
         BlissSVGBuilder.removeDefinition('CircularA');
         BlissSVGBuilder.removeDefinition('CircularB');
       }
     });
 
-    test('throws "Maximum recursion depth exceeded" for a cycle in parseParts() (CircularC ↔ CircularD via ;H)', () => {
-      BlissSVGBuilder.define({
+    test('rejects a composite cycle so the builder does not recurse (CircularC / CircularD via ;H)', () => {
+      const result = BlissSVGBuilder.define({
         CircularC: { codeString: 'CircularD;H' },
         CircularD: { codeString: 'CircularC;H' },
       }, { overwrite: true });
       try {
-        expect(() => new BlissSVGBuilder('CircularC')).toThrow('Maximum recursion depth exceeded');
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(() => new BlissSVGBuilder('CircularC')).not.toThrow();
       } finally {
         BlissSVGBuilder.removeDefinition('CircularC');
         BlissSVGBuilder.removeDefinition('CircularD');
@@ -301,6 +312,27 @@ describe('BlissElement', () => {
 
     test('does not throw for a legitimate deeply-nested built-in composite (B291 enclosure)', () => {
       expect(() => new BlissSVGBuilder('B291')).not.toThrow();
+    });
+  });
+
+  describe('when a non-circular custom chain exceeds the parse recursion depth', () => {
+    test('throws "Maximum recursion depth exceeded" for a deep glyph chain', () => {
+      // post-hardening the parser depth guard is reached via a legitimate deep
+      // chain (cycles are now rejected at define). Glyph defs are not flattened by
+      // bare-alias resolution, so the chain survives parse-time expansion. This
+      // keeps the parser MAX_RECURSION_DEPTH coverage the circular tests used to
+      // provide before define() began rejecting cycles.
+      const depth = MAX_RECURSION_DEPTH + 5;
+      const codes = Array.from({ length: depth + 1 }, (_, k) => `DeepChain${k}`);
+      BlissSVGBuilder.define({ [codes[0]]: { type: 'glyph', codeString: 'B291' } });
+      for (let k = 1; k <= depth; k++) {
+        BlissSVGBuilder.define({ [codes[k]]: { type: 'glyph', codeString: codes[k - 1] } });
+      }
+      try {
+        expect(() => new BlissSVGBuilder(codes[depth])).toThrow('Maximum recursion depth exceeded');
+      } finally {
+        for (const code of codes) BlissSVGBuilder.removeDefinition(code);
+      }
     });
   });
 });

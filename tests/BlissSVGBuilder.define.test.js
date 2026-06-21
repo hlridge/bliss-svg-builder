@@ -228,6 +228,27 @@ describe('BlissSVGBuilder.define', () => {
     });
   });
 
+  describe('when a definition forms a reference cycle', () => {
+    // complements the glyph-cycle coverage in custom-glyphs.test.js: bare aliases
+    // can reference any type, so #defineBare must also reject a cycle or it would
+    // store a self-referential codeString and crash at render with "Maximum
+    // recursion depth". One side fails to register, terminating the chain.
+    it('rejects a bare-alias cycle and renders without recursing', () => {
+      const result = BlissSVGBuilder.define({
+        [trackCode('CycleA')]: { codeString: 'CycleB;B291' },
+        [trackCode('CycleB')]: { codeString: 'CycleA' },
+      });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(() => new BlissSVGBuilder('H;CycleA').svgCode).not.toThrow();
+    });
+
+    it('rejects a direct bare-alias self-reference', () => {
+      const result = BlissSVGBuilder.define({ [trackCode('SelfRef')]: { codeString: 'SelfRef;B291' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition('SelfRef')).toBeNull();
+    });
+  });
+
   describe(`when called with type 'shape'`, () => {
     it('creates a primitive shape from a getPath function', () => {
       const code = trackCode('TYPESHAPE1');

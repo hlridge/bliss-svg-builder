@@ -1889,6 +1889,15 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
     }
 
+    // Reject a definition cycle at define time. Bare aliases can reference any
+    // type (glyph/shape/bare), so unlike #defineGlyph/#defineShape this path had
+    // no cycle guard: a cycle (CA -> CB -> CA, or a direct self-reference) was
+    // stored and then crashed at render with "Maximum recursion depth". Rejecting
+    // one side here leaves the chain terminating at an unregistered code instead.
+    if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
+      throw new Error(`define("${code}"): circular reference detected`);
+    }
+
     // Part-merge operand rule: a ; part must be a part (a primitive or a flagged
     // glyph/indicator), never a composition. Reject a codeString that uses a
     // composed unflagged alias as a ;-part (checked on the raw codeString, before
