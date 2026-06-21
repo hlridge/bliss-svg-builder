@@ -42,8 +42,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   (WS-2…WS-4), see the `ElementHandle.*` suites.
  * - The define-time guard rejecting base+indicator glyph definitions (D-S1a,
  *   Task 3b-2), see `BlissSVGBuilder.define.test.js`.
- * - The buried-indicator warning for an alias used as a non-leading `;`-part
- *   (D-S1b, Task 3b-3).
+ * - The composite-as-part warning for a composed unflagged alias used as a
+ *   non-leading `;`-part, see `BlissSVGBuilder.composite-part.test.js`.
  * - Programmatic `glyph().applyIndicators()` char-path parity (Task 5), see
  *   `ElementHandle.apply-indicators.test.js`.
  * - Rendered pixel output: promotion is render-neutral by design (no e2e).

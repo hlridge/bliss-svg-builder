@@ -987,7 +987,7 @@ export class BlissParser {
             }
 
             BlissParser.#applyDefinitionMetadata(part, definition);
-            BlissParser.#flagBuriedIndicator(part, partIndex);
+            BlissParser.#flagCompositePart(part, partIndex);
 
             this.#extractPositionFromOptions(part);
             parts.push(part);
@@ -1060,7 +1060,7 @@ export class BlissParser {
         if (!glyph.parts) continue;
         for (const [partIndex, part] of glyph.parts.entries()) {
           BlissParser.#expandPartRecursive(part);
-          BlissParser.#flagBuriedIndicator(part, partIndex);
+          BlissParser.#flagCompositePart(part, partIndex);
         }
       }
     }
@@ -1068,22 +1068,22 @@ export class BlissParser {
   }
 
   /**
-   * Re-derive the BURIED_INDICATOR flag on every (already-expanded) part of a
-   * structure, in place. The flag is position-dependent (a part buries an
-   * indicator only when non-leading), so it must be recomputed whenever the
+   * Re-derive the COMPOSITE_AS_PART flag on every (already-expanded) part of a
+   * structure, in place. The flag is position-dependent (a composed alias is a
+   * violation only when non-leading), so it must be recomputed whenever the
    * mutation API reassembles a glyph: insertPart parses a new part through an
    * `H;<code>` scaffold (index 1) and may then place it at index 0, and
    * removePart can shift a non-leading part to the leading slot. Unlike
    * expandParts this does not expand, so it is safe to run on every rebuild.
    */
-  static reflagBuriedIndicators(blissObj) {
+  static reflagCompositeParts(blissObj) {
     if (!blissObj?.groups) return blissObj;
     for (const group of blissObj.groups) {
       if (!group.glyphs) continue;
       for (const glyph of group.glyphs) {
         if (!glyph.parts) continue;
         for (const [partIndex, part] of glyph.parts.entries()) {
-          BlissParser.#flagBuriedIndicator(part, partIndex);
+          BlissParser.#flagCompositePart(part, partIndex);
         }
       }
     }
@@ -1091,29 +1091,32 @@ export class BlissParser {
   }
 
   /**
-   * D-S1b: flag a part that buries an indicator. A base+indicator alias used as
-   * a NON-leading ;-part (index > 0) turns its baked indicator into an
-   * indicator-of-a-part, which is forbidden (indicators attach to characters,
-   * not parts). It must look like a base FOLLOWED BY an indicator:
-   * - the part is not itself a flagged indicator (excludes a built-in compound
-   *   indicator such as B85 = B270;B86 or B98 = B97;B99, whose first sub-part is
-   *   a non-indicator shape — only its isIndicator flag distinguishes it);
-   * - its first sub-part is not an indicator (excludes an all-indicator alias
-   *   such as B97;B81 — define() strips a custom isIndicator flag, so this
-   *   indicator-first shape is the only signal left);
-   * - a later sub-part IS an indicator (the baked indicator being buried).
-   * Literal inline parts have no recursive sub-parts and are skipped. Must run
-   * AFTER #applyDefinitionMetadata stamps part.isIndicator. The element layer
-   * then fails the whole character to render with a BURIED_INDICATOR warning.
-   * Shared by parseParts (DSL input) and expandParts (object input).
+   * Flag a non-leading ;-part whose operand is a composed, unflagged alias.
+   * `;` is part-merge, so its operands must be PARTS: a primitive, or a flagged
+   * reusable definition (an indicator, a type:'glyph', or a type:'shape'). A
+   * character/word alias that expands to multiple parts is a higher-level unit;
+   * superimposing it as a part would bury its internal structure (e.g. a baked
+   * indicator), so it is rejected. The predicate:
+   * - index > 0: a leading operand is the base (and the promotion path), not a part;
+   * - part.parts.length > 1: a composition (a primitive or single-code rename
+   *   alias expands to <= 1 part and stays legal);
+   * - part.isIndicator !== true: a flagged indicator is a legal part (excludes a
+   *   built-in compound indicator such as B85 = B270;B86 or B98 = B97;B99);
+   * - the definition is not a flagged glyph/shape: isBlissGlyph / isShape are
+   *   carried by the DEFINITION, not stamped onto the part, so they are read from
+   *   the registry (this exempts the ~1000 built-in composite characters and
+   *   custom type:'glyph'/'shape' definitions, which are legal parts).
+   * Must run AFTER #applyDefinitionMetadata stamps part.isIndicator. The element
+   * layer then fails the whole character to render with a COMPOSITE_AS_PART
+   * warning. Shared by parseParts (DSL input) and expandParts (object input).
    */
-  static #flagBuriedIndicator(part, index) {
-    if (index > 0 && part.isIndicator !== true && part.parts?.length &&
-        part.parts[0]?.isIndicator !== true &&
-        part.parts.some(p => p.isIndicator === true)) {
-      part.error = `"${part.codeName}" carries an indicator and cannot be a non-leading part; indicators attach to characters, not parts`;
-      part.errorCode = 'BURIED_INDICATOR';
-    } else if (part.errorCode === 'BURIED_INDICATOR') {
+  static #flagCompositePart(part, index) {
+    const def = blissElementDefinitions[part.codeName];
+    if (index > 0 && part.parts?.length > 1 && part.isIndicator !== true &&
+        def?.isBlissGlyph !== true && def?.isShape !== true) {
+      part.error = `"${part.codeName}" is a composition and cannot be a part; a ; part must be a primitive or a flagged glyph`;
+      part.errorCode = 'COMPOSITE_AS_PART';
+    } else if (part.errorCode === 'COMPOSITE_AS_PART') {
       // The flag is position-dependent, so it is authoritative at the CURRENT
       // index: clear a stale one stamped elsewhere. The mutation API parses a
       // new part through an `H;<code>` scaffold (index 1) and may then insert it

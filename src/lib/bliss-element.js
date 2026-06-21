@@ -646,16 +646,17 @@ export class BlissElement {
         this.#relativeToParentX = this.#blissObj.x ?? 0;
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
-        if (this.#blissObj.errorCode === 'BURIED_INDICATOR') {
-          // A base+indicator alias buried as a non-leading ;-part (D-S1b). The
-          // part is a composite, so it never reaches the leaf-fail branch below;
-          // record the warning and render invisible so the level-2 character
-          // fails (placeholder per error-placeholder), mirroring WORD_AS_PART.
+        if (this.#blissObj.errorCode === 'COMPOSITE_AS_PART') {
+          // A composed unflagged alias used as a non-leading ;-part (the
+          // part-merge operand rule). The part is a composite, so it never
+          // reaches the leaf-fail branch below; record the warning and render
+          // invisible so the level-2 character fails (placeholder per
+          // error-placeholder), mirroring WORD_AS_PART.
           if (!this.#sharedOptions?.warnings) {
             throw new Error(`Unable to create Bliss element: ${this.#blissObj.error || this.#blissObj.codeName || 'unknown'}`);
           }
           this.#sharedOptions.warnings.push({
-            code: 'BURIED_INDICATOR',
+            code: 'COMPOSITE_AS_PART',
             message: this.#blissObj.error,
             source: this.#blissObj.codeName || 'unknown',
           });
