@@ -22,9 +22,11 @@ import { BlissSVGBuilder } from '../src/index';
  *   identity and replaces an existing B97; { stripSemantic: true }
  *   suppresses preservation.
  * - Invalid handle or input: missing/empty codes throw; non-indicator-only
- *   inputs no-op (semantic preserved); apply on an all-indicator glyph or
- *   on a glyph with indicator parts preceding base parts is a no-op; apply
- *   on a part handle is a no-op that still returns the handle.
+ *   inputs no-op (semantic preserved); apply on a part handle is a no-op that
+ *   still returns the handle; apply on a space glyph no-ops.
+ * - Atypical/empty base (R15 Task 5): the first part is always the base (i>0
+ *   rule), so apply onto a lone indicator, an indicator-led glyph, or a
+ *   detach-emptied glyph attaches the indicator (matching addPart).
  * - Chaining: applyIndicators followed by applyIndicators replaces;
  *   clearIndicators({stripSemantic:true}).applyIndicators(...) yields a
  *   single new indicator over the bare base.
@@ -205,18 +207,19 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B97']);
     });
 
-    it('is a no-op on an all-indicator glyph (no base parts to attach to)', () => {
+    it('attaches onto a lone-indicator glyph, treating the first part as the base', () => {
       const b = new BlissSVGBuilder('B86');
       b.group(0).glyph(0).applyIndicators('B81');
-      // B86 is the only part and is an indicator; baseParts is empty, so no-op
-      expect(partCodes(b)).toEqual(['B86']);
+      // R15 Task 5: index 0 is always the base (i>0 rule), so a lone indicator
+      // carries a further indicator rather than no-opping.
+      expect(partCodes(b)).toEqual(['B86', 'B81']);
     });
 
-    it('is a no-op when an indicator part precedes the base parts (B86;B291)', () => {
+    it('treats the first part as the base even when it is an indicator (B86;B291)', () => {
       const b = new BlissSVGBuilder('B86;B291');
       b.group(0).glyph(0).applyIndicators('B81');
-      // firstIndicatorIndex is 0, so baseParts is empty, no-op
-      expect(partCodes(b)).toEqual(['B86', 'B291']);
+      // R15 Task 5: index 0 is the base under the i>0 rule, so B81 appends.
+      expect(partCodes(b)).toEqual(['B86', 'B291', 'B81']);
     });
 
     it('is a no-op when a non-indicator part follows an indicator part (invalid pattern)', () => {
@@ -226,13 +229,13 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B86', 'B303']);
     });
 
-    // regression: burndown D4 (folds into R14). The silent no-ops above now
-    // surface an INDICATOR_MUTATION_NOOP warning on the persistent mutation
-    // channel so a caller knows the call did nothing. The full warning matrix
-    // (apply / clear / flatten variants) lives in
+    // regression: burndown D4 (folds into R14). The surviving no-ops (an invalid
+    // part pattern; a space glyph; an unrecognized code) still surface an
+    // INDICATOR_MUTATION_NOOP warning on the persistent mutation channel so a
+    // caller knows the call did nothing. The full warning matrix lives in
     // ElementHandle.indicator-noop-warning.test.js; this pins the named gate.
-    it('warns when applyIndicators is called out of scope instead of silently no-opping', () => {
-      const b = new BlissSVGBuilder('B86');
+    it('warns on a surviving no-op (invalid pattern) instead of silently no-opping', () => {
+      const b = new BlissSVGBuilder('B291;B86;B303');
       b.group(0).glyph(0).applyIndicators('B81');
       const noop = b.warnings.filter(w => w.code === 'INDICATOR_MUTATION_NOOP');
       expect(noop).toHaveLength(1);
@@ -252,6 +255,32 @@ describe('ElementHandle apply indicators', () => {
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true }).applyIndicators('B81');
       // Clear strips all, then apply adds B81
       expect(partCodes(b)).toEqual(['B291', 'B81']);
+    });
+  });
+
+  describe('when applying indicators to an atypical or empty base', () => {
+    it('attaches onto an empty glyph, matching addPart', () => {
+      // regression (R15 Task 5): a glyph emptied by detaching all its parts
+      // accepts an indicator via applyIndicators, the same as addPart already does.
+      const viaApply = new BlissSVGBuilder('B291;B86');
+      viaApply.group(0).glyph(0).part(1).detach();
+      viaApply.group(0).glyph(0).part(0).detach();
+      viaApply.group(0).glyph(0).applyIndicators('B86');
+      expect(partCodes(viaApply)).toEqual(['B86']);
+
+      const viaAdd = new BlissSVGBuilder('B291;B86');
+      viaAdd.group(0).glyph(0).part(1).detach();
+      viaAdd.group(0).glyph(0).part(0).detach();
+      viaAdd.group(0).glyph(0).addPart('B86');
+      expect(partCodes(viaApply)).toEqual(partCodes(viaAdd));
+    });
+
+    it('does not attach an indicator to a space glyph', () => {
+      const b = new BlissSVGBuilder('B291//B291');
+      b.element(1).glyph(0).applyIndicators('B86');
+      // the space part is untouched; no indicator is appended
+      expect(b.element(1).glyph(0).part(1)).toBeNull();
+      expect(b.element(1).glyph(0).part(0).codeName).toBe('TSP');
     });
   });
 

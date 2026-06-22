@@ -326,16 +326,20 @@ export declare class ElementHandle {
    *   overlay (the DSL `;;` channel), leaving the base glyphs intact so a later
    *   `clearIndicators()` restores them. `{ flatten: true }` opts out of the
    *   overlay and bakes onto the head glyph as character-level parts instead
-   *   (the pre-overlay shape; mirrors the deprecated `applyHeadIndicators`).
+   *   (the pre-overlay shape; mirrors the deprecated `applyHeadIndicators`). A
+   *   `flatten` apply keeps the overlay when its code applies no indicator (it
+   *   would bake nothing), rather than silently dropping the overlay.
    *
    * The per-surface `flatten` asymmetry is deliberate: it applies only to the
    * group/word-level overlay, the only surface with a portable `;;` form to
    * collapse.
    *
-   * On a glyph handle, a call that cannot apply any indicator (the requested
-   * codes are not indicators, or the glyph has no base part to carry one) adds
-   * an `INDICATOR_MUTATION_NOOP` warning to `warnings` instead of silently
-   * doing nothing.
+   * On a glyph handle the first part is always the base, so applying onto a lone
+   * indicator or a detach-emptied glyph attaches the indicator (matching
+   * `addPart`). A call that still cannot apply any indicator (the requested
+   * codes are not indicators, or the target glyph is a space) adds an
+   * `INDICATOR_MUTATION_NOOP` warning to `warnings` instead of silently doing
+   * nothing.
    */
   applyIndicators(code: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 

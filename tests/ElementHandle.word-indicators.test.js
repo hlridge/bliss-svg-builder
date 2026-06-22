@@ -15,7 +15,8 @@ import { BlissSVGBuilder } from '../src/index';
  *   untouched; replace-all over an existing overlay; { stripSemantic: true }
  *   stores the strip flag.
  * - apply { flatten: true }: bakes onto the head, no overlay; drops a
- *   pre-existing overlay before baking.
+ *   pre-existing overlay before baking, but keeps it when the flattened code
+ *   applies no indicator (N15).
  * - clear default: removes the overlay and restores the base, including a
  *   semantic the overlay's `!` strip had suppressed (N12); { stripSemantic }
  *   keeps a reversible empty-codes strip overlay.
@@ -106,6 +107,15 @@ describe('ElementHandle word indicators', () => {
       expect(overlay(b)).toBeUndefined();
       expect(glyphParts(b)).toEqual(['B313', 'B86']);
     });
+
+    it('keeps a pre-existing overlay when the flattened code applies no indicator', () => {
+      // N15 (R15 Task 5): a non-indicator code bakes nothing, so the overlay must
+      // not be silently destroyed.
+      const b = new BlissSVGBuilder('B313/B1103;;B81');
+      b.group(0).applyIndicators('B303', { flatten: true });
+      expect(overlay(b)).toEqual({ codes: ['B81'], stripSemantic: false });
+      expect(b.toString()).toBe('B313/B1103;;B81');
+    });
   });
 
   describe('when clearing word-level indicators from a group handle', () => {
@@ -170,26 +180,23 @@ describe('ElementHandle word indicators', () => {
   });
 
   describe('when the word head is itself a lone indicator', () => {
-    // characterization: the two surfaces deliberately disagree here.
-    // The overlay (default) path treats the first part as base and APPENDS;
-    // flatten faithfully mirrors the legacy applyHeadIndicators, whose
-    // character-level classifier treats a lone indicator as having no base and
-    // no-ops (the new code is dropped). Whether a lone/structural indicator is a
-    // valid base for further indicators is an open contract question tracked in
-    // .claude/backlog/indicator-on-atypical-base.md; this test pins today's
-    // behavior so a future symmetric fix is a deliberate, visible change.
+    // R15 Task 5: the two surfaces now AGREE. The overlay (default) path treats
+    // the first part as the base and APPENDS; the flatten path (and its legacy
+    // applyHeadIndicators alias) bakes onto the head, which under the symmetric
+    // i>0 rule also treats the lone indicator as the base and attaches. The old
+    // flatten no-op (the new code was dropped) is gone.
     it('appends via the overlay path', () => {
       const b = new BlissSVGBuilder('B81');
       b.group(0).applyIndicators('B86');
       expect(b.toString()).toBe('B81;;B86');
     });
 
-    it('no-ops via the flatten path, matching legacy applyHeadIndicators', () => {
+    it('bakes onto the lone-indicator head via the flatten path, matching legacy applyHeadIndicators', () => {
       const flat = new BlissSVGBuilder('B81');
       flat.group(0).applyIndicators('B86', { flatten: true });
       const legacy = new BlissSVGBuilder('B81');
       legacy.group(0).applyHeadIndicators('B86');
-      expect(flat.toString()).toBe('B81');
+      expect(flat.toString()).toBe('B81;B86');
       expect(flat.toString()).toBe(legacy.toString());
       expect(flat.svgCode).toBe(legacy.svgCode);
     });

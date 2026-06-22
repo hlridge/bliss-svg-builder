@@ -791,14 +791,33 @@ export class ElementHandle {
   #applyOrClearIndicators(code, opts, suppressNoop = false) {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
-    if (!glyph?.parts?.length) return this;
+    if (!glyph) return this;
+    if (!glyph.parts) glyph.parts = [];
 
     const definitions = this.#ctx.getDefinitions();
     const stripSemantic = opts?.stripSemantic === true;
     const targetCode = glyph.codeName || glyph.parts[0]?.codeName || 'unknown';
 
-    // Classify parts: separate base parts from trailing indicator parts
-    const firstIndicatorIndex = glyph.parts.findIndex(p => p.isIndicator === true);
+    // A space glyph is not a base for indicators. Under the i>0 rule its single
+    // part would otherwise classify as a base, so carve it out and keep the
+    // no-op + warning (R15 Task 5).
+    if (this.#ctx.isRawSpaceGroup(this.#parentRef)) {
+      if (!suppressNoop) {
+        const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
+        this.#warnIndicatorNoop(
+          `${verb} had no effect: the target glyph '${targetCode}' is a space.`,
+          code ?? targetCode,
+        );
+      }
+      return this;
+    }
+
+    // Classify parts: the first part is always the base (even when it is itself
+    // an indicator), so scan for the first TRAILING indicator from index 1.
+    // Mirrors mergeWordIndicatorsOntoHead and the parser's getBaseCode i===0
+    // guard, so a lone indicator or an empty glyph carries a further indicator
+    // rather than no-opping (the atypical-base contract, R15 Task 5).
+    const firstIndicatorIndex = glyph.parts.findIndex((p, i) => i > 0 && p.isIndicator === true);
 
     let baseParts, indicatorParts;
     if (firstIndicatorIndex === -1) {
@@ -807,21 +826,6 @@ export class ElementHandle {
     } else {
       baseParts = glyph.parts.slice(0, firstIndicatorIndex);
       indicatorParts = glyph.parts.slice(firstIndicatorIndex);
-    }
-
-    // Must have base parts (indicators without a base are just normal combined parts)
-    if (baseParts.length === 0) {
-      // D4: an indicator-only glyph has nothing to carry the indicator, so the
-      // call does nothing. Surface it (this also catches the flatten path's
-      // lone-indicator-head data loss) rather than dropping it silently.
-      if (!suppressNoop) {
-        const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
-        this.#warnIndicatorNoop(
-          `${verb} had no effect: the target glyph '${targetCode}' is indicator-only, so it has no base part to carry an indicator.`,
-          code ?? targetCode,
-        );
-      }
-      return this;
     }
 
     // Validate pattern: no non-indicators after the first indicator
@@ -945,20 +949,27 @@ export class ElementHandle {
 
     if (opts?.flatten === true) {
       // Bake onto the head; drop any overlay so the indicator is not applied
-      // twice (once baked, once re-merged at render).
+      // twice (once baked, once re-merged at render). N15: only drop the overlay
+      // when the bake actually lands. A clear always bakes (removal is the
+      // effect); an apply bakes only if its code carries a recognized indicator,
+      // else the overlay is kept rather than silently destroyed (R15 Task 5).
       const head = this.headGlyph();
       const hadOverlay = group.wordIndicators !== undefined;
-      delete group.wordIndicators;
+      const requestedCodes = code === null
+        ? []
+        : code.split(';').map(s => s.trim()).filter(Boolean);
+      const bakeApplies = code === null
+        || filterToIndicators(requestedCodes, this.#ctx.getDefinitions()).length > 0;
+      if (bakeApplies) delete group.wordIndicators;
       if (head) {
         // When an overlay was removed, that removal IS the effect, so the
         // delegated char-level clear-nothing must not warn as a no-op. The
         // suppress signal is passed as a private positional arg (not an opts
         // key), so it goes through the private method, not public clearIndicators.
-        // An apply is left unsuppressed so a dropped bake (lone-indicator head)
-        // still surfaces (D4 / DECIDED 2-A).
+        // An apply is left unsuppressed so an unrecognized code still warns.
         if (code === null) head.#applyOrClearIndicators(null, { stripSemantic }, hadOverlay);
         else head.applyIndicators(code, { stripSemantic });
-      } else if (hadOverlay) {
+      } else if (hadOverlay && bakeApplies) {
         this.#ctx.rebuild();
       }
       this.#syncGeneration();
