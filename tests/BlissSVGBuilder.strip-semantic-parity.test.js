@@ -22,12 +22,14 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Compound-indicator bases (B85, itself an indicator): char `;!` and word
  *   `;;!` render identically; the word overlay adds onto the indicator base
  *   (the base part is never dropped) and keeps its `;;!` serialization.
- * - Custom definitions with a baked semantic root: all three surfaces strip
- *   the baked B97 and render identically; the char-level `;!` and word-level
- *   `;;!` DSL forms both serialize to the reversible `B291;B97;;!B86` overlay
- *   (R15 promotion: a base+indicator alias keeps the baked root recoverable),
- *   while the API char-path still bakes to `B291;B86` (a serialization
- *   divergence gated to Task 5; render parity holds).
+ * - Custom definitions with a baked semantic root: all surfaces strip the baked
+ *   B97 and render identically. The WORD-level surfaces (the DSL `;!`-on-alias
+ *   use-site auto-promotion, the DSL `;;!`, and the group-handle API) serialize
+ *   to the reversible `B291;B97;;!B86` overlay (keeping the baked root
+ *   recoverable); the CHARACTER-level glyph-handle API bakes to `B291;B86`. That
+ *   is the deliberate level distinction, NOT a parity gap (R15 T3b1-2):
+ *   `glyph().applyIndicators` is character-level, while `group().applyIndicators`
+ *   and the DSL `;`-on-alias promotion are word-level.
  * - Multi-glyph words: word-level `;;!` and the head-glyph API render
  *   identically; char-level `;!` is excluded because it follows the last
  *   glyph (different target).
@@ -120,29 +122,35 @@ describe('BlissSVGBuilder strip-semantic parity', () => {
       BlissSVGBuilder.removeDefinition('TEST_THING');
     });
 
-    it('strips the baked B97 across all three surfaces, rendering identically', () => {
-      const charLevel = new BlissSVGBuilder('TEST_THING;!B86');
-      const wordLevel = new BlissSVGBuilder('TEST_THING;;!B86');
+    it('distinguishes the character-level glyph API (bakes) from the word-level surfaces (promote)', () => {
+      const charDSL = new BlissSVGBuilder('TEST_THING;!B86');   // use-site `;` auto-promotes
+      const wordDSL = new BlissSVGBuilder('TEST_THING;;!B86');  // explicit word-level
+      const glyphApi = new BlissSVGBuilder('TEST_THING');       // character-level: bakes
+      glyphApi.group(0).glyph(0).applyIndicators('B86', { stripSemantic: true });
+      const groupApi = new BlissSVGBuilder('TEST_THING');       // word-level: overlay
+      groupApi.group(0).applyIndicators('B86', { stripSemantic: true });
 
-      const apiBuilder = new BlissSVGBuilder('TEST_THING');
-      apiBuilder.group(0).glyph(0).applyIndicators('B86', { stripSemantic: true });
+      expect(charDSL.warnings).toEqual([]);
+      expect(wordDSL.warnings).toEqual([]);
+      expect(glyphApi.warnings).toEqual([]);
+      expect(groupApi.warnings).toEqual([]);
 
-      expect(charLevel.warnings).toEqual([]);
-      expect(wordLevel.warnings).toEqual([]);
-      expect(apiBuilder.warnings).toEqual([]);
+      // Render parity holds across every surface: the word-level overlay resolves
+      // to the same parts the character-level bake produces.
+      expect(charDSL.svgCode).toBe(wordDSL.svgCode);
+      expect(charDSL.svgCode).toBe(glyphApi.svgCode);
+      expect(charDSL.svgCode).toBe(groupApi.svgCode);
 
-      expect(charLevel.svgCode).toBe(wordLevel.svgCode);
-      expect(charLevel.svgCode).toBe(apiBuilder.svgCode);
-
-      // R15 promotion: applying an indicator to a base+indicator alias (here
-      // TEST_THING = B291;B97) routes it into the reversible `;;` overlay, so the
-      // char-level `;!` DSL now matches the word-level `;;!` form and keeps B97
-      // recoverable. The API char-path still bakes destructively to `B291;B86`:
-      // a DSL/API serialization divergence gated to Task 5 (symmetric
-      // applyIndicators). Render parity across all three surfaces still holds.
-      expect(charLevel.toString()).toBe('B291;B97;;!B86');
-      expect(apiBuilder.toString()).toBe('B291;B86');
-      expect(wordLevel.toString()).toBe('B291;B97;;!B86');
+      // The three WORD-level surfaces serialize identically to the reversible
+      // overlay (the baked B97 stays recoverable); the CHARACTER-level glyph API
+      // bakes destructively. This is the deliberate level distinction, NOT a
+      // parity gap (R15 T3b1-2): glyph().applyIndicators is character-level,
+      // while group().applyIndicators and the DSL `;`-on-alias promotion are
+      // word-level.
+      expect(charDSL.toString()).toBe('B291;B97;;!B86');
+      expect(wordDSL.toString()).toBe('B291;B97;;!B86');
+      expect(groupApi.toString()).toBe('B291;B97;;!B86');
+      expect(glyphApi.toString()).toBe('B291;B86');
     });
   });
 
