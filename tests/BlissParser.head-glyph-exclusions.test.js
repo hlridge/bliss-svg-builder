@@ -15,8 +15,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   3. Low-priority exclusions (B401, B699): head only when alone or
  *      together with same-or-lower-priority codes (no regular
  *      exclusions present).
- *   4. Absolute never-head (B233): can NEVER be head, even as a
- *      fallback (purely structural marker).
+ *   4. Absolute never-head (B233): never outranks another glyph,
+ *      but is the head when it is the sole candidate (purely
+ *      structural marker).
  * Plus the conditional-exclusion exception: B10 (one) is normally
  * excluded but is NOT excluded when followed immediately by B4.
  *
@@ -341,12 +342,12 @@ describe('BlissParser head-glyph exclusions', () => {
     });
 
     it('falls back to position 0 when B233 is the entire word', () => {
-      // Provisional behavior, NOT a settled contract: a lone absolute-never-head
-      // glyph still receives the indicator at index 0 (something must be the
-      // head). The principled contract for indicators on an atypical base (and
-      // the relocation-ordering divergence behind it) is under review in
-      // .claude/backlog/indicator-on-atypical-base.md (burndown T7). Do not treat
-      // this 0 as decided.
+      // Decided contract (burndown T7): a never-head glyph never outranks
+      // another glyph, but is the head when it is the sole candidate. An
+      // atypical/structural glyph at the default position still carries the
+      // indicator when it stands alone (something must be the head); the
+      // never-head rule only prevents B233 from outranking a real glyph, see
+      // the B233/B401 and B233/B368 pins above.
       expect(getHeadGlyphIndex('B233;;B86')).toBe(0);
     });
   });

@@ -14,7 +14,8 @@
  * 1. Non-exclusions - always head if present
  * 2. Regular exclusions - head if no non-exclusions available
  * 3. Low-priority exclusions (B401, B699) - head only if alone or with same/lower priority
- * 4. Absolute never-head (B233) - can NEVER be head (structural marker like quotation marks)
+ * 4. Absolute never-head (B233) - never outranks another glyph, but is the
+ *    head when it is the sole candidate (structural marker like quotation marks)
  *
  * When prefix modifiers are used, it's recommended to mark the head glyph
  * explicitly with ^ to avoid ambiguity.
@@ -25,9 +26,12 @@
  */
 
 /**
- * Absolute never-head codes.
- * These can NEVER be head glyphs, even as a fallback.
- * They are purely structural markers (like quotation marks).
+ * Absolute never-head codes (lowest priority tier).
+ * These never outrank another glyph when competing for the head: any other
+ * candidate wins. But a never-head code is still the head when it is the sole
+ * candidate, because something must carry the indicator (an atypical or
+ * structural glyph is a valid head at the default position when it stands
+ * alone). They are purely structural markers (like quotation marks).
  */
 export const absoluteNeverHead = [
   'B233', // combine marker (structural, like quotation mark)
