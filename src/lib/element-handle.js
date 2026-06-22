@@ -219,10 +219,11 @@ export class ElementHandle {
       // Map to the snapshot part by identity, not raw position: a `;;` word
       // overlay on a head injects and reorders the resolved indicator parts
       // (semantic-root preservation), so the raw partIndex no longer aligns with
-      // the snapshot array. A base part keeps its object (and key) through the
-      // merge, so match by key; a char-level indicator is re-parsed into the
-      // resolved overlay and loses its key, so match it by code. Fall back to
-      // position when nothing matches (no overlay, or a deep keyless sub-part).
+      // the snapshot array. Both a base part and (since N14-2) a reordered
+      // character-level `;` indicator keep their object key through the merge, so
+      // match by key. The by-code match is a defensive fallback for a keyless
+      // node (e.g. a deep nested sub-part that #assignKeys does not key). Fall
+      // back to position when nothing matches (no overlay).
       const node = this.#nodeRef;
       const parts = glyphSnap.children;
       if (node?.key != null) {

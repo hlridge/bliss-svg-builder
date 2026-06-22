@@ -14,8 +14,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - `getElementByKey(key)` lookup for both user-assigned and auto keys.
  * - `toJSON()` omits keys (auto and user); keys do not round-trip through JSON.
  * - `[id=...]` is treated as an SVG pass-through attribute, not intercepted by the key system.
- * - Tripwire: an overlay-reordered char-indicator key does not yet round-trip
- *   through `getElementByKey` (R15 Task 5 folds the fix; flip when it lands).
+ * - An overlay-reordered char-indicator key round-trips through
+ *   `getElementByKey`: its raw key is preserved through the `;;` overlay merge.
  *
  * Does NOT cover:
  * - Element handle level/type semantics; see `ElementHandle.taxonomy.test.js`.
@@ -89,17 +89,15 @@ describe('BlissSVGBuilder element keys', () => {
       expect(handle.level).toBe(2);
     });
 
-    it('returns null for an overlay-reordered char-indicator key, pending Task 5', () => {
-      // tripwire (N14-2): a `;` char-indicator that a `;;` overlay reorders into
-      // the resolved head is re-parsed by mergeWordIndicatorsOntoHead and loses
-      // its raw key, so getElementByKey cannot round-trip it (the part is still
-      // reachable via part(i); its base sibling, which keeps its key, DOES round
-      // -trip). R15 Task 5 preserves the raw key through the overlay merge; flip
-      // this to expect a B97 handle when it lands. Do not close N14-2 until then.
+    it('round-trips an overlay-reordered char-indicator key through getElementByKey', () => {
+      // regression (N14-2): a `;` char-indicator that a `;;` overlay reorders into
+      // the resolved head keeps its raw key through the overlay merge
+      // (mergeWordIndicatorsOntoHead reuses the existing part instead of
+      // re-parsing it), so getElementByKey round-trips it, like its base sibling.
       const builder = new BlissSVGBuilder('B313;B97;;B81');
       const charIndicator = builder.part(1);
       expect(charIndicator.codeName).toBe('B97');
-      expect(builder.getElementByKey(charIndicator.key)).toBeNull();
+      expect(builder.getElementByKey(charIndicator.key)?.codeName).toBe('B97');
 
       const base = builder.part(0);
       expect(builder.getElementByKey(base.key).codeName).toBe('B313');

@@ -123,10 +123,13 @@ export function classifyIndicatorKind(code, definitions) {
  *
  * Splits the head's parts into base parts and trailing indicator parts, runs
  * resolveIndicatorCodes against the overlay (replace-all with semantic-root
- * preservation), and returns a new array of [...baseParts, ...resolved] with
- * each resolved indicator appended strictly after every base part and tagged
- * `_indicatorOrigin: 'word'`. The input glyph is not mutated. A head whose
- * parts hold a non-indicator after an indicator is returned unchanged.
+ * preservation), and returns a new array of [...baseParts, ...resolved], each
+ * resolved indicator appended strictly after every base part. A resolved code
+ * that matches an existing character-level `;` indicator part REUSES that part
+ * (a shallow clone keeping its key and its 'character' origin) so navigation
+ * round-trips it (N14-2); a genuinely overlay-added code is parsed fresh and
+ * tagged `_indicatorOrigin: 'word'`. The input glyph is not mutated. A head
+ * whose parts hold a non-indicator after an indicator is returned unchanged.
  *
  * @param {{parts: Array}} headGlyph - the head glyph node (has .parts)
  * @param {{codes: string[], stripSemantic?: boolean}} overlay
@@ -156,8 +159,19 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
     definitions
   );
 
+  // N14-2: reuse an existing character-level `;` indicator part when a resolved
+  // code matches it, so the reordered part keeps its raw key (navigation and
+  // getElementByKey round-trip it) and its true 'character' origin, instead of
+  // re-parsing into a fresh keyless node tagged 'word'. A code with no existing
+  // match is genuinely overlay-added, so it is parsed fresh and tagged 'word'.
+  const reusable = existingIndicatorParts.slice();
   const indicatorParts = [];
   for (const code of finalCodes) {
+    const reuseIndex = reusable.findIndex(p => p.codeName === code);
+    if (reuseIndex !== -1) {
+      indicatorParts.push({ ...reusable.splice(reuseIndex, 1)[0] });
+      continue;
+    }
     const node = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts?.[0];
     if (node) indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
   }

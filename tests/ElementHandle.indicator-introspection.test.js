@@ -142,6 +142,19 @@ describe('ElementHandle indicator introspection', () => {
       expect(part.indicatorLevel).toBe('character');
       expect(part.indicatorKind).toBe('semantic');
     });
+
+    it('classifies the reused character indicator as character on the snapshot, the overlay as word', () => {
+      // regression (N14-2): the `;` char indicator B97, reordered into the head by
+      // the `;;B81` overlay, is REUSED (not re-parsed), so it keeps its 'character'
+      // origin on the snapshot too; only the overlay-added B81 is 'word'. Snapshot
+      // and handle now agree (both 'character' for B97).
+      const head = new BlissSVGBuilder('B313;B97;;B81')
+        .snapshot().children[0].children.filter(c => c.isGlyph)[0];
+      const b97 = head.children.find(c => c.codeName === 'B97');
+      const b81 = head.children.find(c => c.codeName === 'B81');
+      expect(b97.indicatorLevel).toBe('character');
+      expect(b81.indicatorLevel).toBe('word');
+    });
   });
 
   describe('when the handle is a nested sub-part', () => {
