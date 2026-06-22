@@ -10,6 +10,12 @@ import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
+// Horizontal gap (in glyph units) between consecutive indicators in a stack.
+// Shared by the character-level indicator layout (#positionIndicatorGroup) and
+// the nested compound-indicator layout (#handleCompositeElement) so the two
+// cannot drift.
+const INDICATOR_GAP = 1;
+
 export class BlissElement {
   //#region Private Properties
   #key
@@ -263,7 +269,6 @@ export class BlissElement {
     const anchorX = glyphCenterX + baseAnchorOffsetX;
 
     // Calculate total indicator group width (including gaps)
-    const INDICATOR_GAP = 1;
     const totalIndicatorWidth = indicatorParts.reduce((sum, ind) => sum + ind.width, 0)
       + (indicatorParts.length - 1) * INDICATOR_GAP;
 
@@ -1183,6 +1188,25 @@ export class BlissElement {
         sharedOptions: this.#sharedOptions,
       });
       this.#children.push(child);
+    }
+
+    // A compound indicator whose sub-parts carry no baked positions must lay
+    // them out as a baseless stack (left-to-right from origin), the same as
+    // #positionIndicatorGroup does for a baseless stack at the character level.
+    // Without this, an unpositioned all-indicator composite (e.g. a user-defined
+    // COMBO_IND = B86;B97) collapses its sub-parts to x=0 when nested as a glyph
+    // part, so a sibling stacked indicator overlaps it and the composite's width
+    // (derived from its children) under-reports. Built-in compound indicators
+    // bake explicit x on their parts (B98 = B97;B99:3,0), so the x === undefined
+    // guard leaves them untouched. R15 3b-5.
+    // (#handleCompositeElement is only reached for a non-empty parts list, so
+    // children is non-empty here and .every is never vacuous.)
+    if (this.#children.every(c => c.isIndicator)) {
+      let currentX = 0;
+      for (const child of this.#children) {
+        if (child.#blissObj.x === undefined) child.#relativeToParentX = currentX;
+        currentX = child.#relativeToParentX + child.width + INDICATOR_GAP;
+      }
     }
 
     // Check if this is an indicator at level 3 that will be positioned by #positionIndicatorGroup

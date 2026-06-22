@@ -421,30 +421,60 @@ export class BlissParser {
           crownWordChunk(chunk, label);
         };
 
-        // Helper to get base code from expanded glyph, stripping only indicator parts.
-        // Non-indicator parts (glyph composition like B291;B303) are preserved.
-        // Defined at top level for use in both ;; handling and expand()
+        // Helper to get base code from an expanded glyph, stripping the indicator
+        // parts. The base is the NON-indicator parts and the strippable
+        // indicators are the indicator parts, derived position-independently (not
+        // by assuming segment 0 is the base) so an indicator-first or all-indicator
+        // head is read correctly. Defined at top level for use in ;; handling and
+        // expand().
         const getBaseCode = (glyph) => {
-          // Use glyphCode only if it's a simple code (no / or ; which indicate codeStrings/words)
-          // This preserves composite glyphs like B502 = 'DOT:2,10;HL4:0,12;DOT:2,14'
+          const parts = glyph.part.split(';');
+          const nonIndicatorParts = parts.filter(p => {
+            const bareCode = p.split(':')[0];
+            return !definitions[bareCode]?.isIndicator;
+          });
+          // Atomic compound indicator: every part is an indicator, so there is no
+          // base to strip - the stack itself IS the base. Decompose to the parts
+          // (do NOT keep the glyph-identity fast-path here: a glyph-identity head
+          // keeps its parts as one composite unit and mis-positions a later
+          // stacked indicator, so it must render as a flat baseless stack). R15 3b-5.
+          if (nonIndicatorParts.length === 0) return glyph.part;
+          // Normal base-first head: preserve the glyph-identity fast-path so a
+          // composite glyph (e.g. B502 = 'DOT:2,10;HL4:0,12;DOT:2,14') keeps its
+          // code. Simple code only (no / or ; that indicate words/codeStrings).
           const isSimpleGlyphCode = glyph.glyphCode &&
             !glyph.glyphCode.includes('/') &&
             !glyph.glyphCode.includes(';');
           if (isSimpleGlyphCode) return glyph.glyphCode;
-          const parts = glyph.part.split(';');
-          const nonIndicatorParts = parts.filter((p, i) => {
-            if (i === 0) return true;
-            const bareCode = p.split(':')[0];
-            return !definitions[bareCode]?.isIndicator;
-          });
           return nonIndicatorParts.join(';');
         };
 
-        // Extract only indicator codes from a glyph's part string (after the first ;)
+        // Extract the strippable indicator parts of a glyph (position-independent).
+        // An all-indicator (atomic compound indicator) glyph has no strippable
+        // applied indicator - the stack itself is the base - so it returns []. R15 3b-5.
         const getIndicatorParts = (glyph) => {
-          return glyph.part.split(';').slice(1).filter(p => {
+          const parts = glyph.part.split(';');
+          const indicatorParts = parts.filter(p => {
             const bareCode = p.split(':')[0];
             return definitions[bareCode]?.isIndicator === true;
+          });
+          if (indicatorParts.length === parts.length) return [];
+          return indicatorParts;
+        };
+
+        // A glyph whose every part is an indicator (an atomic compound indicator):
+        // applying a strip-semantic (;!) to it strips nothing (there is no base
+        // semantic indicator), so the ! is a no-op. Shared by the single-glyph and
+        // word-head warning sites so the STRIP_SEMANTIC_NOOP message cannot drift. R15 3b-5.
+        const isAllIndicatorGlyph = (glyph) => {
+          const parts = glyph.part.split(';');
+          return parts.every(p => definitions[p.split(':')[0]]?.isIndicator === true);
+        };
+        const pushStripSemanticNoop = (source) => {
+          parseWarnings.push({
+            code: 'STRIP_SEMANTIC_NOOP',
+            message: `Strip-semantic (;!) has no effect on the compound indicator in "${source}": it has no base semantic indicator to strip, so the indicator is stacked instead.`,
+            source,
           });
         };
 
@@ -594,7 +624,15 @@ export class BlissParser {
           const inputIndicatorsAreReal = filteredIndicators.length > 0 &&
             filteredIndicators.every(ind => definitions[getBareCode(ind)]?.isIndicator === true);
 
-          // Check if base code supports indicator replacement
+          // Check if base code supports indicator replacement.
+          // The .slice(1) "segment 0 is the base" assumption is safe on this
+          // single-glyph replace path: an indicator-first base is undefinable
+          // (the D-S1a define guard rejects any type:'glyph' that bakes an
+          // indicator, no built-in has an indicator-first unflagged codeString,
+          // and a bare alias routes through promotion which skips this path), so
+          // a base whose segment 0 is an indicator never reaches here. Generalizing
+          // it would add a branch no test can cover. R15 3b-5 (guarded by
+          // BlissSVGBuilder.compound-indicator-application.test.js).
           const baseCodeDef = definitions[potentialBaseCode];
           const baseCodeStringParts = baseCodeDef?.codeString?.split(';') || [];
           const baseCodeExistingIndicators = baseCodeStringParts.slice(1).map(p => p.split(':')[0]);
@@ -604,6 +642,18 @@ export class BlissParser {
           // Don't apply indicator replacement to compound indicators (like B928 = B92;B87)
           // These are indicators composed of multiple indicator parts, not characters with replaceable indicators
           const baseIsCompoundIndicator = baseCodeDef?.isIndicator === true;
+
+          // Strip-semantic (;!) on a single ATOMIC compound indicator (every
+          // part an indicator, e.g. COMBO_IND = B86;B97) strips nothing - it has
+          // no base semantic indicator - so the applied indicator stacks and the
+          // ! is a no-op; warn. A compound indicator WITH a base part (B85 =
+          // B270;B86) is not atomic, so it is left silent; a bare ; (empty strip)
+          // stays silent; and a bare ALIAS routes through promotion (not this
+          // stack path), so baseIsCompoundIndicator (the flag) gates it out. R15 3b-5.
+          if (stripSemantic && baseIsCompoundIndicator
+              && isAllIndicatorGlyph({ part: baseCodeDef?.codeString ?? '' })) {
+            pushStripSemanticNoop(str);
+          }
 
           // A base+indicator *alias* (a bare definition: has a codeString but is
           // not a glyph, shape, or external glyph) promotes an applied indicator
@@ -648,6 +698,10 @@ export class BlissParser {
             // the codeString; the applied indicator becomes a ;; overlay below.
             if ((shouldReplace || shouldRemove) && !shouldPromote) {
               const codeStringParts = definition.codeString.split(';');
+              // .slice(1) "segment 0 is the base" is safe here for the same reason
+              // as the baseCodeExistingIndicators scan above: an indicator-first
+              // base is undefinable and never reaches this single-glyph replace
+              // path (D-S1a + no qualifying built-in + bare-alias promotion). R15 3b-5.
               const existingIndicatorCodes = codeStringParts.slice(1).map(p => p.split(':')[0]);
               const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
 
@@ -778,6 +832,8 @@ export class BlissParser {
               const validInds = filterToIndicators(filteredIndicators, definitions);
               if (validInds.length > 0) {
                 const targetIndex = fragResolved.index;
+                // Strip-semantic on an all-indicator head strips nothing; warn. R15 3b-5.
+                if (stripSemantic && isAllIndicatorGlyph(expandedParts[targetIndex])) pushStripSemanticNoop(str);
                 const existingInds = getIndicatorParts(expandedParts[targetIndex]);
                 const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
                 const baseCode = getBaseCode(expandedParts[targetIndex]);
@@ -797,6 +853,8 @@ export class BlissParser {
             // or isBareEmptyStrip (if no real indicator in definition, via base case return)
             if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
               const targetIndex = fragResolved.index;
+              // Strip-semantic empty strip on an all-indicator head is a no-op; warn. R15 3b-5.
+              if (stripSemantic && isAllIndicatorGlyph(expandedParts[targetIndex])) pushStripSemanticNoop(str);
               const existingInds = getIndicatorParts(expandedParts[targetIndex]);
               const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
               const baseCode = getBaseCode(expandedParts[targetIndex]);

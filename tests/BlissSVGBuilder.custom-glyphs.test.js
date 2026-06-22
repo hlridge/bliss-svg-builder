@@ -24,11 +24,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - `define()` API mechanics (overwrite option, removeDefinition), see
  *   `BlissSVGBuilder.define.test.js` and
  *   `BlissSVGBuilder.definition-maintenance.test.js`.
- * - The R15 goal that a baseless compound-indicator glyph, when an indicator is
- *   applied at the use site, renders identically to its indicators used as
- *   standalone B-codes. That fix (R3b4-2, the parse-time `.slice(1)` sites) is
- *   pending its own explore session; the describe below only pins the current
- *   (no-op) behavior as a tripwire so the gap cannot be silently forgotten.
+ * - The word-alias head-merge form of compound-indicator application (applying
+ *   an indicator to a word whose head is a baseless compound indicator), and the
+ *   indicator-first-base guard, see
+ *   `BlissSVGBuilder.compound-indicator-application.test.js`. The single-glyph
+ *   strip-semantic no-op warning IS pinned in the describe below (R15 3b-5).
  */
 
 const customCodes = [];
@@ -225,19 +225,16 @@ describe('BlissSVGBuilder custom glyphs', () => {
   });
 
   describe('when applying a strip-semantic indicator to a baseless compound-indicator glyph', () => {
-    it('currently keeps the baked semantic and emits no warning', () => {
-      // tripwire: R3b4-2, folded into R15 (2026-06-21). The "segment 0 is a base"
-      // assumption fixed in serializeCustomGlyphDelta (Task 3b-4) still lives at
-      // 3 parse-time sites in bliss-parser.js (the apply/replace path + the ;;
-      // head-merge), so `;!` applied to a baseless compound indicator strips
-      // nothing: COMBO_IND;!B81 == COMBO_IND;B81 (the baked semantic B97 stays).
-      // GOAL contract (needs its own explore session): a compound indicator must
-      // render identically to the same indicators used as standalone B-codes.
-      // When that task lands, the ! will strip and/or warn -- flip BOTH asserts.
+    it('stacks the indicator and warns that the strip-semantic is a no-op', () => {
+      // R15 Task 3b-5 (R3b4-2): a baseless compound indicator has no base
+      // semantic indicator to strip, so `;!` strips nothing. The applied
+      // indicator stacks (render == the indicators as standalone B-codes:
+      // COMBO_IND;!B81 == B86;B97;B81), and the meaningless ! emits a
+      // STRIP_SEMANTIC_NOOP warning. A bare `;` (empty strip) stays silent.
       defineAndTrack({ COMBO_IND: { type: 'glyph', codeString: 'B86;B97', isIndicator: true } });
       const stripped = new BlissSVGBuilder('COMBO_IND;!B81');
       expect(stripped.toString()).toBe('B86;B97;B81');
-      expect(stripped.warnings).toEqual([]);
+      expect(stripped.warnings.filter(w => w.code === 'STRIP_SEMANTIC_NOOP')).toHaveLength(1);
     });
   });
 

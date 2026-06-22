@@ -27,9 +27,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   (absoluteNeverHead); single-char composite code resolution preferring
  *   the outer glyphCode over part-derived bareCodes.
  * - WORD;INDICATORS (`;`) reattach through replaceWithDefinitionHelpers:
- *   simple-shape glyphCode early return; inline-composite head filtering
- *   with indicator-head and unknown-bareCode guards; multi-segment
- *   indicator scan excluding the head.
+ *   simple-shape glyphCode early return; position-independent base/indicator
+ *   extraction on an inline-composite head (indicator-first and all-indicator
+ *   heads, with an unknown-bareCode guard); the existing-indicator scan not
+ *   double-counting an all-indicator head.
  * - Post-expand glyph construction in fromStringPostprocess: leading
  *   `_wordBreak` guard; empty-part filter; optional-property propagation
  *   (isIndicator, isExternalGlyph, kerningRules, isHeadGlyph); parseParts
@@ -260,15 +261,15 @@ describe('BlissParser', () => {
   });
 
   describe('when WORD; reattaches indicators on an inline-composite head', () => {
-    it('keeps the head segment even when its bareCode is an indicator (i === 0 guard)', () => {
-      // _C5_inline_b97_c is an inline composite with no glyphCode and head
-      // bareCode B97 (which IS an indicator). The getBaseCode filter returns
-      // true at i === 0 to preserve the head; without that guard, B97 would
-      // be filtered out and the head's part would collapse to 'C', losing
-      // its semantic identity.
+    it('reads an indicator-first head segment as a semantic indicator, not part of the base', () => {
+      // _C5_inline_b97_c is an inline composite 'B97;C': B97 is an indicator,
+      // C is the base. The position-independent getBaseCode / getIndicatorParts
+      // (R15 3b-5, which replaced the old i===0 head-preserve guard) read the
+      // base as the non-indicator part (C) and B97 as a semantic indicator, so
+      // applying ;B86 stacks B86 and preserves the semantic B97 last.
       const r = BlissParser.parse('_C5_word_inline;B86');
       expect(r.groups[0].glyphs[0].parts.map(p => p.codeName))
-        .toEqual(['B97', 'C', 'B86']);
+        .toEqual(['C', 'B86', 'B97']);
     });
 
     it('does not throw on an unknown bareCode in the head\'s composite parts', () => {
@@ -287,12 +288,13 @@ describe('BlissParser', () => {
       expect(() => BlissParser.parse('_C5_unknown_word;B86')).not.toThrow();
     });
 
-    it('drops the head segment from the indicator scan (slice(1))', () => {
+    it('does not double-count an all-indicator head in the existing-indicator scan', () => {
       // B97 is itself a semantic indicator. When it's the head glyph of a
       // multi-glyph word, getIndicatorParts must not include it in
-      // existingInds (it's the head, not an attached indicator). Without
-      // the slice(1), B97 would be detected as an existing semantic root
-      // and re-injected by buildWithSemantic, duplicating it in the output.
+      // existingInds (it's the head, not an attached indicator). The
+      // position-independent helper returns [] for an all-indicator head
+      // (R15 3b-5), so B97 is not detected as an existing semantic root and
+      // re-injected by buildWithSemantic, which would duplicate it.
       const r = BlissParser.parse('_C5_b97_word;B86');
       const codeNames = r.groups[0].glyphs[0].parts.map(p => p.codeName);
       expect(codeNames.filter(c => c === 'B97').length).toBe(1);
