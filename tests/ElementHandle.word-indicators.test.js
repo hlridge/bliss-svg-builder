@@ -116,6 +116,16 @@ describe('ElementHandle word indicators', () => {
       expect(overlay(b)).toEqual({ codes: ['B81'], stripSemantic: false });
       expect(b.toString()).toBe('B313/B1103;;B81');
     });
+
+    it('preserves the head semantic on a default (non-strip) flatten apply', () => {
+      // pins that the flatten apply forwards stripSemantic only when asked:
+      // baking B86 over the baked semantic B97 keeps B97 (B86 is adjectival, so
+      // the semantic goes last). kills an always-strip mutant on the delegated
+      // flatten apply (R15 Task 5 review F2 fix).
+      const b = new BlissSVGBuilder('B291;B97');
+      b.group(0).applyIndicators('B86', { flatten: true });
+      expect(b.toString()).toBe('B291;B86;B97');
+    });
   });
 
   describe('when clearing word-level indicators from a group handle', () => {

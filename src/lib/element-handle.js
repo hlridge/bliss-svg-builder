@@ -967,9 +967,12 @@ export class ElementHandle {
         // delegated char-level clear-nothing must not warn as a no-op. The
         // suppress signal is passed as a private positional arg (not an opts
         // key), so it goes through the private method, not public clearIndicators.
-        // An apply is left unsuppressed so an unrecognized code still warns.
+        // An apply is left unsuppressed so an unrecognized code still warns; but
+        // stripSemantic is forwarded only when the bake applies, so a non-indicator
+        // apply stays a pure no-op (it must not strip the head as a side effect
+        // while keeping the overlay — F2). Use clearIndicators to strip instead.
         if (code === null) head.#applyOrClearIndicators(null, { stripSemantic }, hadOverlay);
-        else head.applyIndicators(code, { stripSemantic });
+        else head.applyIndicators(code, { stripSemantic: bakeApplies && stripSemantic });
       } else if (hadOverlay && bakeApplies) {
         this.#ctx.rebuild();
       }

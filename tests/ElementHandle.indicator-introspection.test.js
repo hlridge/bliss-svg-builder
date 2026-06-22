@@ -150,6 +150,10 @@ describe('ElementHandle indicator introspection', () => {
       // and handle now agree (both 'character' for B97).
       const head = new BlissSVGBuilder('B313;B97;;B81')
         .snapshot().children[0].children.filter(c => c.isGlyph)[0];
+      // pins the reuse branch: B97 is reused (not also re-parsed), so the head
+      // resolves to exactly [base, overlay-B81, reused-B97] with no duplicate.
+      // kills a dropped-`continue` mutant in mergeWordIndicatorsOntoHead.
+      expect(head.children.map(c => c.codeName)).toEqual(['B313', 'B81', 'B97']);
       const b97 = head.children.find(c => c.codeName === 'B97');
       const b81 = head.children.find(c => c.codeName === 'B81');
       expect(b97.indicatorLevel).toBe('character');

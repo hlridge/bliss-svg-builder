@@ -229,5 +229,17 @@ describe('ElementHandle indicator no-op warning', () => {
       expect(w).toHaveLength(1);
       expect(w[0].source).toBe('B303');
     });
+
+    it('does not strip the head when the unrecognized code also requests stripSemantic', () => {
+      // F2 (R15 Task 5 review): a non-indicator flatten apply is a pure no-op even
+      // with stripSemantic — it must not strip the head's baked semantic as a side
+      // effect while keeping the overlay. Use clearIndicators({stripSemantic}) to strip.
+      const b = new BlissSVGBuilder('B291;B97;;B81');
+      b.group(0).applyIndicators('B303', { flatten: true, stripSemantic: true });
+      expect(b.toString()).toBe('B291;B97;;B81');
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B303');
+    });
   });
 });
