@@ -164,12 +164,29 @@ describe('ElementHandle indicator introspection', () => {
   });
 
   describe('when a handle sits on an overlay-reordered head', () => {
-    // tripwire (N14): a head carrying BOTH a ';' char indicator and a ';;'
-    // overlay reorders its resolved parts (semantic-root preservation), so the
-    // positional #findSnapshot mapping returns the WRONG part's geometry/key.
-    // The introspection getters dodge this by reading the raw node (above);
-    // the measure()/x/y/key fix folds into the N13/R15 coordinate-ownership
-    // work. See the plan's "Task 6 review" / N14 entry.
-    it.todo("measure() returns the handle's own part geometry, not the reordered overlay part");
+    it('maps to its own snapshot part by identity, not the reordered overlay position', () => {
+      // regression (N14): a head carrying BOTH a ';' char indicator and a ';;'
+      // overlay resolves to [B313, B81(word), B97(word)] (semantic-root B97
+      // preserved + reordered), so the raw partIndex (1) no longer aligns with
+      // the snapshot array. measure()/x/y/key must follow the handle's own part
+      // by identity, not the part that happens to sit at its raw position.
+      const builder = new BlissSVGBuilder('B313;B97;;B81');
+      const head = builder.snapshot().children[0].children.filter(c => c.isGlyph)[0];
+      const b97Snap = head.children.find(c => c.codeName === 'B97'); // resolved index 2
+      const b81Snap = head.children.find(c => c.codeName === 'B81'); // raw position (index 1)
+
+      const handle = builder.part(1); // raw B97 char indicator
+      expect(handle.codeName).toBe('B97');
+      expect(handle.key).toBe(b97Snap.key);
+      expect(handle.x).toBe(b97Snap.x);
+      expect(handle.y).toBe(b97Snap.y);
+      expect(handle.measure().x).toBe(b97Snap.x);
+
+      // not the positionally-mapped overlay part; the guard keeps the negative
+      // assertion meaningful (B81 and B97 do not share an x).
+      expect(b81Snap.x).not.toBe(b97Snap.x);
+      expect(handle.key).not.toBe(b81Snap.key);
+      expect(handle.x).not.toBe(b81Snap.x);
+    });
   });
 });

@@ -216,7 +216,24 @@ export class ElementHandle {
       const glyphs = groupSnap.children.filter(c => c.isGlyph);
       const glyphSnap = glyphs[idx.glyphIndex];
       if (!glyphSnap) throw new Error('Snapshot not found for glyph in part handle.');
-      return glyphSnap.children[idx.partIndex];
+      // Map to the snapshot part by identity, not raw position: a `;;` word
+      // overlay on a head injects and reorders the resolved indicator parts
+      // (semantic-root preservation), so the raw partIndex no longer aligns with
+      // the snapshot array. A base part keeps its object (and key) through the
+      // merge, so match by key; a char-level indicator is re-parsed into the
+      // resolved overlay and loses its key, so match it by code. Fall back to
+      // position when nothing matches (no overlay, or a deep keyless sub-part).
+      const node = this.#nodeRef;
+      const parts = glyphSnap.children;
+      if (node?.key != null) {
+        const byKey = parts.find(c => c.key === node.key);
+        if (byKey) return byKey;
+      }
+      if (node?.isIndicator === true) {
+        const byCode = parts.find(c => c.isIndicator === true && c.codeName === node.codeName);
+        if (byCode) return byCode;
+      }
+      return parts[idx.partIndex];
     }
 
     throw new Error(`Unsupported handle level: ${this.#level}`);
