@@ -176,6 +176,9 @@ export const blissHeadGlyphExclusions = [
  * @param {string|undefined} firstPartCode - codeName of the first part
  * @returns {string|undefined} the head-scan code, or undefined when non-excludable
  */
+// `||` (not `??`) is deliberate: an identity-less snapshot glyph carries
+// codeName === '' (an empty string, not nullish), which must fall through to
+// the part-count branch. `??` would return that bogus '' identity.
 export const headScanCode = (identityCode, partCount, firstPartCode) =>
   identityCode || (partCount > 1 ? undefined : firstPartCode);
 
