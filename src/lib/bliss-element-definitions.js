@@ -35,7 +35,7 @@ const referenceGlyphDefinitions = {
 // Shape primitives
 const shapeDefinitions = {
   'DOT': sc.createDot(0.5, 0.333),
-  'SDOT': sc.createDot(0.5, 0),
+  'SDOT': sc.createDot(0.5, 0.1665),
   'COMMA': sc.createComma(0.5, 0.333),
   'H': sc.createHeart(8),
   'E': sc.createEar(8),
@@ -491,13 +491,20 @@ shapeDefinitions['DOT'].extraPathOptions = {
 
 shapeDefinitions['SDOT'].extraPathOptions = {
   baseStrokeWidth: 0.5,
-  extraDotWidth: 0
+  extraDotWidth: 0.1665
 };
 
 shapeDefinitions['COMMA'].extraPathOptions = {
   baseStrokeWidth: 0.5,
   extraDotWidth: 0.333
 };
+
+// Dot family: which per-type sizing knobs apply to each dot-bearing shape.
+// DOT and COMMA take the dot-* knobs; SDOT takes the sdot-* knobs (and
+// halves dot-extra-width by default). Read in bliss-element.js getSvgContent.
+shapeDefinitions['DOT'].dotFamily = 'dot';
+shapeDefinitions['SDOT'].dotFamily = 'sdot';
+shapeDefinitions['COMMA'].dotFamily = 'dot';
 
 /**
  * External glyph definitions derived from alphabetData in liberation-sans-svg-path-data.js.

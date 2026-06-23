@@ -152,11 +152,12 @@ describe('BlissSVGBuilder stroke and color', () => {
       expect(svg).toContain('stroke-width="0.4443333333333333"');
     });
 
-    it('applies stroke-width=0.5 and dot-extra-width=0 to make DOT match SDOT', () => {
+    it('renders a DOT forced to its minimum extra (dot-extra-width=0)', () => {
       const builder = new BlissSVGBuilder('[stroke-width=0.5;dot-extra-width=0]||DOT');
       const svg = builder.svgCode;
 
-      // (0.5 + 0) / 2 = 0.25; matches SDOT (small dot) behavior.
+      // (0.5 + 0) / 2 = 0.25. DOT forced to its smallest; this no longer
+      // equals the default SDOT, whose extra is now 0.1665 (-> 0.33325).
       expect(svg).toContain('stroke-width="0.25"');
     });
 
