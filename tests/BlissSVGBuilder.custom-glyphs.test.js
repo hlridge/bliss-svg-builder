@@ -225,16 +225,16 @@ describe('BlissSVGBuilder custom glyphs', () => {
   });
 
   describe('when applying a strip-semantic indicator to a baseless compound-indicator glyph', () => {
-    it('stacks the indicator and warns that the strip-semantic is a no-op', () => {
-      // R15 Task 3b-5 (R3b4-2): a baseless compound indicator has no base
-      // semantic indicator to strip, so `;!` strips nothing. The applied
-      // indicator stacks (render == the indicators as standalone B-codes:
-      // COMBO_IND;!B81 == B86;B97;B81), and the meaningless ! emits a
-      // STRIP_SEMANTIC_NOOP warning. A bare `;` (empty strip) stays silent.
+    it('stacks the indicator silently (no base semantic indicator to strip)', () => {
+      // R15 Task 3b-5 (R3b4-2): a baseless compound indicator is an atomic
+      // indicator unit with no base semantic indicator, so `;!` strips nothing
+      // and follows the general rule SILENTLY: the applied indicator stacks
+      // (render == the indicators as standalone B-codes: COMBO_IND;!B81 ==
+      // B86;B97;B81). No special strip-semantic warning is emitted.
       defineAndTrack({ COMBO_IND: { type: 'glyph', codeString: 'B86;B97', isIndicator: true } });
       const stripped = new BlissSVGBuilder('COMBO_IND;!B81');
       expect(stripped.toString()).toBe('B86;B97;B81');
-      expect(stripped.warnings.filter(w => w.code === 'STRIP_SEMANTIC_NOOP')).toHaveLength(1);
+      expect(stripped.warnings).toEqual([]);
     });
   });
 

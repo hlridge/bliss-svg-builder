@@ -94,7 +94,8 @@ describe('BlissParser', () => {
     };
 
     // Inline composite (no glyphCode) whose first part is an indicator (B97 = thing).
-    // Used to pin getBaseCode's filter `i === 0` head-preserve guard.
+    // Pins getBaseCode's position-independent base extraction: the base is the
+    // non-indicator parts (C), not "keep index 0", so an indicator-first head reads base=C.
     blissElementDefinitions['_C5_inline_b97_c'] = {
       codeString: 'B97;C',
       isBlissGlyph: true
@@ -131,8 +132,8 @@ describe('BlissParser', () => {
     };
 
     // Multi-glyph word whose head bareCode is itself a real indicator (B97).
-    // Used to pin getIndicatorParts' slice(1): the head segment is excluded
-    // from the existing-indicator scan even when it is an indicator.
+    // Pins getIndicatorParts' position-independent extraction: indicator parts are
+    // selected by isIndicator (not by slice-after-index-0), and an all-indicator head is atomic.
     blissElementDefinitions['_C5_b97_word'] = {
       codeString: 'B97/H',
       glyphCode: '_C5_b97_word',
