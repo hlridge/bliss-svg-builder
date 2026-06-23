@@ -13,7 +13,7 @@ export const LIB_VERSION = typeof __LIB_VERSION__ !== 'undefined' ? __LIB_VERSIO
  * Any option key NOT in this set will be passed through as-is (for unknown SVG attributes like stroke-dasharray).
  */
 export const KNOWN_OPTION_KEYS = new Set([
-  'stroke-width', 'dot-extra-width', 'char-space', 'word-space', 'external-glyph-space',
+  'stroke-width', 'dot-extra-width', 'sdot-extra-width', 'char-space', 'word-space', 'external-glyph-space',
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
   'min-width', 'center',
   'crop', 'crop-top', 'crop-bottom', 'crop-left', 'crop-right',
@@ -66,7 +66,7 @@ export function generateKey() {
  *
  * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)
  * Element-level positioning: handled by element positioning logic (x, y, kerning)
- * Internal calculation options: used for calculations but not rendered (dotExtraWidth)
+ * Internal calculation options: used for calculations but not rendered (dot family: dotExtraWidth, sdotExtraWidth)
  *
  * Note: strokeWidth is NOT here - it's a multi-level option like 'color'
  * that can appear at both global and element levels as SVG attributes.
@@ -97,6 +97,7 @@ export const INTERNAL_OPTIONS = new Set([
 
   // Internal calculation options
   'dotExtraWidth',
+  'sdotExtraWidth',
 
   // Builder-level settings
   'background',

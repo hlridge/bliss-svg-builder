@@ -12,6 +12,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   renders stroke-width 0.33325.
  * - `dot-extra-width` as a bulk knob: SDOT follows as half, DOT takes the
  *   full value.
+ * - `sdot-extra-width`: overrides the SDOT half-default (and the SDOT
+ *   default), wins over `dot-extra-width` for SDOT, never touches DOT, and
+ *   clamps to 0-1.
  *
  * Does NOT cover:
  * - The DOT/COMMA stroke-width formula and clamping, see
@@ -42,6 +45,37 @@ describe('BlissSVGBuilder dot sizing', () => {
     it('keeps the full dot-extra-width for DOT', () => {
       // DOT takes the full value: (0.5 + 0.6) / 2 = 0.55
       expect(new BlissSVGBuilder('[dot-extra-width=0.6]||DOT').svgCode).toContain('stroke-width="0.55"');
+    });
+  });
+
+  describe('when sdot-extra-width is set', () => {
+    it('sizes SDOT independently', () => {
+      // (0.5 + 0.8) / 2 = 0.65
+      expect(new BlissSVGBuilder('[sdot-extra-width=0.8]||SDOT').svgCode).toContain('stroke-width="0.65"');
+    });
+
+    it('overrides the dot-extra-width half-default for SDOT', () => {
+      // sdot override wins: (0.5 + 0.1) / 2 = 0.3, not the 0.6/2 half-default (0.4)
+      const svg = new BlissSVGBuilder('[dot-extra-width=0.6;sdot-extra-width=0.1]||SDOT').svgCode;
+      expect(svg).toContain('stroke-width="0.3"');
+      expect(svg).not.toContain('stroke-width="0.4"');
+    });
+
+    it('leaves DOT untouched', () => {
+      // DOT keeps its own default extra 0.333: (0.5 + 0.333) / 2 = 0.4165
+      const svg = new BlissSVGBuilder('[sdot-extra-width=0.8]||DOT').svgCode;
+      expect(svg).toContain('stroke-width="0.4165"');
+      expect(svg).not.toContain('stroke-width="0.65"'); // the sdot value must not bleed into DOT
+    });
+
+    it('clamps to a maximum of 1', () => {
+      // sdot-extra-width=2 clamps to 1: (0.5 + 1) / 2 = 0.75
+      expect(new BlissSVGBuilder('[sdot-extra-width=2]||SDOT').svgCode).toContain('stroke-width="0.75"');
+    });
+
+    it('clamps to a minimum of 0', () => {
+      // sdot-extra-width=-0.5 clamps to 0: (0.5 + 0) / 2 = 0.25
+      expect(new BlissSVGBuilder('[sdot-extra-width=-0.5]||SDOT').svgCode).toContain('stroke-width="0.25"');
     });
   });
 });

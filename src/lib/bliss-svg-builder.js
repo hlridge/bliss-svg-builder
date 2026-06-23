@@ -68,6 +68,17 @@ class BlissSVGBuilder {
       options.dotExtraWidth = dotExtraWidth;
     }
 
+    // sdot-extra-width: Number, clamped 0-1 (small-dot override of the dot-extra-width half-default)
+    if ('sdot-extra-width' in rawOptions && !isNaN(rawOptions['sdot-extra-width'])) {
+      let sdotExtraWidth = Number(rawOptions['sdot-extra-width']);
+      if (sdotExtraWidth < 0) {
+        sdotExtraWidth = 0;
+      } else if (sdotExtraWidth > 1) {
+        sdotExtraWidth = 1;
+      }
+      options.sdotExtraWidth = sdotExtraWidth;
+    }
+
     // char-space: Number, clamped 0-10
     if ('char-space' in rawOptions && !isNaN(rawOptions['char-space'])) {
       let charSpace = Number(rawOptions['char-space']);
