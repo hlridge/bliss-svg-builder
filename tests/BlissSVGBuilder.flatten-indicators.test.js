@@ -79,49 +79,38 @@ describe('BlissSVGBuilder flattenIndicators', () => {
   });
 
   describe('when flattenIndicators composes with preserve (orthogonality)', () => {
-    // R15 D-S1a: a base+indicator combo is a bare alias, not a glyph. An alias
-    // has no LOCAL name to retain (it decomposes under preserve regardless), so
-    // the orthogonality shown here is the flatten on/off axis (;; kept vs baked)
-    // with preserve a no-op. NOTE (finding R3b2-3, backlog): the name-preserving
-    // half of this demo is parked. The only D-S1a-legal name-preserving subject
-    // is a base-only custom glyph, but `<base-only-glyph>;;<ind>` with
-    // flattenIndicators currently DROPS the overlay (the decompose-to-bare-code
-    // path in toJSON discards the merged head parts). Restore the name-kept
-    // assertions (preserve keeps the glyph name, flatten still bakes ;;) once
-    // that flatten bug is fixed.
-    const DEFS = { _LOVE: { codeString: 'B291;B97' } };
+    // R15 D-S1a: a base+indicator combo cannot be a custom glyph (define rejects
+    // a baked indicator), so the only name-preserving subject is a base-only
+    // custom glyph. The two axes are independent: `preserve` governs the LOCAL
+    // name (kept vs decomposed to portable codes), `flattenIndicators` governs
+    // the WORD structure (`;;` kept vs baked onto the head as `;`).
+    // regression (R3b2-2): a base-only custom head used to DROP its `;;` overlay
+    // under flatten -- the identity-clear that forces baked parts to serialize
+    // was built-in-only, so the custom head decomposed to a bare code and
+    // serializeGlyph emitted the code alone, ignoring the baked parts. The
+    // flatten-only and toJSON cases below pin the fix.
+    const DEFS = { _LOVE: { type: 'glyph', codeString: 'B291' } };
     beforeAll(() => BlissSVGBuilder.define(DEFS));
     afterAll(() => Object.keys(DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
 
-    it('keeps ;; and decomposes the alias when flatten is off', () => {
-      expect(new BlissSVGBuilder('_LOVE;;B81').toString({ preserve: true })).toBe('B291;B97;;B81');
+    it('keeps the name and ;; when neither flag is set', () => {
+      expect(new BlissSVGBuilder('_LOVE;;B81').toString({ preserve: true })).toBe('_LOVE;;B81');
     });
 
-    it('flattens ;; onto the head and decomposes the alias name', () => {
-      expect(new BlissSVGBuilder('_LOVE;;B81').toString({ flattenIndicators: true })).toBe('B291;B81;B97');
+    it('decomposes the name and bakes ;; onto the head when only flatten is set', () => {
+      expect(new BlissSVGBuilder('_LOVE;;B81').toString({ flattenIndicators: true })).toBe('B291;B81');
     });
 
-    it('flattens ;; even with preserve, since an alias has no name to retain', () => {
+    it('keeps the name and bakes ;; onto it when both preserve and flatten are set', () => {
       expect(new BlissSVGBuilder('_LOVE;;B81').toString({ preserve: true, flattenIndicators: true }))
-        .toBe('B291;B81;B97');
+        .toBe('_LOVE;B81');
     });
-  });
 
-  describe('when flattening a ;; overlay onto a base-only custom glyph (R3b2-2 tripwire)', () => {
-    // TRIPWIRE for finding R3b2-2 (the gate for the parked name-kept orthogonality
-    // assertions above): a base-only custom-glyph head loses its `;;` overlay under
-    // flattenIndicators -- toJSON's decompose-to-bare-code path discards the parts
-    // mergeWordIndicatorsOntoHead baked, because the identity-clear is built-in-only.
-    // A built-in base bakes correctly (`B291;;B81` flatten -> `B291;B81`). This pins
-    // the CURRENT (buggy) output so the fix flips it RED; when it does, switch _LOVE
-    // above back to a base-only `type:'glyph'` and restore the name-kept assertions.
-    const DEFS = { _BASEONLY_R3B2: { type: 'glyph', codeString: 'B291' } };
-    beforeAll(() => BlissSVGBuilder.define(DEFS));
-    afterAll(() => Object.keys(DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
-
-    it('drops the overlay today (flip to B291;B81 when R3b2-2 is fixed)', () => {
-      expect(new BlissSVGBuilder('_BASEONLY_R3B2;;B81').toString({ flattenIndicators: true }))
-        .toBe('B291');
+    it('toJSON drops the bare-code identity once the overlay is baked onto the parts', () => {
+      const json = new BlissSVGBuilder('_LOVE;;B81').toJSON({ flattenIndicators: true });
+      expect(json.groups[0].wordIndicators).toBeUndefined();
+      expect(json.groups[0].glyphs[0].codeName).toBeUndefined();
+      expect(json.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'B81']);
     });
   });
 });

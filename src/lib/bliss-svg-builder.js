@@ -1482,11 +1482,14 @@ class BlissSVGBuilder {
           head.parts = mergeWordIndicatorsOntoHead(
             head, group.wordIndicators, blissElementDefinitions, (code) => BlissParser.parse(code)
           );
-          // A built-in head with baked indicator parts is no longer a bare code:
-          // clear its single-code identity so serialization decomposes the parts
-          // (serializeGlyph emits the bare codeName for built-ins otherwise).
-          // Custom glyphs keep their identity for the name/delta serialization.
-          if (head.glyphCode && builtInCodes.has(head.glyphCode) && head.parts.some(p => p.isIndicator)) {
+          // A head with baked indicator parts is no longer a bare single code,
+          // so clear its single-code identity to force part-based serialization
+          // (`B291;B81`); otherwise serializeGlyph emits the bare codeName and
+          // drops the baked parts. The one exception is a custom glyph under
+          // `preserve`: it keeps its name and re-emits the overlay as a delta
+          // (`_LOVE;B81`), so leave its identity intact.
+          if (head.glyphCode && head.parts.some(p => p.isIndicator)
+              && !(options.preserve && !builtInCodes.has(head.glyphCode))) {
             delete head.glyphCode;
             delete head.isBlissGlyph;
           }
