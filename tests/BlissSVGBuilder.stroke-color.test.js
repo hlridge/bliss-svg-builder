@@ -40,10 +40,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - SVG-attribute mapping: `color` -> `stroke`, passthrough of
  *   `fill`/`opacity`/etc. onto the content group, HTML-entity
  *   escaping of attribute values.
- * - `dot-extra-width` (it.todo placeholder; option is parsed but
- *   not yet wired through to DOT/COMMA rendering at the option
- *   level; DOT/COMMA currently use the hardcoded extraDotWidth
- *   from element definitions).
+ * - `dot-extra-width` feeding the DOT/COMMA stroke-width formula
+ *   (clamped to max 1) at global and element scopes.
  *
  * Does NOT cover:
  * - Per-definition `defaultOptions` and the inner-`<g>`-wins cascade,
@@ -69,6 +67,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - External-glyph rendering for non-X-prefix codes and the
  *   text-fallback boundary, see `BlissSVGBuilder.external-glyphs.test.js`
  *   and `BlissSVGBuilder.text-fallback.test.js`.
+ * - The per-family dot sizing system (SDOT default = half DOT,
+ *   `sdot-extra-width`, absolute `dot-width`/`sdot-width`, and
+ *   indicator dots rendered at SDOT size), see
+ *   `BlissSVGBuilder.dot-sizing.test.js`.
  */
 describe('BlissSVGBuilder stroke and color', () => {
 
@@ -438,17 +440,5 @@ describe('BlissSVGBuilder stroke and color', () => {
 
       expect(svg).toMatch(/<g class="bliss-content"[^>]*id="test&amp;value"/);
     });
-  });
-
-  describe('when dot-extra-width controls dot-family rendering', () => {
-    // CORRECTED 2026-06-13 (burndown D5): dot-extra-width is ALREADY wired.
-    // #getInheritedOption('dotExtraWidth') overrides the baked extraDotWidth on
-    // DOT, COMMA, AND SDOT (the SDOT case contrary to the original "leave SDOT
-    // unaffected" intent; at =1 SDOT and DOT become the same size). The
-    // remaining work is the dot sizing system (per-type width control, SDOT
-    // default = half DOT, indicators -> SDOT); design + acceptance criteria in
-    // .claude/backlog/dot-sizing-system.md. The current uniform wiring ships
-    // as-is until that lands.
-    it.todo('applies independent DOT and SDOT width control');
   });
 });
