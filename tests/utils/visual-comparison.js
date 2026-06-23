@@ -2,7 +2,6 @@
 import { createCanvas, loadImage } from 'canvas';
 import fs from 'fs';
 import path from 'path';
-import { expect } from 'vitest';
 import { fileURLToPath } from 'url';
 
 // Get the directory name in ESM
@@ -489,26 +488,3 @@ export async function compareImages(image1Buffer, image2Buffer, testName, thresh
     filesSaved: shouldSaveFiles
   };
 }
-
-// Custom matcher for Vitest
-export function toMatchImage(received, expected, threshold = 0.00001) {
-  return {
-    async pass() {
-      const result = await compareImages(received, expected, threshold);
-      return result.match;
-    },
-    async message() {
-      const result = await compareImages(received, expected, threshold);
-      if (result.match) {
-        return `Expected images to be different, but they are similar (${(result.similarity * 100).toFixed(2)}% similar).`;
-      } else {
-        return `EXACT MATCH REQUIRED: Images differ by ${result.diffPixels} pixels (${(result.similarity * 100).toFixed(6)}% similar).`;
-      }
-    }
-  };
-}
-
-// Extend Vitest's expect
-expect.extend({
-  toMatchImage
-});
