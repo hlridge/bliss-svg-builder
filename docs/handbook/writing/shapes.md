@@ -32,7 +32,7 @@ Shapes fall into several categories:
 | Angles | `RA8NE`, `AA8N` | Right angles, acute angles |
 | Arrows | `ARR8N`, `LARR8N` | Arrows and large arrows |
 | Crosses | `SC8`, `DC8` | Straight and diagonal crosses |
-| Dots | `DOT` | Point marker |
+| Dots | `DOT`, `SDOT` | Point markers (full size and small) |
 | Waves | `W8`, `HW4N` | Waves and half-waves (arcs) |
 | Squares | `SQ8`, `SQ4` | Solid squares |
 | Rectangles | `RE84`, `RE82` | Width × height rectangles |

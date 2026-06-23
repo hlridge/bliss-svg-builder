@@ -17,6 +17,21 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 
 ---
 
+## Dots
+
+`DOT` is the full-size dot, `SDOT` the small dot (used by indicators); `COMMA` rides the DOT family. Dot size is controlled separately from the line stroke, with two relative options and two absolute ones.
+
+| Option | Default | Range | Description |
+|--------|---------|-------|-------------|
+| `dot-extra-width` | `0.333` | 0-1 | Relative extra width over the stroke for the DOT family. Bulk knob: SDOT follows at half. Rendered diameter = `stroke-width + value` |
+| `sdot-extra-width` | `0.1665` | 0-1 | Relative extra for SDOT only, overriding the `dot-extra-width` half-default |
+| `dot-width` | unset | 0-1.5 | Absolute rendered DOT diameter, independent of stroke-width. Overrides `dot-extra-width` |
+| `sdot-width` | unset | 0-1.5 | Absolute rendered SDOT diameter. Overrides `sdot-extra-width` and the half-default |
+
+Precedence within a dot type: **absolute wins over relative**. These options cascade at every scope (global, word, character, part), like `color` and `stroke-width`.
+
+---
+
 ## Spacing
 
 | Option | Default | Range | Description |
