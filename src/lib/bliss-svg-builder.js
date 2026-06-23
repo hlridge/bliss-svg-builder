@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
 import { getSemanticRoot, mergeWordIndicatorsOntoHead } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -77,6 +77,28 @@ class BlissSVGBuilder {
         sdotExtraWidth = 1;
       }
       options.sdotExtraWidth = sdotExtraWidth;
+    }
+
+    // dot-width: absolute rendered dot diameter, clamped [0, DOT_WIDTH_MAX]
+    if ('dot-width' in rawOptions && !isNaN(rawOptions['dot-width'])) {
+      let dotWidth = Number(rawOptions['dot-width']);
+      if (dotWidth < 0) {
+        dotWidth = 0;
+      } else if (dotWidth > DOT_WIDTH_MAX) {
+        dotWidth = DOT_WIDTH_MAX;
+      }
+      options.dotWidth = dotWidth;
+    }
+
+    // sdot-width: absolute rendered dot diameter, clamped [0, DOT_WIDTH_MAX]
+    if ('sdot-width' in rawOptions && !isNaN(rawOptions['sdot-width'])) {
+      let sdotWidth = Number(rawOptions['sdot-width']);
+      if (sdotWidth < 0) {
+        sdotWidth = 0;
+      } else if (sdotWidth > DOT_WIDTH_MAX) {
+        sdotWidth = DOT_WIDTH_MAX;
+      }
+      options.sdotWidth = sdotWidth;
     }
 
     // char-space: Number, clamped 0-10

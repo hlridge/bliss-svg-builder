@@ -486,10 +486,13 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
      * @param {number} y - The y-coordinate of the dot's position.
      * @param {number} baseStrokeWidth - The stroke-width of a normal line in the SVG, used to derive other dimensions of the dot.
      * @param {number} extraDotWidth - A dot's outer diameter is the normal line stroke-width + extraDotWidth.
+     * @param {number} [settings.dotWidth] - Optional absolute rendered diameter; when set, overrides baseStrokeWidth/extraDotWidth (ink stroke-width = dotWidth/2).
      * @returns {Object} - An object with closePath, openPath, dotPath and openPath properties.
      */
     getDotData: (x, y, settings = { baseStrokeWidth: defaultBaseStrokeWidth, extraDotWidth: defaultExtraDotWidth }) => {
-      const dotStrokeWidth = (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
+      const dotStrokeWidth = settings.dotWidth !== undefined
+        ? settings.dotWidth / 2
+        : (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
       const dotStrokeRadius = dotStrokeWidth / 2;
       return {
         closePath: `"/>`,
@@ -537,10 +540,13 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
      * @param {number} y - The y-coordinate of the dot's position.
      * @param {number} baseStrokeWidth - The stroke-width of a normal line in the SVG, used to derive other dimensions of the comma.
      * @param {number} extraDotWidth - A dot's outer diameter is the normal line stroke-width + extraDotWidth.
+     * @param {number} [settings.dotWidth] - Optional absolute rendered dot diameter; when set, overrides baseStrokeWidth/extraDotWidth (ink stroke-width = dotWidth/2). The comma tail scales off it too.
      * @returns {Object} - An object with closePath, openDotPath, dotPath, commaPath and openPath properties.
      */
     getCommaData: (x, y, settings = { baseStrokeWidth: defaultBaseStrokeWidth, extraDotWidth: defaultExtraDotWidth }) => {
-      const dotStrokeWidth = (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
+      const dotStrokeWidth = settings.dotWidth !== undefined
+        ? settings.dotWidth / 2
+        : (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
       const dotStrokeRadius = dotStrokeWidth / 2;
       const commaStrokeWidth = dotStrokeWidth * 2 / 3;
       const commaStartX = commaStrokeWidth + x;

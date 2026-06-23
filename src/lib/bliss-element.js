@@ -1160,17 +1160,22 @@ export class BlissElement {
       const inheritedStrokeWidth = this.#getInheritedOption('strokeWidth');
       const inheritedDotExtraWidth = this.#getInheritedOption('dotExtraWidth');
       const inheritedSdotExtraWidth = this.#getInheritedOption('sdotExtraWidth');
+      const inheritedDotWidth = this.#getInheritedOption('dotWidth');
+      const inheritedSdotWidth = this.#getInheritedOption('sdotWidth');
 
-      // Per-family dot sizing: DOT/COMMA take dot-extra-width as-is; SDOT
-      // follows as half by default (the bulk knob preserves the DOT:SDOT
-      // half-relationship), but its own sdot-extra-width overrides that.
+      // Per-family dot sizing. Absolute (dot-width/sdot-width) beats relative
+      // (dot-extra-width/sdot-extra-width). DOT/COMMA take dot-extra-width
+      // as-is; SDOT follows as half by default (the bulk knob preserves the
+      // DOT:SDOT half-relationship), but its own sdot-* options override that.
       // Non-dot shapes get no dot knob (they ignore it).
       const dotFamily = definition.dotFamily;
       let dotPathOpts = {};
       if (dotFamily === 'dot') {
-        if (inheritedDotExtraWidth !== undefined) dotPathOpts = { extraDotWidth: inheritedDotExtraWidth };
+        if (inheritedDotWidth !== undefined) dotPathOpts = { dotWidth: inheritedDotWidth };
+        else if (inheritedDotExtraWidth !== undefined) dotPathOpts = { extraDotWidth: inheritedDotExtraWidth };
       } else if (dotFamily === 'sdot') {
-        if (inheritedSdotExtraWidth !== undefined) dotPathOpts = { extraDotWidth: inheritedSdotExtraWidth };
+        if (inheritedSdotWidth !== undefined) dotPathOpts = { dotWidth: inheritedSdotWidth };
+        else if (inheritedSdotExtraWidth !== undefined) dotPathOpts = { extraDotWidth: inheritedSdotExtraWidth };
         else if (inheritedDotExtraWidth !== undefined) dotPathOpts = { extraDotWidth: inheritedDotExtraWidth / 2 };
       }
 

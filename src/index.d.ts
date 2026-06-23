@@ -12,6 +12,8 @@ export interface BlissOptions {
   'stroke-width'?: number;
   'dot-extra-width'?: number;
   'sdot-extra-width'?: number;
+  'dot-width'?: number;
+  'sdot-width'?: number;
   'char-space'?: number;
   'word-space'?: number;
   'external-glyph-space'?: number;

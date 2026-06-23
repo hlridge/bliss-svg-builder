@@ -13,7 +13,8 @@ export const LIB_VERSION = typeof __LIB_VERSION__ !== 'undefined' ? __LIB_VERSIO
  * Any option key NOT in this set will be passed through as-is (for unknown SVG attributes like stroke-dasharray).
  */
 export const KNOWN_OPTION_KEYS = new Set([
-  'stroke-width', 'dot-extra-width', 'sdot-extra-width', 'char-space', 'word-space', 'external-glyph-space',
+  'stroke-width', 'dot-extra-width', 'sdot-extra-width', 'dot-width', 'sdot-width',
+  'char-space', 'word-space', 'external-glyph-space',
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
   'min-width', 'center',
   'crop', 'crop-top', 'crop-bottom', 'crop-left', 'crop-right',
@@ -66,7 +67,7 @@ export function generateKey() {
  *
  * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)
  * Element-level positioning: handled by element positioning logic (x, y, kerning)
- * Internal calculation options: used for calculations but not rendered (dot family: dotExtraWidth, sdotExtraWidth)
+ * Internal calculation options: used for calculations but not rendered (dot family: dotExtraWidth, sdotExtraWidth, dotWidth, sdotWidth)
  *
  * Note: strokeWidth is NOT here - it's a multi-level option like 'color'
  * that can appear at both global and element levels as SVG attributes.
@@ -98,6 +99,8 @@ export const INTERNAL_OPTIONS = new Set([
   // Internal calculation options
   'dotExtraWidth',
   'sdotExtraWidth',
+  'dotWidth',
+  'sdotWidth',
 
   // Builder-level settings
   'background',
@@ -127,6 +130,14 @@ export const INTERNAL_OPTIONS = new Set([
   'relativeKerning',
   'absoluteKerning'
 ]);
+
+/**
+ * Upper bound for the absolute `dot-width` / `sdot-width` options (a rendered
+ * dot diameter in glyph units). Mirrors the `stroke-width` ceiling so an
+ * absolute dot cannot exceed what the relative `dot-extra-width` knob can
+ * already reach. The lower bound is 0 (an invisible dot; no crash).
+ */
+export const DOT_WIDTH_MAX = 1.5;
 
 /**
  * Maps semantic indicator types to their root B-codes.
