@@ -18,12 +18,17 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Absolute `dot-width`/`sdot-width`: pin the rendered diameter (inked
  *   stroke-width = value/2), beat the relative knobs, stay independent of
  *   `stroke-width`, and clamp to [0, 1.5].
+ * - Indicator dots render at SDOT ink (0.33325): the directly-composed
+ *   B83/B907 dots, the B84/B85/B912 dots relocated off the shared PERIOD
+ *   glyph B270, and the inherited dot inside composites (B88). The shared
+ *   PERIOD glyph B270 stays at full DOT size.
  *
  * Does NOT cover:
  * - The DOT/COMMA stroke-width formula and clamping, see
  *   `BlissSVGBuilder.stroke-color.test.js`.
- * - Rendered visual dot SIZE (pixel diff) and indicator-dot retargeting,
- *   vetted by the visual-regression e2e suite (R2 baseline regen).
+ * - The rendered visual dot SIZE as pixels (the SDOT-default and
+ *   indicator-retarget pixel diffs are vetted by the visual-regression
+ *   e2e suite / R2 baseline regen).
  * - Custom dot definitions (custom getPath primitives are not portable;
  *   out of R16 scope).
  */
@@ -116,6 +121,61 @@ describe('BlissSVGBuilder dot sizing', () => {
     it('clamps a negative dot-width to 0', () => {
       // dot-width=-1 clamps to 0 → 0 (an invisible dot, no crash)
       expect(new BlissSVGBuilder('[dot-width=-1]||DOT').svgCode).toContain('stroke-width="0"');
+    });
+  });
+
+  describe('when an indicator carries a dot', () => {
+    // Indicator dots retarget DOT -> SDOT: SDOT ink (0.5 + 0.1665) / 2 = 0.33325
+    // replaces the old DOT ink 0.4165. B84/B85/B912 reach their dot through the
+    // shared PERIOD glyph B270 (DOT:0,12), relocated inline; only the indicator
+    // definitions retarget, never B270 itself (it stays the full-size period).
+    it('renders the directly-composed B83 dot at SDOT size', () => {
+      const svg = new BlissSVGBuilder('B291;B83').svgCode;
+      expect(svg).toContain('stroke-width="0.33325"');
+      expect(svg).not.toContain('stroke-width="0.4165"');
+    });
+
+    it('renders the directly-composed B907 dot at SDOT size', () => {
+      const svg = new BlissSVGBuilder('B291;B907').svgCode;
+      expect(svg).toContain('stroke-width="0.33325"');
+      expect(svg).not.toContain('stroke-width="0.4165"');
+    });
+
+    // B84/B85/B912 reach their dot via the shared PERIOD glyph B270 (DOT:0,12),
+    // inlined as SDOT at the compensated coords (-8 + 12 = 4). Each also pins the
+    // dot's rendered center (M = center - radius) so a miscalculated compensation
+    // is caught here, not only in the e2e baseline.
+    it('renders the B270-relocated B84 dot at SDOT size and original center', () => {
+      const svg = new BlissSVGBuilder('B291;B84').svgCode;
+      expect(svg).toContain('stroke-width="0.33325"');
+      expect(svg).not.toContain('stroke-width="0.4165"');
+      expect(svg).toContain('M5.833375,4a'); // dot centered at (6, 4)
+    });
+
+    it('renders the B270-relocated B85 dot at SDOT size and original center', () => {
+      const svg = new BlissSVGBuilder('B291;B85').svgCode;
+      expect(svg).toContain('stroke-width="0.33325"');
+      expect(svg).not.toContain('stroke-width="0.4165"');
+      expect(svg).toContain('M1.833375,4a'); // dot centered at (2, 4)
+    });
+
+    it('renders the B270-relocated B912 dot at SDOT size and original center', () => {
+      const svg = new BlissSVGBuilder('B291;B912').svgCode;
+      expect(svg).toContain('stroke-width="0.33325"');
+      expect(svg).not.toContain('stroke-width="0.4165"');
+      expect(svg).toContain('M4.583375,4a'); // dot centered at (4.75, 4)
+    });
+
+    it('shrinks the inherited B83 dot inside the composite B88', () => {
+      const svg = new BlissSVGBuilder('B291;B88').svgCode;
+      expect(svg).toContain('stroke-width="0.33325"');
+      expect(svg).not.toContain('stroke-width="0.4165"');
+    });
+
+    it('leaves the shared PERIOD glyph (B270) at full DOT size', () => {
+      const svg = new BlissSVGBuilder('B270').svgCode;
+      expect(svg).toContain('stroke-width="0.4165"');
+      expect(svg).not.toContain('stroke-width="0.33325"');
     });
   });
 });

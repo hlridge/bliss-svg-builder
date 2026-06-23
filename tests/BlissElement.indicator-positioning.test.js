@@ -222,8 +222,15 @@ describe('BlissElement indicator positioning', () => {
         .toEqual(indicatorPosition('B233:0,-3;C8:0,8;B84'));
     });
 
-    it('anchors the indicator at the default height on a multi-part base (y=-8)', () => {
-      expect(lastIndicatorOf('B233:0,-3;C8:0,8;B84').y).toBe(-8);
+    it('anchors a B270-relocated indicator at the multi-part-base default height (y=0)', () => {
+      // R16 retargeted the B84/B85/B912 dots DOT -> SDOT, inlining the shared
+      // PERIOD glyph B270's +12 internal offset; this recomputed each indicator's
+      // derived anchorOffsetY (8 -> 0) while leaving the rendered dot center
+      // identical. The multi-part base still contributes the default (0,0) anchor,
+      // so the result is 0 -- not B233's -4 (the order-dependence bug this pins).
+      expect(lastIndicatorOf('B233:0,-3;C8:0,8;B84').y).toBe(0);
+      expect(lastIndicatorOf('B233:0,-3;C8:0,8;B85').y).toBe(0);
+      expect(lastIndicatorOf('B233:0,-3;C8:0,8;B912').y).toBe(0);
     });
 
     it('positions the indicator identically across an x-divergent base reorder', () => {

@@ -139,14 +139,14 @@ const glyphData = {
     name: "INDICATOR ACTIVE"
   },
   B83: {
-    codeString: "OC1SW:0,4;VL.25:0.5,5;DOT:0.5,6",
+    codeString: "OC1SW:0,4;VL.25:0.5,5;SDOT:0.5,6",
     isIndicator: true,
     indicatorRole: 'verbal',
     width: 1,
     name: "INDICATOR PRESENT CONDITIONAL"
   },
   B84: {
-    codeString: "B86;B270:3,-8",
+    codeString: "B86;SDOT:3,4",
     isIndicator: true,
     indicatorRole: 'adjectival',
     anchorOffsetX: -0.5,
@@ -154,7 +154,7 @@ const glyphData = {
     name: "INDICATOR DESCRIPTION AFTER THE FACT"
   },
   B85: {
-    codeString: "B270:0,-8;B86:1,0",
+    codeString: "SDOT:0,4;B86:1,0",
     isIndicator: true,
     indicatorRole: 'adjectival',
     anchorOffsetX:  0.5,
@@ -2908,7 +2908,7 @@ const glyphData = {
     name: "INDICATOR FIRST PERSON"
   },
   B907: {
-    codeString: "VL1.25:0,4;DOT:0,6",
+    codeString: "VL1.25:0,4;SDOT:0,6",
     isIndicator: true,
     indicatorRole: 'verbal',
     width: 0,
@@ -2944,7 +2944,7 @@ const glyphData = {
     name: "INDICATOR PAST PARTICIPLE"
   },
   B912: {
-    codeString: "B92;B270:1.5,-8",
+    codeString: "B92;SDOT:1.5,4",
     isIndicator: true,
     indicatorRole: 'adjectival',
     width: 1.5,
