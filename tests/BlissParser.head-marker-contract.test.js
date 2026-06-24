@@ -197,4 +197,41 @@ describe('BlissParser head-marker contract', () => {
       expect(r._parseWarnings).toBeUndefined();
     });
   });
+
+  describe('when ^ sits on the base before the character indicator (rule 1)', () => {
+    // A character may carry indicators (B291;B81); the head marker belongs to the
+    // whole CHARACTER, so writing it on the base before the indicator separator
+    // (B291^;B81) marks that character, identical to the canonical trailing form
+    // (B291;B81^). Previously `B291^` was looked up as an unknown code and the
+    // base was SILENTLY dropped (parts became [null, B81]).
+    const partsOf = (input) =>
+      BlissParser.parse(input).groups[0].glyphs.map(g => g.parts.map(p => p.codeName));
+    const svgEq = (a, b) => new BlissSVGBuilder(a).svgCode === new BlissSVGBuilder(b).svgCode;
+
+    it('marks the character and keeps its base and indicator (B291^;B81)', () => {
+      expect(partsOf('B291^;B81')).toEqual([['B291', 'B81']]);
+      expect(markedIndexes(BlissParser.parse('B291^;B81'))).toEqual([0]);
+      expect(BlissParser.parse('B291^;B81')._parseWarnings).toBeUndefined();
+      // pins the ^-before-; head marker; previously dropped the base to [null, B81].
+    });
+
+    it('resolves identically to the canonical trailing form (B291^;B81 == B291;B81^)', () => {
+      expect(partsOf('B291^;B81')).toEqual(partsOf('B291;B81^'));
+      expect(svgEq('B291^;B81', 'B291;B81^')).toBe(true);
+    });
+
+    it('marks the correct glyph in a multi-glyph word (B291/B313^;B81)', () => {
+      expect(partsOf('B291/B313^;B81')).toEqual([['B291'], ['B313', 'B81']]);
+      expect(markedIndexes(BlissParser.parse('B291/B313^;B81'))).toEqual([1]);
+      expect(svgEq('B291/B313^;B81', 'B291/B313;B81^')).toBe(true);
+    });
+
+    it('crowns an explicitly-marked exclusion before its indicator (B486^;B81/B313)', () => {
+      // Explicit ^ overrides the exclusion tier even when written before the
+      // character's indicator; equivalent to the trailing form B486;B81^.
+      expect(partsOf('B486^;B81/B313')).toEqual(partsOf('B486;B81^/B313'));
+      expect(markedIndexes(BlissParser.parse('B486^;B81/B313')))
+        .toEqual(markedIndexes(BlissParser.parse('B486;B81^/B313')));
+    });
+  });
 });

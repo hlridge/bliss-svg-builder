@@ -607,6 +607,18 @@ export class BlissParser {
             hasMarker = true;
             str = str.slice(0, -1);
           }
+          // A head marker may also sit on the base code, immediately before the
+          // character's indicator separator (`BASE^;IND`). The `^` marks the
+          // whole CHARACTER (rule 1), wherever in the token it is written, so it
+          // is stripped here exactly like the trailing form (`BASE;IND^`).
+          // Without this it would be looked up as part of an unknown code (`B291^`)
+          // and the base would be silently dropped. Both forms can co-occur
+          // (`BASE^;IND^`); either presence sets the one marker.
+          const caretBeforeIndicator = str.match(/^(.*?)\^(;.*)$/);
+          if (caretBeforeIndicator) {
+            hasMarker = true;
+            str = caretBeforeIndicator[1] + caretBeforeIndicator[2];
+          }
           const parts = expandSegment(str, definitions, isTopLevel, depth);
           if (hasMarker) {
             if (parts.length === 1) {
