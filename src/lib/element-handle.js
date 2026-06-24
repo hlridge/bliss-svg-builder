@@ -1009,6 +1009,10 @@ export class ElementHandle {
     if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs) return this;
+    // A fail-flagged word (malformed `;;`) is terminal: it renders as a single
+    // placeholder, and its hidden base glyphs must not escape across a group
+    // boundary and render as valid. No-op; only replaceGroup recovers it.
+    if (group.errorCode) return this;
     const len = group.glyphs.length;
     if (glyphIndex <= 0 || glyphIndex >= len) {
       throw new Error(`splitAt(${glyphIndex}) is out of range: must be between 1 and ${len - 1} (inclusive) for a group with ${len} glyphs`);
@@ -1069,6 +1073,10 @@ export class ElementHandle {
 
     // No-op for space groups
     if (this.#ctx.isRawSpaceGroup(group)) return this;
+    // No-op when this word is fail-flagged (malformed `;;`): it is terminal and
+    // cannot absorb a neighbor (the merged glyphs would render through the
+    // re-emitted error source, silently dropping the absorbed word).
+    if (group.errorCode) return this;
 
     // Scan right to find the next non-space group
     let nextWordIndex = -1;
@@ -1083,6 +1091,10 @@ export class ElementHandle {
     // No-op if the next group has no glyphs to absorb
     const nextGroup = groups[nextWordIndex];
     if (!nextGroup.glyphs?.length) return this;
+    // No-op when the neighbor is fail-flagged (malformed `;;`): absorbing its
+    // hidden base glyphs would let the failed word's content render as valid
+    // (a silent un-fail). The failed word stays separate until replaced.
+    if (nextGroup.errorCode) return this;
 
     // Absorb the next word group's glyphs
     group.glyphs.push(...nextGroup.glyphs);

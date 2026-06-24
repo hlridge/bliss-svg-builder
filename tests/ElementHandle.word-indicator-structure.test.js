@@ -21,6 +21,10 @@ import { BlissSVGBuilder } from '../src/index';
  * - Glyph-list edits that keep the group (addGlyph, removeGlyph, replaceGlyph)
  *   and head base-part edits (addPart) leave the overlay floating onto the
  *   current head, with no per-op overlay handling needed.
+ * - A fail-flagged (malformed-`;;`) word is the terminal sibling of the overlay:
+ *   splitAt and mergeWithNext NO-OP when a flagged group is involved (a failed
+ *   word's hidden base glyphs must not escape across a group boundary and render
+ *   as valid); only replacing the whole group recovers it.
  *
  * Does NOT cover:
  * - The applyIndicators / clearIndicators overlay API itself, see
@@ -270,6 +274,47 @@ describe('ElementHandle word indicators under structural mutation', () => {
       b.group(0).glyph(0).addPart('B331');
       expect(b.toString()).toBe('B313;B331/B1103;;B86');
       expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
+    });
+  });
+
+  describe('when restructuring a fail-flagged (malformed-;;) word', () => {
+    // A malformed `;;` (non-trailing or repeated) flags the WHOLE word
+    // (group.errorCode) for a single-icon fail-render. Like the overlay it is a
+    // word-level property, but unlike the overlay it is TERMINAL: splitAt and
+    // mergeWithNext move glyphs across a group boundary, which would let the
+    // failed word's hidden base glyphs escape and render as valid (a silent
+    // un-fail, or silent loss of the absorbed word). So both NO-OP when a
+    // flagged group is involved; only replacing the whole group recovers it.
+    const malformedWarnings = (builder) =>
+      builder.warnings.filter(w => w.code === 'MALFORMED_WORD_INDICATOR');
+
+    it('does not split a fail-flagged word', () => {
+      const b = new BlissSVGBuilder('B313;;B81/B431');
+      b.group(0).splitAt(1);
+      expect(b.toString()).toBe('B313;;B81/B431');
+      expect(b.stats.groupCount).toBe(1);
+      expect(malformedWarnings(b)).toHaveLength(1);
+    });
+
+    it('does not merge a valid word into a following fail-flagged word', () => {
+      const b = new BlissSVGBuilder('B291//B313;;B84;;B97');
+      b.group(0).mergeWithNext();
+      expect(b.toString()).toBe('B291//B313;;B84;;B97');
+      expect(malformedWarnings(b)).toHaveLength(1);
+    });
+
+    it('does not merge a fail-flagged word with its valid neighbor', () => {
+      const b = new BlissSVGBuilder('B313;;B84;;B97//B291');
+      b.group(0).mergeWithNext();
+      expect(b.toString()).toBe('B313;;B84;;B97//B291');
+      expect(malformedWarnings(b)).toHaveLength(1);
+    });
+
+    it('recovers the word when the whole group is replaced', () => {
+      const b = new BlissSVGBuilder('B313;;B81/B431');
+      b.replaceGroup(0, 'B291');
+      expect(b.toString()).toBe('B291');
+      expect(malformedWarnings(b)).toHaveLength(0);
     });
   });
 });

@@ -33,6 +33,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Overlay scoping to its own word group in a multi-word sentence.
  * - Degenerate inputs (no base, two-glyph default).
  * - Scope fence: single ; on a pre-defined word still bakes (no overlay).
+ * - Malformed ;; (a glyph follows the indicators, or ;; repeats) flagging the
+ *   whole word (group.errorCode = MALFORMED_WORD_INDICATOR) for a single-icon
+ *   fail-render, emitting exactly one warning, and round-tripping the offending
+ *   string (toString re-emit, toJSON flag fields, rebuild stickiness).
  *
  * Does NOT cover:
  * - The semantic-root placement/preservation rules, see
@@ -41,7 +45,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   and `BlissParser.head-glyph-exclusions.test.js`.
  * - The single-; WORD;INDICATORS bake path, see
  *   `BlissParser.word-indicators.test.js`.
- * - toString/toJSON re-emission and round-trip, see
+ * - The L1 fail-render mechanism itself (placeholder vs invisible, advance),
+ *   see `BlissElement.error-placeholder.test.js`.
+ * - WELL-FORMED ;; toString/toJSON re-emission and round-trip, see
  *   `BlissSVGBuilder.indicator-round-trip.test.js`.
  */
 
@@ -267,45 +273,77 @@ describe('BlissParser ;; syntax', () => {
   });
 
   describe('when ;; is malformed (a glyph follows the indicators, or ;; repeats)', () => {
-    // A word-level indicator list must be the trailing part of a word. When a
-    // `/`-separated glyph follows the indicators, or a second `;;` appears, the
-    // parser warns MALFORMED_WORD_INDICATOR and falls back to a character-level
-    // (`;`) reading so nothing is dropped and no null part leaks into the tree.
+    // A word-level indicator must be the TRAILING part of a word. When a
+    // `/`-separated glyph follows the indicators (B313;;B81/B431), or a second
+    // ;; appears (B313;;B84;;B97), the word is invalid: the parser flags the
+    // whole GROUP (group.errorCode = MALFORMED_WORD_INDICATOR) and the element
+    // fails the entire word to one error placeholder (error-placeholder on) or
+    // nothing (off), emitting exactly ONE warning. This revises the earlier
+    // char-level (;) degrade: a malformed word-level indicator is a WORD
+    // property, so it invalidates the word, not one character (user decision,
+    // corpus-expansion-and-indicator-contract plan, Decision 6).
     const warningCodes = (dsl) => new BlissSVGBuilder(dsl).warnings.map((w) => w.code);
-    const allParts = (dsl) =>
-      BlissParser.parse(dsl).groups.flatMap((g) => g.glyphs ?? []).flatMap((g) => g.parts ?? []);
-    const allCodeNames = (dsl) => allParts(dsl).map((p) => p.codeName);
+    const flaggedGroup = (dsl) => BlissParser.parse(dsl).groups[0];
 
-    it('warns and drops nothing when a glyph follows the indicators (B313;;B81/B431)', () => {
-      expect(warningCodes('B313;;B81/B431')).toContain('MALFORMED_WORD_INDICATOR');
-      expect(allCodeNames('B313;;B81/B431')).toEqual(expect.arrayContaining(['B313', 'B81', 'B431']));
-      expect(allParts('B313;;B81/B431').every((p) => p != null)).toBe(true);
+    it.each([
+      'B313;;B81/B431',       // a glyph follows the indicators
+      'B313;;B84;;B97',       // a second ;; repeats
+      'B313;;B81/B431;;B86',  // non-trailing AND repeated
+    ])('flags the whole word with group.errorCode for %s', (dsl) => {
+      expect(flaggedGroup(dsl).errorCode).toBe('MALFORMED_WORD_INDICATOR');
+      expect(flaggedGroup(dsl).errorSource).toBe(dsl);
     });
 
-    it('warns and produces no null part for a repeated ;; (B313;;B84;;B97)', () => {
-      expect(warningCodes('B313;;B84;;B97')).toContain('MALFORMED_WORD_INDICATOR');
-      expect(allCodeNames('B313;;B84;;B97')).toEqual(expect.arrayContaining(['B313', 'B84', 'B97']));
-      expect(allParts('B313;;B84;;B97').every((p) => p != null)).toBe(true);
+    it('emits exactly one MALFORMED_WORD_INDICATOR warning for the word', () => {
+      // The warning is recorded once by the L1 fail-render mechanism, not twice
+      // (the parser no longer also pushes a parse warning for the same fault).
+      const malformed = new BlissSVGBuilder('B313;;B84;;B97').warnings
+        .filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
+      expect(malformed).toHaveLength(1);
     });
 
-    it('warns and does not leak ;; for non-trailing + repeated (B313;;B81/B431;;B86)', () => {
-      expect(warningCodes('B313;;B81/B431;;B86')).toContain('MALFORMED_WORD_INDICATOR');
-      expect(allCodeNames('B313;;B81/B431;;B86')).toEqual(expect.arrayContaining(['B313', 'B81', 'B431', 'B86']));
-      expect(allParts('B313;;B81/B431;;B86').every((p) => p != null)).toBe(true);
+    it('collapses the whole word to a single placeholder when error-placeholder is on', () => {
+      const group = new BlissSVGBuilder('[error-placeholder]||B313;;B81/B431').snapshot().children[0];
+      expect(group.children).toHaveLength(1);
     });
 
-    it('does not warn for a well-formed trailing ;; (B313/B1103;;B81)', () => {
+    it('renders the word invisible with no children when error-placeholder is off', () => {
+      const group = new BlissSVGBuilder('B313;;B81/B431').snapshot().children[0];
+      expect(group.children).toEqual([]);
+    });
+
+    it('does not flag or warn for a well-formed trailing ;; (B313/B1103;;B81)', () => {
+      expect(flaggedGroup('B313/B1103;;B81').errorCode).toBeUndefined();
       expect(warningCodes('B313/B1103;;B81')).not.toContain('MALFORMED_WORD_INDICATOR');
     });
+  });
 
-    it('parses a malformed ;; identically to its character-level (;) collapse', () => {
-      // The fallback must equal a fresh parse of the collapsed string, including
-      // head crowning (B486 is excluded, so the collapse crowns index 1), so the
-      // malformed reading is a faithful character-level one.
-      const malformed = BlissParser.parse('B486/B291;;B81/B431');
-      const collapsed = BlissParser.parse('B486/B291;B81/B431');
-      delete malformed._parseWarnings;
-      expect(malformed).toEqual(collapsed);
+  describe('when a malformed-;; word round-trips or rebuilds', () => {
+    // Task-2 self-review acceptance gates: the flag must survive serialization
+    // and rebuild. toString re-emits the offending string so parse(toString(x))
+    // re-flags; toJSON keeps the flag fields; a rebuild re-honors the flag
+    // exactly once. The flag is STATIC (the malformed ;; grammar is resolved
+    // away at parse, leaving no structure to re-derive from), so it is never
+    // re-derived and a mutation cannot silently un-fail the word.
+    it('re-emits the malformed string from toString and re-flags on re-parse', () => {
+      const builder = new BlissSVGBuilder('B313;;B81/B431');
+      expect(builder.toString()).toBe('B313;;B81/B431');
+      expect(BlissParser.parse(builder.toString()).groups[0].errorCode)
+        .toBe('MALFORMED_WORD_INDICATOR');
+    });
+
+    it('preserves the flag fields through toJSON', () => {
+      const json = new BlissSVGBuilder('B313;;B84;;B97').toJSON();
+      expect(json.groups[0].errorCode).toBe('MALFORMED_WORD_INDICATOR');
+      expect(json.groups[0].errorSource).toBe('B313;;B84;;B97');
+    });
+
+    it('keeps the flag and one warning after a sibling-word mutation rebuilds', () => {
+      const builder = new BlissSVGBuilder('B313;;B81/B431');
+      builder.addGroup('B291'); // mutates a sibling word, triggering a rebuild
+      const malformed = builder.warnings.filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
+      expect(malformed).toHaveLength(1);
+      expect(builder.snapshot().children[0].children).toEqual([]);
     });
   });
 

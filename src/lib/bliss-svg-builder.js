@@ -1397,6 +1397,16 @@ class BlissSVGBuilder {
     const segments = [];
     for (const group of obj.groups || []) {
       if (!group.glyphs) continue;
+      // A group the parser flagged as a malformed word (errorCode) re-emits its
+      // original offending string verbatim, so parse(toString(x)) re-detects the
+      // same fault and re-flags. Its base glyphs (kept only so the failed word
+      // advances like a normal one) are NOT serialized: they would collapse to a
+      // valid word and silently lose the malformation.
+      if (group.errorCode && group.errorSource !== undefined) {
+        const optPrefix = serializeOptions(group.options);
+        segments.push(optPrefix ? `${optPrefix}|${group.errorSource}` : group.errorSource);
+        continue;
+      }
       if (isSpaceGroup(group)) {
         const hasNonDefaultSpace = group.glyphs.some(g =>
           g.parts?.some(p => p._differsFromDefault)

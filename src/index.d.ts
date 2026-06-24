@@ -506,6 +506,17 @@ export interface BlissJSON {
   groups: Array<{
     options?: Record<string, string>;
     /**
+     * Word-level fail-render flag: set when the parser rejects the whole word
+     * (e.g. a malformed `;;` indicator that is not the trailing part of the
+     * word). The word renders as a single error placeholder (`error-placeholder`
+     * on) or nothing (off) and emits one `MALFORMED_WORD_INDICATOR` warning.
+     * `errorSource` is the original offending string, re-emitted verbatim by
+     * `toString()` so the malformation round-trips.
+     */
+    errorCode?: WarningCode;
+    error?: string;
+    errorSource?: string;
+    /**
      * Word-level indicator overlay (the DSL `;;` form): stored on the word and
      * resolved onto the head glyph at render. Present in default output (kept
      * by default); absent when there is no word-level indicator.

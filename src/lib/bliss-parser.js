@@ -499,20 +499,28 @@ export class BlissParser {
           // A word-level indicator list must be the trailing part of the word:
           // exactly one `;;`, and no `/`-separated glyph after the indicators
           // (greedy match means rawIndicators holds everything after the last
-          // `;;`). Otherwise warn and fall back to a character-level (`;`)
-          // reading so no glyph is dropped and no stray `;;` leaks into the
-          // glyph expansion as a null part (N11/N11c).
+          // `;;`). Otherwise the whole WORD is invalid: a word-level indicator
+          // is a word property (it sets part-of-speech), so a malformed one
+          // invalidates the word, not one character. Stash a word-error on the
+          // first part; the assembly loop lifts it onto group.errorCode, where
+          // the element collapses the word to a single error placeholder (the
+          // L1 analogue of the L2 character placeholder) and records ONE warning.
           // str is inside the wordLevelMatch guard, so it always contains `;;`
-          // (match is non-null).
+          // (match is non-null). The base still expands to real (non-space)
+          // glyphs so the failed group advances like a normal word; those glyphs
+          // are not rendered (the placeholder stands in), and toString re-emits
+          // the original `str` so parse(toString(x)) re-flags (round-trip).
           const isMalformed = str.match(/;;/g).length > 1 || rawIndicators.includes('/');
           if (isMalformed) {
-            parseWarnings.push({
-              code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
-              message: `Malformed word-level indicator in "${str}": ;; indicators must be the trailing part of a word. Reading ;; as character-level ;.`,
-              source: str,
-            });
             const fallbackParts = str.replace(/;;/g, ';').split('/').flatMap(strPart => expand(strPart, definitions));
             crownWordChunks(fallbackParts, wordCode);
+            if (fallbackParts.length > 0) {
+              fallbackParts[0]._wordError = {
+                code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
+                message: `Malformed word-level indicator in "${str}": ;; must be the trailing part of a word.`,
+                source: str,
+              };
+            }
             return fallbackParts;
           }
 
@@ -914,7 +922,18 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak, _wordIndicators } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
+        // Lift a word-level fail-render flag onto its enclosing group (mirrors
+        // the _wordIndicators lift below). A malformed `;;` makes the whole word
+        // invalid; the element reads group.errorCode and collapses it to one
+        // placeholder. The flag is static (no `;;` structure survives to
+        // re-derive from), so it persists across rebuild; errorSource carries the
+        // original string for the toString round-trip.
+        if (_wordError) {
+          group.errorCode = _wordError.code;
+          group.error = _wordError.message;
+          group.errorSource = _wordError.source;
+        }
         // R14/R15: lift a word-level indicator overlay onto its enclosing group.
         // The word-level ;; slot is a WORD property owned by the FIRST glyph:
         // the first glyph (group.glyphs still empty) claims it; a later glyph's
