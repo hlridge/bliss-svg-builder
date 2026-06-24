@@ -21,6 +21,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Single-glyph character distinction from word-level behavior under ; / ;! /
  *   ;X-not-an-indicator inputs.
  * - Edge cases: undefined word code, empty base, glyph-level options.
+ * - An indicator bound to a multi-word alias (one token expanding past a word
+ *   break) failing the whole unit (group.errorCode = MALFORMED_WORD_INDICATOR),
+ *   uniformly for direct and nested aliases; the `;;` facet of the same
+ *   contract lives in `BlissParser.double-semicolon.test.js`.
  *
  * Does NOT cover:
  * - The ;; (double-semicolon) syntax on inline expressions, see
@@ -687,6 +691,115 @@ describe('BlissParser word-indicator syntax', () => {
       expect(result.groups[0].glyphs.length).toBe(2);
       expect(result.groups[0].glyphs[0].options.color).toBe('red');
       expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+    });
+  });
+
+  describe('when an indicator is bound to a multi-word alias', () => {
+    // An indicator (character-level `;` or word-level `;;`) targets a single
+    // word. A multi-word alias is ONE token that expands to more than one word,
+    // so there is no single head to carry the indicator: the binding is invalid.
+    // The parser flags the whole unit (group.errorCode = MALFORMED_WORD_INDICATOR)
+    // for a one-icon fail-render (the L1 mechanism), instead of the legacy silent
+    // drop (direct // alias) or first-word-head attach (nested alias). User
+    // decision, corpus-expansion-and-indicator-contract plan (Decision 6); applies
+    // UNIFORMLY to direct and nested aliases. The `;;` facet of this contract is
+    // pinned in BlissParser.double-semicolon.test.js.
+    const MULTIWORD_DEFS = {
+      _MWORD_DIRECT: { codeString: 'B291//B313' },        // // directly in the codeString
+      _MWORD_INNER: { codeString: 'B291//B303' },
+      _MWORD_NESTED: { codeString: 'B208/_MWORD_INNER' },  // // lives in a referenced alias
+      _MWORD_SINGLE: { codeString: 'B291/B313' },          // one word (single /), control
+    };
+    beforeAll(() => BlissSVGBuilder.define(MULTIWORD_DEFS));
+    afterAll(() => Object.keys(MULTIWORD_DEFS).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
+
+    const flaggedGroup = (dsl) => BlissParser.parse(dsl).groups[0];
+    const groupChildren = (dsl) => new BlissSVGBuilder(dsl).snapshot().children;
+
+    it.each([
+      '_MWORD_DIRECT;B81',  // direct // codeString alias (was a silent drop)
+      '_MWORD_NESTED;B81',  // nested alias, // inside the referenced alias
+    ])('flags the whole unit with group.errorCode for %s', (dsl) => {
+      expect(flaggedGroup(dsl).errorCode).toBe('MALFORMED_WORD_INDICATOR');
+      expect(flaggedGroup(dsl).errorSource).toBe(dsl);
+    });
+
+    it('collapses the unit to one group when failing, leaving no word split', () => {
+      // The alias would render as 3 groups (word, space, word); the fail
+      // collapses it to ONE flagged group, so no head can carry the indicator.
+      expect(groupChildren('_MWORD_DIRECT;B81')).toHaveLength(1);
+    });
+
+    it('emits exactly one MALFORMED_WORD_INDICATOR warning for the unit', () => {
+      const malformed = new BlissSVGBuilder('_MWORD_NESTED;B81').warnings
+        .filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
+      expect(malformed).toHaveLength(1);
+    });
+
+    it('shows one placeholder for the whole unit when error-placeholder is on', () => {
+      const children = groupChildren('[error-placeholder]||_MWORD_DIRECT;B81');
+      expect(children).toHaveLength(1);
+      expect(children[0].children).toHaveLength(1);
+    });
+
+    it('renders the unit invisible with no children when error-placeholder is off', () => {
+      expect(groupChildren('_MWORD_DIRECT;B81')[0].children).toEqual([]);
+    });
+
+    it('re-emits the offending string from toString and re-flags on re-parse', () => {
+      const builder = new BlissSVGBuilder('_MWORD_DIRECT;B81');
+      expect(builder.toString()).toBe('_MWORD_DIRECT;B81');
+      expect(BlissParser.parse(builder.toString()).groups[0].errorCode)
+        .toBe('MALFORMED_WORD_INDICATOR');
+    });
+
+    it('binds the indicator to the head of a single-word alias without failing', () => {
+      // Control: _MWORD_SINGLE = 'B291/B313' is ONE word; ;B81 binds to its head.
+      expect(flaggedGroup('_MWORD_SINGLE;B81').errorCode).toBeUndefined();
+      expect(partCodes(flaggedGroup('_MWORD_SINGLE;B81').glyphs[0])).toEqual(['B291', 'B81']);
+    });
+
+    it('binds an explicit // sentence indicator to its second word without failing', () => {
+      // Control: explicit DSL // splits into word groups BEFORE alias expansion,
+      // so ;B81 binds to the second word (B313), never the whole sentence.
+      const parsed = BlissParser.parse('B291//B313;B81');
+      expect(parsed.groups.every((g) => g.errorCode === undefined)).toBe(true);
+      expect(partCodes(parsed.groups[2].glyphs[0])).toEqual(['B313', 'B81']);
+    });
+
+    it('does not fail an empty strip (;) on a multi-word alias', () => {
+      // An empty `;` strips indicators (a no-op here) and must never warn or
+      // fail: the user cannot know whether a code bakes an indicator. Only a
+      // REAL indicator bound to the multi-word alias fails the unit.
+      // pins the inputIndicatorsAreReal gate (not merely hasInputIndicators).
+      expect(flaggedGroup('_MWORD_DIRECT;').errorCode).toBeUndefined();
+    });
+
+    it('does not fail when a multi-word-alias indicator is embedded in a definition', () => {
+      // Scope boundary: the fail is for a USER-written indicator on a multi-word
+      // alias. An alias whose codeString embeds `<multi-word>;<indicator>` is an
+      // internal expansion that keeps its legacy non-failing behavior; the fail
+      // is scoped to top-level input (the isTopLevel guard).
+      BlissSVGBuilder.define({ _MWORD_WRAPS: { codeString: '_MWORD_DIRECT;B81' } });
+      try {
+        expect(flaggedGroup('_MWORD_WRAPS').errorCode).toBeUndefined();
+      } finally {
+        BlissSVGBuilder.removeDefinition('_MWORD_WRAPS');
+      }
+    });
+
+    it('emits no head-marker warning for a failed alias with markers in two words', () => {
+      // End-to-end: a failed unit whose word-strings each carry a `^` head
+      // marker still emits exactly ONE warning (MALFORMED_WORD_INDICATOR). The
+      // per-word markers are sealed to designations during expansion, so
+      // collapsing the words into one failed group adds no MULTIPLE_HEAD_MARKERS.
+      BlissSVGBuilder.define({ _MWORD_TWOMARK: { codeString: 'B291^//B303^' } });
+      try {
+        const codes = new BlissSVGBuilder('_MWORD_TWOMARK;B81').warnings.map((w) => w.code);
+        expect(codes).toEqual(['MALFORMED_WORD_INDICATOR']);
+      } finally {
+        BlissSVGBuilder.removeDefinition('_MWORD_TWOMARK');
+      }
     });
   });
 

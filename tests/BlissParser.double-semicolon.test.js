@@ -37,6 +37,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   whole word (group.errorCode = MALFORMED_WORD_INDICATOR) for a single-icon
  *   fail-render, emitting exactly one warning, and round-tripping the offending
  *   string (toString re-emit, toJSON flag fields, rebuild stickiness).
+ * - A ;; bound to a MULTI-WORD ALIAS (one token expanding past a word break)
+ *   failing the whole unit (group.errorCode) instead of overlaying only the
+ *   first word; uniform with the char-level `;` multi-word-alias fail in
+ *   `BlissParser.word-indicators.test.js`.
  *
  * Does NOT cover:
  * - The semantic-root placement/preservation rules, see
@@ -344,6 +348,51 @@ describe('BlissParser ;; syntax', () => {
       const malformed = builder.warnings.filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
       expect(malformed).toHaveLength(1);
       expect(builder.snapshot().children[0].children).toEqual([]);
+    });
+  });
+
+  describe('when ;; is bound to a multi-word alias', () => {
+    // A ;; word-level overlay also targets a single word. Bound to a multi-word
+    // alias (one token expanding past a word break), it has no single head, so
+    // the whole unit fails (group.errorCode = MALFORMED_WORD_INDICATOR) instead
+    // of attaching the overlay to only the first word. Uniform with the
+    // character-level (;) multi-word-alias fail in
+    // BlissParser.word-indicators.test.js (Decision 6).
+    const MULTIWORD_DEFS = {
+      _MWSEMI_DIRECT: { codeString: 'B291//B313' },
+      _MWSEMI_INNER: { codeString: 'B291//B303' },
+      _MWSEMI_NESTED: { codeString: 'B208/_MWSEMI_INNER' },
+      _MWSEMI_SINGLE: { codeString: 'B291/B313' },
+    };
+    beforeAll(() => BlissSVGBuilder.define(MULTIWORD_DEFS));
+    afterAll(() => Object.keys(MULTIWORD_DEFS).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
+
+    const flaggedGroup = (dsl) => BlissParser.parse(dsl).groups[0];
+
+    it.each([
+      '_MWSEMI_DIRECT;;B81',  // direct // codeString alias
+      '_MWSEMI_NESTED;;B81',  // nested alias, // inside the referenced alias
+    ])('flags the whole unit with group.errorCode for %s', (dsl) => {
+      expect(flaggedGroup(dsl).errorCode).toBe('MALFORMED_WORD_INDICATOR');
+      expect(flaggedGroup(dsl).errorSource).toBe(dsl);
+    });
+
+    it('stores no overlay on the failed unit', () => {
+      // The overlay path is abandoned for the fail; no group.wordIndicators set.
+      expect(flaggedGroup('_MWSEMI_DIRECT;;B81').wordIndicators).toBeUndefined();
+    });
+
+    it('collapses the unit to one placeholder when error-placeholder is on', () => {
+      const children = new BlissSVGBuilder('[error-placeholder]||_MWSEMI_DIRECT;;B81')
+        .snapshot().children;
+      expect(children).toHaveLength(1);
+      expect(children[0].children).toHaveLength(1);
+    });
+
+    it('still overlays ;; on a single-word alias without failing', () => {
+      // Control: _MWSEMI_SINGLE = 'B291/B313' is ONE word; ;; overlays its head.
+      expect(flaggedGroup('_MWSEMI_SINGLE;;B81').errorCode).toBeUndefined();
+      expect(overlay('_MWSEMI_SINGLE;;B81')).toEqual({ codes: ['B81'], stripSemantic: false });
     });
   });
 

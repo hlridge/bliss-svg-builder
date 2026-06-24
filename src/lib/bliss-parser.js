@@ -484,6 +484,38 @@ export class BlissParser {
           return resolveToFinalCodeString(def.codeString, visited);
         };
 
+        // An indicator (char-level `;` or word-level `;;`) binds to exactly one
+        // word. When it is bound to a single ALIAS token that expands to MORE
+        // THAN ONE word (a `_wordBreak` survives expansion), there is no single
+        // head to carry it, so the binding is invalid. Fail the whole unit:
+        // collapse the word-break expansion into one group (filter the breaks so
+        // no `//` split survives) and flag it with `_wordError`, exactly like the
+        // malformed-`;;` path. The assembly loop lifts the flag onto
+        // group.errorCode and the L1 fail-render mechanism collapses it to ONE
+        // placeholder (error-placeholder on) or nothing (off). This replaces the
+        // legacy silent drop (direct `//` alias) and first-word-head attach
+        // (nested alias / `;;` overlay). errorSource is the whole group string
+        // (`wordCode`) so toString re-emits it and parse(toString(x)) re-flags;
+        // the flag is static + sticky and the splitAt/mergeWithNext guards key
+        // off group.errorCode. R2 corpus task 4, Decision 6 (applies uniformly to
+        // direct and nested aliases). See [[feedback_no_indicator_of_a_part]].
+        const failMultiWordIndicator = (parts) => {
+          // Filtering the `_wordBreak` markers collapses the multi-word
+          // expansion into one group; any head markers the words carried are
+          // already sealed to per-word designations by sealFragment during
+          // expansion (so the collapse cannot re-trigger MULTIPLE_HEAD_MARKERS)
+          // and are inert anyway, since a placeholder renders for the unit.
+          const collapsed = parts.filter(p => !p._wordBreak);
+          if (collapsed.length > 0) {
+            collapsed[0]._wordError = {
+              code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
+              message: `Indicator bound to the multi-word unit "${wordCode}": an indicator targets a single word, but this expands to multiple words.`,
+              source: wordCode,
+            };
+          }
+          return collapsed;
+        };
+
         // Detect ;; for word-level indicators on inline multi-character expressions.
         // Pattern: baseCode;;indicators. R14: instead of baking the indicators
         // onto the head glyph, store them as a reversible overlay on the group.
@@ -530,6 +562,14 @@ export class BlissParser {
           // Process baseCode using the normal flow (splits on / and expands each
           // part): definitions, ^ markers, options, etc.
           const expandedParts = baseCode.split('/').flatMap(strPart => expand(strPart, definitions));
+
+          // A ;; overlay binds to ONE word. Bound to a multi-word alias (the base
+          // expands past a word break), it has no single head: fail the whole
+          // unit instead of overlaying only the first word. Decision 6 (uniform
+          // with the char-level multi-word-alias fail in expandSegment).
+          if (expandedParts.some(part => part._wordBreak)) {
+            return failMultiWordIndicator(expandedParts);
+          }
 
           // Resolve and crown the word so the head is identifiable at decode.
           crownWordChunks(expandedParts, wordCode);
@@ -763,6 +803,12 @@ export class BlissParser {
               if (optionsPrefix && allParts.length > 0) {
                 allParts[0].part = optionsPrefix + allParts[0].part;
               }
+              // A real indicator bound to this multi-word alias targets no single
+              // head: fail the whole unit instead of the legacy silent drop.
+              // Decision 6 (uniform with the nested + ;; fail paths).
+              if (isTopLevel && inputIndicatorsAreReal) {
+                return failMultiWordIndicator(allParts);
+              }
               return allParts;
             }
 
@@ -808,6 +854,14 @@ export class BlissParser {
                   ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions })
                 };
               });
+
+            // A real indicator bound to an alias that expands past a word break
+            // targets no single head: fail the whole unit rather than binding it
+            // to only the first word. Decision 6 (uniform with the direct // and
+            // ;; fail paths).
+            if (isTopLevel && inputIndicatorsAreReal && expandedParts.some(part => part._wordBreak)) {
+              return failMultiWordIndicator(expandedParts);
+            }
 
             // Rule 2: a definition's codeString is its own word-string.
             // Resolve its written markers now; the result is carried upward

@@ -21,10 +21,11 @@ import { BlissSVGBuilder } from '../src/index';
  * - Glyph-list edits that keep the group (addGlyph, removeGlyph, replaceGlyph)
  *   and head base-part edits (addPart) leave the overlay floating onto the
  *   current head, with no per-op overlay handling needed.
- * - A fail-flagged (malformed-`;;`) word is the terminal sibling of the overlay:
- *   splitAt and mergeWithNext NO-OP when a flagged group is involved (a failed
- *   word's hidden base glyphs must not escape across a group boundary and render
- *   as valid); only replacing the whole group recovers it.
+ * - A fail-flagged word (malformed-`;;` OR an indicator bound to a multi-word
+ *   alias) is the terminal sibling of the overlay: splitAt and mergeWithNext
+ *   NO-OP when a flagged group is involved (a failed word's hidden base glyphs
+ *   must not escape across a group boundary and render as valid), via one
+ *   generic group.errorCode guard; only replacing the whole group recovers it.
  *
  * Does NOT cover:
  * - The applyIndicators / clearIndicators overlay API itself, see
@@ -277,14 +278,16 @@ describe('ElementHandle word indicators under structural mutation', () => {
     });
   });
 
-  describe('when restructuring a fail-flagged (malformed-;;) word', () => {
-    // A malformed `;;` (non-trailing or repeated) flags the WHOLE word
-    // (group.errorCode) for a single-icon fail-render. Like the overlay it is a
-    // word-level property, but unlike the overlay it is TERMINAL: splitAt and
-    // mergeWithNext move glyphs across a group boundary, which would let the
-    // failed word's hidden base glyphs escape and render as valid (a silent
-    // un-fail, or silent loss of the absorbed word). So both NO-OP when a
-    // flagged group is involved; only replacing the whole group recovers it.
+  describe('when restructuring a fail-flagged (malformed-;; or multi-word-alias) word', () => {
+    // A malformed `;;` (non-trailing or repeated) OR an indicator bound to a
+    // multi-word alias flags the WHOLE word (group.errorCode) for a single-icon
+    // fail-render. Like the overlay it is a word-level property, but unlike the
+    // overlay it is TERMINAL: splitAt and mergeWithNext move glyphs across a
+    // group boundary, which would let the failed word's hidden base glyphs
+    // escape and render as valid (a silent un-fail, or silent loss of the
+    // absorbed word). So both NO-OP when a flagged group is involved, via a
+    // single generic guard keyed on group.errorCode (not on how the flag was
+    // set); only replacing the whole group recovers it.
     const malformedWarnings = (builder) =>
       builder.warnings.filter(w => w.code === 'MALFORMED_WORD_INDICATOR');
 
@@ -315,6 +318,23 @@ describe('ElementHandle word indicators under structural mutation', () => {
       b.replaceGroup(0, 'B291');
       expect(b.toString()).toBe('B291');
       expect(malformedWarnings(b)).toHaveLength(0);
+    });
+
+    it('no-ops splitAt and mergeWithNext on a multi-word-alias fail (same guard)', () => {
+      // An indicator bound to a multi-word alias sets the SAME group.errorCode as
+      // a malformed `;;`, so the generic guard protects it identically: the
+      // collapsed unit cannot be split back into the words it would have rendered.
+      BlissSVGBuilder.define({ _MW_FAIL: { codeString: 'B291//B313' } });
+      try {
+        const b = new BlissSVGBuilder('_MW_FAIL;B81');
+        b.group(0).splitAt(1);
+        b.group(0).mergeWithNext();
+        expect(b.toString()).toBe('_MW_FAIL;B81');
+        expect(b.stats.groupCount).toBe(1);
+        expect(malformedWarnings(b)).toHaveLength(1);
+      } finally {
+        BlissSVGBuilder.removeDefinition('_MW_FAIL');
+      }
     });
   });
 });
