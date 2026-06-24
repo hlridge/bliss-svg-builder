@@ -31,7 +31,7 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   expansion: fallback heuristics applied to the expanded glyph
  *   list, an explicit `^` carried inside a codeString, an outer `^`
  *   on a multi-character definition code dropping with
- *   `HEAD_MARKER_ON_WORD` (head-marker contract rule 1), and
+ *   `MISPLACED_HEAD_MARKER` (head-marker contract rule 1), and
  *   `MULTIPLE_HEAD_MARKERS` emission when a definition expands
  *   multiple `^` markers.
  * - The single-crown invariant: exactly one `isHeadGlyph: true` per
@@ -478,7 +478,7 @@ describe('BlissParser head-glyph marker', () => {
 
     it('drops an outer ^ marker on a multi-character definition and falls back to the heuristic', () => {
       // Head-marker contract rule 1: ^ attaches to characters. A marker on
-      // a multi-character alias is dropped with HEAD_MARKER_ON_WORD; the
+      // a multi-character alias is dropped with MISPLACED_HEAD_MARKER; the
       // automatic scan then skips the B486 exclusion and crowns B291.
       const r = BlissParser.parse('_C15B_WORD_SEMANTIC^');
       const glyphs = r.groups[0].glyphs;
@@ -488,7 +488,7 @@ describe('BlissParser head-glyph marker', () => {
       expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);
       expect(crownIndex('_C15B_WORD_SEMANTIC^')).toBe(1);
       expect(r._parseWarnings).toEqual([
-        expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' }),
+        expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' }),
       ]);
     });
 

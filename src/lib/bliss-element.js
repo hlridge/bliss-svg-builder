@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -354,7 +354,7 @@ export class BlissElement {
     if (this.#sharedOptions.keys) {
       if (this.#blissObj.key && this.#sharedOptions.keys.has(this.#key)) {
         this.#sharedOptions.warnings.push({
-          code: 'DUPLICATE_KEY',
+          code: WARNING_CODES.DUPLICATE_KEY,
           message: `Duplicate element key: "${this.#key}"`,
           source: this.#key,
         });
@@ -661,7 +661,7 @@ export class BlissElement {
             throw new Error(`Unable to create Bliss element: ${this.#blissObj.error || this.#blissObj.codeName || 'unknown'}`);
           }
           this.#sharedOptions.warnings.push({
-            code: 'COMPOSITE_AS_PART',
+            code: WARNING_CODES.COMPOSITE_AS_PART,
             message: this.#blissObj.error,
             source: this.#blissObj.codeName || 'unknown',
           });
@@ -677,14 +677,14 @@ export class BlissElement {
 
           if (this.#blissObj.errorCode === 'WORD_AS_PART') {
             this.#sharedOptions.warnings.push({
-              code: 'WORD_AS_PART',
+              code: WARNING_CODES.WORD_AS_PART,
               message: this.#blissObj.error,
               source: this.#blissObj.codeName || 'unknown',
             });
           } else {
             const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
             this.#sharedOptions.warnings.push({
-              code: 'UNKNOWN_CODE',
+              code: WARNING_CODES.UNKNOWN_CODE,
               message: `Unknown or invalid code: "${failedCode}"`,
               source: failedCode,
             });

@@ -6,13 +6,13 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Pins the head-marker (`^`) contract decided 2026-06-11: `^` belongs to
  * characters. The ten acceptance fixtures from
  * `.claude/backlog/head-marker-contract.md` land here verbatim, plus the
- * warning-exactness rules (HEAD_MARKER_ON_WORD for markers on
+ * warning-exactness rules (MISPLACED_HEAD_MARKER for markers on
  * multi-character aliases; MULTIPLE_HEAD_MARKERS only for two written
  * markers in the same word-string).
  *
  * Covers:
  * - Rule 1: `^` on a multi-character alias is dropped with a
- *   HEAD_MARKER_ON_WORD warning; `^` on a single-character alias behaves
+ *   MISPLACED_HEAD_MARKER warning; `^` on a single-character alias behaves
  *   exactly as a marker on that character.
  * - Rule 2: one head per word-string; a written marker outranks a dormant
  *   embedded designation regardless of order; dropped markers do not count
@@ -65,7 +65,7 @@ describe('BlissParser head-marker contract', () => {
       const r = BlissParser.parse('B291/B1103/_HMC_CD^');
 
       expect(markedIndexes(r)).toEqual([]);
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
       expect(crownOf('B291/B1103/_HMC_CD^')).toBe(0);
     });
 
@@ -73,7 +73,7 @@ describe('BlissParser head-marker contract', () => {
       const r = BlissParser.parse('B291/B1103/_HMC_CD^');
 
       expect(r._parseWarnings).toEqual([{
-        code: 'HEAD_MARKER_ON_WORD',
+        code: 'MISPLACED_HEAD_MARKER',
         message: 'Head marker (^) ignored on "_HMC_CD": it expands to multiple characters. Mark a single character instead.',
         source: '_HMC_CD',
       }]);
@@ -83,7 +83,7 @@ describe('BlissParser head-marker contract', () => {
       const r = BlissParser.parse('B291/B1103/_HMC_CDH^');
 
       expect(markedIndexes(r)).toEqual([]);
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
       expect(crownOf('B291/B1103/_HMC_CDH^')).toBe(0);
     });
 
@@ -94,7 +94,7 @@ describe('BlissParser head-marker contract', () => {
       // (B313, index 1) is now resolved at query time (R15 WS-4), not stamped.
       expect(markedIndexes(r)).toEqual([]);
       expect(crownOf('_HMC_XW^')).toBe(1);
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
     });
   });
 
@@ -153,7 +153,7 @@ describe('BlissParser head-marker contract', () => {
       const r = BlissParser.parse('_HMC_AH/_HMC_CD^');
 
       expect(markedIndexes(r)).toEqual([0]);
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
     });
   });
 
@@ -184,7 +184,7 @@ describe('BlissParser head-marker contract', () => {
       const r = BlissParser.parse('B291^/_HMC_CD^');
 
       expect(markedIndexes(r)).toEqual([0]);
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
     });
   });
 

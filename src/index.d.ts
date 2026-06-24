@@ -341,7 +341,7 @@ export declare class ElementHandle {
    * indicator or a detach-emptied glyph attaches the indicator (matching
    * `addPart`). A call that still cannot apply any indicator (the requested
    * codes are not indicators, or the target glyph is a space) adds an
-   * `INDICATOR_MUTATION_NOOP` warning to `warnings` instead of silently doing
+   * `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing
    * nothing.
    */
   applyIndicators(code: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
@@ -359,7 +359,7 @@ export declare class ElementHandle {
    *   the head glyph instead of leaving an overlay.
    *
    * On a glyph handle, a clear that finds no indicators to remove adds an
-   * `INDICATOR_MUTATION_NOOP` warning to `warnings`.
+   * `NOOP_INDICATOR_MUTATION` warning to `warnings`.
    */
   clearIndicators(opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
@@ -528,10 +528,30 @@ export interface BlissJSON {
 
 // --- Warnings ---
 
-/** A warning generated when the builder encounters an unknown or invalid code. */
+/**
+ * Every warning code the builder can emit. Mirrors the `WARNING_CODES` registry
+ * in `bliss-constants.js` (the runtime source of truth).
+ */
+export type WarningCode =
+  | 'MALFORMED_GLOBAL_OPTIONS'
+  | 'MALFORMED_GROUP_OPTIONS'
+  | 'MALFORMED_WORD_INDICATOR'
+  | 'MALFORMED_COORDINATES'
+  | 'MALFORMED_KERNING_VALUE'
+  | 'MISPLACED_HEAD_MARKER'
+  | 'MULTIPLE_HEAD_MARKERS'
+  | 'DUPLICATE_KEY'
+  | 'UNKNOWN_CODE'
+  | 'DROPPED_WORD_INDICATOR'
+  | 'UNSUPPORTED_TEXT_BLOCKS'
+  | 'NOOP_INDICATOR_MUTATION'
+  | 'COMPOSITE_AS_PART'
+  | 'WORD_AS_PART';
+
+/** A warning generated when the builder encounters a problem it can recover from. */
 export interface Warning {
-  /** Warning type identifier (e.g., 'UNKNOWN_CODE'). */
-  readonly code: string;
+  /** Warning type identifier (see `WarningCode`). */
+  readonly code: WarningCode;
   /** Human-readable description of the issue. */
   readonly message: string;
   /** The problematic DSL code that triggered the warning. */

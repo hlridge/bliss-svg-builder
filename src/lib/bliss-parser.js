@@ -16,7 +16,7 @@ import {
   buildWithSemantic,
   getBareCode
 } from "./indicator-utils.js";
-import { MAX_RECURSION_DEPTH } from "./bliss-constants.js";
+import { MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 
 export class BlissParser {
   static parse(codeStr, options) {
@@ -127,14 +127,14 @@ export class BlissParser {
     // {...} uses greedy match because text content must be able to contain any
     // characters, including literal `{` and `}`. The downside is that multiple
     // `{...}` blocks in one input collapse into a single match, which silently
-    // merges the glyphs between them. We emit MULTIPLE_TEXT_BLOCKS below to
+    // merges the glyphs between them. We emit UNSUPPORTED_TEXT_BLOCKS below to
     // make that visible. Proper multi-block support requires a stateful
     // tokenizer and ships with the {text} rendering feature
     // (see .claude/backlog/text-overlay.md).
     // [...] uses non-greedy match since it can appear multiple times.
     if ((inputString.match(/\{/g) || []).length > 1) {
       parseWarnings.push({
-        code: 'MULTIPLE_TEXT_BLOCKS',
+        code: WARNING_CODES.UNSUPPORTED_TEXT_BLOCKS,
         message: 'Multiple `{...}` blocks in one input are not supported by the current parser. Behavior is undefined until proper text-block tokenization ships. Use a single trailing `{text}` per group.',
         source: inputString,
       });
@@ -174,7 +174,7 @@ export class BlissParser {
       if (globalOptionsString && globalOptionsString.length > 0) {
         const restored = restorePlaceholders(globalOptionsString);
         parseWarnings.push({
-          code: 'INVALID_GLOBAL_OPTIONS',
+          code: WARNING_CODES.MALFORMED_GLOBAL_OPTIONS,
           message: `Invalid global options syntax: "${restored}||" - expected [options]|| format. Ignoring.`,
           source: restored,
         });
@@ -239,7 +239,7 @@ export class BlissParser {
         } else if (beforePipe.length > 0) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
           parseWarnings.push({
-            code: 'INVALID_GROUP_OPTIONS',
+            code: WARNING_CODES.MALFORMED_GROUP_OPTIONS,
             message: `Invalid group options syntax: "${restoredBeforePipe}|" - expected [options]| format. Ignoring.`,
             source: restoredBeforePipe
           });
@@ -336,7 +336,7 @@ export class BlissParser {
           const markerIndexes = parts.flatMap((p, i) => (p._marker ? [i] : []));
           for (const laterIndex of markerIndexes.slice(1)) {
             delete parts[laterIndex]._marker;
-            parseWarnings.push({ code: 'MULTIPLE_HEAD_MARKERS', message: `Multiple head markers (^) found in word: ${label}. Using first marked glyph.`, source: label });
+            parseWarnings.push({ code: WARNING_CODES.MULTIPLE_HEAD_MARKERS, message: `Multiple head markers (^) found in word: ${label}. Using first marked glyph.`, source: label });
           }
           if (markerIndexes.length > 0) {
             delete parts[markerIndexes[0]]._marker;
@@ -495,7 +495,7 @@ export class BlissParser {
           const isMalformed = str.match(/;;/g).length > 1 || rawIndicators.includes('/');
           if (isMalformed) {
             parseWarnings.push({
-              code: 'MALFORMED_WORD_INDICATOR',
+              code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
               message: `Malformed word-level indicator in "${str}": ;; indicators must be the trailing part of a word. Reading ;; as character-level ;.`,
               source: str,
             });
@@ -527,7 +527,7 @@ export class BlissParser {
               // stays byte-identical to mergeWithNext.
               const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
               parseWarnings.push({
-                code: 'DROPPED_WORD_INDICATOR',
+                code: WARNING_CODES.DROPPED_WORD_INDICATOR,
                 message: `An explicit word-level indicator overlay (${dropped}) collided with the leading glyph's promoted overlay. The word keeps only the first overlay.`,
                 source: dropped,
               });
@@ -555,7 +555,7 @@ export class BlissParser {
               parts[0]._marker = true;
             } else {
               parseWarnings.push({
-                code: 'HEAD_MARKER_ON_WORD',
+                code: WARNING_CODES.MISPLACED_HEAD_MARKER,
                 message: `Head marker (^) ignored on "${restorePlaceholders(str)}": it expands to multiple characters. Mark a single character instead.`,
                 source: restorePlaceholders(str),
               });
@@ -915,7 +915,7 @@ export class BlissParser {
             const { codes = [], stripSemantic } = _wordIndicators;
             const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
             parseWarnings.push({
-              code: 'DROPPED_WORD_INDICATOR',
+              code: WARNING_CODES.DROPPED_WORD_INDICATOR,
               message: `Composing glyphs into one word dropped a later glyph's word-level indicator overlay (${dropped}). The word keeps only the first glyph's overlay.`,
               source: dropped,
             });

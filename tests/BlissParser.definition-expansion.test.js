@@ -604,7 +604,7 @@ describe('BlissParser definition expansion', () => {
       expect(r.groups[2].glyphs[0].options).toBeUndefined();
       expect(Object.hasOwn(r.groups[2].glyphs[0], 'isHeadGlyph')).toBe(false);
       expect(r._parseWarnings).toEqual([
-        expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' }),
+        expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' }),
       ]);
     });
 

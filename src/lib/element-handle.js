@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { camelToKebab } from "./bliss-constants.js";
+import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators } from "./indicator-utils.js";
 
@@ -900,7 +900,7 @@ export class ElementHandle {
   // (survives #rebuild), not the parse `#warnings` (which resets each rebuild).
   #warnIndicatorNoop(message, source) {
     this.#ctx.addMutationWarning({
-      code: 'INDICATOR_MUTATION_NOOP',
+      code: WARNING_CODES.NOOP_INDICATOR_MUTATION,
       message,
       source,
     });
@@ -1100,7 +1100,7 @@ export class ElementHandle {
       const { codes = [], stripSemantic } = nextGroup.wordIndicators;
       const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
       this.#ctx.addMutationWarning({
-        code: 'DROPPED_WORD_INDICATOR',
+        code: WARNING_CODES.DROPPED_WORD_INDICATOR,
         message: `mergeWithNext() dropped the absorbed word's word-level indicator overlay (${dropped}). The merged word keeps only the first word's overlay.`,
         source: dropped,
       });

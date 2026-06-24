@@ -273,7 +273,7 @@ describe('BlissParser head-marker matrix', () => {
 
       expect(markedIndexes(r)).toEqual([1]);
       expect(r.groups[0].glyphs[0].options).toEqual({ color: 'red' });
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
     });
 
     it('drops a marker on a position-suffixed multi-character alias and keeps the position', () => {
@@ -281,7 +281,7 @@ describe('BlissParser head-marker matrix', () => {
 
       expect(markedIndexes(r)).toEqual([]);
       expect(r.groups[0].glyphs[0].parts[0].x).toBe(2);
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'HEAD_MARKER_ON_WORD' })]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
     });
   });
 

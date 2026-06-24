@@ -28,12 +28,12 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Glyph-level option regex anchored at start of the part (no
  *   mid-string extraction).
  * - Group option prefix before single |: bracketed form required,
- *   non-bracket prefixes warn INVALID_GROUP_OPTIONS without throwing,
+ *   non-bracket prefixes warn MALFORMED_GROUP_OPTIONS without throwing,
  *   empty | accepted as no options, text placeholders restored inside
  *   warning sources, prefix and suffix around an otherwise valid bracket
  *   block both rejected.
  * - Global option prefix before ||: bracketed form required, non-bracket
- *   prefixes warn INVALID_GLOBAL_OPTIONS without throwing, empty ||
+ *   prefixes warn MALFORMED_GLOBAL_OPTIONS without throwing, empty ||
  *   accepted as no options, text placeholders restored inside warning
  *   sources, prefix and suffix around an otherwise valid bracket block
  *   both rejected.
@@ -55,13 +55,13 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  */
 
 const invalidGroupOptionsWarning = source => ({
-  code: 'INVALID_GROUP_OPTIONS',
+  code: 'MALFORMED_GROUP_OPTIONS',
   message: `Invalid group options syntax: "${source}|" - expected [options]| format. Ignoring.`,
   source
 });
 
 const invalidGlobalOptionsWarning = source => ({
-  code: 'INVALID_GLOBAL_OPTIONS',
+  code: 'MALFORMED_GLOBAL_OPTIONS',
   message: `Invalid global options syntax: "${source}||" - expected [options]|| format. Ignoring.`,
   source
 });
@@ -372,7 +372,7 @@ describe('BlissParser bracket options', () => {
       const parsed = BlissParser.parse('bad[color=red]||B313');
 
       expect(parsed.options).toEqual({});
-      expect(parsed._parseWarnings?.[0]?.code).toBe('INVALID_GLOBAL_OPTIONS');
+      expect(parsed._parseWarnings?.[0]?.code).toBe('MALFORMED_GLOBAL_OPTIONS');
       // pins start-anchor strictness; killed line 174 start-anchor regex mutant in 2026-05 Stryker run.
     });
 
@@ -380,7 +380,7 @@ describe('BlissParser bracket options', () => {
       const parsed = BlissParser.parse('[color=red]bad||B313');
 
       expect(parsed.options).toEqual({});
-      expect(parsed._parseWarnings?.[0]?.code).toBe('INVALID_GLOBAL_OPTIONS');
+      expect(parsed._parseWarnings?.[0]?.code).toBe('MALFORMED_GLOBAL_OPTIONS');
       // pins end-anchor strictness; killed line 174 end-anchor regex mutant in 2026-05 Stryker run.
     });
   });

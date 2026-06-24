@@ -49,7 +49,7 @@ import { BlissSVGBuilder } from '../src/index';
  * - Visual regression of mutation-built vs DSL-built SVG output beyond the
  *   `svgCode` byte-for-byte parity tests, see
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
- * - The full INDICATOR_MUTATION_NOOP warning matrix across apply / clear /
+ * - The full NOOP_INDICATOR_MUTATION warning matrix across apply / clear /
  *   flatten no-op cases, see `ElementHandle.indicator-noop-warning.test.js`.
  */
 
@@ -231,13 +231,13 @@ describe('ElementHandle apply indicators', () => {
 
     // regression: burndown D4 (folds into R14). The surviving no-ops (an invalid
     // part pattern; a space glyph; an unrecognized code) still surface an
-    // INDICATOR_MUTATION_NOOP warning on the persistent mutation channel so a
+    // NOOP_INDICATOR_MUTATION warning on the persistent mutation channel so a
     // caller knows the call did nothing. The full warning matrix lives in
     // ElementHandle.indicator-noop-warning.test.js; this pins the named gate.
     it('warns on a surviving no-op (invalid pattern) instead of silently no-opping', () => {
       const b = new BlissSVGBuilder('B291;B86;B303');
       b.group(0).glyph(0).applyIndicators('B81');
-      const noop = b.warnings.filter(w => w.code === 'INDICATOR_MUTATION_NOOP');
+      const noop = b.warnings.filter(w => w.code === 'NOOP_INDICATOR_MUTATION');
       expect(noop).toHaveLength(1);
     });
   });

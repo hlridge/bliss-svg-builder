@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index';
 
 /**
- * Pins the INDICATOR_MUTATION_NOOP warning: applyIndicators / clearIndicators
+ * Pins the NOOP_INDICATOR_MUTATION warning: applyIndicators / clearIndicators
  * surface a warning (instead of silently no-opping) when the mutation cannot
  * apply or remove any indicator. The warning lives on the persistent mutation
  * channel, so it survives later rebuilds and reads through `warnings`.
@@ -41,7 +41,7 @@ import { BlissSVGBuilder } from '../src/index';
  */
 
 const noopWarnings = (builder) =>
-  builder.warnings.filter(w => w.code === 'INDICATOR_MUTATION_NOOP');
+  builder.warnings.filter(w => w.code === 'NOOP_INDICATOR_MUTATION');
 
 describe('ElementHandle indicator no-op warning', () => {
   describe('when applyIndicators is given no recognized indicator', () => {
@@ -50,7 +50,7 @@ describe('ElementHandle indicator no-op warning', () => {
       b.group(0).glyph(0).applyIndicators('B303');
       const w = noopWarnings(b);
       expect(w).toHaveLength(1);
-      expect(w[0].code).toBe('INDICATOR_MUTATION_NOOP');
+      expect(w[0].code).toBe('NOOP_INDICATOR_MUTATION');
       expect(w[0].source).toBe('B303');
       expect(w[0].message).toContain("applyIndicators('B303')");
     });

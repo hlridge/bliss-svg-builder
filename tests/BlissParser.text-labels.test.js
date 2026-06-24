@@ -5,7 +5,7 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * Pins the interim contract of the `{text}` placeholder pre-pass: a
  * single trailing `{...}` block per group is captured verbatim;
  * multiple `{...}` blocks (whether in one group or spread across `//`)
- * produce a `MULTIPLE_TEXT_BLOCKS` warning with documented-undefined
+ * produce a `UNSUPPORTED_TEXT_BLOCKS` warning with documented-undefined
  * parse behavior. The pre-pass uses a regex, so any nested `{` inside
  * a single block raises the same warning even though the content is
  * still preserved.
@@ -88,10 +88,10 @@ describe('BlissParser text-label placeholder pre-pass', () => {
       expect(result.groups[2].text).toBe(expectedText);
 
       // A nested `{` bumps the brace count, so the interim contract fires
-      // MULTIPLE_TEXT_BLOCKS (visible, not silent); the square-bracket row
+      // UNSUPPORTED_TEXT_BLOCKS (visible, not silent); the square-bracket row
       // has no nested brace and parses without a warning.
       if (expectsWarning) {
-        expect(result._parseWarnings?.[0]?.code).toBe('MULTIPLE_TEXT_BLOCKS');
+        expect(result._parseWarnings?.[0]?.code).toBe('UNSUPPORTED_TEXT_BLOCKS');
       } else {
         expect(result._parseWarnings).toBeUndefined();
       }
@@ -99,17 +99,17 @@ describe('BlissParser text-label placeholder pre-pass', () => {
   });
 
   describe('when the {text} content contains nested braces', () => {
-    it('preserves the nested characters and emits a MULTIPLE_TEXT_BLOCKS warning', () => {
+    it('preserves the nested characters and emits a UNSUPPORTED_TEXT_BLOCKS warning', () => {
       const r = BlissParser.parse('B313{hello {world} and [stuff]}');
       expect(r.groups[0].text).toBe('hello {world} and [stuff]');
       // Nested `{}` bumps the `{` count, so the warning fires too. That is
       // the documented trade-off of the interim contract: visible, not silent.
-      expect(r._parseWarnings?.[0]?.code).toBe('MULTIPLE_TEXT_BLOCKS');
+      expect(r._parseWarnings?.[0]?.code).toBe('UNSUPPORTED_TEXT_BLOCKS');
     });
   });
 
   describe('when the input has multiple {...} blocks (interim limitation)', () => {
-    it('emits a MULTIPLE_TEXT_BLOCKS warning when blocks live in different groups', () => {
+    it('emits a UNSUPPORTED_TEXT_BLOCKS warning when blocks live in different groups', () => {
       // Two `{` characters anywhere in the input, even split across groups,
       // currently means the greedy regex eats from the first `{` to the last
       // `}` and merges across the `//`. We flag this with a warning; the
@@ -117,12 +117,12 @@ describe('BlissParser text-label placeholder pre-pass', () => {
       // ships. When that lands, this test should flip to asserting per-group
       // text capture.
       const r = BlissParser.parse('B313{first}//B431{second}');
-      expect(r._parseWarnings?.[0]?.code).toBe('MULTIPLE_TEXT_BLOCKS');
+      expect(r._parseWarnings?.[0]?.code).toBe('UNSUPPORTED_TEXT_BLOCKS');
     });
 
-    it('emits a MULTIPLE_TEXT_BLOCKS warning when multiple blocks live in the same group', () => {
+    it('emits a UNSUPPORTED_TEXT_BLOCKS warning when multiple blocks live in the same group', () => {
       const r = BlissParser.parse('H/B313{a}/B313{b}');
-      const warning = r._parseWarnings?.find(w => w.code === 'MULTIPLE_TEXT_BLOCKS');
+      const warning = r._parseWarnings?.find(w => w.code === 'UNSUPPORTED_TEXT_BLOCKS');
       expect(warning).toBeDefined();
       expect(warning.message).toMatch(/not supported/i);
     });

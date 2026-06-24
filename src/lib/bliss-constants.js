@@ -140,6 +140,52 @@ export const INTERNAL_OPTIONS = new Set([
 export const DOT_WIDTH_MAX = 1.5;
 
 /**
+ * The complete warning-code vocabulary. Single source of truth: every warning
+ * emitted on `builder.warnings` references `WARNING_CODES.X` rather than an inline
+ * literal, so the set is typo-proof and discoverable in one place.
+ *
+ * Verb convention (see `.claude/plans/2026-06-24-warning-code-vocabulary-design.md`):
+ *   MALFORMED_   input did not parse in the required shape (a FORMAT failure;
+ *                INVALID_/OUT_OF_RANGE are reserved for future VALUE/range checks)
+ *   MISPLACED_   a well-formed token in the wrong position
+ *   MULTIPLE_    more than one where one is allowed (resolved by picking the first)
+ *   DUPLICATE_   the same identifier twice
+ *   UNKNOWN_     an unrecognized reference
+ *   DROPPED_     something discarded (first-wins / merge)
+ *   UNSUPPORTED_ valid, but not implemented yet
+ *   NOOP_        a mutation call had no effect
+ *   …_AS_PART    an illegal operand in a ;-part slot
+ *
+ * Structural attachment points use group/glyph/part (matches `toJSON()`); the
+ * linguistic indicator concepts use word/character (a word-indicator sets a
+ * word's part-of-speech; a space-group has none).
+ */
+export const WARNING_CODES = Object.freeze({
+  // malformed-syntax: input did not parse in the required shape
+  MALFORMED_GLOBAL_OPTIONS: 'MALFORMED_GLOBAL_OPTIONS',
+  MALFORMED_GROUP_OPTIONS: 'MALFORMED_GROUP_OPTIONS',
+  MALFORMED_WORD_INDICATOR: 'MALFORMED_WORD_INDICATOR',
+  MALFORMED_COORDINATES: 'MALFORMED_COORDINATES',
+  MALFORMED_KERNING_VALUE: 'MALFORMED_KERNING_VALUE',
+  // misplaced: a well-formed token in the wrong position
+  MISPLACED_HEAD_MARKER: 'MISPLACED_HEAD_MARKER',
+  // too-many / duplicate
+  MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
+  DUPLICATE_KEY: 'DUPLICATE_KEY',
+  // unrecognized reference
+  UNKNOWN_CODE: 'UNKNOWN_CODE',
+  // discarded
+  DROPPED_WORD_INDICATOR: 'DROPPED_WORD_INDICATOR',
+  // unsupported feature
+  UNSUPPORTED_TEXT_BLOCKS: 'UNSUPPORTED_TEXT_BLOCKS',
+  // no-op mutation
+  NOOP_INDICATOR_MUTATION: 'NOOP_INDICATOR_MUTATION',
+  // illegal operand in a ;-part slot (also used as an internal part.errorCode)
+  COMPOSITE_AS_PART: 'COMPOSITE_AS_PART',
+  WORD_AS_PART: 'WORD_AS_PART',
+});
+
+/**
  * Maps semantic indicator types to their root B-codes.
  * When overriding indicators, the semantic root is preserved by default
  * unless the new indicators include a semantic indicator or strip-semantic (!) is used.
