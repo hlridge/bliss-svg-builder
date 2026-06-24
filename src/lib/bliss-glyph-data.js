@@ -2947,6 +2947,7 @@ const glyphData = {
     codeString: "B92;SDOT:1.5,4",
     isIndicator: true,
     indicatorRole: 'adjectival',
+    anchorOffsetX: -0.5,
     width: 1.5,
     name: "INDICATOR PAST PERFECTIVE PARTICIPLE"
   },

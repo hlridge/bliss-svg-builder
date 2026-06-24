@@ -159,11 +159,13 @@ describe('BlissSVGBuilder dot sizing', () => {
       expect(svg).toContain('M1.833375,4a'); // dot centered at (2, 4)
     });
 
-    it('renders the B270-relocated B912 dot at SDOT size and original center', () => {
+    it('renders the B270-relocated B912 dot at SDOT size, shifted by its anchorOffsetX', () => {
       const svg = new BlissSVGBuilder('B291;B912').svgCode;
       expect(svg).toContain('stroke-width="0.33325"');
       expect(svg).not.toContain('stroke-width="0.4165"');
-      expect(svg).toContain('M4.583375,4a'); // dot centered at (4.75, 4)
+      // B912 carries anchorOffsetX:-0.5 (2026-06-24, matching B84); the dot sits at
+      // center 5.25 (was 4.75 before the offset). Negative offset shifts it right.
+      expect(svg).toContain('M5.083375,4a'); // dot centered at (5.25, 4)
     });
 
     it('shrinks the inherited B83 dot inside the composite B88', () => {
