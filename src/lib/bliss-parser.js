@@ -954,6 +954,21 @@ export class BlissParser {
           continue;
         }
 
+        // A kerning marker (RK:/AK:) whose value failed the grammar above is a
+        // malformed kerning value (RK:abc, RK:., RK:.5.5, RK:5e2, RK:). Warn and
+        // drop it — apply no kerning, leaving the next glyph unshifted — rather
+        // than letting it fall through as a misleading UNKNOWN_CODE. The ^ anchor
+        // keeps a real code that merely contains RK:/AK: (e.g. B86RK:abc) from
+        // being mis-read as kerning.
+        if (/^(RK|AK):/.test(part)) {
+          parseWarnings.push({
+            code: WARNING_CODES.MALFORMED_KERNING_VALUE,
+            message: `Malformed kerning value "${part}"; the marker is ignored.`,
+            source: part,
+          });
+          continue;
+        }
+
         if (pendingRelativeKerning !== undefined) {
           (glyphObj.options ??= {}).relativeKerning = pendingRelativeKerning;
           pendingRelativeKerning = undefined;

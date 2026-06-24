@@ -14,8 +14,10 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Decimal-only multi-digit RK values (RK:.55; pins the \.\d+ alternative
  *   quantifier).
  * - Bare RK defaulting to 0, both between glyphs and at the start of input.
- * - Malformed kerning falling through to general code parsing without
- *   silently emitting a kerning value.
+ * - A malformed kerning value (RK:/AK: followed by a non-number: RK:., RK:abc,
+ *   RK:.5.5, RK:5e2, RK:, AK:.) warns MALFORMED_KERNING_VALUE and applies no
+ *   kerning (the marker is dropped, the next glyph unshifted), rather than the
+ *   misleading UNKNOWN_CODE the general code parser would emit.
  * - Start-anchor on the kerning regex (`^(RK|AK)...$`): a glyph code that
  *   happens to end with `RK` or `AK` is treated as a code, not consumed
  *   as a trailing-anchored kerning instruction.
@@ -124,13 +126,35 @@ describe('BlissParser kerning', () => {
     });
   });
 
-  describe('when kerning syntax is malformed', () => {
-    // Inputs that do not match the kerning grammar. We don't pin the exact
-    // fallthrough behavior here (it routes to the general code parser);
-    // we just assert kerning is NOT silently emitted.
-    it.each(['RK:.', 'RK:abc', 'RK:.5.5', 'RK:5e2'])('does not emit kerning for %s', (dsl) => {
-      const glyphs = probe(dsl);
-      expect(glyphs[glyphs.length - 1].relativeKerning).toBeUndefined();
+  describe('when a kerning value is malformed', () => {
+    // A kerning marker (RK:/AK:) whose value is not a valid number is dropped
+    // with a MALFORMED_KERNING_VALUE warning; no kerning is applied (the next
+    // glyph is unshifted). This is a FORMAT error (the value didn't parse),
+    // distinct from a value/range error, so MALFORMED_ not INVALID_.
+    it.each(['RK:.', 'RK:abc', 'RK:.5.5', 'RK:5e2', 'RK:', 'AK:.', 'AK:abc'])(
+      'warns MALFORMED_KERNING_VALUE and applies no kerning for %s', (dsl) => {
+        const b = new BlissSVGBuilder(`B313/${dsl}/B1103`);
+        const glyphs = b.toJSON().groups[0].glyphs;
+        expect(glyphs).toHaveLength(2);
+        expect(glyphs[1].options?.relativeKerning).toBeUndefined();
+        expect(glyphs[1].options?.absoluteKerning).toBeUndefined();
+        expect(b.warnings.map(w => w.code)).toContain('MALFORMED_KERNING_VALUE');
+      });
+
+    it('names the malformed marker verbatim in the warning source', () => {
+      const w = new BlissSVGBuilder('B291/RK:abc/B291').warnings;
+      expect(w).toHaveLength(1);
+      expect(w[0].code).toBe('MALFORMED_KERNING_VALUE');
+      expect(w[0].source).toBe('RK:abc');
+    });
+
+    it('does not flag a code that merely contains RK:/AK: mid-token', () => {
+      // pins the ^ anchor on the malformed-kerning regex: B86RK:abc is a code
+      // (it does not START with RK:/AK:), so it must not be read as kerning.
+      for (const dsl of ['B86RK:abc', 'B86AK:abc']) {
+        const codes = new BlissSVGBuilder(`B313/${dsl}/B1103`).warnings.map(w => w.code);
+        expect(codes).not.toContain('MALFORMED_KERNING_VALUE');
+      }
     });
   });
 
