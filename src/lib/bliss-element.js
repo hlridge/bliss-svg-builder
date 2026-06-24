@@ -429,9 +429,36 @@ export class BlissElement {
         this.#blissObj = { glyphs: [this.#blissObj] };
       }
 
-      for (const glyph of this.#blissObj.glyphs) {
-        const child = new BlissElement(glyph, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
-        this.#children.push(child);
+      // Word/group-level fail-render: the L1 analogue of the L2 character
+      // placeholder. A group the parser flagged invalid (errorCode) -- e.g. a
+      // malformed word-level indicator, or an indicator bound to a multi-word
+      // alias -- records ONE warning for the whole word and collapses to a
+      // single error icon (error-placeholder on) or nothing (off), instead of
+      // expanding its glyphs. A malformed *word* property invalidates the word,
+      // not one character, so the failure lives at L1, not L2.
+      if (this.#blissObj.errorCode) {
+        if (!this.#sharedOptions?.warnings) {
+          throw new Error(`Unable to create Bliss element: ${this.#blissObj.error || this.#blissObj.errorCode}`);
+        }
+        this.#sharedOptions.warnings.push({
+          code: this.#blissObj.errorCode,
+          message: this.#blissObj.error,
+          source: this.#blissObj.errorSource,
+        });
+        if (this.#sharedOptions?.errorPlaceholder) {
+          // One placeholder character stands in for the whole failed word.
+          const placeholderChild = new BlissElement(
+            { parts: structuredClone(this.#sharedOptions.errorPlaceholderParts) },
+            { parentElement: this, level: this.#level + 1, sharedOptions: this.#sharedOptions }
+          );
+          this.#children.push(placeholderChild);
+        }
+        // error-placeholder off: leave #children empty (invisible word).
+      } else {
+        for (const glyph of this.#blissObj.glyphs) {
+          const child = new BlissElement(glyph, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
+          this.#children.push(child);
+        }
       }
 
 
@@ -492,6 +519,12 @@ export class BlissElement {
 
         return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
       };
+
+      if (this.#blissObj.errorCode && !this.#sharedOptions?.errorPlaceholder) {
+        // Invisible failed word takes zero space (mirrors the L2 character path).
+        this.#advanceX = 0;
+        this.getSvgContent = () => '';
+      }
     } else {
       if (this.#level === 2) {
         // Character level
