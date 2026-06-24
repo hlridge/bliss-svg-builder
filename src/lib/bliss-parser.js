@@ -607,17 +607,22 @@ export class BlissParser {
             hasMarker = true;
             str = str.slice(0, -1);
           }
-          // A head marker may also sit on the base code, immediately before the
-          // character's indicator separator (`BASE^;IND`). The `^` marks the
-          // whole CHARACTER (rule 1), wherever in the token it is written, so it
-          // is stripped here exactly like the trailing form (`BASE;IND^`).
-          // Without this it would be looked up as part of an unknown code (`B291^`)
-          // and the base would be silently dropped. Both forms can co-occur
-          // (`BASE^;IND^`); either presence sets the one marker.
+          // A head marker attaches to the END of a character, after its
+          // indicators (`B291;B81^`). A character includes its indicators, so a
+          // `^` written on the base before the indicator separator (`B291^;B81`)
+          // is MISPLACED -- not a synonym for the trailing form. Strip it so the
+          // base is not lost as an unknown code (`B291^`), but DROP it with a
+          // warning rather than honoring it (parallel to a `^` on a multi-
+          // character alias below); the user must write it at the character's end.
           const caretBeforeIndicator = str.match(/^(.*?)\^(;.*)$/);
           if (caretBeforeIndicator) {
-            hasMarker = true;
-            str = caretBeforeIndicator[1] + caretBeforeIndicator[2];
+            const cleaned = caretBeforeIndicator[1] + caretBeforeIndicator[2];
+            parseWarnings.push({
+              code: WARNING_CODES.MISPLACED_HEAD_MARKER,
+              message: `Head marker (^) ignored on "${restorePlaceholders(str)}": it must mark the end of a character, after its indicators (e.g. "${restorePlaceholders(cleaned)}^"), not the base before them.`,
+              source: restorePlaceholders(str),
+            });
+            str = cleaned;
           }
           const parts = expandSegment(str, definitions, isTopLevel, depth);
           if (hasMarker) {

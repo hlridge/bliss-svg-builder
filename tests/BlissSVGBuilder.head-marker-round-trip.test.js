@@ -110,19 +110,19 @@ describe('BlissSVGBuilder head-marker round-trip', () => {
     });
   });
 
-  describe('when ^ is written on the base before the character indicator', () => {
-    // `BASE^;IND` is accepted as marking the character (head-marker contract);
-    // export normalizes the marker to the canonical trailing position, so the
-    // output re-parses to the same crown.
-    it('omits the redundant ^ for a single-glyph word (B291^;B81 -> B291;B81)', () => {
+  describe('when ^ is misplaced on the base before the character indicator', () => {
+    // A ^ before the indicator (B291^;B81) is misplaced and dropped with a
+    // warning at parse; export omits it (the base and indicator survive, no
+    // crown), so the re-parsed output is clean.
+    it('drops the misplaced ^ on export (B291^;B81 -> B291;B81)', () => {
       expect(new BlissSVGBuilder('B291^;B81').toString()).toBe('B291;B81');
     });
 
-    it('re-emits ^ trailing on a non-default head (B291/B313^;B81 -> B291/B313;B81^)', () => {
+    it('drops the misplaced ^ in a multi-glyph word (B291/B313^;B81 -> B291/B313;B81)', () => {
       const b = new BlissSVGBuilder('B291/B313^;B81');
 
-      expect(b.toString()).toBe('B291/B313;B81^');
-      expect(markedIndexes(BlissParser.parse(b.toString()))).toEqual([1]);
+      expect(b.toString()).toBe('B291/B313;B81');
+      expect(markedIndexes(BlissParser.parse(b.toString()))).toEqual([]);
     });
   });
 });

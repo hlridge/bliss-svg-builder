@@ -198,40 +198,43 @@ describe('BlissParser head-marker contract', () => {
     });
   });
 
-  describe('when ^ sits on the base before the character indicator (rule 1)', () => {
-    // A character may carry indicators (B291;B81); the head marker belongs to the
-    // whole CHARACTER, so writing it on the base before the indicator separator
-    // (B291^;B81) marks that character, identical to the canonical trailing form
-    // (B291;B81^). Previously `B291^` was looked up as an unknown code and the
-    // base was SILENTLY dropped (parts became [null, B81]).
+  describe('when ^ is misplaced on the base before the character indicator (rule 1)', () => {
+    // A head marker attaches to the END of a character, after its indicators
+    // (B291;B81^). A character includes its indicators, so B291;B81 does not end
+    // after B291: writing the marker on the base before the indicator separator
+    // (B291^;B81) is MISPLACED, not a synonym for the trailing form. The marker
+    // is dropped with a MISPLACED_HEAD_MARKER warning (parallel to a ^ on a
+    // multi-character alias), but the base and indicator are preserved.
+    // Previously `B291^` was looked up as an unknown code and the base was
+    // SILENTLY dropped (parts became [null, B81]).
     const partsOf = (input) =>
       BlissParser.parse(input).groups[0].glyphs.map(g => g.parts.map(p => p.codeName));
-    const svgEq = (a, b) => new BlissSVGBuilder(a).svgCode === new BlissSVGBuilder(b).svgCode;
 
-    it('marks the character and keeps its base and indicator (B291^;B81)', () => {
+    it('preserves the base and indicator but drops the misplaced marker (B291^;B81)', () => {
+      const r = BlissParser.parse('B291^;B81');
+
       expect(partsOf('B291^;B81')).toEqual([['B291', 'B81']]);
-      expect(markedIndexes(BlissParser.parse('B291^;B81'))).toEqual([0]);
-      expect(BlissParser.parse('B291^;B81')._parseWarnings).toBeUndefined();
-      // pins the ^-before-; head marker; previously dropped the base to [null, B81].
+      expect(markedIndexes(r)).toEqual([]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
+      // pins drop+warn for a ^ before the indicator; previously the base was lost to [null, B81].
     });
 
-    it('resolves identically to the canonical trailing form (B291^;B81 == B291;B81^)', () => {
-      expect(partsOf('B291^;B81')).toEqual(partsOf('B291;B81^'));
-      expect(svgEq('B291^;B81', 'B291;B81^')).toBe(true);
+    it('names the offending token and points to the trailing form in the warning', () => {
+      const r = BlissParser.parse('B291^;B81');
+
+      expect(r._parseWarnings[0].source).toBe('B291^;B81');
+      expect(r._parseWarnings[0].message).toContain('B291;B81^');
     });
 
-    it('marks the correct glyph in a multi-glyph word (B291/B313^;B81)', () => {
+    it('does not crown a misplaced marker in a multi-glyph word (B291/B313^;B81)', () => {
+      // The marker is ignored, so the head falls back to the default (index 0),
+      // unlike the valid trailing form B291/B313;B81^ which crowns B313.
+      const r = BlissParser.parse('B291/B313^;B81');
+
       expect(partsOf('B291/B313^;B81')).toEqual([['B291'], ['B313', 'B81']]);
-      expect(markedIndexes(BlissParser.parse('B291/B313^;B81'))).toEqual([1]);
-      expect(svgEq('B291/B313^;B81', 'B291/B313;B81^')).toBe(true);
-    });
-
-    it('crowns an explicitly-marked exclusion before its indicator (B486^;B81/B313)', () => {
-      // Explicit ^ overrides the exclusion tier even when written before the
-      // character's indicator; equivalent to the trailing form B486;B81^.
-      expect(partsOf('B486^;B81/B313')).toEqual(partsOf('B486;B81^/B313'));
-      expect(markedIndexes(BlissParser.parse('B486^;B81/B313')))
-        .toEqual(markedIndexes(BlissParser.parse('B486;B81^/B313')));
+      expect(markedIndexes(r)).toEqual([]);
+      expect(markedIndexes(BlissParser.parse('B291/B313;B81^'))).toEqual([1]);
+      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
     });
   });
 });
