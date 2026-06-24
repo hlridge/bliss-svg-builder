@@ -102,6 +102,18 @@ export class BlissParser {
         y !== undefined && (part.y = Number(y));
       } else {
         part.error = `Invalid format: ${codeString}`;
+        // A recognizable code followed by a malformed coordinate suffix
+        // (B291:abc, B291:., B291:5,6,7) is a coordinate FORMAT error, not an
+        // unknown code: the code lexes fine, only the `:x,y` failed to parse.
+        // Tag it so the renderer surfaces MALFORMED_COORDINATES instead of the
+        // misleading UNKNOWN_CODE. The token is still dropped (invalid syntax is
+        // not carried forward); only the warning code differs. The syntax error
+        // is reported before semantics, so an unknown code with a bad suffix
+        // (ZZ:abc) is MALFORMED_COORDINATES too. The `:` (not `,`) is the
+        // trigger: it is the marker that says "a coordinate follows".
+        if (/^[a-zA-Z0-9À-ſͰ-ϿЀ-ӿ\-._]+:/.test(codeString)) {
+          part.errorCode = WARNING_CODES.MALFORMED_COORDINATES;
+        }
       }
     }
 

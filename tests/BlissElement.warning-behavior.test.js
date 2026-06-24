@@ -7,7 +7,8 @@ import { BlissElement } from '../src/lib/bliss-element.js';
  *
  * Covers:
  * - Caller-tagged path: a part with `errorCode` records that exact code
- *   and message verbatim (e.g., WORD_AS_PART supplied by the parser).
+ *   verbatim — WORD_AS_PART (source = the codeName) and MALFORMED_COORDINATES
+ *   (source = the parse-error message), both supplied by the parser.
  * - Fallback path: a part without `errorCode` records UNKNOWN_CODE; the
  *   source field reflects the codeName when present, the literal "unknown"
  *   when an empty composite is given, or the parse-error message when
@@ -47,6 +48,22 @@ describe('BlissElement warning behavior', () => {
         code: 'WORD_AS_PART',
         message: 'Multi-character text "ab" is a word and cannot be composed with ;',
         source: 'Xab'
+      }]);
+      expect(part.width).toBe(0);
+      expect(part.getSvgContent()).toBe('');
+    });
+
+    test('records MALFORMED_COORDINATES with the parse error as message and source', () => {
+      const shared = sharedOptions();
+      const part = new BlissElement({
+        error: 'Invalid format: B291:abc',
+        errorCode: 'MALFORMED_COORDINATES'
+      }, { level: 3, sharedOptions: shared });
+
+      expect(shared.warnings).toEqual([{
+        code: 'MALFORMED_COORDINATES',
+        message: 'Invalid format: B291:abc',
+        source: 'Invalid format: B291:abc'
       }]);
       expect(part.width).toBe(0);
       expect(part.getSvgContent()).toBe('');

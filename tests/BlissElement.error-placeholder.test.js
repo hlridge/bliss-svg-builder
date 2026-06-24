@@ -17,10 +17,11 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   trigger placeholder rendering; only warnings added during construction
  *   count toward the failure check.
  * - error-placeholder also activates on malformed-coordinate parse errors
- *   (e.g. B291:5,5,5), not only on unknown-code failures.
+ *   (e.g. B291:5,5,5, which warns MALFORMED_COORDINATES), not only on
+ *   unknown-code failures.
  *
  * Does NOT cover:
- * - WORD_AS_PART, UNKNOWN_CODE, and parse-error warning codes themselves,
+ * - WORD_AS_PART, UNKNOWN_CODE, MALFORMED_COORDINATES, and parse-error codes themselves,
  *   see `BlissSVGBuilder.word-as-part.test.js` and the forthcoming
  *   `BlissElement.warning-behavior.test.js`.
  * - Defensive option validation (prototype pollution, malformed keys),
@@ -61,14 +62,15 @@ describe('BlissElement error placeholder', () => {
     });
 
     test('activates the placeholder on a malformed-coordinate parse error (B291:5,5,5)', () => {
-      // The activation rule keys off any new warning during construction,
-      // not just UNKNOWN_CODE on a missing code. A parse error surfaced as
-      // an UNKNOWN_CODE wrapper around "Invalid format: ..." also counts.
+      // The activation rule keys off any new warning during construction, not
+      // just a missing code. A valid code with a malformed coordinate suffix
+      // fails the same way and surfaces as MALFORMED_COORDINATES, which also
+      // counts toward placeholder activation.
       const withPlaceholder = new BlissSVGBuilder('[error-placeholder]||B291:5,5,5');
       const withoutPlaceholder = new BlissSVGBuilder('B291:5,5,5');
 
       const warningMatcher = expect.objectContaining({
-        code: 'UNKNOWN_CODE',
+        code: 'MALFORMED_COORDINATES',
         message: expect.stringContaining('Invalid format: B291:5,5,5'),
       });
       expect(withPlaceholder.warnings).toEqual([warningMatcher]);

@@ -675,11 +675,20 @@ export class BlissElement {
             throw new Error(`Unable to create Bliss element: ${failedCode}`);
           }
 
-          if (this.#blissObj.errorCode === 'WORD_AS_PART') {
+          if (this.#blissObj.errorCode === WARNING_CODES.WORD_AS_PART) {
             this.#sharedOptions.warnings.push({
               code: WARNING_CODES.WORD_AS_PART,
               message: this.#blissObj.error,
               source: this.#blissObj.codeName || 'unknown',
+            });
+          } else if (this.#blissObj.errorCode === WARNING_CODES.MALFORMED_COORDINATES) {
+            // A valid code with a malformed coordinate suffix: the parser tagged
+            // it (parsePartString) so the warning names the coordinate, not the
+            // code. The token is still dropped (rendered invisible below).
+            this.#sharedOptions.warnings.push({
+              code: WARNING_CODES.MALFORMED_COORDINATES,
+              message: this.#blissObj.error,
+              source: this.#blissObj.error,
             });
           } else {
             const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
