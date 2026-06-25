@@ -12,6 +12,9 @@ tests/BlissSVGBuilder.visual-regression.e2e.cases.js
 # Ignore temporary Vite files
 *.timestamp-*.mjs
 
+# Throwaway tooling generators (not the tracked test suite)
+tests/*.tmp.mjs
+
 # Ignore temporary testing files but keep directory structure
 /temp/*
 !/temp/.gitkeep
