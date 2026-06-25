@@ -25,6 +25,11 @@ export default defineConfig({
     environment: 'node',
     root: '.',
     reporters: ['verbose'],
+    // Mirror the lib project's canvas cold-start allowance (vitest.config.js):
+    // the visual-comparison meta-test would otherwise time out in Stryker's
+    // dry run and abort the mutation run before it starts.
+    testTimeout: 30000,
+    hookTimeout: 30000,
     include: ['tests/**/*.{test,spec}.js'],
     exclude: [
       'node_modules',

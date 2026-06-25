@@ -36,6 +36,13 @@ export default defineConfig({
             'tests/**/*.dist.{test,spec}.js',
           ],
           name: 'lib',
+          // The lib project includes canvas-backed meta-tests
+          // (tests/visual-comparison.test.js) whose first render JIT-loads the
+          // node-canvas native module and can exceed vitest's 5s default on a
+          // cold start. Match the e2e project's allowance so a cold run is not
+          // spuriously red.
+          testTimeout: 30000,
+          hookTimeout: 30000,
         }
       },
       {
