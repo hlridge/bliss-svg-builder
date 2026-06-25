@@ -4,11 +4,6 @@ dist/
 # Dependencies
 node_modules/
 
-# Deferred: visual-regression corpus regeneration pending (tracked via GitHub).
-tests/reference-svgs/
-tests/BlissSVGBuilder.visual-regression.e2e.test.js
-tests/BlissSVGBuilder.visual-regression.e2e.cases.js
-
 # Ignore temporary Vite files
 *.timestamp-*.mjs
 

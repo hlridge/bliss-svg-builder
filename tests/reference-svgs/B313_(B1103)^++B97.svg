@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" data-generator="bliss-svg-builder" width="141" height="129" viewBox="-0.75 -0.75 23.5 21.5">
+  <g class="bliss-content" fill="none" stroke="#000000" stroke-linejoin="round" stroke-linecap="round" stroke-width="0.5">
+    <path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6M10,12h8M16,10l2,2M16,14l2,-2M14,12a4,4 0 1,1 8,0M14,12v4M14,16h8M22,12v4M17,4h2M17,6h2M17,4v2M19,4v2"/>
+  </g>
+</svg>

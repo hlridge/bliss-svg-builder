@@ -1,0 +1,6 @@
+# Visual-regression reference SVGs are written with LF newlines by the
+# regeneration engine (tests/regenerate-references.js). Pin them to LF so a
+# checkout matches the engine's output on every platform; otherwise an
+# autocrlf checkout rewrites them to CRLF and the engine sees spurious
+# byte-drift against the (LF) render on every --refresh-safe run.
+tests/reference-svgs/*.svg text eol=lf
