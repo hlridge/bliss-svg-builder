@@ -25,6 +25,17 @@ describe('ElementHandle.detach()', () => {
       expect(glyphs[0].parts).toHaveLength(0); // empty parts array
     });
 
+    it('does not re-emit an emptied glyph as a phantom code (round-trip fidelity)', () => {
+      // regression: N16 (R15 gap). Detaching the only part empties the glyph,
+      // but its cached single-code identity (codeName) lingered, so toString
+      // re-emitted the phantom "B291" while the render was empty, and the
+      // round-trip diverged. Mirrors insertPart's identity-clear.
+      const b = new BlissSVGBuilder('B291');
+      b.glyph(0).part(0).detach();
+      expect(b.toString()).not.toContain('B291'); // no phantom in the serialization
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode); // round-trips
+    });
+
     it('returns undefined', () => {
       const b = new BlissSVGBuilder('B291;B86');
       const result = b.glyph(0).part(1).detach();

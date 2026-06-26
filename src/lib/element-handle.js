@@ -541,6 +541,10 @@ export class ElementHandle {
       const partIndex = glyph.parts.indexOf(this.#nodeRef);
       if (partIndex < 0) return undefined;
       glyph.parts.splice(partIndex, 1);
+      // A glyph recomposed by part removal is no longer the single code it was
+      // parsed from; drop its cached identity so an emptied glyph does not
+      // re-emit a phantom codeName from toString (mirrors insertPart). N16.
+      this.#clearGlyphIdentity(glyph);
       this.#ctx.rebuild();
       return undefined;
     }
