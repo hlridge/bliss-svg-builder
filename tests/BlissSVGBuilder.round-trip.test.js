@@ -20,11 +20,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   custom-defined alias and composition codes, external glyphs and text
  *   fallback (XTXT_ path), multi-word/deep-composition edge cases, broader
  *   parameterized SVG-equivalence set, and { deep: true } toJSON.
- * - XTXT_ singleton isolation: rendering text-fallback codes does not pollute
- *   the global definitions registry, and two builders with different XTXT_
- *   inputs produce independent output.
+ * - XTXT_ text-fallback round-trip through toJSON (rendered-SVG identity).
  *
  * Does NOT cover:
+ * - XTXT_ singleton state-isolation (no global-registry leak, independent
+ *   builders); see `BlissSVGBuilder.text-fallback.test.js`.
  * - The toJSON() shape itself; see `BlissSVGBuilder.json-output.test.js`.
  * - The toString() output format; see `BlissSVGBuilder.string-output.test.js`.
  * - Element keys (which intentionally do not round-trip); see
@@ -32,7 +32,6 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Idempotency (same builder, repeated reads); see
  *   `BlissSVGBuilder.svg-code-idempotency.test.js`.
  */
-import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 describe('BlissSVGBuilder round-trip identity', () => {
 
@@ -365,22 +364,10 @@ describe('BlissSVGBuilder round-trip identity', () => {
     }
   });
 
-  describe('when XTXT_ inputs round-trip without polluting global state', () => {
-    it('rendering XTXT_ codes does not pollute global definitions', () => {
-      new BlissSVGBuilder('Xhéllo');
-      const xtxtKeys = Object.keys(blissElementDefinitions).filter(k => k.startsWith('XTXT_'));
-      expect(xtxtKeys).toHaveLength(0);
-    });
-
-    it('two builders with different XTXT_ codes produce correct independent output', () => {
-      const builder1 = new BlissSVGBuilder('Xhéllo');
-      const builder2 = new BlissSVGBuilder('Xwörld');
-      // Both should render without error and produce different SVG
-      expect(builder1.svgCode).toContain('<svg');
-      expect(builder2.svgCode).toContain('<svg');
-      expect(builder1.svgCode).not.toBe(builder2.svgCode);
-    });
-
+  describe('when XTXT_ inputs round-trip through toJSON', () => {
+    // XTXT_ singleton state-isolation (no global-registry leak, independent
+    // builders) moved to BlissSVGBuilder.text-fallback.test.js (T16); this
+    // keeps the round-trip-identity facet that belongs in this file.
     it('XTXT_ text fallback round-trips through JSON', () => {
       const original = new BlissSVGBuilder('Xhéllo');
       const roundTripped = new BlissSVGBuilder(original.toJSON());

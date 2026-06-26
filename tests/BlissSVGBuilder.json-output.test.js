@@ -16,7 +16,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Structural consistency: unpositioned codes and codes with explicit (0,0)
  *   positions produce equivalent parsed trees and identical SVG.
  * - Parsed-tree width invariants for /, //, ///, //// and explicit TSP/QSP
- *   space variants.
+ *   space variants (kept here as a structural parsed-tree invariant adjacent
+ *   to the JSON-shape pins, rather than split into the spacing file — decided
+ *   best-fit, low-stakes scope-stretch).
  *
  * Does NOT cover:
  * - Round-trip identity through toJSON (parse → toJSON → reconstruct →

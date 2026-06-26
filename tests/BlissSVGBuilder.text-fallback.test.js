@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { hasPathData, createTextFallbackGlyph } from '../src/lib/bliss-shape-creators.js';
 import { BlissSVGBuilder } from '../src/index.js';
+import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
  * Pins the text-fallback rendering path: characters with hardcoded SVG path
@@ -28,12 +29,14 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   silently dropped.
  * - Round-trip of partial-fallback inputs through `toJSON` preserves
  *   the rendered SVG byte-identically.
+ * - XTXT_ singleton isolation: rendering a text-fallback input does not
+ *   leak `XTXT_` keys into the global definitions registry, and two
+ *   builders with different XTXT_ inputs render independently.
  *
  * Does NOT cover:
- * - XTXT_ singleton isolation across builders (state-isolation across the
- *   global definitions registry), see
- *   `BlissSVGBuilder.round-trip.test.js` describe-path
- *   `... > when XTXT_ inputs round-trip without polluting global state`.
+ * - XTXT_ round-trip through `toJSON` (the rendered-SVG-identity contract),
+ *   see `BlissSVGBuilder.round-trip.test.js` describe-path
+ *   `... > when XTXT_ inputs round-trip through toJSON`.
  * - External glyph rendering for non-text X-codes (the canonical Xa
  *   single-char form is touched here as a regression check; the broader
  *   external-glyph contract lives in `BlissSVGBuilder.external-glyphs.test.js`).
@@ -268,5 +271,21 @@ describe('BlissSVGBuilder text fallback', () => {
     it.todo('renders Xḿ as a single text element since the base char lacks hardcoded data (m with acute)');
     it.todo('renders Xpiǎ as a single text element when one mid-word char lacks hardcoded data');
     it.todo('renders Xhello//Xpiǎ as paths for the hardcoded word and a single text element for the fallback word');
+  });
+
+  describe('when XTXT_ inputs are isolated from global state', () => {
+    it('does not leak XTXT_ keys into the global definitions registry', () => {
+      new BlissSVGBuilder('Xhéllo');
+      const xtxtKeys = Object.keys(blissElementDefinitions).filter(k => k.startsWith('XTXT_'));
+      expect(xtxtKeys).toHaveLength(0);
+    });
+
+    it('renders two builders with different XTXT_ inputs independently', () => {
+      const builder1 = new BlissSVGBuilder('Xhéllo');
+      const builder2 = new BlissSVGBuilder('Xwörld');
+      expect(builder1.svgCode).toContain('<svg');
+      expect(builder2.svgCode).toContain('<svg');
+      expect(builder1.svgCode).not.toBe(builder2.svgCode);
+    });
   });
 });

@@ -5,8 +5,7 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
 /**
  * Pins the geometric properties of a level-2 Bliss character built through
  * the parser → element pipeline: the isGlyph / isBlissGlyph /
- * isExternalGlyph identification flags, the default-mode height invariant
- * (every level-2 element reports height=20), the effectiveBounds content
+ * isExternalGlyph identification flags, the effectiveBounds content
  * extents, and the width / advanceX behaviour when the input carries
  * positive or negative x offsets.
  *
@@ -15,9 +14,6 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   isGlyph=true and isBlissGlyph=true; an external glyph (Xa) reports
  *   isGlyph=true and isExternalGlyph=true; a raw shape primitive (H)
  *   reports isGlyph=true and isBlissGlyph=false.
- * - Default-mode character height: every level-2 element reports
- *   height=20 (full grid) regardless of glyph kind: predefined glyphs,
- *   external glyphs, and raw shape primitives.
  * - effectiveBounds at level 2: predefined glyph (B291) reflects exact
  *   content extents (y∈[8,16]); external glyph (Xa) reflects approximate
  *   content extents (minY=11); two external glyphs sharing the
@@ -35,11 +31,11 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Snapshot-side level-derived booleans on the public API
  *   (`isGlyph` on a snapshot node), see
  *   `tests/BlissElement.taxonomy.test.js`.
- * - Level-2 height invariant for inline composites and indicators, see
- *   `tests/BlissSVGBuilder.character-height.test.js` (overlapping but
- *   non-redundant; character-height covers multi-part glyphs and
- *   indicators that this file does not, while this file covers external
- *   glyphs and raw shape primitives that character-height does not).
+ * - The level-2 default-mode height invariant (every character reports
+ *   height=20), now consolidated in its named home
+ *   `tests/BlissSVGBuilder.character-height.test.js` (which covers Bliss
+ *   glyphs, external glyphs, raw shapes, indicators, and multi-part
+ *   characters in one place).
  * - Visual regression of the rendered SVG, see
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
  */
@@ -74,33 +70,6 @@ describe('BlissSVGBuilder element bounds', () => {
       const character = getFirstCharacter('H');
       expect(character.isGlyph).toBe(true);
       expect(character.isBlissGlyph).toBe(false);
-    });
-  });
-
-  describe('when reading default-mode character height', () => {
-    it('reports height=20 for a Bliss glyph (B291)', () => {
-      const character = getFirstCharacter('B291');
-      expect(character.height).toBe(20);
-    });
-
-    it('reports height=20 for an external glyph (Xa)', () => {
-      const character = getFirstCharacter('Xa');
-      expect(character.height).toBe(20);
-    });
-
-    it('reports height=20 for the raw shape primitive H', () => {
-      const character = getFirstCharacter('H');
-      expect(character.height).toBe(20);
-    });
-
-    it('reports height=20 for the raw shape primitive S8', () => {
-      const character = getFirstCharacter('S8');
-      expect(character.height).toBe(20);
-    });
-
-    it('reports height=20 for the raw shape primitive C8', () => {
-      const character = getFirstCharacter('C8');
-      expect(character.height).toBe(20);
     });
   });
 

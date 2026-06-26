@@ -174,6 +174,14 @@ describe('BlissSVGBuilder shapes', () => {
   });
 
   describe('when auditing category coverage', () => {
+    // note: sample-based by design (accepted-by-design, burndown T19). Each
+    // category lists a few representative codes rather than the full set; an
+    // exhaustive enumeration would couple this test to the registry's exact
+    // size and churn on every shape addition. The registry-tour render test
+    // above ('when rendering every shape primitive') gives the exhaustive
+    // pass. Upgrade only if a real regression motivates it: assert a minimum
+    // cardinality per category (e.g. >= 6 vertical lines) to catch
+    // mass-deletion without churning on additions.
     const expectedCategories = [
       ['Special', ['ZSA']],
       ['Iconic', ['H', 'E', 'F']],

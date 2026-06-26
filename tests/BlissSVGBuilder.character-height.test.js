@@ -10,9 +10,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  * Covers:
  * - Predefined glyph (`B291`).
+ * - External glyph (`Xa`).
  * - Indicator (`B86`).
  * - Part-superimposed glyph and indicator (`B291;B86`).
- * - Shape (`H`).
+ * - Raw shape primitives (`H`, `S8`, `C8`).
  * - Part-superimposed shape and named shape (`H;DOT`).
  * - First character of a multi-character word (`B291/H`).
  *
@@ -21,6 +22,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.svg-structure.test.js`.
  * - Numeric dimensions on level-3 parts, see
  *   `ElementHandle.dimensions.test.js`.
+ * - Other level-2 geometry (isGlyph flags, effectiveBounds, x-offset
+ *   width / advanceX), see `BlissSVGBuilder.element-bounds.test.js`.
  */
 describe('BlissSVGBuilder character-height invariant', () => {
   const firstCharacter = (b) => b.elements.children[0].children.find(c => c.isGlyph);
@@ -28,9 +31,12 @@ describe('BlissSVGBuilder character-height invariant', () => {
   describe('when probing the first character of a snapshot tree', () => {
     it.each([
       ['B291',     'predefined glyph'],
+      ['Xa',       'external glyph'],
       ['B86',      'indicator'],
       ['B291;B86', 'part-superimposed glyph and indicator'],
       ['H',        'shape'],
+      ['S8',       'raw shape primitive'],
+      ['C8',       'raw shape primitive'],
       ['H;DOT',    'part-superimposed shape and named shape'],
       ['B291/H',   'first character of a multi-character word'],
     ])('reports height 20 for %s (%s)', (code) => {
