@@ -78,6 +78,13 @@ describe('BlissParser semantic indicator preservation', () => {
       glyphCode: 'SemTestNonSemanticChar',
       isBlissGlyph: true
     };
+    // Multi-glyph word whose marked head (B291) carries the semantic B97.
+    // B486 is an excluded modifier, so the head is the second glyph either way.
+    blissElementDefinitions['SemTestSemanticHeadWord'] = {
+      codeString: 'B486/B291;B97^',
+      glyphCode: 'SemTestSemanticHeadWord',
+      isBlissGlyph: true
+    };
   });
 
   afterAll(() => {
@@ -284,6 +291,21 @@ describe('BlissParser semantic indicator preservation', () => {
       const headGlyph = glyphs.find(g => g.isHeadGlyph) || glyphs[glyphs.length - 1];
       const partNames = headGlyph.parts.map(p => p.codeName);
       expect(partNames).not.toContain('B97');
+    });
+
+    it('does not double the semantic root when the replacement is itself semantic', () => {
+      // SemTestSemanticHeadWord = B486/B291;B97^: the head (B291) carries the
+      // semantic B97. Replacing with the (compound) semantic B98 must REPLACE
+      // B97, leaving exactly B291;B98 on the head, not a doubled B291;B97;B98.
+      // pins the (semanticRoot && !hasSemantic) gate on the multi-glyph
+      // WORD;IND reattach (parser L903); killed the ConditionalExpression->true
+      // and LogicalOperator &&->|| mutants in the 2026-06-26 Stryker run, both
+      // of which re-inject the old B97 -> B291;B97;B98.
+      const result = BlissParser.parse('SemTestSemanticHeadWord;B98');
+      const glyphs = result.groups[0].glyphs;
+
+      const headGlyph = glyphs.find(g => g.isHeadGlyph) || glyphs[glyphs.length - 1];
+      expect(headGlyph.parts.map(p => p.codeName)).toEqual(['B291', 'B98']);
     });
   });
 

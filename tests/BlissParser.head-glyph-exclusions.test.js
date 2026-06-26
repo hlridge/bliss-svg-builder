@@ -2,6 +2,7 @@ import { afterAll, describe, it, expect, beforeAll } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
+import { resolveHeadIndex } from '../src/lib/bliss-head-glyph-exclusions.js';
 
 /**
  * Pins BlissParser head-glyph fallback heuristics: which character of a
@@ -35,7 +36,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Low-priority semantics: B401 / B699 yield to non-excluded
  *   characters, yield to regular exclusions, and use last-position
  *   among themselves when alone.
- * - Absolute never-head B233 placement.
+ * - Absolute never-head B233 placement, including the all-never-head
+ *   tie-break (B233/B233 keeps the first character: a never-head code
+ *   never wins a same-tier tie).
  * - Conditional-exception B10/B4 vs B10/B208.
  * - Non-excluded first character keeps head designation regardless
  *   of suffix.
@@ -349,6 +352,26 @@ describe('BlissParser head-glyph exclusions', () => {
       // never-head rule only prevents B233 from outranking a real glyph, see
       // the B233/B401 and B233/B368 pins above.
       expect(getHeadGlyphIndex('B233;;B86')).toBe(0);
+    });
+  });
+
+  describe('when every character of the word is the never-head B233', () => {
+    // When all candidates share the lowest (never-head) priority tier, the
+    // tie-break keeps the FIRST character: a never-head code never wins a
+    // same-tier tie, so `best` stays at index 0 rather than sliding to the
+    // last same-tier candidate. B233 is the only never-head code, so B233/B233
+    // is the sole input that reaches this all-never-head tie-break.
+    it('keeps the first character as head for B233/B233', () => {
+      // pins the all-never-head tie-break in resolveHeadIndex (L248); killed
+      // the `>`->`>=` and the two `priority > 0`->true / >=0 mutants in the
+      // 2026-06-26 Stryker run, each of which slides best to the last index.
+      expect(resolveHeadIndex(['B233', 'B233'])).toBe(0);
+    });
+
+    it('attaches the indicator to the first B233 via the DSL', () => {
+      // Parity: the element-level query-time head scan (the public path) also
+      // resolves the head to index 0 for an all-B233 word.
+      expect(getHeadGlyphIndex('B233/B233;;B86')).toBe(0);
     });
   });
 

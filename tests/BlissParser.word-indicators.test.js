@@ -9,6 +9,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *
  * Covers:
  * - Basic ;-attachment to a head glyph across word expansion (TestWord1;B86).
+ * - Re-joining a multi-primitive-part head base with ';' when an indicator is
+ *   reattached (the head's base parts must stay separate, not fuse).
  * - Modifier-skipping fallback heuristics when the word has no explicit ^ marker.
  * - Alias-chain resolution (1-level, 3-level, 4-level).
  * - Indicator removal (WORD;) and replacement (WORD;NEW_IND).
@@ -161,6 +163,15 @@ describe('BlissParser word-indicator syntax', () => {
       isBlissGlyph: true
     };
 
+    // Word whose marked head is a bare alias resolving to a TWO-primitive-part
+    // base (no glyphCode), to exercise the multi-part head re-join on reattach.
+    blissElementDefinitions['_MultiPartBase'] = { codeString: 'S8:0,8;VL4:0,0' };
+    blissElementDefinitions['_WordMultiPartHead'] = {
+      codeString: 'B291/_MultiPartBase^',
+      glyphCode: '_WordMultiPartHead',
+      isBlissGlyph: true
+    };
+
   });
 
   afterAll(() => {
@@ -212,6 +223,26 @@ describe('BlissParser word-indicator syntax', () => {
 
       expect(result.groups[0].glyphs[2].parts[0].codeName).toBe('E');
       expect(result.groups[0].glyphs[2].parts.length).toBe(1);
+    });
+  });
+
+  describe('when the head glyph base has multiple primitive parts', () => {
+    // _WordMultiPartHead = B291/_MultiPartBase^ where _MultiPartBase resolves to
+    // 'S8:0,8;VL4:0,0': the marked head is a base of TWO primitive parts and no
+    // glyphCode. Reattaching an indicator must re-join those base parts with ';'
+    // so S8 and VL4 stay separate, rather than fusing into one malformed token.
+    it('re-joins the multi-part base with ; when attaching an indicator', () => {
+      // pins getBaseCode's nonIndicatorParts.join(';') on the WORD;IND head
+      // reattach (parser L461); killed the join(';')->join('') mutant in the
+      // 2026-06-26 Stryker run, which fuses S8:0,8 and VL4 into 'S8:0,8VL4'.
+      const result = BlissParser.parse('_WordMultiPartHead;B81');
+      const head = result.groups[0].glyphs.find(g => g.isHeadGlyph);
+      expect(head.parts.map(p => p.codeName)).toEqual(['S8', 'VL4', 'B81']);
+    });
+
+    it('emits no MALFORMED_COORDINATES warning for the re-joined base', () => {
+      const codes = new BlissSVGBuilder('_WordMultiPartHead;B81').warnings.map(w => w.code);
+      expect(codes).not.toContain('MALFORMED_COORDINATES');
     });
   });
 

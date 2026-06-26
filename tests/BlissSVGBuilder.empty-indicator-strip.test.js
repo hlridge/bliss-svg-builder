@@ -20,6 +20,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Stripping a baked-in indicator from a single-char alias.
  * - Stripping the head-glyph indicator from a multi-char alias.
  * - Part-level `;` vs word-level `;;` distinction in inline compositions.
+ * - Robustness tripwire: the empty-strip semantic scan excludes the base
+ *   segment, so a (synthetic) alias whose base is itself a semantic indicator
+ *   strips cleanly to one part instead of doubling a bogus semantic root.
  *
  * Does NOT cover:
  * - Stripping via the apply/clear ElementHandle API surface, see
@@ -47,6 +50,9 @@ describe('BlissSVGBuilder empty indicator strip', () => {
     SI:   { codeString: 'B291;B99' },       // single char with B99 as baked-in indicator
     MWI:  { codeString: 'B291;B99/B291' }, // multi-char: head has B99 indicator
     MWI2: { codeString: 'B291/B291;B99' }, // multi-char: head is plain
+    // SYNTHETIC (not valid Bliss): base segment is itself a bare semantic
+    // indicator (B97), used only to pin the base-exclusion invariant below.
+    BADBASE: { codeString: 'B97;B99' },
   };
 
   beforeAll(() => BlissSVGBuilder.define(TEST_DEFS));
@@ -181,6 +187,21 @@ describe('BlissSVGBuilder empty indicator strip', () => {
       expect(secondGlyph?.children?.length).toBe(2);
     });
 
+  });
+
+  describe('when the base of a synthetic alias is itself a bare semantic indicator (BADBASE = B97;B99)', () => {
+    // BADBASE is SYNTHETIC: no real Bliss character has a base segment that is
+    // itself a bare semantic indicator (every built-in with a semantic-indicator
+    // base is a compound indicator, gated out of this path). It exists only as a
+    // robustness tripwire for the empty-strip semantic scan.
+    it('strips BADBASE; to the single base part, not a doubled semantic root', () => {
+      // pins existingIndicatorCodes = codeStringParts.slice(1) on the strip path
+      // (parser L754); killed the .slice(1)->codeStringParts mutant in the
+      // 2026-06-26 Stryker run, which includes the B97 base in the semantic
+      // scan, finds it semantic, and preserves a bogus root -> B97;B97.
+      expect(warnings('BADBASE;')).toHaveLength(0);
+      expect(childCount('BADBASE;')).toBe(1);
+    });
   });
 
 });

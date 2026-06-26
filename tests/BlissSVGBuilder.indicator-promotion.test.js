@@ -20,6 +20,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - A semantic base+indicator alias: the semantic baked indicator is kept and
  *   the applied indicator still routes to the overlay.
  * - A clean-base alias is NOT promoted (stays plain `;`, no overlay).
+ * - Promotion requires EVERY applied code to be a real indicator: a mixed
+ *   applied list (real indicator + non-indicator primitive) appends at
+ *   character level instead.
+ * - Promotion requires the alias's baked tail to be all indicators: a tail
+ *   mixing an indicator and a non-indicator does not support replacement, so an
+ *   applied indicator appends at character level instead.
  * - A `!`-stripped applied indicator routes to a `;;!` overlay.
  * - Round-trip svg-identity for the promoted form.
  * - An indicator applied to a base+indicator alias in a multi-glyph word: the
@@ -53,6 +59,8 @@ describe('BlissSVGBuilder indicator promotion', () => {
     NOUN_BI: { codeString: 'B291;B81' }, // base + grammatical (verbal) indicator
     NOUN_S: { codeString: 'B291;B97' },  // base + semantic ('thing') indicator
     NOUN_B: { codeString: 'B291' },      // clean base, no baked indicator
+    GRAMBASE: { codeString: 'B291;B99' }, // base + indicator; gates promotion on the APPLIED list
+    MIXEDTAIL: { codeString: 'B291;B99;VL4' }, // tail mixes indicator (B99) + non-indicator (VL4)
   };
   const svg = (dsl) => new BlissSVGBuilder(dsl).svgCode;
 
@@ -107,6 +115,36 @@ describe('BlissSVGBuilder indicator promotion', () => {
     it('keeps the plain character-level ; and creates no overlay', () => {
       const b = new BlissSVGBuilder('NOUN_B;B97');
       expect(b.toString()).toBe('B291;B97');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+    });
+  });
+
+  describe('when not all applied indicators are real indicators', () => {
+    // GRAMBASE = 'B291;B99' is a base+indicator alias, but the applied list
+    // B81;VL4 mixes a real indicator (B81) with a non-indicator primitive
+    // (VL4). Promotion requires EVERY applied code to be a real indicator, so
+    // this appends at character level instead of routing to the ;; overlay.
+    it('appends at character level without creating an overlay', () => {
+      // pins inputIndicatorsAreReal's .every (parser L686); killed the .every->
+      // .some mutant in the 2026-06-26 Stryker run, which promotes when only
+      // SOME of the applied codes are real indicators.
+      const b = new BlissSVGBuilder('GRAMBASE;B81;VL4');
+      expect(b.toString()).toBe('B291;B99;B81;VL4');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+    });
+  });
+
+  describe('when the alias baked tail mixes indicator and non-indicator parts', () => {
+    // MIXEDTAIL = 'B291;B99;VL4': the codeString tail mixes an indicator (B99)
+    // and a non-indicator primitive (VL4), so the base does NOT support
+    // indicator replacement. Applying a real indicator appends at character
+    // level rather than promoting to the ;; overlay.
+    it('appends at character level without creating an overlay', () => {
+      // pins baseCodeSupportsReplacement's .every (parser L701); killed the
+      // .every->.some mutant in the 2026-06-26 Stryker run, which treats a tail
+      // with ANY indicator as replacement-capable and promotes.
+      const b = new BlissSVGBuilder('MIXEDTAIL;B81');
+      expect(b.toString()).toBe('B291;B99;VL4;B81');
       expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
     });
   });

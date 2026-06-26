@@ -21,6 +21,9 @@ import { BlissSVGBuilder } from '../src/index';
  * - Glyph-list edits that keep the group (addGlyph, removeGlyph, replaceGlyph)
  *   and head base-part edits (addPart) leave the overlay floating onto the
  *   current head, with no per-op overlay handling needed.
+ * - The head stamp (isHeadGlyph) itself re-resolves at query time after the
+ *   group-boundary mutations: mergeWithNext and removeGlyph re-derive which
+ *   glyph heads the word, independent of the overlay.
  * - A fail-flagged word (malformed-`;;` OR an indicator bound to a multi-word
  *   alias) is the terminal sibling of the overlay: splitAt and mergeWithNext
  *   NO-OP when a flagged group is involved (a failed word's hidden base glyphs
@@ -42,6 +45,14 @@ const overlay = (builder, groupIdx = 0) =>
 
 const dropWarnings = (builder) =>
   builder.warnings.filter(w => w.code === 'DROPPED_WORD_INDICATOR');
+
+// The re-derived head of a word, read from the query-time snapshot (an unmarked
+// word stores no `^`, so the head is recomputed from the live glyph list).
+const headGlyph = (builder, groupIdx = 0) => {
+  const glyphs = builder.snapshot().children[groupIdx].children.filter(c => c.isGlyph);
+  const idx = glyphs.findIndex(g => g.isHeadGlyph);
+  return { idx, codeName: glyphs[idx]?.codeName };
+};
 
 describe('ElementHandle word indicators under structural mutation', () => {
   describe('when splitting a word', () => {
@@ -275,6 +286,34 @@ describe('ElementHandle word indicators under structural mutation', () => {
       b.group(0).glyph(0).addPart('B331');
       expect(b.toString()).toBe('B313;B331/B1103;;B86');
       expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
+    });
+  });
+
+  describe('when a structural mutation changes which glyph heads the word', () => {
+    // The head is resolved at query time from the live glyph list (an unmarked
+    // word stores no `^`), so it re-derives every snapshot. These pin the
+    // re-derived isHeadGlyph stamp after the two group-boundary mutations,
+    // which the overlay tests above exercise only indirectly through toString /
+    // svgCode. Covers the head-re-resolution coverage gap surfaced by the
+    // 2026-06-26 Stryker triage (mergeWithNext / remove were unpinned).
+    it('re-resolves the head onto the non-excluded glyph after mergeWithNext', () => {
+      const b = new BlissSVGBuilder('B486//B291');
+      b.group(0).mergeWithNext();
+      expect(headGlyph(b)).toEqual({ idx: 1, codeName: 'B291' });
+    });
+
+    it('re-resolves the head onto the next candidate when the head glyph is removed', () => {
+      const b = new BlissSVGBuilder('B291/B313/B431');
+      b.group(0).removeGlyph(0);
+      expect(headGlyph(b)).toEqual({ idx: 0, codeName: 'B313' });
+    });
+
+    it('heads a lone excluded glyph left after removing the only non-excluded one', () => {
+      // B486 is a regular exclusion; once B291 (the non-excluded head) is
+      // removed, the sole survivor heads the word despite being an exclusion.
+      const b = new BlissSVGBuilder('B486/B291');
+      b.group(0).removeGlyph(1);
+      expect(headGlyph(b)).toEqual({ idx: 0, codeName: 'B486' });
     });
   });
 

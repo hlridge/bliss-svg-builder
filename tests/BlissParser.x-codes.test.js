@@ -23,7 +23,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   a longer code token (e.g. a custom code name) is NOT expanded,
  *   so the token can still be looked up as a definition.
  * - WORD_AS_PART error: multi-character X-text used as a ;-part
- *   carries the documented `errorCode` and message.
+ *   carries the documented `errorCode` and message, anchored start
+ *   (`^`) to end (`$`) so a code that merely contains `X<letters>`
+ *   mid-string, or an X-code whose suffix ends in a non-letter, is
+ *   NOT mis-flagged.
  *
  * Does NOT cover:
  * - XTXT_ fallback metadata propagation (isExternalGlyph / char
@@ -116,6 +119,22 @@ describe('BlissParser X-codes', () => {
       const part = r.groups[0].glyphs[0].parts[1];
       expect(part.error).toBe('Multi-character text "ab" is a word and cannot be composed with ;');
       expect(part.errorCode).toBe('WORD_AS_PART');
+    });
+
+    it('does not flag a ;-part code whose name merely contains X<letters> mid-string', () => {
+      // pins the ^ start-anchor on the WORD_AS_PART regex (parser L1127);
+      // without it, 'MAXWELL' matches the trailing 'XWELL' and is mis-flagged
+      // as a word. Killed the ^-drop mutant in the 2026-06-26 Stryker run.
+      const r = BlissParser.parse('B291;MAXWELL');
+      expect(r.groups[0].glyphs[0].parts[1].errorCode).not.toBe('WORD_AS_PART');
+    });
+
+    it('does not flag an X-code whose suffix ends in a non-letter', () => {
+      // pins the $ end-anchor on the WORD_AS_PART regex (parser L1127); without
+      // it, 'Xhello9' matches the 'Xhello' prefix and is mis-flagged. Killed the
+      // $-drop mutant in the 2026-06-26 Stryker run.
+      const r = BlissParser.parse('B291;Xhello9');
+      expect(r.groups[0].glyphs[0].parts[1].errorCode).not.toBe('WORD_AS_PART');
     });
   });
 });
