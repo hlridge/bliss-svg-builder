@@ -119,7 +119,7 @@ Use a **glyph** (`type: 'glyph'`) when you're defining a proper Bliss character 
 
 ### Character Properties
 
-Most glyphs only need `type` and `codeString`. Some characters use `anchorOffsetX` and `anchorOffsetY` to adjust their anchor point in compositions. Indicators need additional properties like `isIndicator` and `width`. See the [API Documentation](/reference/api-documentation#define-definitions-options) for all available properties.
+Most glyphs only need `type` and `codeString`. Some characters use `anchorOffsetX` and `anchorOffsetY` to adjust their anchor point in compositions. Indicators need additional properties like `isIndicator` and `width`. See the [API Documentation](/reference/api-documentation#define-definitions-options) for all available properties, and [Metadata propagation](/reference/api-documentation#metadata-propagation) for how each field shows up in parser output, rendering, serialization, and handles.
 
 ## Shapes
 

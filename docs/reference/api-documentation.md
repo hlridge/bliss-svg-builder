@@ -1118,6 +1118,55 @@ For adding characters from external font systems. Requires providing your own SV
 - Has `getPath` + `char` → external glyph
 - Has `getPath` (no `char`) → shape
 
+### Metadata propagation
+
+The fields above are the input surface. This is how each one shows up (or
+doesn't) once a custom code is used, across the four observable surfaces:
+parser output (`toJSON()`), rendering (`svgCode`), serialization
+(`toString()`), and handles/snapshot nodes.
+
+| Field | Affects | Surfaced as |
+|-------|---------|-------------|
+| `codeString` | parser, rendering, serialization | the composition; a non-glyph code decomposes to it on export, a `type: 'glyph'` keeps its name in the tree but still decomposes on export |
+| `getPath` / `width` / `height` | rendering, measurements | path geometry and `width`/`height`/`bounds` on snapshot nodes and handles |
+| `anchorOffsetX` / `anchorOffsetY` | rendering (composition) | the anchor point an applied indicator positions against |
+| `isIndicator: true` | parser (part-merge, head-glyph exclusion, `;`→`;;` promotion) | `indicatorKind` / `indicatorLevel` on the resolved part; an `isIndicator` glyph is an atomic indicator unit |
+| `char` | rendering (text path) | the rendered Unicode character on the snapshot node's `.char` (external glyphs) |
+| `kerningRules` | rendering | inter-glyph positions only (no field on the tree) |
+| `shrinksPrecedingWordSpace: true` | rendering (spacing) | the auto-shrunk word space before the glyph |
+| `defaultOptions` | rendering | merged into the element's options at construction; any per-element option overrides it |
+
+Public output surface: the handle/snapshot booleans `.isGlyph`,
+`.isBlissGlyph`, `.isExternalGlyph`, `.isIndicator`, plus `.codeName`,
+`.char`, `indicatorKind`, and `indicatorLevel` (see the [Element
+API](#element-api)). The input field names that begin with `is…` are the
+input form; read them back through these accessors, not by reaching into a
+definition object.
+
+**Falsey flags are omitted from parsed output.** A flag set `false` (or left
+off) does not appear as a key on `toJSON()` — only truthy flags are emitted, so
+a missing `isIndicator` and `isIndicator: false` are equivalent. Don't test for
+a flag's absence as if it carried meaning.
+
+```js
+// Composite character: identity is kept in the tree, decomposed on export.
+BlissSVGBuilder.define({ SMILEY: { type: 'glyph', codeString: 'C8:0,8;DOT:2,11' } });
+const b = new BlissSVGBuilder('B313/SMILEY');
+b.glyph(1).codeName;   // 'SMILEY'  (handle keeps the name)
+b.toString();          // 'B313/C8:0,8;DOT:2,11'  (export decomposes)
+new BlissSVGBuilder('SMILEY').toJSON().groups[0].glyphs[0];
+// { parts: [...], isBlissGlyph: true, codeName: 'SMILEY' }  — no isIndicator key (falsey, omitted)
+
+// External glyph: char surfaces on the snapshot node.
+const x = new BlissSVGBuilder('Xa').snapshot().children[0].children[0];
+x.char;             // 'a'
+x.isExternalGlyph;  // true
+```
+
+These describe the current behavior. `define()` validates references and
+rejects cycles, but does not validate option *values* or coordinate ranges —
+do not rely on the definition API for that.
+
 ### Options
 
 | Option | Default | Description |
