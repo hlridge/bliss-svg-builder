@@ -8,7 +8,14 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  * Covers:
  * - Top-level shape: groups, glyphs, parts, options, text labels, space groups.
- * - Part-level fields: codeName (user-level B-code identity), x, y, isIndicator, width, options.
+ * - Part-level fields: codeName (user-level B-code identity), x, y, isIndicator
+ *   and width (indicator parts only), options.
+ * - Default output omits definition-derived metadata (glyph isBlissGlyph/
+ *   isExternalGlyph/char/kerningRules and part anchorOffsetX/Y); it is fully
+ *   re-derived from the code on reconstruction, so object round-trips render
+ *   identically and external-glyph navigation/spacing survives. { deep: true }
+ *   retains the metadata for toString()/merge().
+ * - Boolean option values (grid/center/error-placeholder) round-trip as booleans.
  * - Default toJSON() strips nested parts; { deep: true } preserves them.
  * - Constructor accepts a string or a toJSON() object as input.
  * - JSON input with unknown or unresolvable codeName produces a UNKNOWN_CODE
@@ -292,6 +299,70 @@ describe('BlissSVGBuilder JSON output', () => {
       const json = new BlissSVGBuilder('B313').toJSON();
       const part = json.groups[0].glyphs[0].parts[0];
       expect(part.parts).toBeUndefined();
+    });
+  });
+
+  describe('when default toJSON omits definition-derived metadata', () => {
+    it('drops glyph isBlissGlyph, isExternalGlyph, char, and kerningRules', () => {
+      const glyph = new BlissSVGBuilder('Xa').toJSON().groups[0].glyphs[0];
+
+      expect(glyph.isExternalGlyph).toBeUndefined();
+      expect(glyph.isBlissGlyph).toBeUndefined();
+      expect(glyph.char).toBeUndefined();
+      expect(glyph.kerningRules).toBeUndefined();
+      expect(glyph.codeName).toBe('Xa');
+    });
+
+    it('drops anchorOffsetX and anchorOffsetY from parts', () => {
+      // B109 carries a nonzero anchorOffsetX in its definition
+      const part = new BlissSVGBuilder('B109;B99').toJSON().groups[0].glyphs[0].parts[0];
+
+      expect(part.codeName).toBe('B109');
+      expect(part.anchorOffsetX).toBeUndefined();
+      expect(part.anchorOffsetY).toBeUndefined();
+    });
+
+    it('retains the metadata under deep mode', () => {
+      const glyph = new BlissSVGBuilder('Xa').toJSON({ deep: true }).groups[0].glyphs[0];
+
+      expect(glyph.isExternalGlyph).toBe(true);
+      expect(glyph.char).toBe('a');
+      expect(glyph.parts[0]).toBeDefined();
+    });
+
+    it('re-derives glyph metadata on reconstruction so navigation survives', () => {
+      // char/isExternalGlyph are dropped from output but re-derived from the
+      // code on reconstruction, so the navigation getters still report them.
+      const rebuilt = new BlissSVGBuilder(new BlissSVGBuilder('Xα').toJSON());
+
+      expect(rebuilt.glyph(0).char).toBe('α');
+      expect(rebuilt.glyph(0).isExternalGlyph).toBe(true);
+    });
+
+    it('round-trips adjacent external glyph spacing through default output', () => {
+      // isExternalGlyph drives inter-external-glyph spacing; it is re-derived on
+      // reconstruction, so an object round-trip renders identically
+      // (regression: stripping it without re-derivation widened the output).
+      const orig = new BlissSVGBuilder('Xa/Xb/Xc');
+      const rebuilt = new BlissSVGBuilder(orig.toJSON());
+
+      expect(rebuilt.svgCode).toBe(orig.svgCode);
+    });
+
+    it('round-trips multi-character text-fallback spacing', () => {
+      const orig = new BlissSVGBuilder('Xhello');
+      const rebuilt = new BlissSVGBuilder(orig.toJSON());
+
+      expect(rebuilt.svgCode).toBe(orig.svgCode);
+    });
+  });
+
+  describe('when serializing boolean option values', () => {
+    it('keeps boolean option values as booleans, not strings', () => {
+      const json = new BlissSVGBuilder('[grid;center]||B291').toJSON();
+
+      expect(json.options.grid).toBe(true);
+      expect(json.options.center).toBe(true);
     });
   });
 

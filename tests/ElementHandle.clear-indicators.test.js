@@ -86,7 +86,8 @@ describe('ElementHandle clear indicators', () => {
     it('restores glyph identity once the cleared part list matches a known bare glyph', () => {
       const b = new BlissSVGBuilder('B291;B86');
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
-      expect(b.toJSON().groups[0].glyphs[0].isBlissGlyph).toBe(true);
+      // isBlissGlyph is live identity (read from the handle); toJSON omits it
+      expect(b.group(0).glyph(0).isBlissGlyph).toBe(true);
       expect(b.toJSON().groups[0].glyphs[0].codeName).toBe('B291');
       // pins the zero-offset boundary of the relocation re-emit (R15 Task 3):
       // a restored built-in with no offset stays bare, never B291:0,0.

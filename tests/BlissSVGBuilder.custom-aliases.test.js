@@ -44,10 +44,10 @@ describe('BlissSVGBuilder custom aliases', () => {
   describe('when defining a single-glyph alias', () => {
     it('resolves to the target B-code in the element tree', () => {
       defineAndTrack({ 'LOVE': { codeString: 'B431' } });
-      const json = new BlissSVGBuilder('LOVE').toJSON();
-      const glyph = json.groups[0].glyphs[0];
-      expect(glyph.codeName).toBe('B431');
-      expect(glyph.isBlissGlyph).toBe(true);
+      const b = new BlissSVGBuilder('LOVE');
+      expect(b.toJSON().groups[0].glyphs[0].codeName).toBe('B431');
+      // isBlissGlyph is live identity, read from the handle (toJSON omits it)
+      expect(b.group(0).glyph(0).isBlissGlyph).toBe(true);
     });
 
     it('serializes via toString to the target B-code', () => {

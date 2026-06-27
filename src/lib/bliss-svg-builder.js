@@ -1144,6 +1144,11 @@ class BlissSVGBuilder {
           glyph.glyphCode = BlissSVGBuilder.#textFallbackInternalForm(glyph.codeName);
           delete glyph.codeName;
         }
+        // Re-derive glyph-classification metadata that toJSON() omits (it is
+        // fully derived from the code, not authored). The element reads these
+        // directly and they round-trip external-glyph navigation/spacing, so
+        // restore them from the resolved code the same way the parser does.
+        BlissSVGBuilder.#reapplyGlyphMetadata(glyph);
         if (glyph.parts) BlissSVGBuilder.#normalizePartCodes(glyph.parts);
       }
     }
@@ -1166,6 +1171,30 @@ class BlissSVGBuilder {
     if (code.length < 2 || code[0] !== 'X') return code;
     if (blissElementDefinitions[code]) return code;
     return 'XTXT_' + code.slice(1);
+  }
+
+  // Re-derive glyph-classification metadata (isBlissGlyph / isExternalGlyph /
+  // char / kerningRules) from a glyph's resolved glyphCode. toJSON() omits these
+  // (they are pure derived data, not authored composition), so object input must
+  // restore them like the parser does on string input: a registered code copies
+  // them from its definition; a text-fallback 'XTXT_<chars>' derives them (a
+  // single char is that rendered glyph, multi-char is '' since it is text, not
+  // one glyph). A composite (no glyphCode) carries no glyph-level identity.
+  static #reapplyGlyphMetadata(glyph) {
+    const code = glyph.glyphCode;
+    if (!code) return;
+    const def = blissElementDefinitions[code];
+    if (def) {
+      if (def.isBlissGlyph) glyph.isBlissGlyph = true;
+      if (def.isExternalGlyph) glyph.isExternalGlyph = true;
+      if (typeof def.char === 'string') glyph.char = def.char;
+      if (def.kerningRules) glyph.kerningRules = def.kerningRules;
+    } else if (code.startsWith('XTXT_')) {
+      const chars = code.slice(5);
+      glyph.isExternalGlyph = true;
+      glyph.char = chars.length === 1 ? chars : '';
+      glyph.kerningRules = {};
+    }
   }
 
   /**
@@ -1502,6 +1531,13 @@ class BlissSVGBuilder {
           if (part.codeName?.startsWith('XTXT_')) {
             part.codeName = 'X' + part.codeName.slice(5);
           }
+          // Default output drops definition-derived anchor metadata the renderer
+          // recomputes from the code; isIndicator/width stay (a documented part of
+          // the default shape). deep output keeps everything for toString()/merge().
+          if (!options.deep) {
+            delete part.anchorOffsetX;
+            delete part.anchorOffsetY;
+          }
           if (options.deep && part.parts) {
             stripParts(part.parts);
           } else {
@@ -1567,6 +1603,17 @@ class BlissSVGBuilder {
               delete glyph.glyphCode;
             }
             // Parts already use codeName internally, no rename needed
+
+            // Default output omits glyph-classification metadata: it is fully
+            // derived from the code and re-derived on reconstruction (see
+            // #reapplyGlyphMetadata), so it is not user-authored composition data.
+            // deep output keeps it for toString()/merge(). (issue #28 toJSON audit)
+            if (!options.deep) {
+              delete glyph.char;
+              delete glyph.isBlissGlyph;
+              delete glyph.isExternalGlyph;
+              delete glyph.kerningRules;
+            }
           }
         }
       }

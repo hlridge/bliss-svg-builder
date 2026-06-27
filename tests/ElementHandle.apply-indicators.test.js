@@ -102,11 +102,12 @@ describe('ElementHandle apply indicators', () => {
     });
 
     it('clears glyph identity once indicators are added', () => {
+      // isBlissGlyph is live identity (read from the handle); toJSON omits it
       const b = new BlissSVGBuilder('B291');
-      expect(b.toJSON().groups[0].glyphs[0].isBlissGlyph).toBe(true);
+      expect(b.group(0).glyph(0).isBlissGlyph).toBe(true);
       b.group(0).glyph(0).applyIndicators('B86');
       // Should no longer be identified as a bare glyph
-      expect(b.toJSON().groups[0].glyphs[0].isBlissGlyph).toBeUndefined();
+      expect(b.group(0).glyph(0).isBlissGlyph).toBe(false);
     });
   });
 

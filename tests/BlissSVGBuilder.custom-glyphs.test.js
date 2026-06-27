@@ -68,8 +68,8 @@ describe('BlissSVGBuilder custom glyphs', () => {
 
     it('reports isBlissGlyph as true on a shape-backed custom glyph', () => {
       defineAndTrack({ 'MYGLYPH': { type: 'glyph', codeString: 'H:0,8' } });
-      const json = new BlissSVGBuilder('MYGLYPH').toJSON();
-      const glyph = json.groups[0].glyphs[0];
+      // isBlissGlyph is live identity, read from the handle (toJSON omits it)
+      const glyph = new BlissSVGBuilder('MYGLYPH').group(0).glyph(0);
       expect(glyph.isBlissGlyph).toBe(true);
     });
 

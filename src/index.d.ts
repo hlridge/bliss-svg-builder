@@ -500,11 +500,20 @@ export interface DefinitionMetadata {
 
 // --- Serialization output ---
 
-/** Normalized parsed structure returned by `toJSON()`. */
+/**
+ * Normalized parsed structure returned by `toJSON()`. Describes the default
+ * (authoring) shape: the composition the user wrote, plus `isIndicator`/`width`
+ * on indicator parts. Definition-derived metadata
+ * (`isBlissGlyph`/`isExternalGlyph`/`char`/`kerningRules` and part
+ * `anchorOffsetX`/`anchorOffsetY`) is omitted — it is fully re-derived from the
+ * code when this object is passed back to the constructor. `{ deep: true }`
+ * retains that metadata plus nested sub-parts for `toString()`/`merge()`; those
+ * extra fields are not part of this type.
+ */
 export interface BlissJSON {
   options?: Record<string, string>;
   groups: Array<{
-    options?: Record<string, string>;
+    options?: Record<string, string | boolean>;
     /**
      * Word-level fail-render flag: set when the parser rejects the whole word
      * (e.g. a malformed `;;` indicator that is not the trailing part of the
@@ -524,11 +533,15 @@ export interface BlissJSON {
     wordIndicators?: { codes: string[]; stripSemantic: boolean };
     glyphs?: Array<{
       codeName?: string;
-      options?: Record<string, string>;
+      options?: Record<string, string | boolean>;
       isHeadGlyph?: boolean;
       parts?: Array<{
         codeName: string;
-        options?: Record<string, string>;
+        options?: Record<string, string | boolean>;
+        /** Present (true) only on an indicator part. */
+        isIndicator?: boolean;
+        /** Rendered indicator width; present only on an indicator part. */
+        width?: number;
         x?: number;
         y?: number;
         parts?: Array<any>;
@@ -712,6 +725,11 @@ export declare class BlissSVGBuilder {
    *
    * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
    * omits the `wordIndicators` field (see `toString`).
+   *
+   * `deep` keeps nested sub-parts and all definition-derived metadata (consumed
+   * by `toString()`/`merge()`); the default output omits those (they are
+   * re-derived from the code on reconstruction) and is the authoring shape
+   * described by {@link BlissJSON}.
    */
   toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean }): BlissJSON;
 
