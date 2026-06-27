@@ -2431,6 +2431,11 @@ class BlissSVGBuilder {
       'stroke-width': strokeWidth,
     };
     const contentAttrs = { ...contentDefaults, ...this.globalSvgAttributes };
+    // A global `class` option merges with the structural bliss-content class
+    // instead of emitting a second class attribute (invalid SVG; issue #28).
+    const userClass = contentAttrs['class'];
+    delete contentAttrs['class'];
+    const contentClass = userClass ? `bliss-content ${userClass}` : 'bliss-content';
     // vector-effect is non-inherited; relocate it from the content group onto
     // the glyph paths so it actually takes effect. Always remove it from the
     // group (even an empty value, which would otherwise be a dead attribute on
@@ -2454,7 +2459,7 @@ class BlissSVGBuilder {
       desc,
       backgroundContent,
       gridPath,
-      `  <g class="bliss-content" ${contentAttrsStr}>`,
+      `  <g class="${contentClass}" ${contentAttrsStr}>`,
       `    ${contentInner}`,
       '  </g>',
       svgText,

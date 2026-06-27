@@ -638,7 +638,8 @@ describe('BlissSVGBuilder hierarchical options', () => {
 
       expect(svg).toContain('fill="red"');
       expect(svg).toContain('opacity="0.5"');
-      expect(svg).toContain('class="test"');
+      // class merges with the structural bliss-content class (#28), not a second attribute
+      expect(svg).toContain('class="bliss-content test"');
     });
   });
 

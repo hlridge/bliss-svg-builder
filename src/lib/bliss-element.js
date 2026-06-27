@@ -127,7 +127,7 @@ export class BlissElement {
     };
 
     const anchorAttrs = [];
-    const groupAttrs = [];
+    const groupAttrs = new Map(); // attrName -> value; deduped, explicit name beats alias
     let hasHref = false;
     let hasPointerEvents = false;
     let vectorEffect = null;
@@ -152,17 +152,28 @@ export class BlissElement {
         // vector-effect is non-inherited; capture it for relocation onto paths
         if (attrName === 'vector-effect') { vectorEffect = value; continue; }
         if (key === 'pointer-events') hasPointerEvents = true;
-        groupAttrs.push(`${attrName}="${value}"`);
+        // Each attribute name is emitted once (issue #28). On a collision the
+        // explicitly-named attribute wins over an alias (color -> stroke,
+        // strokeWidth -> stroke-width). Today #processOptions already orders the
+        // color alias ahead of a passthrough stroke, so the skip branch is
+        // defensive: it keeps explicit-wins an invariant rather than an artifact
+        // of that ordering, independent of option order.
+        const isAlias = attrName !== key;
+        if (!groupAttrs.has(attrName) || !isAlias) {
+          groupAttrs.set(attrName, value);
+        }
       }
     }
 
     if (hasHref && !hasPointerEvents) {
-      groupAttrs.push('pointer-events="bounding-box"');
+      groupAttrs.set('pointer-events', 'bounding-box');
     }
+
+    const groupAttrStrings = [...groupAttrs].map(([name, value]) => `${name}="${value}"`);
 
     return {
       anchorAttrs: anchorAttrs.join(' '),
-      groupAttrs: groupAttrs.join(' '),
+      groupAttrs: groupAttrStrings.join(' '),
       hasHref,
       vectorEffect
     };
