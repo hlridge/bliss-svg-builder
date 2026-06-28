@@ -1,0 +1,15 @@
+{
+  // skipLibCheck MUST stay false: this config's only job is to type-check our
+  // own src/index.d.ts, which is itself a declaration file. skipLibCheck:true
+  // would skip ALL .d.ts files (including ours), so `pnpm run typecheck` would
+  // pass vacuously. `types: []` + the file's lack of imports keep node_modules
+  // out of the program, so there is no third-party .d.ts noise to suppress.
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": false,
+    "types": []
+  },
+  "include": ["src/index.d.ts"]
+}
