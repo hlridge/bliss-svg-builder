@@ -67,8 +67,10 @@ export interface BlissOptions {
   // Error handling
   'error-placeholder'?: boolean;
 
-  // SVG pass-through attributes (any key not in the known set)
-  [key: string]: string | number | undefined;
+  // SVG pass-through attributes (any key not in the known set). Includes
+  // `boolean` so the boolean options (`grid`, `center`, `error-placeholder`)
+  // conform to the index signature; without it `tsc` rejects this interface.
+  [key: string]: string | number | boolean | undefined;
 }
 
 /** Cascading option layers: defaults (lowest priority) and overrides (highest priority). */
