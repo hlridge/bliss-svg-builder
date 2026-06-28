@@ -17,10 +17,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   the semantic; glyph identity restored when the cleared part list
  *   matches a known bare-glyph code; mutation-built output equals the
  *   DSL-built bare glyph byte-for-byte.
- * - Relocated base offset round-trips: clearing an indicator from a
- *   relocated base (built-in or custom) keeps its :x,y in toString, so the
- *   round-trip is lossless (R15 Task 3; the offset was previously dropped
- *   from toString while still driving the render).
+ * - Restored base round-trips losslessly: clearing an indicator from a
+ *   relocated base (built-in or custom) keeps its :x,y AND any part-level
+ *   option in toString (R15 Task 3 for the offset; RR3-3 for the option,
+ *   both previously dropped from toString while still driving the render).
  *
  * Does NOT cover:
  * - applyIndicators on its own surface, see
@@ -139,16 +139,27 @@ describe('ElementHandle clear indicators', () => {
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
-    it('drops a part-level option on the restored base in toString (known gap, gated for rc.4)', () => {
-      // KNOWN GAP (gated): the identityful-built-in fall-through in serializeGlyph re-emits
-      // the codeName + offset but NOT parts[0].options, so a part-level option on a restored
-      // base is lost from toString (the render and the raw part both keep it). A serializeParts
-      // re-route would fix this and DRY the offset path; this tripwire flips when that lands.
-      // see .claude/backlog/part-options-dropped-on-restored-base.md
+    it('re-emits a part-level option on the restored base so the round-trip is lossless', () => {
+      // RR3-3: clearing reduces the glyph to a single identityful base part that
+      // still carries a part-level option (plus the relocation offset). serializeGlyph
+      // routes the single-part built-in through serializeParts so the option AND the
+      // offset re-emit, instead of collapsing to the bare code. Subsumes the N13 offset
+      // path (one code path). see .claude/backlog/part-options-dropped-on-restored-base.md
       const b = new BlissSVGBuilder('[color=red]>B291:2,3;B86/B303');
       b.group(0).glyph(0).clearIndicators();
-      expect(b.toString()).toBe('B291:2,3/B303'); // option dropped (current behavior)
+      expect(b.toString()).toBe('[color=red]>B291:2,3/B303');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
       expect(b.toJSON().groups[0].glyphs[0].parts[0].options).toMatchObject({ color: 'red' });
+    });
+
+    it('re-emits a part-level option with no relocation offset', () => {
+      // pins option re-emit independent of the offset: a restored base with a
+      // part option but x=y=0 still round-trips the option (kills a mutant that
+      // would only re-emit options when an offset is also present).
+      const b = new BlissSVGBuilder('[color=red]>B291;B86/B303');
+      b.group(0).glyph(0).clearIndicators();
+      expect(b.toString()).toBe('[color=red]>B291/B303');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
   });
 });

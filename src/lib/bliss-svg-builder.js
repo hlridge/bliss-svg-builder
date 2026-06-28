@@ -1391,16 +1391,15 @@ class BlissSVGBuilder {
           code = serializeCustomGlyphDelta(glyph);
         }
         if (!code) {
-          code = glyph.codeName;
-          // A built-in glyph can re-acquire identity while keeping a relocated
-          // base offset on its sole part (e.g. clearIndicators on `B291:2,3;B86`
-          // restores codeName 'B291' but parts[0] still holds x/y). Re-emit that
-          // offset so toString round-trips the render instead of dropping it.
-          if (glyph.parts?.length === 1) {
-            const x = glyph.parts[0].x ?? 0;
-            const y = glyph.parts[0].y ?? 0;
-            if (x !== 0 || y !== 0) code += `:${x},${y}`;
-          }
+          // A built-in glyph can re-acquire identity while its sole part still
+          // holds a relocation offset and/or a part-level option (e.g.
+          // clearIndicators on `[color=red]>B291:2,3;B86` restores codeName
+          // 'B291' but parts[0] keeps x/y + options). Route the single-part case
+          // through serializeParts so both round-trip, instead of emitting the
+          // bare codeName and dropping them. (Subsumes the N13 offset path.)
+          code = glyph.parts?.length === 1
+            ? serializeParts(glyph.parts)
+            : glyph.codeName;
         }
       } else if (glyph.parts) {
         code = serializeParts(glyph.parts);
