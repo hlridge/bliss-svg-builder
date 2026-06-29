@@ -1,254 +1,139 @@
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
-import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
+import { BlissSVGBuilder } from '../src/index.js';
 
 /**
- * Pins reversible-overlay promotion: applying a character-level indicator
- * (`;<ind>`) to a use-site code that resolves to a base+indicator *alias*
- * routes the applied indicator into the reversible word-level `;;` overlay
- * instead of the destructive char-level replace-all.
+ * Pins that the former character-level indicator *promotion* is gone. A `;`-part
+ * on a bare alias (a word unit) no longer routes into a reversible `;;` word-
+ * level overlay. It is now MISPLACED: the parser warns
+ * MISPLACED_CHARACTER_INDICATOR, drops the part, and renders the alias as
+ * defined, creating no `wordIndicators` overlay and no DROPPED_WORD_INDICATOR.
+ * The reversible word overlay is reached only via `;;` (or the smart API);
+ * `addPart` still composes at the character level.
  *
- * The render is deliberately UNCHANGED: the word-level overlay hides the
- * alias's baked indicator (override-except-semantic), so the pixels equal the
- * old char-level result. The value is reversibility: the baked indicator is
- * retained on the character and reappears when the overlay is stripped,
- * whereas the old char-level apply destroyed it permanently.
+ * The fixtures are the exact bases that used to promote (single-character bare
+ * aliases, with and without a baked indicator); this file is the regression
+ * guard that promotion stays removed.
  *
  * Covers:
- * - A grammatical base+indicator alias: the `;`-applied indicator routes to
- *   `;;`, the render stays identical to the char-level result, and clearing
- *   the overlay recovers the alias.
- * - A semantic base+indicator alias: the semantic baked indicator is kept and
- *   the applied indicator still routes to the overlay.
- * - A clean-base alias is NOT promoted (stays plain `;`, no overlay).
- * - Promotion requires EVERY applied code to be a real indicator: a mixed
- *   applied list (real indicator + non-indicator primitive) appends at
- *   character level instead.
- * - Promotion requires the alias's baked tail to be all indicators: a tail
- *   mixing an indicator and a non-indicator does not support replacement, so an
- *   applied indicator appends at character level instead.
- * - A `!`-stripped applied indicator routes to a `;;!` overlay.
- * - Round-trip svg-identity for the promoted form.
- * - An indicator applied to a base+indicator alias in a multi-glyph word: the
- *   word-level `;;` slot is a word property owned by the FIRST glyph
- *   (first-wins), so a later glyph's promoted overlay is dropped with a
- *   `DROPPED_WORD_INDICATOR` warning while every glyph keeps its own baked
- *   character-level indicator. Composing with `/` is byte-identical to
- *   `mergeWithNext`.
- * - Single-glyph promotion records no `DROPPED_WORD_INDICATOR` (nothing to drop).
- * - A promoted overlay colliding with an explicit `;;` in one word: the leftmost
- *   glyph's word-overlay wins and the later one is dropped + `DROPPED_WORD_INDICATOR`
- *   (the same first-wins rule as `mergeWithNext`, so `/`-composition stays
- *   byte-identical to it).
+ * - A `;`-part on a single-character bare alias (grammatical-baked, semantic-
+ *   baked, clean-base, multi-part base): MISPLACED + drop + render-as-defined,
+ *   with no word overlay.
+ * - A `;`-part on a bare alias inside a multi-glyph word: MISPLACED, no overlay,
+ *   and no DROPPED_WORD_INDICATOR (the old first-wins word-slot machinery is
+ *   gone); an explicit `;;` overlay elsewhere in the same word is untouched.
+ * - The supported replacement: `;;` on the same alias still builds a reversible
+ *   word overlay.
+ * - `addPart` diverging from a misplaced `;` on a bare alias (the API composes
+ *   at the character level; the DSL part is dropped).
  *
  * Does NOT cover:
- * - Per-glyph (glyph-scoped) reversibility: the `;;` slot is word-scoped and
- *   first-glyph-owned, so a non-first glyph's applied indicator is dropped, not
- *   given its own reversible slot (a deliberate non-goal).
- * - Split/merge round-trip of the word-slot and query-time head resolution
- *   (WS-2…WS-4), see the `ElementHandle.*` suites.
- * - The define-time guard rejecting base+indicator glyph definitions (D-S1a,
- *   Task 3b-2), see `BlissSVGBuilder.define.test.js`.
- * - The composite-as-part warning for a composed unflagged alias used as a
- *   non-leading `;`-part, see `BlissSVGBuilder.composite-part.test.js`.
- * - Programmatic `glyph().applyIndicators()` char-path parity (Task 5), see
- *   `ElementHandle.apply-indicators.test.js`.
- * - Rendered pixel output: promotion is render-neutral by design (no e2e).
+ * - The core dumb-`;` / MISPLACED contract, `;`<->addPart parity on a real
+ *   glyph, trailing-`;` inertness, and `;!` content-drop, see
+ *   `BlissParser.strict-indicator-separation.test.js`.
+ * - `;` on a multi-character word / alias chain / multi-word `//` alias and head
+ *   resolution via `;;`, see `BlissParser.word-indicators.test.js`.
+ * - The `;;` overlay store shape, first-wins ownership, and DROPPED_WORD_INDICATOR
+ *   collision rules, see `BlissParser.double-semicolon.test.js` and
+ *   `BlissSVGBuilder.compose-merge-parity.test.js`.
  */
 describe('BlissSVGBuilder indicator promotion', () => {
   const PROMO_DEFS = {
-    NOUN_BI: { codeString: 'B291;B81' }, // base + grammatical (verbal) indicator
-    NOUN_S: { codeString: 'B291;B97' },  // base + semantic ('thing') indicator
-    NOUN_B: { codeString: 'B291' },      // clean base, no baked indicator
-    GRAMBASE: { codeString: 'B291;B99' }, // base + indicator; gates promotion on the APPLIED list
-    MIXEDTAIL: { codeString: 'B291;B99;VL4' }, // tail mixes indicator (B99) + non-indicator (VL4)
+    NOUN_BI: { codeString: 'B291;B81' },       // bare alias, grammatical baked
+    NOUN_S: { codeString: 'B291;B97' },        // bare alias, semantic baked
+    NOUN_B: { codeString: 'B291' },            // bare alias, clean base (no baked indicator)
+    MIXEDTAIL: { codeString: 'B291;B99;VL4' }, // bare alias, multi-part base
   };
+  const codes = (dsl) => new BlissSVGBuilder(dsl).warnings.map((w) => w.code);
   const svg = (dsl) => new BlissSVGBuilder(dsl).svgCode;
 
   beforeAll(() => BlissSVGBuilder.define(PROMO_DEFS));
-  afterAll(() => Object.keys(PROMO_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+  afterAll(() => Object.keys(PROMO_DEFS).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
 
-  describe('when an indicator is applied to a grammatical base+indicator alias', () => {
-    it('routes the applied indicator into a reversible ;; overlay', () => {
+  describe('when a character ; is applied to a single-character bare alias', () => {
+    it('warns MISPLACED, drops the part, and creates no word overlay', () => {
+      // The defining "promotion is gone" pin: no reversible ;; overlay is built.
       const b = new BlissSVGBuilder('NOUN_BI;B97');
-      expect(b.toString()).toBe('B291;B81;;B97');
-      expect(b.warnings.map((w) => w.code)).not.toContain('DROPPED_WORD_INDICATOR');
-    });
-
-    it('leaves the render unchanged from the char-level result', () => {
-      // note: the word-level ;; overlay HIDES the baked B81 (override-except-
-      // semantic), so the pixels equal B291;B97; promotion buys reversibility,
-      // not a visual change.
-      expect(svg('NOUN_BI;B97')).toBe(svg('B291;B97'));
-    });
-
-    it('recovers the baked indicator when the overlay is cleared', () => {
-      const b = new BlissSVGBuilder('NOUN_BI;B97');
-      b.group(0).clearIndicators();
+      expect(codes('NOUN_BI;B97')).toContain('MISPLACED_CHARACTER_INDICATOR');
       expect(b.toString()).toBe('B291;B81');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
       expect(b.svgCode).toBe(svg('B291;B81'));
     });
 
-    it('round-trips svg-identically', () => {
-      const b = new BlissSVGBuilder('NOUN_BI;B97');
-      expect(svg(b.toString())).toBe(b.svgCode);
-    });
-  });
-
-  describe('when an indicator is applied to a semantic base+indicator alias', () => {
-    it('routes the applied indicator into the overlay and keeps the semantic part', () => {
-      expect(new BlissSVGBuilder('NOUN_S;B81').toString()).toBe('B291;B97;;B81');
-    });
-
-    it('leaves the render unchanged from the char-level result', () => {
-      expect(svg('NOUN_S;B81')).toBe(svg('B291;B81;B97'));
-    });
-
-    it('recovers the semantic baked indicator when the overlay is cleared', () => {
+    it('drops the misplaced part on a semantic-baked alias too', () => {
       const b = new BlissSVGBuilder('NOUN_S;B81');
-      b.group(0).clearIndicators();
+      expect(codes('NOUN_S;B81')).toContain('MISPLACED_CHARACTER_INDICATOR');
       expect(b.toString()).toBe('B291;B97');
-      expect(b.svgCode).toBe(svg('B291;B97'));
     });
-  });
 
-  describe('when an indicator is applied to a clean-base alias', () => {
-    it('keeps the plain character-level ; and creates no overlay', () => {
+    it('treats a ; on a clean-base alias as misplaced', () => {
+      // The discriminator is bare-alias-ness, not the presence of a baked
+      // indicator: NOUN_B = 'B291' is a clean base, yet ; is still misplaced.
+      // (This was a plain character-append in the old promotion model.)
       const b = new BlissSVGBuilder('NOUN_B;B97');
-      expect(b.toString()).toBe('B291;B97');
-      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(codes('NOUN_B;B97')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(b.toString()).toBe('B291');
     });
-  });
 
-  describe('when not all applied indicators are real indicators', () => {
-    // GRAMBASE = 'B291;B99' is a base+indicator alias, but the applied list
-    // B81;VL4 mixes a real indicator (B81) with a non-indicator primitive
-    // (VL4). Promotion requires EVERY applied code to be a real indicator, so
-    // this appends at character level instead of routing to the ;; overlay.
-    it('appends at character level without creating an overlay', () => {
-      // pins inputIndicatorsAreReal's .every (parser L686); killed the .every->
-      // .some mutant in the 2026-06-26 Stryker run, which promotes when only
-      // SOME of the applied codes are real indicators.
-      const b = new BlissSVGBuilder('GRAMBASE;B81;VL4');
-      expect(b.toString()).toBe('B291;B99;B81;VL4');
-      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
-    });
-  });
-
-  describe('when the alias baked tail mixes indicator and non-indicator parts', () => {
-    // MIXEDTAIL = 'B291;B99;VL4': the codeString tail mixes an indicator (B99)
-    // and a non-indicator primitive (VL4), so the base does NOT support
-    // indicator replacement. Applying a real indicator appends at character
-    // level rather than promoting to the ;; overlay.
-    it('appends at character level without creating an overlay', () => {
-      // pins baseCodeSupportsReplacement's .every (parser L701); killed the
-      // .every->.some mutant in the 2026-06-26 Stryker run, which treats a tail
-      // with ANY indicator as replacement-capable and promotes.
+    it('preserves a multi-part baked base when dropping the misplaced part', () => {
+      // MIXEDTAIL = 'B291;B99;VL4': the whole 3-part base survives, not just the
+      // first part.
       const b = new BlissSVGBuilder('MIXEDTAIL;B81');
-      expect(b.toString()).toBe('B291;B99;VL4;B81');
-      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(codes('MIXEDTAIL;B81')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(b.toString()).toBe('B291;B99;VL4');
     });
   });
 
-  describe('when the applied indicator strips the semantic root', () => {
-    it('routes a !-prefixed indicator into a ;;! overlay', () => {
-      const b = new BlissSVGBuilder('NOUN_S;!B81');
-      expect(b.toString()).toBe('B291;B97;;!B81');
-      expect(b.svgCode).toBe(svg('B291;B81'));
-    });
-  });
-
-  describe('when an indicator is applied to an alias in a multi-glyph word', () => {
-    // note: the word-level ;; slot is a WORD property owned by the first glyph
-    // (first-wins), so composing glyphs with `/` behaves byte-identically to
-    // mergeWithNext: a later glyph's promoted overlay is dropped + warned, and
-    // every glyph keeps its own baked character-level indicator (R15 word-slot
-    // model, supersedes the 85b67a7 single-glyph gate).
-    it('drops a later glyph overlay when the first glyph has an empty word-slot', () => {
+  describe('when a character ; is applied to a bare alias inside a multi-glyph word', () => {
+    it('warns MISPLACED with no overlay and no DROPPED_WORD_INDICATOR', () => {
+      // The old promotion path built a word-slot overlay on this glyph and then
+      // dropped it (first-wins) with DROPPED_WORD_INDICATOR. That machinery is
+      // gone: the ; is simply misplaced and the word renders as defined.
       const b = new BlissSVGBuilder('H/NOUN_BI;B97');
+      expect(codes('H/NOUN_BI;B97')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(codes('H/NOUN_BI;B97')).not.toContain('DROPPED_WORD_INDICATOR');
       expect(b.toString()).toBe('H/B291;B81');
-      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
       expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
       expect(b.svgCode).toBe(svg('H/B291;B81'));
     });
 
-    it('keeps a first-glyph overlay with no warning when later glyphs are plain', () => {
-      const b = new BlissSVGBuilder('NOUN_BI;B97/E');
-      expect(b.toString()).toBe('B291;B81/E;;B97');
-      expect(b.warnings.map((w) => w.code)).not.toContain('DROPPED_WORD_INDICATOR');
-      expect(svg(b.toString())).toBe(b.svgCode);
-    });
-
-    it('keeps the first glyph overlay and drops the second when two aliases promote', () => {
+    it('warns once per misplaced glyph with no promotion machinery', () => {
       const b = new BlissSVGBuilder('NOUN_BI;B97/NOUN_BI;B86');
-      expect(b.toString()).toBe('B291;B81/B291;B81;;B97');
-      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
-      expect(svg(b.toString())).toBe(b.svgCode);
+      expect(codes('NOUN_BI;B97/NOUN_BI;B86'))
+        .toEqual(['MISPLACED_CHARACTER_INDICATOR', 'MISPLACED_CHARACTER_INDICATOR']);
+      expect(b.toString()).toBe('B291;B81/B291;B81');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
     });
 
-    it('describes the dropped overlay with a ;;B86 source', () => {
-      const b = new BlissSVGBuilder('NOUN_BI;B97/NOUN_BI;B86');
-      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(dropped?.source).toBe(';;B86');
-    });
-
-    it('preserves the ! marker in a dropped strip-semantic overlay source', () => {
-      const b = new BlissSVGBuilder('NOUN_S;!B86/NOUN_S;!B81');
-      expect(b.toString()).toBe('B291;B97/B291;B97;;!B86');
-      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(dropped?.source).toBe(';;!B81');
-    });
-
-    it('keeps every applied code in a multi-indicator dropped source', () => {
-      const b = new BlissSVGBuilder('E/NOUN_BI;B97;B81');
-      expect(b.toString()).toBe('E/B291;B81');
-      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(dropped?.source).toBe(';;B97;B81');
-    });
-
-    it('warns once per dropped overlay when several later glyphs promote', () => {
-      const b = new BlissSVGBuilder('E/NOUN_BI;B97/NOUN_BI;B86');
-      const drops = b.warnings.filter((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(drops.map((w) => w.source)).toEqual([';;B97', ';;B86']);
+    it('leaves an explicit ;; overlay in the same word intact', () => {
+      // The misplaced ; and a genuine word-level ;; are independent: ;B97 drops,
+      // ;;B86 still builds its reversible overlay on the word.
+      const b = new BlissSVGBuilder('NOUN_BI;B97/E;;B86');
+      expect(codes('NOUN_BI;B97/E;;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(codes('NOUN_BI;B97/E;;B86')).not.toContain('DROPPED_WORD_INDICATOR');
+      expect(b.toString()).toBe('B291;B81/E;;B86');
     });
   });
 
-  describe('when a promoted overlay and an explicit ;; collide in one word', () => {
-    // note: an explicit `;;` does NOT automatically win; the leftmost glyph's
-    // word-overlay wins and the later one is dropped + warned, whether the
-    // leftmost is promoted or explicit. This is the same first-wins rule as
-    // mergeWithNext, which keeps `/`-composition byte-identical to it (R15
-    // Finding A: the ;;-handler now respects an already-promoted slot instead
-    // of silently clobbering it). The stray trailing `;;` on an empty `;;`
-    // (`NOUN_BI;B97/E;;`) is a SEPARATE pre-existing issue (`H/E;;` emits it
-    // too, no promotion involved).
-    it('keeps the leading promoted overlay and drops the trailing explicit ;;', () => {
-      const b = new BlissSVGBuilder('NOUN_BI;B97/E;;B86');
-      expect(b.toString()).toBe('B291;B81/E;;B97');
-      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(dropped?.source).toBe(';;B86');
+  describe('when a word-level ;; is applied to a former-promotion alias', () => {
+    it('builds a reversible word overlay (the supported replacement for promotion)', () => {
+      const b = new BlissSVGBuilder('NOUN_BI;;B97');
+      expect(b.toString()).toBe('B291;B81;;B97');
+      expect(b.toJSON().groups[0].wordIndicators).toEqual({ codes: ['B97'], stripSemantic: false });
+      expect(b.warnings).toEqual([]);
     });
+  });
 
-    it('keeps the leading promoted overlay when an explicit ;; trails a plain glyph', () => {
-      const b = new BlissSVGBuilder('NOUN_BI;B97/H;;B86');
-      expect(b.toString()).toBe('B291;B81/H;;B97');
-      expect(b.warnings.map((w) => w.code)).toContain('DROPPED_WORD_INDICATOR');
-    });
-
-    it('keeps a leading explicit overlay and drops a later promoted glyph', () => {
-      const b = new BlissSVGBuilder('E/NOUN_BI;B97;;B86');
-      expect(b.toString()).toBe('E/B291;B81;;B86');
-      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(dropped?.source).toBe(';;B97');
-    });
-
-    it('preserves the ! marker and every code in a dropped explicit overlay source', () => {
-      // pins the dropped-source build in the ;;-handler collision path; a
-      // multi-code strip-semantic explicit overlay distinguishes join(';') from
-      // join('') and the '!' branch from ''
-      const b = new BlissSVGBuilder('NOUN_BI;B97/E;;!B86;B81');
-      expect(b.toString()).toBe('B291;B81/E;;B97');
-      const dropped = b.warnings.find((w) => w.code === 'DROPPED_WORD_INDICATOR');
-      expect(dropped?.source).toBe(';;!B86;B81');
+  describe('when the same indicator is applied via addPart instead of ;', () => {
+    it('composes at the character level, diverging from the misplaced DSL ;', () => {
+      // ;<->addPart parity holds on a real glyph (see the strict-indicator-
+      // separation contract). On a bare alias they diverge: addPart reaches the
+      // wrapping character and composes; the DSL ;-part is misplaced and dropped.
+      const dsl = new BlissSVGBuilder('NOUN_BI;B97');
+      const api = new BlissSVGBuilder('NOUN_BI');
+      api.group(0).glyph(0).addPart('B97');
+      expect(dsl.toString()).toBe('B291;B81');
+      expect(api.toString()).toBe('B291;B81;B97');
+      expect(dsl.svgCode).not.toBe(api.svgCode);
     });
   });
 });
