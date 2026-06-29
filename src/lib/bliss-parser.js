@@ -544,7 +544,11 @@ export class BlissParser {
           // the original `str` so parse(toString(x)) re-flags (round-trip).
           const isMalformed = str.match(/;;/g).length > 1 || rawIndicators.includes('/');
           if (isMalformed) {
-            const fallbackParts = str.replace(/;;/g, ';').split('/').flatMap(strPart => expand(strPart, definitions));
+            // Expand the fallback NOT at top level: this malformed `;;` already
+            // fail-renders with MALFORMED_WORD_INDICATOR, so the re-expansion must
+            // not also emit a spurious char-level MISPLACED_CHARACTER_INDICATOR
+            // when the base is a bare alias or word. (Strict Indicator Separation.)
+            const fallbackParts = str.replace(/;;/g, ';').split('/').flatMap(strPart => expand(strPart, definitions, false));
             crownWordChunks(fallbackParts, wordCode);
             if (fallbackParts.length > 0) {
               fallbackParts[0]._wordError = {
@@ -577,23 +581,13 @@ export class BlissParser {
           // Stash the overlay on the first part; the assembly loop lifts it onto
           // the group. Codes are merged/indicator-filtered at decode, not here;
           // filter(Boolean) drops empties so a bare `;;` yields an empty list.
+          // With char-level promotion gone, no leading glyph can pre-claim the
+          // word-level slot, so this explicit `;;` overlay always wins here. (A
+          // `/`-composition of two explicit `;;` overlays is still resolved
+          // first-wins by the assembly loop below.) (Strict Indicator Separation.)
           const codes = indicators.split(';').filter(Boolean);
           if (expandedParts.length > 0) {
-            if (expandedParts[0]._wordIndicators) {
-              // The leading glyph already promoted an applied indicator into the
-              // single word-level slot; this explicit `;;` is a later contender.
-              // First-wins (mirrors mergeWithNext): keep the promoted overlay and
-              // drop the explicit one loudly (Decision Log #7), so `/`-composition
-              // stays byte-identical to mergeWithNext.
-              const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
-              parseWarnings.push({
-                code: WARNING_CODES.DROPPED_WORD_INDICATOR,
-                message: `An explicit word-level indicator overlay (${dropped}) collided with the leading glyph's promoted overlay. The word keeps only the first overlay.`,
-                source: dropped,
-              });
-            } else {
-              expandedParts[0]._wordIndicators = { codes, stripSemantic };
-            }
+            expandedParts[0]._wordIndicators = { codes, stripSemantic };
           }
 
           return expandedParts;
@@ -664,11 +658,10 @@ export class BlissParser {
           const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
 
           const [potentialBaseCodeRaw, ...rawIndicators] = codeForLookup.split(';');
-          // Detect strip-semantic modifier (! prefix on first indicator)
-          const stripSemantic = rawIndicators.length > 0 && rawIndicators[0]?.startsWith('!');
-          if (stripSemantic) rawIndicators[0] = rawIndicators[0].slice(1);
+          // Strict Indicator Separation: `;` is dumb part-composition, so the
+          // `!` strip-semantic shortcut no longer has a special parse. A `!`
+          // after a single `;` is just part of an (invalid) appended code.
           const filteredIndicators = rawIndicators.filter(ind => ind !== '');
-          const hasInputIndicators = rawIndicators.length > 0;
 
           // Strip position modifier (e.g. ":2,0" or ":-1.5,3") from base code
           // so definition lookup works for codes like "WORD:2,0"
@@ -681,57 +674,40 @@ export class BlissParser {
           const resolvedCodeString = resolveToFinalCodeString(potentialBaseCode);
           const isWordDefinition = resolvedCodeString?.includes('/') ?? false;
 
-          // Check if input indicators are real indicators (for replacement)
-          const inputIndicatorsAreReal = filteredIndicators.length > 0 &&
-            filteredIndicators.every(ind => definitions[getBareCode(ind)]?.isIndicator === true);
-
-          // Check if base code supports indicator replacement.
-          // The .slice(1) "segment 0 is the base" assumption is safe on this
-          // single-glyph replace path: an indicator-first base is undefinable
-          // (the D-S1a define guard rejects any type:'glyph' that bakes an
-          // indicator, no built-in has an indicator-first unflagged codeString,
-          // and a bare alias routes through promotion which skips this path), so
-          // a base whose segment 0 is an indicator never reaches here. Generalizing
-          // it would add a branch no test can cover. R15 3b-5 (guarded by
-          // BlissSVGBuilder.compound-indicator-application.test.js).
+          // A bare alias (a `{codeString}`-only definition, no glyph flag) is a
+          // WORD unit, not a single character; a multi-glyph word is many
+          // characters. In both cases a char-level `;`-part has no single
+          // character to attach to, so it is MISPLACED: warn once, drop it, and
+          // render the base as defined (the head keeps any baked indicator). A
+          // glyph / literal / unknown code is a single character and dumb-appends
+          // the part (base case / built-in path below). Use `;;` for a word-level
+          // indicator. See [[feedback_no_indicator_of_a_part]] (Strict Indicator
+          // Separation, supersedes R15 Task 3b promotion).
           const baseCodeDef = definitions[potentialBaseCode];
-          const baseCodeStringParts = baseCodeDef?.codeString?.split(';') || [];
-          const baseCodeExistingIndicators = baseCodeStringParts.slice(1).map(p => p.split(':')[0]);
-          const baseCodeSupportsReplacement = baseCodeExistingIndicators.length > 0 &&
-            baseCodeExistingIndicators.every(ind => definitions[ind]?.isIndicator === true);
-
-          // Don't apply indicator replacement to compound indicators (like B928 = B92;B87)
-          // These are indicators composed of multiple indicator parts, not characters with replaceable indicators
-          const baseIsCompoundIndicator = baseCodeDef?.isIndicator === true;
-
-          // A base+indicator *alias* (a bare definition: has a codeString but is
-          // not a glyph, shape, or external glyph) promotes an applied indicator
-          // into the reversible word-level ;; overlay instead of destroying the
-          // baked indicator via char-level replace-all. User glyphs keep
-          // replace-all. Mirrors the bare-alias test in #resolveBareAliases.
-          // See [[feedback_no_indicator_of_a_part]] (R15 Task 3b-1).
           const baseIsBareAlias = !!baseCodeDef && baseCodeDef.codeString !== undefined
             && !baseCodeDef.isBlissGlyph && !baseCodeDef.isShape
             && !baseCodeDef.isExternalGlyph && !baseCodeDef.glyphCode;
+          const misplacedCharIndicator = isTopLevel
+            && (baseIsBareAlias || isWordDefinition)
+            && filteredIndicators.length > 0;
+          if (misplacedCharIndicator) {
+            parseWarnings.push({
+              code: WARNING_CODES.MISPLACED_CHARACTER_INDICATOR,
+              message: `Character indicator (;${filteredIndicators.join(';')}) ignored on "${restorePlaceholders(potentialBaseCode)}": ; composes onto a single character, but this is a word. Use ;; for a word-level indicator.`,
+              source: restorePlaceholders(potentialBaseCode),
+            });
+          }
 
-          // Indicator replacement: only for top-level, non-words, with matching indicator types
-          // Skip if the base code itself is an indicator (compound indicators should keep their structure)
-          const canModifyIndicators = isTopLevel && !isWordDefinition && baseCodeSupportsReplacement && !baseIsCompoundIndicator;
-          const shouldReplace = canModifyIndicators && inputIndicatorsAreReal;
-          // Promotion: route the applied indicator into the reversible ;; overlay
-          // rather than the destructive char-level replace, for any base+indicator
-          // alias. The ;; overlay is the word-level slot; when several glyphs in
-          // one word promote, the assembly loop keeps the first glyph's slot and
-          // drops the rest (first-wins, mirrors mergeWithNext). See the word-slot
-          // model: 2026-06-18-word-indicator-slot-and-head-model-design.md.
-          const shouldPromote = shouldReplace && baseIsBareAlias;
-          const shouldRemove = canModifyIndicators && hasInputIndicators && filteredIndicators.length === 0;
-          // Bare empty strip: trailing ; with no indicator, on any code (even without a known indicator in its definition).
-          // The user has no way to know if a B-code has a baked-in indicator, so empty ; must never warn.
-          const isBareEmptyStrip = !shouldRemove && hasInputIndicators && filteredIndicators.length === 0;
+          // A trailing/empty `;` (no real part: `B291;`, `WORD;`) is inert. It
+          // must resolve the BASE definition so the code keeps its identity and
+          // metadata (the `;` is normalized away in toString); it is neither a
+          // dumb append nor misplaced.
+          const isEmptyStrip = rawIndicators.length > 0 && filteredIndicators.length === 0;
 
-          // Use base code lookup for words, or when replacing/removing indicators
-          const useBaseCodeLookup = isWordDefinition || shouldReplace || shouldRemove || isBareEmptyStrip;
+          // Use base code lookup for words, a misplaced char indicator (both
+          // render the base definition; the misplaced part is dropped), and an
+          // inert empty `;` (preserve the base definition's metadata).
+          const useBaseCodeLookup = isWordDefinition || misplacedCharIndicator || isEmptyStrip;
           const definition = useBaseCodeLookup
             ? (definitions[potentialBaseCode] || {})
             : codeForLookup.startsWith('XTXT_')
@@ -740,47 +716,19 @@ export class BlissParser {
 
           // If we have a codeString, recursively expand it
           if (definition.codeString) {
-            let codeStringToExpand = definition.codeString;
-
-            // Modify codeString for indicator replacement/removal. Promotion (a
-            // base+indicator alias) skips this so the baked indicator stays in
-            // the codeString; the applied indicator becomes a ;; overlay below.
-            if ((shouldReplace || shouldRemove) && !shouldPromote) {
-              const codeStringParts = definition.codeString.split(';');
-              // .slice(1) "segment 0 is the base" is safe here for the same reason
-              // as the baseCodeExistingIndicators scan above: an indicator-first
-              // base is undefinable and never reaches this single-glyph replace
-              // path (D-S1a + no qualifying built-in + bare-alias promotion). R15 3b-5.
-              const existingIndicatorCodes = codeStringParts.slice(1).map(p => p.split(':')[0]);
-              const semanticRoot = !stripSemantic ? getSemanticRoot(existingIndicatorCodes, definitions) : null;
-
-              codeStringToExpand = codeStringParts[0];
-              if (filteredIndicators.length > 0) {
-                if (semanticRoot && !hasSemantic(filteredIndicators, definitions)) {
-                  codeStringToExpand += ';' + buildWithSemantic(semanticRoot, filteredIndicators, definitions).join(';');
-                } else {
-                  codeStringToExpand += ';' + filteredIndicators.join(';');
-                }
-              } else if (semanticRoot) {
-                // shouldRemove but preserve semantic root
-                codeStringToExpand += ';' + semanticRoot;
-              }
-            }
+            // Strict Indicator Separation: `;` no longer rewrites a definition's
+            // baked indicators, so the codeString expands verbatim.
+            const codeStringToExpand = definition.codeString;
 
             // Built-in single-character codes: skip expansion, let parseParts handle it.
             // This eliminates the flatten-then-unflatten pattern where expand() substitutes
             // a B-code's codeString (e.g. B291 → "S8:0,8") only for a later wrapping patch
             // to reconstruct the nesting. Word codes (codeString with /) must still be
             // expanded here because word decomposition produces multiple glyphs.
-            // Indicator modification (shouldReplace/shouldRemove) must still expand because
-            // the codeString is being modified, not just passed through.
             if (builtInCodes.has(potentialBaseCode)
-                && !codeStringToExpand.includes('/')
-                && !shouldReplace && !shouldRemove) {
+                && !codeStringToExpand.includes('/')) {
               return [{
-                part: isBareEmptyStrip
-                  ? optionsPrefix + potentialBaseCode + positionSuffix
-                  : str.replace(/;$/, ''),
+                part: str.replace(/;$/, ''),
                 _scanCode: potentialBaseCode,
                 ...(definition.shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace: true }),
                 ...(definition.isIndicator === true && { isIndicator: true }),
@@ -820,12 +768,8 @@ export class BlissParser {
               if (optionsPrefix && allParts.length > 0) {
                 allParts[0].part = optionsPrefix + allParts[0].part;
               }
-              // A real indicator bound to this multi-word alias targets no single
-              // head: fail the whole unit instead of the legacy silent drop.
-              // Decision 6 (uniform with the nested + ;; fail paths).
-              if (isTopLevel && inputIndicatorsAreReal) {
-                return failMultiWordIndicator(allParts);
-              }
+              // A char-level `;`-part on a multi-word (//) alias is MISPLACED
+              // (warned up front): render every word and drop the part. D1.
               return allParts;
             }
 
@@ -872,56 +816,20 @@ export class BlissParser {
                 };
               });
 
-            // A real indicator bound to an alias that expands past a word break
-            // targets no single head: fail the whole unit rather than binding it
-            // to only the first word. Decision 6 (uniform with the direct // and
-            // ;; fail paths).
-            if (isTopLevel && inputIndicatorsAreReal && expandedParts.some(part => part._wordBreak)) {
-              return failMultiWordIndicator(expandedParts);
-            }
+            // A char-level `;`-part on a nested alias that expands past a word
+            // break is MISPLACED (warned up front): render the words, drop the
+            // part. D1.
 
             // Rule 2: a definition's codeString is its own word-string.
-            // Resolve its written markers now; the result is carried upward
-            // as at most one designation that only acts when this fragment
-            // occupies the word's head position (rule 4).
-            const fragResolved = sealFragment(expandedParts, potentialBaseCode);
+            // Resolve its written markers now (head resolution rule 4); the
+            // call mutates expandedParts in place, so its return is not needed.
+            sealFragment(expandedParts, potentialBaseCode);
 
-            // Handle WORD;INDICATORS syntax (only for multi-glyph words, not single characters)
-            // Single characters with indicators are handled by parseParts later
-            // Use expandedParts.length to detect words (covers aliases like TestAlias → TestWord1 → H^/C)
-            if (expandedParts.length > 1 && filteredIndicators.length > 0) {
-              // It's a word (multiple glyphs) - strip and replace indicators on head glyph
-              // Only use codes that are real indicators
-              const validInds = filterToIndicators(filteredIndicators, definitions);
-              if (validInds.length > 0) {
-                const targetIndex = fragResolved.index;
-                const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-                const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
-                const baseCode = getBaseCode(expandedParts[targetIndex]);
-
-                // Reattach with new indicators, preserving semantic root when appropriate
-                if (semanticRoot && !hasSemantic(validInds, definitions)) {
-                  expandedParts[targetIndex].part = baseCode + ';' + buildWithSemantic(semanticRoot, validInds, definitions).join(';');
-                } else {
-                  expandedParts[targetIndex].part = baseCode + ';' + validInds.join(';');
-                }
-              }
-              // If no valid indicators, don't modify the head glyph at all
-            }
-
-            // Handle WORD; (empty indicators) - strip from head glyph of multi-glyph words
-            // Single-char cases are handled by: shouldRemove (if definition has real indicators)
-            // or isBareEmptyStrip (if no real indicator in definition, via base case return)
-            if (expandedParts.length > 1 && rawIndicators.length > 0 && filteredIndicators.length === 0) {
-              const targetIndex = fragResolved.index;
-              const existingInds = getIndicatorParts(expandedParts[targetIndex]);
-              const semanticRoot = !stripSemantic ? getSemanticRoot(existingInds, definitions) : null;
-              const baseCode = getBaseCode(expandedParts[targetIndex]);
-
-              expandedParts[targetIndex].part = semanticRoot
-                ? baseCode + ';' + semanticRoot
-                : baseCode;
-            }
+            // Strict Indicator Separation: a char-level `;`-part on a multi-glyph
+            // word is handled up front -- a real part is MISPLACED and dropped
+            // (warned above), a trailing `;` is inert. Either way the head is NOT
+            // modified here: the word renders as defined, keeping any baked head
+            // indicator. Use `;;` for a word-level indicator.
 
             // Apply position suffix from outer code (e.g. WORD:2,0) to first glyph's first part
             if (positionSuffix && expandedParts.length > 0) {
@@ -944,14 +852,6 @@ export class BlissParser {
               expandedParts[0].part = optionsPrefix + expandedParts[0].part;
             }
 
-            // Promotion (R15 Task 3b-1): stash the applied indicators as a
-            // reversible ;; overlay on the head part; the assembly loop lifts it
-            // onto group.wordIndicators (mirrors the ;; handler ~L559). The
-            // alias's baked indicator stays on the character and reappears when
-            // the overlay is cleared. See [[feedback_no_indicator_of_a_part]].
-            if (shouldPromote && expandedParts.length > 0) {
-              expandedParts[0]._wordIndicators = { codes: filteredIndicators, stripSemantic };
-            }
             return expandedParts;
           }
 
@@ -963,11 +863,11 @@ export class BlissParser {
           const glyphCode = definition.glyphCode;
           const isBlissGlyph = definition.isBlissGlyph;
           const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
-          // stripSemantic consumed the ! marker from rawIndicators above, but `str`
-          // still contains it. Strip it here so it doesn't leak into part.codeName.
-          const baseStr = stripSemantic ? str.replace(';!', ';') : str;
+          // Strict Indicator Separation: `;` dumb-appends, so `str` is kept
+          // verbatim (a trailing `;` is normalized away; an invalid appended
+          // part such as `!B81` falls through to UNKNOWN_CODE in parseParts).
           return [{
-            part: isBareEmptyStrip ? optionsPrefix + potentialBaseCode + positionSuffix : baseStr.replace(/;$/, ''),
+            part: str.replace(/;$/, ''),
             _scanCode: potentialBaseCode,
             ...(shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace }),
             ...(isIndicator === true && { isIndicator }),

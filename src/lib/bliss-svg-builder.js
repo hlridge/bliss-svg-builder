@@ -1326,7 +1326,14 @@ class BlissSVGBuilder {
         const optPrefix = serializeOptions(part.options);
         if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
-      }).join(';');
+      })
+        // Drop parts that carry no serializable code: an invalid appended part
+        // (e.g. the `!B81` in a dumb `GPLAIN;!B81`) has no codeName, so it must
+        // not emit a dangling `;`. The part still warned UNKNOWN_CODE at parse;
+        // here it is normalized away so toString round-trips. (Strict Indicator
+        // Separation surfaced this; the empty-separator artifact predates it.)
+        .filter(Boolean)
+        .join(';');
     }
 
     // Under preserve, keep a custom glyph's name but re-emit any per-instance
