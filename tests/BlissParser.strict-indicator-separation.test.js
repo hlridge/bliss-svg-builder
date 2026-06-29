@@ -195,4 +195,24 @@ describe('BlissParser strict indicator separation', () => {
       expect(c).not.toContain('MISPLACED_CHARACTER_INDICATOR');
     });
   });
+
+  describe('when a malformed ;; is applied to a multi-word (//) alias', () => {
+    it('fail-renders without growing the toString round-trip', () => {
+      // regression (M1): the malformed-;; fallback expanded the // alias into
+      // separate word-groups, so toString re-emitted the whole expansion and the
+      // round-trip grew by "//B313/B291" on every pass. Collapsing the multi-word
+      // expansion to one fail-placeholder restores the verbatim fixpoint.
+      const b = new BlissSVGBuilder('MWORD;;B81/B291');
+      const t1 = b.toString();
+      const t2 = new BlissSVGBuilder(t1).toString();
+      expect(t1).toBe('MWORD;;B81/B291');
+      expect(t2).toBe(t1);
+    });
+
+    it('warns MALFORMED_WORD_INDICATOR, not a character-indicator warning', () => {
+      const c = codes('MWORD;;B81/B291');
+      expect(c).toContain('MALFORMED_WORD_INDICATOR');
+      expect(c).not.toContain('MISPLACED_CHARACTER_INDICATOR');
+    });
+  });
 });

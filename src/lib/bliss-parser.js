@@ -549,6 +549,15 @@ export class BlissParser {
             // not also emit a spurious char-level MISPLACED_CHARACTER_INDICATOR
             // when the base is a bare alias or word. (Strict Indicator Separation.)
             const fallbackParts = str.replace(/;;/g, ';').split('/').flatMap(strPart => expand(strPart, definitions, false));
+            // A malformed `;;` whose base expands past a word break (a multi-word
+            // `//` alias) yields several word-groups; rendering them all makes
+            // toString re-emit the full expansion, so the round-trip grows without
+            // bound on every pass. Collapse to one fail-placeholder (verbatim
+            // round-trip via errorSource = wordCode), mirroring the well-formed
+            // multi-word `;;` fail below. (Strict Indicator Separation.)
+            if (fallbackParts.some(p => p._wordBreak)) {
+              return failMultiWordIndicator(fallbackParts);
+            }
             crownWordChunks(fallbackParts, wordCode);
             if (fallbackParts.length > 0) {
               fallbackParts[0]._wordError = {
