@@ -232,6 +232,43 @@ describe('BlissSVGBuilder.define', () => {
     });
   });
 
+  describe('when a glyph or shape definition contains a word-level indicator (;;)', () => {
+    // note: `;;` is a word-level construct (it sets a word's part-of-speech); a
+    // glyph and a shape are each a single character, so `;;` cannot appear in
+    // their codeString. (Strict Indicator Separation.)
+    it('rejects a glyph whose codeString contains ;;', () => {
+      const code = trackCode('GLYPH_WORDIND');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B303;;B291' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('rejects a shape whose codeString contains ;;', () => {
+      const code = trackCode('SHAPE_WORDIND');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: 'HL8;;VL8' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('names the word-level indicator in the message', () => {
+      const code = trackCode('GLYPH_WORDIND_MSG');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B303;;B291' } });
+      expect(result.errors[0]).toContain(';;');
+    });
+  });
+
+  describe('when a shape definition bakes an indicator', () => {
+    // a shape can only reference other shapes; an indicator is a glyph-type
+    // character, so a shape codeString that bakes one is rejected. Pins the
+    // indicator case of the shape-only-reference rule explicitly.
+    it('rejects a shape whose codeString references an indicator', () => {
+      const code = trackCode('SHAPE_INDICATOR');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: 'HL8;B86' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+  });
+
   describe('when a definition uses a composed alias as a ; part', () => {
     // note: ; is part-merge, so a ;-part operand must be a part (a primitive or a
     // flagged glyph/indicator). A composed unflagged alias (B291;B81) is a

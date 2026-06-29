@@ -1822,6 +1822,12 @@ class BlissSVGBuilder {
       if (definition.codeString.includes('/')) {
         throw new Error(`define("${code}"): a shape definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"shape").`);
       }
+
+      // `;;` is a word-level indicator (a word property); a shape is a single
+      // character, so it cannot carry one. (Strict Indicator Separation.)
+      if (definition.codeString.includes(';;')) {
+        throw new Error(`define("${code}"): a shape definition cannot contain a word-level indicator (";;"); a shape is a single character.`);
+      }
     }
 
     if (blissElementDefinitions[code] && !options.overwrite) {
@@ -1861,6 +1867,12 @@ class BlissSVGBuilder {
     // alias (omit type:"glyph"). (Strict Indicator Separation, F4.)
     if (definition.codeString.includes('/')) {
       throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"glyph").`);
+    }
+
+    // `;;` is a word-level indicator (a word property); a glyph is a single
+    // character, so it cannot carry one. (Strict Indicator Separation.)
+    if (definition.codeString.includes(';;')) {
+      throw new Error(`define("${code}"): a glyph definition cannot contain a word-level indicator (";;"); a glyph is a single character. Apply a word indicator at the use site (WORD;;INDICATOR).`);
     }
 
     // Glyphs can reference other glyphs and shapes, but not external glyphs or bare aliases
