@@ -215,4 +215,13 @@ describe('BlissParser strict indicator separation', () => {
       expect(c).not.toContain('MISPLACED_CHARACTER_INDICATOR');
     });
   });
+
+  describe('when a part-level options prefix [...]> wraps a ;-bearing base', () => {
+    // Deferred gap (F2/F3): the parser's part-level-options early return bypasses
+    // the strict-separation model, so an options-prefixed base does not reach the
+    // MISPLACED gate. Tracked in .claude/backlog/backlog.md; convert these todos to
+    // real assertions when the [...]> path is integrated. (External review 2026-06-30.)
+    it.todo('warns MISPLACED on an options-prefixed ; over a bare alias (F2)');
+    it.todo('drops an options-prefixed invalid ;-part rather than leaking "undefined" (F3)');
+  });
 });
