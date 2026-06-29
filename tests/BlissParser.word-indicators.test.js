@@ -4,44 +4,54 @@ import { BlissSVGBuilder } from '../src/index.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
- * Pins WORD;INDICATOR DSL syntax: indicator attachment to the head glyph
- * after a pre-defined word (or character) is expanded.
+ * Pins how a character-level `;` and a word-level `;;` interact with a
+ * pre-defined word (or alias chain) after Strict Indicator Separation.
+ *
+ * A character-level `;` is dumb part-composition on a SINGLE character, so on a
+ * multi-character word, an alias (a word unit), or a multi-word `//` alias it is
+ * MISPLACED: the parser warns MISPLACED_CHARACTER_INDICATOR, drops the part, and
+ * still renders the base as defined (the head keeps any baked indicator). Word-
+ * level head resolution (modifier-skip fallback, explicit `^`, multi-part head
+ * re-join, alias-chain expansion) is exercised through `;;`, whose overlay
+ * resolves onto the head at render.
  *
  * Covers:
- * - Basic ;-attachment to a head glyph across word expansion (TestWord1;B86).
- * - Re-joining a multi-primitive-part head base with ';' when an indicator is
- *   reattached (the head's base parts must stay separate, not fuse).
- * - Modifier-skipping fallback heuristics when the word has no explicit ^ marker.
- * - Alias-chain resolution (1-level, 3-level, 4-level).
- * - Indicator removal (WORD;) and replacement (WORD;NEW_IND).
- * - Semantic-indicator preservation rules (semantic stays last; grammatic replaceable).
- * - Word-definition-carries-indicators behavior across ;X / ; / ;! inputs:
- *   add-with-semantic-preserve, invalid-indicator no-op, empty-; strip
- *   non-semantic, empty-; preserve semantic, ;! strip even semantic.
- * - Composite-indicator structure preservation (B914 = B928;B86:3,0).
- * - Multi-word sentence context.
- * - Single-glyph character distinction from word-level behavior under ; / ;! /
- *   ;X-not-an-indicator inputs.
- * - Edge cases: undefined word code, empty base, glyph-level options.
- * - An indicator bound to a multi-word alias (one token expanding past a word
- *   break) failing the whole unit (group.errorCode = MALFORMED_WORD_INDICATOR),
- *   uniformly for direct and nested aliases; the `;;` facet of the same
- *   contract lives in `BlissParser.double-semicolon.test.js`.
+ * - Character `;` on a multi-character word / alias chain / word that already
+ *   carries a baked indicator: MISPLACED + drop + render-as-defined, with the
+ *   head's baked indicator preserved.
+ * - Trailing `;` on a word: inert (no strip, no warning, baked indicator kept).
+ * - Word `;;` resolving onto the head across modifier patterns, an explicit `^`
+ *   marker, a multi-primitive-part head (re-joined with `;`, not fused), and a
+ *   multi-word sentence scope.
+ * - Legitimate single-character dumb append (`H;B86`, `TestChar;E`).
+ * - Character `;` on a multi-word `//` alias: MISPLACED + render every word
+ *   (Decision D1), with the explicit-`//` and trailing-`;` controls intact.
+ * - Composite indicator (indicator-of-indicators) structure preservation.
  *
  * Does NOT cover:
- * - The ;; (double-semicolon) syntax on inline expressions, see
- *   `BlissParser.double-semicolon.test.js`.
+ * - The core dumb-`;` / MISPLACED contract in isolation (glyph vs bare alias),
+ *   see `BlissParser.strict-indicator-separation.test.js`.
+ * - The `;;` overlay store shape and resolve rules, see
+ *   `BlissParser.double-semicolon.test.js` and
+ *   `BlissSVGBuilder.word-indicator-overlay.test.js`.
  * - Head-glyph algorithm internals, see `BlissParser.head-glyph.test.js` and
  *   `BlissParser.head-glyph-exclusions.test.js`.
  * - Semantic-indicator ordering rules in isolation, see
  *   `BlissParser.semantic-preservation.test.js`.
- * - Rendered SVG output for indicator attachment, see
- *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
+ * - Rendered SVG output, see `BlissSVGBuilder.VisualRegression.e2e.test.js`.
  */
 
 describe('BlissParser word-indicator syntax', () => {
 
   const partCodes = glyph => glyph.parts.map(part => part.codeName);
+  const warningCodes = dsl => new BlissSVGBuilder(dsl).warnings.map(w => w.code);
+  // The ;; overlay resolves onto the head at render; report its index and part
+  // codes (mirrors the helper in BlissParser.double-semicolon.test.js).
+  const resolvedHead = dsl => {
+    const glyphs = new BlissSVGBuilder(dsl).snapshot().children[0].children.filter(c => c.isGlyph);
+    const index = glyphs.findIndex(g => g.children?.some(p => p.isIndicator));
+    return { index, parts: index === -1 ? [] : glyphs[index].children.map(p => p.codeName) };
+  };
 
   // Snapshot built-in definition keys so afterAll strips exactly the
   // test-only definitions registered below, with no key list to maintain.
@@ -122,12 +132,6 @@ describe('BlissParser word-indicator syntax', () => {
       isBlissGlyph: true
     };
 
-    blissElementDefinitions['TestCharWithIndicator'] = {
-      codeString: 'B291;B97',  // B291 with thing indicator (B97 is a real indicator)
-      glyphCode: 'TestCharWithIndicator',
-      isBlissGlyph: true
-    };
-
     // Composite indicators (indicators composed of other indicators)
     // Simulates the B914 = B928;B86:3,0 nested structure
     blissElementDefinitions['TestCompositeInd1'] = {
@@ -157,11 +161,6 @@ describe('BlissParser word-indicator syntax', () => {
       isBlissGlyph: true
     };
     blissElementDefinitions['_C15B_WORD_NONSEM'] = { codeString: 'B486/B291;B81/B313' };
-    blissElementDefinitions['_C15B_SINGLE_WITH_SEMANTIC'] = {
-      codeString: 'B291;B97',
-      glyphCode: '_C15B_SINGLE_WITH_SEMANTIC',
-      isBlissGlyph: true
-    };
 
     // Word whose marked head is a bare alias resolving to a TWO-primitive-part
     // base (no glyphCode), to exercise the multi-part head re-join on reattach.
@@ -180,328 +179,182 @@ describe('BlissParser word-indicator syntax', () => {
     }
   });
 
-  describe('when applying ; to a pre-defined word with explicit ^ marker', () => {
-    it('attaches a single indicator to the head glyph', () => {
+  describe('when a character ; targets a multi-character word', () => {
+    it('drops the misplaced part and renders the word with its head designation', () => {
       const result = BlissParser.parse('TestWord1;B86');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // First glyph (H) should have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(warningCodes('TestWord1;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      // The head ^ designation survives; the misplaced B86 is dropped.
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
       expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-
-      // Second glyph (C) should not have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C']);
     });
 
-    it('attaches multiple indicators to the head glyph', () => {
+    it('drops multiple misplaced ;-parts together', () => {
       const result = BlissParser.parse('TestWord1;B86;B99');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // First glyph (H) should have both indicators
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[0].parts[2].codeName).toBe('B99');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
+      expect(warningCodes('TestWord1;B86;B99')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C']);
     });
 
-    it('attaches the indicator to a middle head glyph when ^ is mid-word', () => {
+    it('drops the misplaced part on a mid-word head, rendering every glyph', () => {
       const result = BlissParser.parse('TestWord2;B86');
 
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // Middle glyph (C) should have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
-
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
+      expect(warningCodes('TestWord2;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C']);
       expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
-
-      expect(result.groups[0].glyphs[2].parts[0].codeName).toBe('E');
-      expect(result.groups[0].glyphs[2].parts.length).toBe(1);
+      expect(partCodes(result.groups[0].glyphs[2])).toEqual(['E']);
     });
   });
 
-  describe('when the head glyph base has multiple primitive parts', () => {
+  describe('when a word-level ;; resolves onto a multi-primitive-part head', () => {
     // _WordMultiPartHead = B291/_MultiPartBase^ where _MultiPartBase resolves to
     // 'S8:0,8;VL4:0,0': the marked head is a base of TWO primitive parts and no
-    // glyphCode. Reattaching an indicator must re-join those base parts with ';'
-    // so S8 and VL4 stay separate, rather than fusing into one malformed token.
-    it('re-joins the multi-part base with ; when attaching an indicator', () => {
-      // pins getBaseCode's nonIndicatorParts.join(';') on the WORD;IND head
-      // reattach (parser L461); killed the join(';')->join('') mutant in the
-      // 2026-06-26 Stryker run, which fuses S8:0,8 and VL4 into 'S8:0,8VL4'.
-      const result = BlissParser.parse('_WordMultiPartHead;B81');
-      const head = result.groups[0].glyphs.find(g => g.isHeadGlyph);
-      expect(head.parts.map(p => p.codeName)).toEqual(['S8', 'VL4', 'B81']);
+    // glyphCode. Merging the ;; overlay onto it must re-join those base parts
+    // with ';' so S8 and VL4 stay separate, not fused into one malformed token.
+    it('re-joins the multi-part base with ; when the overlay merges at render', () => {
+      // pins that the ;; overlay resolves onto a multi-primitive-part head
+      // without fusing its base: S8 and VL4 stay separate parts. Re-homed from
+      // the removed char-`;` reattach; a base-fusing mutation gives 'S8:0,8VL4'.
+      expect(resolvedHead('_WordMultiPartHead;;B81').parts).toEqual(['S8', 'VL4', 'B81']);
     });
 
     it('emits no MALFORMED_COORDINATES warning for the re-joined base', () => {
-      const codes = new BlissSVGBuilder('_WordMultiPartHead;B81').warnings.map(w => w.code);
-      expect(codes).not.toContain('MALFORMED_COORDINATES');
+      expect(warningCodes('_WordMultiPartHead;;B81')).not.toContain('MALFORMED_COORDINATES');
     });
   });
 
-  describe('when the word definition contains modifier glyphs (fallback heuristics)', () => {
-    it('skips a single modifier (B486) and attaches the indicator to the next glyph', () => {
-      const result = BlissParser.parse('TestWord3;B86');
+  describe('when a word-level ;; resolves past modifier glyphs (fallback heuristics)', () => {
+    it('skips a single modifier (B486) and resolves onto the next glyph', () => {
+      // R15 WS-4 / Strict Indicator Separation: the parser leaves a fallback
+      // head unstamped; the ;; overlay resolves onto it at query time.
+      const parsed = BlissParser.parse('TestWord3;;B86');
+      expect(parsed.groups[0].glyphs[0].glyphCode).toBe('B486');
+      expect(parsed.groups[0].glyphs[1].isHeadGlyph).toBeUndefined();
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // First glyph (B486) should not have indicator - it's a modifier
-      expect(result.groups[0].glyphs[0].glyphCode).toBe('B486');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBeUndefined();
-      // B486 has no indicator parts
-      expect(result.groups[0].glyphs[0].parts.every(p => p.codeName !== 'B86')).toBe(true);
-
-      // Second glyph (H) should have indicator attached via fallback heuristics
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B86');
-      // R15 WS-4: the parser no longer stamps a fallback head; the attached
-      // B86 above confirms it resolves here at render.
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBeUndefined();
+      const head = resolvedHead('TestWord3;;B86');
+      expect(head.index).toBe(1);
+      expect(head.parts).toEqual(['H', 'B86']);
     });
 
-    it('skips a multi-glyph modifier pattern and attaches the indicator after it', () => {
-      const result = BlissParser.parse('TestWordMultiModifier;B86');
+    it('skips a multi-glyph modifier pattern and resolves after it', () => {
+      const parsed = BlissParser.parse('TestWordMultiModifier;;B86');
+      expect(parsed.groups[0].glyphs.map(g => g.glyphCode)).toEqual(['B1060', 'B578', 'B303', undefined]);
 
-      expect(result.groups[0].glyphs.length).toBe(4);
-
-      // First 3 glyphs (B1060/B578/B303) form a modifier pattern - no indicator
-      expect(result.groups[0].glyphs[0].glyphCode).toBe('B1060');
-      expect(result.groups[0].glyphs[1].glyphCode).toBe('B578');
-      expect(result.groups[0].glyphs[2].glyphCode).toBe('B303');
-
-      // Fourth glyph (H) carries the indicator; the parser no longer stamps a
-      // fallback head (R15 WS-4), so the attached B86 confirms it resolves here.
-      expect(result.groups[0].glyphs[3].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[3].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[3].isHeadGlyph).toBeUndefined();
+      const head = resolvedHead('TestWordMultiModifier;;B86');
+      expect(head.index).toBe(3);
+      expect(head.parts).toEqual(['H', 'B86']);
     });
 
     it('skips multiple B486 modifiers in sequence', () => {
-      const result = BlissParser.parse('TestWordDoubleModifier;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(3);
-
-      // First two glyphs (B486/B486) are modifiers - no indicator
-      expect(result.groups[0].glyphs[0].glyphCode).toBe('B486');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBeUndefined();
-      expect(result.groups[0].glyphs[1].glyphCode).toBe('B486');
-      expect(result.groups[0].glyphs[1].isHeadGlyph).toBeUndefined();
-
-      // Third glyph (H) carries the indicator; the parser no longer stamps a
-      // fallback head (R15 WS-4), so the attached B86 confirms it resolves here.
-      expect(result.groups[0].glyphs[2].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[2].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[2].isHeadGlyph).toBeUndefined();
+      const head = resolvedHead('TestWordDoubleModifier;;B86');
+      expect(head.index).toBe(2);
+      expect(head.parts).toEqual(['H', 'B86']);
     });
 
     it('honors an explicit ^ marker on a modifier (overrides fallback)', () => {
-      const result = BlissParser.parse('TestWordModifierWithMarker;B86');
+      // B486^ is the marked head even though B486 is normally a modifier.
+      expect(BlissParser.parse('TestWordModifierWithMarker;;B86').groups[0].glyphs[0].isHeadGlyph).toBe(true);
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // First glyph (B486) has explicit ^ marker - should be head and get indicator
-      expect(result.groups[0].glyphs[0].glyphCode).toBe('B486');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-      expect(result.groups[0].glyphs[0].parts.some(p => p.codeName === 'B86')).toBe(true);
-
-      // Second glyph (H) should NOT have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+      const head = resolvedHead('TestWordModifierWithMarker;;B86');
+      expect(head.index).toBe(0);
+      expect(head.parts).toEqual(['B486', 'B86']);
     });
 
-    it('skips combine marker (B233) and modifier pattern sequentially', () => {
-      const result = BlissParser.parse('TestWordCombineMarkerWithModifier;B86');
-
-      expect(result.groups[0].glyphs.length).toBe(5);
-
-      // First glyph (B233) is a combine marker - no indicator
-      expect(result.groups[0].glyphs[0].glyphCode).toBe('B233');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBeUndefined();
-
-      // Next three glyphs (B1060/B578/B303) form a modifier pattern - no indicator
-      expect(result.groups[0].glyphs[1].glyphCode).toBe('B1060');
-      expect(result.groups[0].glyphs[2].glyphCode).toBe('B578');
-      expect(result.groups[0].glyphs[3].glyphCode).toBe('B303');
-
-      // Fifth glyph (H) carries the indicator; the parser no longer stamps a
-      // fallback head (R15 WS-4), so the attached B86 confirms it resolves here.
-      expect(result.groups[0].glyphs[4].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[4].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[4].isHeadGlyph).toBeUndefined();
+    it('skips a combine marker (B233) and modifier pattern sequentially', () => {
+      const head = resolvedHead('TestWordCombineMarkerWithModifier;;B86');
+      expect(head.index).toBe(4);
+      expect(head.parts).toEqual(['H', 'B86']);
     });
   });
 
-  describe('when the word is an alias chain', () => {
-    it('expands a one-level alias and attaches the indicator to the head glyph', () => {
+  describe('when a character ; targets an alias chain', () => {
+    it('expands a one-level alias and drops the misplaced part', () => {
+      // TestAlias -> TestWord1 -> H^/C: the alias resolves, then the misplaced
+      // character indicator drops, leaving the word rendered as defined.
       const result = BlissParser.parse('TestAlias;B86');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // TestAlias → TestWord1 → H^/C
-      // Indicator should attach to H
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(warningCodes('TestAlias;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
       expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C']);
     });
 
-    it('resolves a 3-level alias chain and attaches the indicator', () => {
-      // TestDeepAlias1 → TestAlias → TestWord1 → 'H^/C'
+    it('resolves a 3-level alias chain and drops the misplaced part', () => {
+      // TestDeepAlias1 -> TestAlias -> TestWord1 -> 'H^/C'
       const result = BlissParser.parse('TestDeepAlias1;B86');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // H (head glyph) should have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
-      expect(result.groups[0].glyphs[0].isHeadGlyph).toBe(true);
-
-      // C should not have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+      expect(warningCodes('TestDeepAlias1;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C']);
     });
 
-    it('resolves a 4-level alias chain and attaches the indicator', () => {
-      // TestDeepAlias2 → TestDeepAlias1 → TestAlias → TestWord1 → 'H^/C'
+    it('resolves a 4-level alias chain and drops the misplaced part', () => {
+      // TestDeepAlias2 -> TestDeepAlias1 -> TestAlias -> TestWord1 -> 'H^/C'
       const result = BlissParser.parse('TestDeepAlias2;B86');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(warningCodes('TestDeepAlias2;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C']);
     });
   });
 
-  describe('when ; is used with no following indicator', () => {
-    it('removes existing indicators from the expanded word', () => {
+  describe('when a trailing ; carries no part on a word', () => {
+    it('keeps the head baked indicator (inert, not a strip)', () => {
+      // TestWordWithIndicator = 'H/C;B81^': trailing ; is inert under Strict
+      // Indicator Separation, so the head's baked B81 survives (stripping is
+      // now API-only via clearIndicators).
       const result = BlissParser.parse('TestWordWithIndicator;');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // First glyph (H) should not have indicator
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
-
-      // Second glyph (C) should not have indicator
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(1);
+      expect(warningCodes('TestWordWithIndicator;')).not.toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C', 'B81']);
       expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
+    });
+
+    it('keeps a grammatical head indicator inert (no strip)', () => {
+      // _C15B_WORD_NONSEM = 'B486/B291;B81/B313': B81 stays on the head.
+      expect(partCodes(BlissParser.parse('_C15B_WORD_NONSEM;').groups[0].glyphs[1])).toEqual(['B291', 'B81']);
+    });
+
+    it('keeps a semantic head indicator inert (no strip)', () => {
+      // _C15B_WORD_SEMANTIC = 'B486/B291;B97/B313': B97 stays on the head.
+      expect(partCodes(BlissParser.parse('_C15B_WORD_SEMANTIC;').groups[0].glyphs[1])).toEqual(['B291', 'B97']);
     });
   });
 
-  describe('when ; replaces existing indicators', () => {
-    it('replaces an existing indicator with a new one', () => {
+  describe('when a character ; targets a word that already carries a baked indicator', () => {
+    it('drops the misplaced part and preserves the head baked indicator', () => {
+      // TestWordWithIndicator = 'H/C;B81^': the misplaced B99 drops; B81 stays.
       const result = BlissParser.parse('TestWordWithIndicator;B99');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
-
-      // Second glyph (C) should have new indicator (not B86)
-      expect(result.groups[0].glyphs[1].parts[0].codeName).toBe('C');
-      expect(result.groups[0].glyphs[1].parts[1].codeName).toBe('B99');
-      expect(result.groups[0].glyphs[1].parts.length).toBe(2);
+      expect(warningCodes('TestWordWithIndicator;B99')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
+      expect(partCodes(result.groups[0].glyphs[1])).toEqual(['C', 'B81']);
       expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
     });
 
-    it('preserves a semantic indicator when replacing with a verbal (semantic stays last)', () => {
-      // TestCharWithIndicator has codeString 'B291;B97' (B97 is a semantic indicator)
-      // Using ;B81 (verbal) should preserve B97 but place it AFTER B81
-      const result = BlissParser.parse('TestCharWithIndicator;B81');
-
-      expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts.length).toBe(3);
-      // B291 (base), B81 (verbal, first), B97 (preserved semantic, last)
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B81');
-      expect(result.groups[0].glyphs[0].parts[1].isIndicator).toBe(true);
-      expect(result.groups[0].glyphs[0].parts[2].codeName).toBe('B97');
-      expect(result.groups[0].glyphs[0].parts[2].isIndicator).toBe(true);
+    it('preserves a baked semantic root when dropping the misplaced part', () => {
+      // _C15B_WORD_SEMANTIC: B97 (semantic) stays on the head; B81 is dropped.
+      expect(warningCodes('_C15B_WORD_SEMANTIC;B81')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(BlissParser.parse('_C15B_WORD_SEMANTIC;B81').groups[0].glyphs[1])).toEqual(['B291', 'B97']);
     });
 
-    it('preserves a semantic indicator when stripping grammatic with empty indicator', () => {
-      // TestCharWithIndicator has codeString 'B291;B97'
-      // Using ; should strip grammatic indicators but preserve B97 (semantic)
-      const result = BlissParser.parse('TestCharWithIndicator;');
-
-      expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts.length).toBe(2);
-      // B291 (base) and B97 (semantic, preserved)
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B97');
+    it('treats a non-indicator ;-part as misplaced too, preserving the baked indicator', () => {
+      // _C15B_WORD_NONSEM: C8 is not an indicator, but any ;-part on a word is
+      // misplaced; the baked B81 survives.
+      expect(warningCodes('_C15B_WORD_NONSEM;C8')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(partCodes(BlissParser.parse('_C15B_WORD_NONSEM;C8').groups[0].glyphs[1])).toEqual(['B291', 'B81']);
     });
 
-    it('does not replace when the new part is not a real indicator', () => {
-      // TestChar has codeString 'H;S2' (S2 is NOT a real indicator)
-      // Using ;E should ADD E, not replace S2, because E is not an indicator
-      const result = BlissParser.parse('TestChar;E');
-
-      expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts.length).toBe(2);
-      // Original behavior: TestChar wrapper with E as sibling
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('TestChar');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('E');
-    });
-
-    it('preserves a semantic indicator when replacing with verbal + options (semantic stays last)', () => {
-      // TestCharWithIndicator has codeString 'B291;B97'
-      // Using ;[color=red]>B81 (verbal) should preserve B97 but place it AFTER B81
-      const result = BlissParser.parse('TestCharWithIndicator;[color=red]>B81');
-
-      expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts.length).toBe(3);
-      // B291 (base), B81 (verbal with options, first), B97 (preserved semantic, last)
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B81');
-      expect(result.groups[0].glyphs[0].parts[1].isIndicator).toBe(true);
-      expect(result.groups[0].glyphs[0].parts[1].options.color).toBe('red');
-      expect(result.groups[0].glyphs[0].parts[2].codeName).toBe('B97');
-      expect(result.groups[0].glyphs[0].parts[2].isIndicator).toBe(true);
-    });
-  });
-
-  describe('when the word definition already carries indicators', () => {
-    it('preserves the semantic root when a non-semantic indicator is added to a word head', () => {
-      const r = BlissParser.parse('_C15B_WORD_SEMANTIC;B81');
-      const glyphs = r.groups[0].glyphs;
-
-      expect(partCodes(glyphs[1])).toEqual(['B291', 'B81', 'B97']);
-      // R15 WS-4: fallback head unstamped; the partCodes above confirm it resolves here.
-      expect(glyphs[1].isHeadGlyph).toBeUndefined();
-    });
-
-    it('leaves the existing word indicators unchanged when the provided indicator is not a real indicator', () => {
-      const r = BlissParser.parse('_C15B_WORD_NONSEM;C8');
-      const head = r.groups[0].glyphs[1];
-
-      expect(partCodes(head)).toEqual(['B291', 'B81']);
-    });
-
-    it('strips non-semantic indicators from the word head on empty ;', () => {
-      const r = BlissParser.parse('_C15B_WORD_NONSEM;');
-      const head = r.groups[0].glyphs[1];
-
-      expect(partCodes(head)).toEqual(['B291']);
-      // R15 WS-4: fallback head unstamped; the partCodes above confirm it resolves here.
-      expect(head.isHeadGlyph).toBeUndefined();
-    });
-
-    it('preserves the semantic root on empty ;', () => {
-      const preserved = BlissParser.parse('_C15B_WORD_SEMANTIC;');
-
-      expect(partCodes(preserved.groups[0].glyphs[1])).toEqual(['B291', 'B97']);
-    });
-
-    it('strips even the semantic root with the ;! marker', () => {
-      const stripped = BlissParser.parse('_C15B_WORD_SEMANTIC;!');
-
-      expect(partCodes(stripped.groups[0].glyphs[1])).toEqual(['B291']);
+    it('drops a ;!-part on a word as misplaced only, never validating it (D3)', () => {
+      // The ;-part is dropped before its content is checked, so only MISPLACED
+      // fires, never UNKNOWN_CODE; the baked semantic B97 survives.
+      expect(warningCodes('_C15B_WORD_SEMANTIC;!')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(warningCodes('_C15B_WORD_SEMANTIC;!')).not.toContain('UNKNOWN_CODE');
+      expect(partCodes(BlissParser.parse('_C15B_WORD_SEMANTIC;!').groups[0].glyphs[1])).toEqual(['B291', 'B97']);
     });
   });
 
@@ -614,45 +467,27 @@ describe('BlissParser word-indicator syntax', () => {
     });
   });
 
-  describe('when applying ; to a single character (not a word)', () => {
-    it('attaches the indicator directly to the character', () => {
+  describe('when ; appends to a single character', () => {
+    it('appends the indicator directly to a literal character', () => {
       const result = BlissParser.parse('H;B86');
 
       expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('H');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H', 'B86']);
     });
 
-    it('expands a character definition and adds the indicator as a sibling part', () => {
+    it('expands a glyph definition and appends the part as a sibling', () => {
+      // TestChar = 'H;S2' is a real glyph (S2 is not an indicator), so ; dumb-
+      // appends E alongside the expanded base. A glyph never bakes an indicator,
+      // so dumb ; never meets a baked semantic; see
+      // BlissParser.strict-indicator-separation.test.js.
       const result = BlissParser.parse('TestChar;E');
 
-      // Character (TestChar) stays as outer code, with nested parts for expansion
-      // Indicator (E) is a separate part
       expect(result.groups[0].glyphs.length).toBe(1);
       expect(result.groups[0].glyphs[0].parts.length).toBe(2);
       expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('TestChar');
       expect(result.groups[0].glyphs[0].parts[0].parts[0].codeName).toBe('H');
       expect(result.groups[0].glyphs[0].parts[0].parts[1].codeName).toBe('S2');
       expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('E');
-    });
-
-    it('leaves a single-glyph character with replaceable indicators intact when ; is not provided', () => {
-      const unchanged = BlissParser.parse('_C15B_SINGLE_WITH_SEMANTIC');
-
-      expect(partCodes(unchanged.groups[0].glyphs[0])).toEqual(['B291', 'B97']);
-    });
-
-    it('strips a single-glyph character\'s indicators with the ;! marker', () => {
-      const stripped = BlissParser.parse('_C15B_SINGLE_WITH_SEMANTIC;!');
-
-      expect(partCodes(stripped.groups[0].glyphs[0])).toEqual(['B291']);
-    });
-
-    it('attaches a non-indicator as a sibling part on a single-glyph character', () => {
-      const invalidIndicator = BlissParser.parse('_C15B_SINGLE_WITH_SEMANTIC;C8');
-
-      expect(partCodes(invalidIndicator.groups[0].glyphs[0]))
-        .toEqual(['_C15B_SINGLE_WITH_SEMANTIC', 'C8']);
     });
   });
 
@@ -678,16 +513,17 @@ describe('BlissParser word-indicator syntax', () => {
   });
 
   describe('when the word appears in a multi-word sentence', () => {
-    it('applies the indicator only within its enclosing word group', () => {
+    it('drops the misplaced part within its enclosing word group only', () => {
       const result = BlissParser.parse('H//TestWord1;B86//C');
 
+      expect(warningCodes('H//TestWord1;B86//C')).toContain('MISPLACED_CHARACTER_INDICATOR');
       expect(result.groups.length).toBe(5);  // word, space, word, space, word
 
-      // Second word group (TestWord1;B86)
+      // The TestWord1 group renders as defined (head H, then C); B86 is dropped.
       const wordGroup = result.groups[2];
-      expect(wordGroup.glyphs.length).toBe(2);
-      expect(wordGroup.glyphs[0].parts[1].codeName).toBe('B86');
+      expect(partCodes(wordGroup.glyphs[0])).toEqual(['H']);
       expect(wordGroup.glyphs[0].isHeadGlyph).toBe(true);
+      expect(partCodes(wordGroup.glyphs[1])).toEqual(['C']);
     });
   });
 
@@ -707,34 +543,30 @@ describe('BlissParser word-indicator syntax', () => {
       expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('B86');
     });
 
-    it('attaches the indicator at character level when the code is not a defined word', () => {
+    it('appends the part to an unknown bare code as a single character', () => {
+      // An undefined code is a single (unknown) character, so ; dumb-appends.
       const result = BlissParser.parse('NonExistentWord;B86');
 
-      // Should treat as character (no expansion), indicator attached
       expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('NonExistentWord');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['NonExistentWord', 'B86']);
     });
 
-    it('preserves glyph-level options when applying ; to a word', () => {
+    it('preserves glyph-level options while dropping the misplaced part on a word', () => {
       const result = BlissParser.parse('[color=red]TestWord1;B86');
 
-      expect(result.groups[0].glyphs.length).toBe(2);
+      expect(warningCodes('[color=red]TestWord1;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
       expect(result.groups[0].glyphs[0].options.color).toBe('red');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('B86');
+      expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
     });
   });
 
-  describe('when an indicator is bound to a multi-word alias', () => {
-    // An indicator (character-level `;` or word-level `;;`) targets a single
-    // word. A multi-word alias is ONE token that expands to more than one word,
-    // so there is no single head to carry the indicator: the binding is invalid.
-    // The parser flags the whole unit (group.errorCode = MALFORMED_WORD_INDICATOR)
-    // for a one-icon fail-render (the L1 mechanism), instead of the legacy silent
-    // drop (direct // alias) or first-word-head attach (nested alias). User
-    // decision, corpus-expansion-and-indicator-contract plan (Decision 6); applies
-    // UNIFORMLY to direct and nested aliases. The `;;` facet of this contract is
-    // pinned in BlissParser.double-semicolon.test.js.
+  describe('when a character ; targets a multi-word (//) alias', () => {
+    // A // alias is ONE token that expands to valid multi-word content. A dumb
+    // character `;`-part has no single character to attach to, so per Decision
+    // D1 it is MISPLACED: warn + drop + render every word (NOT the legacy
+    // whole-unit MALFORMED_WORD_INDICATOR fail). The `;;` word-level facet is a
+    // genuine word binding with no single head, so it still fails the unit; that
+    // is pinned in BlissParser.double-semicolon.test.js.
     const MULTIWORD_DEFS = {
       _MWORD_DIRECT: { codeString: 'B291//B313' },        // // directly in the codeString
       _MWORD_INNER: { codeString: 'B291//B303' },
@@ -744,126 +576,120 @@ describe('BlissParser word-indicator syntax', () => {
     beforeAll(() => BlissSVGBuilder.define(MULTIWORD_DEFS));
     afterAll(() => Object.keys(MULTIWORD_DEFS).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
 
-    const flaggedGroup = (dsl) => BlissParser.parse(dsl).groups[0];
+    const parsedGroups = (dsl) => BlissParser.parse(dsl).groups;
     const groupChildren = (dsl) => new BlissSVGBuilder(dsl).snapshot().children;
 
     it.each([
-      '_MWORD_DIRECT;B81',  // direct // codeString alias (was a silent drop)
+      '_MWORD_DIRECT;B81',  // direct // codeString alias
       '_MWORD_NESTED;B81',  // nested alias, // inside the referenced alias
-    ])('flags the whole unit with group.errorCode for %s', (dsl) => {
-      expect(flaggedGroup(dsl).errorCode).toBe('MALFORMED_WORD_INDICATOR');
-      expect(flaggedGroup(dsl).errorSource).toBe(dsl);
+    ])('warns MISPLACED and never flags the unit for %s', (dsl) => {
+      expect(warningCodes(dsl)).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(parsedGroups(dsl).every((g) => g.errorCode === undefined)).toBe(true);
     });
 
-    it('collapses the unit to one group when failing, leaving no word split', () => {
-      // The alias would render as 3 groups (word, space, word); the fail
-      // collapses it to ONE flagged group, so no head can carry the indicator.
-      expect(groupChildren('_MWORD_DIRECT;B81')).toHaveLength(1);
+    it('renders every word of the alias, with no collapse to a failed unit', () => {
+      // The alias renders as 3 groups (word, space, word); the misplaced ;-part
+      // is dropped and never collapses the unit.
+      expect(groupChildren('_MWORD_DIRECT;B81')).toHaveLength(3);
+      expect(new BlissSVGBuilder('_MWORD_DIRECT;B81').toString()).toBe('B291//B313');
     });
 
-    it('emits exactly one MALFORMED_WORD_INDICATOR warning for the unit', () => {
-      const malformed = new BlissSVGBuilder('_MWORD_NESTED;B81').warnings
-        .filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
-      expect(malformed).toHaveLength(1);
+    it('emits exactly one MISPLACED_CHARACTER_INDICATOR warning for the unit', () => {
+      const misplaced = new BlissSVGBuilder('_MWORD_NESTED;B81').warnings
+        .filter((w) => w.code === 'MISPLACED_CHARACTER_INDICATOR');
+      expect(misplaced).toHaveLength(1);
     });
 
-    it('shows one placeholder for the whole unit when error-placeholder is on', () => {
+    it('renders the words normally even with error-placeholder on', () => {
+      // Nothing fails, so error-placeholder has nothing to placehold: 3 groups.
       const children = groupChildren('[error-placeholder]||_MWORD_DIRECT;B81');
-      expect(children).toHaveLength(1);
-      expect(children[0].children).toHaveLength(1);
+      expect(children).toHaveLength(3);
+      children.forEach((c) => expect(c.children).toHaveLength(1));
     });
 
-    it('renders the unit invisible with no children when error-placeholder is off', () => {
-      expect(groupChildren('_MWORD_DIRECT;B81')[0].children).toEqual([]);
-    });
-
-    it('re-emits the offending string from toString and re-flags on re-parse', () => {
+    it('drops the misplaced part from toString, leaving a stable round-trip', () => {
       const builder = new BlissSVGBuilder('_MWORD_DIRECT;B81');
-      expect(builder.toString()).toBe('_MWORD_DIRECT;B81');
-      expect(BlissParser.parse(builder.toString()).groups[0].errorCode)
-        .toBe('MALFORMED_WORD_INDICATOR');
+      expect(builder.toString()).toBe('B291//B313');
+      expect(BlissParser.parse(builder.toString()).groups.every((g) => g.errorCode === undefined)).toBe(true);
     });
 
-    it('binds the indicator to the head of a single-word alias without failing', () => {
-      // Control: _MWORD_SINGLE = 'B291/B313' is ONE word; ;B81 binds to its head.
-      expect(flaggedGroup('_MWORD_SINGLE;B81').errorCode).toBeUndefined();
-      expect(partCodes(flaggedGroup('_MWORD_SINGLE;B81').glyphs[0])).toEqual(['B291', 'B81']);
+    it('drops the misplaced part on a single-word alias too', () => {
+      // _MWORD_SINGLE = 'B291/B313' is ONE word; the ;-part is misplaced on it
+      // and dropped (a word has no single character to take the part).
+      expect(warningCodes('_MWORD_SINGLE;B81')).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(parsedGroups('_MWORD_SINGLE;B81')[0].errorCode).toBeUndefined();
+      expect(partCodes(parsedGroups('_MWORD_SINGLE;B81')[0].glyphs[0])).toEqual(['B291']);
     });
 
-    it('binds an explicit // sentence indicator to its second word without failing', () => {
+    it('appends to the second word of an explicit // sentence without warning', () => {
       // Control: explicit DSL // splits into word groups BEFORE alias expansion,
-      // so ;B81 binds to the second word (B313), never the whole sentence.
+      // so ;B81 dumb-appends onto the single character B313, never misplaced.
       const parsed = BlissParser.parse('B291//B313;B81');
+      expect(warningCodes('B291//B313;B81')).not.toContain('MISPLACED_CHARACTER_INDICATOR');
       expect(parsed.groups.every((g) => g.errorCode === undefined)).toBe(true);
       expect(partCodes(parsed.groups[2].glyphs[0])).toEqual(['B313', 'B81']);
     });
 
-    it('does not fail an empty strip (;) on a multi-word alias', () => {
-      // An empty `;` strips indicators (a no-op here) and must never warn or
-      // fail: the user cannot know whether a code bakes an indicator. Only a
-      // REAL indicator bound to the multi-word alias fails the unit.
-      // pins the inputIndicatorsAreReal gate (not merely hasInputIndicators).
-      expect(flaggedGroup('_MWORD_DIRECT;').errorCode).toBeUndefined();
+    it('keeps a trailing ; inert on a multi-word alias (no warning)', () => {
+      // A trailing `;` has no part, so it is inert, never misplaced.
+      expect(warningCodes('_MWORD_DIRECT;')).not.toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(parsedGroups('_MWORD_DIRECT;')[0].errorCode).toBeUndefined();
     });
 
-    it('does not fail when a multi-word-alias indicator is embedded in a definition', () => {
-      // Scope boundary: the fail is for a USER-written indicator on a multi-word
-      // alias. An alias whose codeString embeds `<multi-word>;<indicator>` is an
-      // internal expansion that keeps its legacy non-failing behavior; the fail
-      // is scoped to top-level input (the isTopLevel guard).
+    it('does not warn for a multi-word-alias indicator embedded in a definition', () => {
+      // Scope boundary: MISPLACED is for a USER-written ;-part (isTopLevel). An
+      // alias whose codeString embeds `<multi-word>;<indicator>` is an internal
+      // expansion and is not re-flagged.
       BlissSVGBuilder.define({ _MWORD_WRAPS: { codeString: '_MWORD_DIRECT;B81' } });
       try {
-        expect(flaggedGroup('_MWORD_WRAPS').errorCode).toBeUndefined();
+        expect(warningCodes('_MWORD_WRAPS')).not.toContain('MISPLACED_CHARACTER_INDICATOR');
       } finally {
         BlissSVGBuilder.removeDefinition('_MWORD_WRAPS');
       }
     });
 
-    it('emits no head-marker warning for a failed alias with markers in two words', () => {
-      // End-to-end: a failed unit whose word-strings each carry a `^` head
-      // marker still emits exactly ONE warning (MALFORMED_WORD_INDICATOR). The
-      // per-word markers are sealed to designations during expansion, so
-      // collapsing the words into one failed group adds no MULTIPLE_HEAD_MARKERS.
+    it('emits exactly the one misplaced warning for an alias with markers in two words', () => {
+      // A // alias whose word-strings each carry a `^` head marker still emits
+      // only MISPLACED_CHARACTER_INDICATOR; the per-word markers are sealed to
+      // designations during expansion, so rendering the words adds no
+      // MULTIPLE_HEAD_MARKERS.
       BlissSVGBuilder.define({ _MWORD_TWOMARK: { codeString: 'B291^//B303^' } });
       try {
-        const codes = new BlissSVGBuilder('_MWORD_TWOMARK;B81').warnings.map((w) => w.code);
-        expect(codes).toEqual(['MALFORMED_WORD_INDICATOR']);
+        expect(warningCodes('_MWORD_TWOMARK;B81')).toEqual(['MISPLACED_CHARACTER_INDICATOR']);
       } finally {
         BlissSVGBuilder.removeDefinition('_MWORD_TWOMARK');
       }
     });
   });
 
-  // These tests use real Bliss word definitions from bliss-element-definitions.js
-  // They are skipped because:
-  // 1. The definitions may not have head glyph markers (^) yet
-  // 2. The codeStrings need verification against official Blissymbolics data
-  //
-  // To enable: remove .skip and verify the expected structure matches the actual
-  // definition. They serve as documentation of intended real-world usage patterns.
-  describe('when applied to real Bliss codes (placeholders pending head-glyph markers)', () => {
-    it.skip('attaches the indicator correctly on B5663;B81 (to confuse)', () => {
-      // B5663 = confuse = B313/B783
+  // These tests use real Bliss word definitions and stay skipped pending
+  // verification of their codeStrings and head-glyph (^) markers against
+  // official Blissymbolics data. Under Strict Indicator Separation a real
+  // multi-character word takes a WORD-level indicator via ;; (the head resolves
+  // at render); a character ; on such a word is misplaced (warn + drop). They
+  // document intended real-world usage once the definitions are verified.
+  describe('when applied to real Bliss codes (pending head-glyph markers)', () => {
+    it.skip('drops a misplaced character ; on B5663;B81 (confuse)', () => {
+      // B5663 = confuse = B313/B783; a character ; is misplaced on this word and
+      // dropped (use ;; for a word indicator). The word still renders.
       const result = BlissParser.parse('B5663;B81');
 
       expect(result.groups[0].glyphs.length).toBe(2);
-      // B313 should have B81, B783 should not
     });
 
-    it.skip('removes the description indicator on B1437; (cold)', () => {
-      // B1437 = cold = B486/B378;B86
+    it.skip('keeps a trailing ; inert on B1437; (cold)', () => {
+      // B1437 = cold = B486/B378;B86; a trailing ; is inert, so B86 is kept.
       const result = BlissParser.parse('B1437;');
 
       expect(result.groups[0].glyphs.length).toBe(2);
-      // B378 should not have B86
     });
 
-    it.skip('replaces the indicator on B1437;B81 (to heat)', () => {
-      // B1437 = cold = B486/B378;B86
+    it.skip('drops a misplaced character ; on B1437;B81 (cold)', () => {
+      // B1437 = cold = B486/B378;B86; B81 is misplaced on this word and dropped.
       const result = BlissParser.parse('B1437;B81');
 
       expect(result.groups[0].glyphs.length).toBe(2);
-      // B378 should have B81, not B86
     });
   });
+
 });
