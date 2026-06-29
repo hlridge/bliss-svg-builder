@@ -23,13 +23,14 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   gone); an explicit `;;` overlay elsewhere in the same word is untouched.
  * - The supported replacement: `;;` on the same alias still builds a reversible
  *   word overlay.
- * - `addPart` diverging from a misplaced `;` on a bare alias (the API composes
- *   at the character level; the DSL part is dropped).
  *
  * Does NOT cover:
  * - The core dumb-`;` / MISPLACED contract, `;`<->addPart parity on a real
  *   glyph, trailing-`;` inertness, and `;!` content-drop, see
  *   `BlissParser.strict-indicator-separation.test.js`.
+ * - `addPart`'s per-glyph semantics (it composes onto a navigated glyph node,
+ *   independent of the DSL token rules, so it is not a parity peer of a
+ *   *misplaced* `;`), see the ElementHandle indicator suites.
  * - `;` on a multi-character word / alias chain / multi-word `//` alias and head
  *   resolution via `;;`, see `BlissParser.word-indicators.test.js`.
  * - The `;;` overlay store shape, first-wins ownership, and DROPPED_WORD_INDICATOR
@@ -120,20 +121,6 @@ describe('BlissSVGBuilder indicator promotion', () => {
       expect(b.toString()).toBe('B291;B81;;B97');
       expect(b.toJSON().groups[0].wordIndicators).toEqual({ codes: ['B97'], stripSemantic: false });
       expect(b.warnings).toEqual([]);
-    });
-  });
-
-  describe('when the same indicator is applied via addPart instead of ;', () => {
-    it('composes at the character level, diverging from the misplaced DSL ;', () => {
-      // ;<->addPart parity holds on a real glyph (see the strict-indicator-
-      // separation contract). On a bare alias they diverge: addPart reaches the
-      // wrapping character and composes; the DSL ;-part is misplaced and dropped.
-      const dsl = new BlissSVGBuilder('NOUN_BI;B97');
-      const api = new BlissSVGBuilder('NOUN_BI');
-      api.group(0).glyph(0).addPart('B97');
-      expect(dsl.toString()).toBe('B291;B81');
-      expect(api.toString()).toBe('B291;B81;B97');
-      expect(dsl.svgCode).not.toBe(api.svgCode);
     });
   });
 });
