@@ -184,6 +184,54 @@ describe('BlissSVGBuilder.define', () => {
     });
   });
 
+  describe('when a glyph or shape definition is a multi-character word', () => {
+    // note: a glyph and a shape are each a single character; `/` and `//` are
+    // word separators, so a `/`-bearing codeString is a word, not a character.
+    // Define a word as a bare alias (omit the type flag). The parser already
+    // treats such a def as a word (isWordDefinition) and warns MISPLACED on a
+    // `;`-part, contradicting the single-character type flag; rejecting at define
+    // removes the contradiction. (Strict Indicator Separation, F4.)
+    it('rejects a glyph whose codeString is a multi-character word', () => {
+      const code = trackCode('GLYPH_WORD');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'H/S2' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('rejects a glyph whose codeString is a multi-word sequence', () => {
+      const code = trackCode('GLYPH_MULTIWORD');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B291//B313' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('rejects a shape whose codeString is a multi-character word', () => {
+      const code = trackCode('SHAPE_WORD');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: 'HL8/VL8' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('names the word problem and the bare-alias alternative in the message', () => {
+      const code = trackCode('GLYPH_WORD_MSG');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'H/S2' } });
+      expect(result.errors[0]).toContain('word');
+      expect(result.errors[0]).toContain('alias');
+    });
+
+    it('still accepts a single-character composite glyph (no /)', () => {
+      const code = trackCode('GLYPH_COMPOSITE_OK');
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'H;S2' } });
+      expect(BlissSVGBuilder.getDefinition(code).type).toBe('glyph');
+    });
+
+    it('still accepts a word defined as a bare alias', () => {
+      const code = trackCode('BARE_WORD_OK');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B291/B313' } });
+      expect(BlissSVGBuilder.getDefinition(code).type).toBe('bare');
+    });
+  });
+
   describe('when a definition uses a composed alias as a ; part', () => {
     // note: ; is part-merge, so a ;-part operand must be a part (a primitive or a
     // flagged glyph/indicator). A composed unflagged alias (B291;B81) is a

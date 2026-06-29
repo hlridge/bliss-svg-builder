@@ -332,7 +332,9 @@ describe('BlissSVGBuilder defaultOptions', () => {
         }
       });
       defineTracked({
-        WORDCOMP1: { codeString: 'DASHSQ4/H', type: 'glyph' }
+        // a word (the `/`) is a bare alias, not a glyph; it still nests the
+        // defaultOptions-bearing DASHSQ4 glyph (Strict Indicator Separation, F4).
+        WORDCOMP1: { codeString: 'DASHSQ4/H' }
       });
       const builder = new BlissSVGBuilder('WORDCOMP1');
       expect(builder.svgCode).toContain('stroke-dasharray="0 0.999"');

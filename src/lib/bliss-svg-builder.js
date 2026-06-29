@@ -1816,6 +1816,12 @@ class BlissSVGBuilder {
       if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
         throw new Error(`define("${code}"): circular reference detected`);
       }
+      // A shape is a single character; `/` and `//` are word separators, so a
+      // `/`-bearing codeString is a word, not a shape. Define a word as a bare
+      // alias (omit type:"shape"). (Strict Indicator Separation, F4.)
+      if (definition.codeString.includes('/')) {
+        throw new Error(`define("${code}"): a shape definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"shape").`);
+      }
     }
 
     if (blissElementDefinitions[code] && !options.overwrite) {
@@ -1848,6 +1854,13 @@ class BlissSVGBuilder {
 
     if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
       throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
+    }
+
+    // A glyph is a single character; `/` and `//` are word separators, so a
+    // `/`-bearing codeString is a word, not a glyph. Define a word as a bare
+    // alias (omit type:"glyph"). (Strict Indicator Separation, F4.)
+    if (definition.codeString.includes('/')) {
+      throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"glyph").`);
     }
 
     // Glyphs can reference other glyphs and shapes, but not external glyphs or bare aliases

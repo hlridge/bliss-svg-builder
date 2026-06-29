@@ -359,7 +359,9 @@ describe('BlissParser definition expansion', () => {
   describe('when an unmarked definition expands across a word break', () => {
     it('does not mark the first expanded glyph as an explicit head glyph', () => {
       const code = 'WORDBREAKHEADPIN';
-      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B10//B4' } }, { overwrite: true });
+      // a multi-word (`//`) definition is a bare alias, not a glyph (Strict
+      // Indicator Separation, F4); the word-break head-marking is unchanged.
+      BlissSVGBuilder.define({ [code]: { codeString: 'B10//B4' } }, { overwrite: true });
 
       try {
         const parsed = BlissParser.parse(code);
