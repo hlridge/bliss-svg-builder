@@ -193,6 +193,11 @@ describe('BlissParser strict indicator separation', () => {
       const c = codes('WORD;;B81/B291');
       expect(c).toContain('MALFORMED_WORD_INDICATOR');
       expect(c).not.toContain('MISPLACED_CHARACTER_INDICATOR');
+      // and its round-trip is a stable fixpoint. M1 showed this property was
+      // unpinned (the multi-word sibling grew unbounded); pin the single-word
+      // case too so a future regression here cannot pass on warning-shape alone.
+      const t1 = new BlissSVGBuilder('WORD;;B81/B291').toString();
+      expect(new BlissSVGBuilder(t1).toString()).toBe(t1);
     });
   });
 
