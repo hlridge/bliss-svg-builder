@@ -662,34 +662,4 @@ describe('BlissParser word-indicator syntax', () => {
     });
   });
 
-  // These tests use real Bliss word definitions and stay skipped pending
-  // verification of their codeStrings and head-glyph (^) markers against
-  // official Blissymbolics data. Under Strict Indicator Separation a real
-  // multi-character word takes a WORD-level indicator via ;; (the head resolves
-  // at render); a character ; on such a word is misplaced (warn + drop). They
-  // document intended real-world usage once the definitions are verified.
-  describe('when applied to real Bliss codes (pending head-glyph markers)', () => {
-    it.skip('drops a misplaced character ; on B5663;B81 (confuse)', () => {
-      // B5663 = confuse = B313/B783; a character ; is misplaced on this word and
-      // dropped (use ;; for a word indicator). The word still renders.
-      const result = BlissParser.parse('B5663;B81');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-    });
-
-    it.skip('keeps a trailing ; inert on B1437; (cold)', () => {
-      // B1437 = cold = B486/B378;B86; a trailing ; is inert, so B86 is kept.
-      const result = BlissParser.parse('B1437;');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-    });
-
-    it.skip('drops a misplaced character ; on B1437;B81 (cold)', () => {
-      // B1437 = cold = B486/B378;B86; B81 is misplaced on this word and dropped.
-      const result = BlissParser.parse('B1437;B81');
-
-      expect(result.groups[0].glyphs.length).toBe(2);
-    });
-  });
-
 });
