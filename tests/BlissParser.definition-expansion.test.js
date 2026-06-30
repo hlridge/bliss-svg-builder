@@ -44,9 +44,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - A multi-word definition carrying an internal head marker, referenced
  *   through another alias, keeps its word break and the designated head of
  *   its non-first word, rendering identically to the directly-written form;
- *   a trailing indicator bound to the multi-word alias fails the whole unit
- *   (group.errorCode); adjacent // breaks seal into empty word chunks without
- *   throwing.
+ *   a char-level ;-part bound to the multi-word alias is misplaced (warn +
+ *   drop) while every word still renders (D1); adjacent // breaks seal into
+ *   empty word chunks without throwing.
  * - XTXT_ fallback parts mark the enclosing glyph as an external glyph.
  *
  * Does NOT cover:
@@ -654,17 +654,19 @@ describe('BlissParser definition expansion', () => {
       expect(nested).toBe(direct);
     });
 
-    it('fails the whole unit when a trailing indicator binds to the multi-word alias', () => {
-      // R2 corpus task 4 / Decision 6: an indicator bound to a multi-word alias
-      // (one token expanding past a word break) targets no single head, so the
-      // whole unit fails to one placeholder (group.errorCode), uniformly for
-      // direct and nested aliases. Supersedes the earlier first-word-head attach
-      // (;B81 -> B208), which was itself inconsistent: it attached only because
-      // _N6_INNER carries a ^; without the ^ the same shape silently dropped.
+    it('warns MISPLACED and renders the words when a char-indicator binds to the multi-word alias', () => {
+      // Strict Indicator Separation (D1): a char-level ;-part bound to a
+      // multi-word (//) alias has no single character to attach to, so it is
+      // misplaced (warn + drop) and every word still renders. (Supersedes the
+      // earlier whole-unit fail; a ;; word indicator still fails the unit, see
+      // BlissParser.double-semicolon.test.js.)
       const r = BlissParser.parse('_N6_OUTER;B81');
-      expect(r.groups).toHaveLength(1);
-      expect(r.groups[0].errorCode).toBe('MALFORMED_WORD_INDICATOR');
-      expect(r.groups[0].errorSource).toBe('_N6_OUTER;B81');
+      expect(r.groups).toHaveLength(3);
+      expect(r.groups.map(g => g.glyphs[0].parts[0].codeName)).toEqual(['B208', 'TSP', 'B303']);
+      expect(new BlissSVGBuilder('_N6_OUTER;B81').warnings.map(w => w.code))
+        .toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(new BlissSVGBuilder('_N6_OUTER;B81').svgCode)
+        .toBe(new BlissSVGBuilder('_N6_OUTER').svgCode);
     });
 
     it('seals empty word chunks from adjacent breaks without throwing', () => {

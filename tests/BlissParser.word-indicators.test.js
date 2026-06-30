@@ -37,7 +37,7 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Head-glyph algorithm internals, see `BlissParser.head-glyph.test.js` and
  *   `BlissParser.head-glyph-exclusions.test.js`.
  * - Semantic-indicator ordering rules in isolation, see
- *   `BlissParser.semantic-preservation.test.js`.
+ *   `BlissSVGBuilder.semantic-preservation.test.js`.
  * - Rendered SVG output, see `BlissSVGBuilder.VisualRegression.e2e.test.js`.
  */
 

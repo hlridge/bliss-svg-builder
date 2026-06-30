@@ -28,7 +28,7 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   an indicator to a word whose head is a baseless compound indicator), and the
  *   indicator-first-base guard, see
  *   `BlissSVGBuilder.compound-indicator-application.test.js`. The single-glyph
- *   strip-semantic no-op warning IS pinned in the describe below (R15 3b-5).
+ *   `;!` UNKNOWN_CODE behavior IS pinned in the describe below.
  */
 
 const customCodes = [];
@@ -224,17 +224,16 @@ describe('BlissSVGBuilder custom glyphs', () => {
     });
   });
 
-  describe('when applying a strip-semantic indicator to a baseless compound-indicator glyph', () => {
-    it('stacks the indicator silently (no base semantic indicator to strip)', () => {
-      // R15 Task 3b-5 (R3b4-2): a baseless compound indicator is an atomic
-      // indicator unit with no base semantic indicator, so `;!` strips nothing
-      // and follows the general rule SILENTLY: the applied indicator stacks
-      // (render == the indicators as standalone B-codes: COMBO_IND;!B81 ==
-      // B86;B97;B81). No special strip-semantic warning is emitted.
+  describe('when a ;!-part is applied to a baseless compound-indicator glyph', () => {
+    it('dumb-appends the invalid !-code and warns UNKNOWN_CODE (no special strip parse)', () => {
+      // Strict Indicator Separation: `;` is dumb part-composition, so `;!B81` on
+      // a glyph appends the invalid code `!B81` (UNKNOWN_CODE); there is no
+      // character-level strip-semantic surface (that is API-only). The base
+      // compound indicator is unchanged.
       defineAndTrack({ COMBO_IND: { type: 'glyph', codeString: 'B86;B97', isIndicator: true } });
-      const stripped = new BlissSVGBuilder('COMBO_IND;!B81');
-      expect(stripped.toString()).toBe('B86;B97;B81');
-      expect(stripped.warnings).toEqual([]);
+      const b = new BlissSVGBuilder('COMBO_IND;!B81');
+      expect(b.toString()).toBe('B86;B97');
+      expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
     });
   });
 

@@ -21,7 +21,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   fragment boundary, low-priority-only words.
  * - Multi-word definitions (`//` in codeString) merging into surrounding
  *   words: per-segment designations redirect only within their final word.
- * - `;`/`;;` word indicators attaching to the contract-resolved head.
+ * - `;;` word indicators attaching to the contract-resolved head; a char-level
+ *   `;` is misplaced on the multi-glyph alias (does not reach the head).
  * - Decorations (options prefix, position suffix) on marked and unmarked
  *   alias invocations, and scan immunity to decorations on characters.
  *
@@ -232,10 +233,15 @@ describe('BlissParser head-marker matrix', () => {
       expect(glyphs[2]).toEqual(['B208']);
     });
 
-    it('attaches ; indicators to the designated character of an alias invocation', () => {
+    it('is misplaced when a char-indicator binds to an alias invocation, not attached to the designated head', () => {
+      // Strict Indicator Separation: _HMM_CDH is a multi-glyph word, so a
+      // char-level ;-part is misplaced (warn + drop) - the ^-designated head
+      // does not rescue it. Use ;; for a word indicator (see the ;; siblings).
       const r = BlissParser.parse('_HMM_CDH;B86');
 
-      expect(r.groups[0].glyphs[1].parts.map(p => p.codeName)).toEqual(['B208', 'B86']);
+      expect(r.groups[0].glyphs.map(g => g.parts.map(p => p.codeName))).toEqual([['B313'], ['B208']]);
+      expect(new BlissSVGBuilder('_HMM_CDH;B86').warnings.map(w => w.code))
+        .toContain('MISPLACED_CHARACTER_INDICATOR');
     });
   });
 

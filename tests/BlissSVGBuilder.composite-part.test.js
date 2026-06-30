@@ -33,8 +33,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Does NOT cover:
  * - The define-time guards (a composed-alias `;`-operand inside a definition's
  *   codeString; circular definitions), see `BlissSVGBuilder.define.test.js`.
- * - The `/`-glyph sibling `H/NOUN_BI;B97` (promotion + DROPPED_WORD_INDICATOR),
- *   see `BlissSVGBuilder.indicator-promotion.test.js`.
+ * - The `/`-glyph sibling `H/NOUN_BI;B97` (now MISPLACED on the bare-alias
+ *   glyph), see `BlissSVGBuilder.indicator-promotion.test.js`.
  * - WORD_AS_PART (a word used as a `;`-part), see `BlissSVGBuilder.word-as-part.test.js`.
  */
 describe('BlissSVGBuilder composite part', () => {
@@ -128,11 +128,14 @@ describe('BlissSVGBuilder composite part', () => {
     it('does not fire when an alias is inserted as the LEADING part', () => {
       // insertPart parses the new part through an `H;<code>` scaffold (index 1),
       // which stamps a position-dependent flag; landing it at index 0 must clear
-      // that stale flag so the result matches the DSL alias-then-base form
+      // that stale flag so the leading composed alias is flattened, not misplaced.
+      // No DSL parity here: the DSL form NOUN_BI;B291 is MISPLACED on the
+      // bare-alias base (feedback_parity_scoped_to_valid_inputs), so the mutation
+      // result is pinned directly: the leading alias flattens and B291 appends.
       const b = new BlissSVGBuilder('B291');
       b.glyph(0).insertPart(0, 'NOUN_BI');
       expect(b.warnings.map((w) => w.code)).not.toContain('COMPOSITE_AS_PART');
-      expect(b.toString()).toBe(new BlissSVGBuilder('NOUN_BI;B291').toString());
+      expect(b.toString()).toBe('B291;B81;B291');
     });
   });
 

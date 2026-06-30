@@ -24,7 +24,7 @@ import { BlissSVGBuilder } from '../src/index';
  * - The head stamp (isHeadGlyph) itself re-resolves at query time after the
  *   group-boundary mutations: mergeWithNext and removeGlyph re-derive which
  *   glyph heads the word, independent of the overlay.
- * - A fail-flagged word (malformed-`;;` OR an indicator bound to a multi-word
+ * - A fail-flagged word (malformed-`;;` OR a `;;` indicator bound to a multi-word
  *   alias) is the terminal sibling of the overlay: splitAt and mergeWithNext
  *   NO-OP when a flagged group is involved (a failed word's hidden base glyphs
  *   must not escape across a group boundary and render as valid), via one
@@ -318,7 +318,7 @@ describe('ElementHandle word indicators under structural mutation', () => {
   });
 
   describe('when restructuring a fail-flagged (malformed-;; or multi-word-alias) word', () => {
-    // A malformed `;;` (non-trailing or repeated) OR an indicator bound to a
+    // A malformed `;;` (non-trailing or repeated) OR a `;;` indicator bound to a
     // multi-word alias flags the WHOLE word (group.errorCode) for a single-icon
     // fail-render. Like the overlay it is a word-level property, but unlike the
     // overlay it is TERMINAL: splitAt and mergeWithNext move glyphs across a
@@ -359,16 +359,18 @@ describe('ElementHandle word indicators under structural mutation', () => {
       expect(malformedWarnings(b)).toHaveLength(0);
     });
 
-    it('no-ops splitAt and mergeWithNext on a multi-word-alias fail (same guard)', () => {
-      // An indicator bound to a multi-word alias sets the SAME group.errorCode as
-      // a malformed `;;`, so the generic guard protects it identically: the
+    it('no-ops splitAt and mergeWithNext on a multi-word-alias ;; fail (same guard)', () => {
+      // A `;;` indicator bound to a multi-word alias sets the SAME group.errorCode
+      // as a malformed `;;`, so the generic guard protects it identically: the
       // collapsed unit cannot be split back into the words it would have rendered.
+      // (A char-level `;` on a multi-word alias is now MISPLACED + render, not a
+      // fail - see BlissParser.strict-indicator-separation.test.js.)
       BlissSVGBuilder.define({ _MW_FAIL: { codeString: 'B291//B313' } });
       try {
-        const b = new BlissSVGBuilder('_MW_FAIL;B81');
+        const b = new BlissSVGBuilder('_MW_FAIL;;B81');
         b.group(0).splitAt(1);
         b.group(0).mergeWithNext();
-        expect(b.toString()).toBe('_MW_FAIL;B81');
+        expect(b.toString()).toBe('_MW_FAIL;;B81');
         expect(b.stats.groupCount).toBe(1);
         expect(malformedWarnings(b)).toHaveLength(1);
       } finally {

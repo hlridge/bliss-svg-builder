@@ -13,7 +13,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * Separator recap:
  *   /  = character separator (character-level)
  *   // = word separator (word-level)
- *   ;  = indicator separator (character-level: attaches to preceding character)
+ *   ;  = part separator (character-level: composes a part onto the preceding
+ *        character; misplaced on a bare alias or multi-glyph word)
  *   ;; = word-level indicator (stored as a group overlay; resolves to the head)
  *
  * Covers:
@@ -27,12 +28,13 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   existing grammatical indicator dropped and a semantic root preserved.
  * - Single-character ;; storing an overlay (kept reversible).
  * - Positioning and glyph-level options surviving alongside the overlay.
- * - Pre-defined words: ;; stores an overlay and renders identically to the
- *   single-; bake (render parity, not tree parity, since ; still bakes).
+ * - Pre-defined words: ;; stores an overlay; the single-; form is misplaced on
+ *   a multi-glyph word, so the two now diverge.
  * - The ; (character-level) vs ;; (word-level) target distinction.
  * - Overlay scoping to its own word group in a multi-word sentence.
  * - Degenerate inputs (no base, two-glyph default).
- * - Scope fence: single ; on a pre-defined word still bakes (no overlay).
+ * - Single ; on a pre-defined multi-glyph word is misplaced (warn + drop, no
+ *   overlay), not baked onto the head.
  * - Malformed ;; (a glyph follows the indicators, or ;; repeats) flagging the
  *   whole word (group.errorCode = MALFORMED_WORD_INDICATOR) for a single-icon
  *   fail-render, emitting exactly one warning, and round-tripping the offending
@@ -44,11 +46,12 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *
  * Does NOT cover:
  * - The semantic-root placement/preservation rules, see
- *   `BlissParser.semantic-preservation.test.js`.
+ *   `BlissSVGBuilder.semantic-preservation.test.js`.
  * - Head-glyph algorithm internals, see `BlissParser.head-glyph.test.js`
  *   and `BlissParser.head-glyph-exclusions.test.js`.
- * - The single-; WORD;INDICATORS bake path, see
- *   `BlissParser.word-indicators.test.js`.
+ * - The single-; misplaced-on-a-word path in depth, see
+ *   `BlissParser.word-indicators.test.js` and
+ *   `BlissParser.strict-indicator-separation.test.js`.
  * - The L1 fail-render mechanism itself (placeholder vs invisible, advance),
  *   see `BlissElement.error-placeholder.test.js`.
  * - WELL-FORMED ;; toString/toJSON re-emission and round-trip, see
@@ -199,9 +202,11 @@ describe('BlissParser ;; syntax', () => {
       expect(head.parts).toEqual(['H', 'B86']);
     });
 
-    it('renders identically to the single-; bake (render parity, not tree parity)', () => {
-      // Single ; still bakes (scope fence); ;; overlays. Same render.
-      expect(svgEq('TestWord1;;B86', 'TestWord1;B86')).toBe(true);
+    it('diverges from the misplaced single-; (which renders the bare word)', () => {
+      // Single ; on a multi-glyph word is MISPLACED: it drops and renders the
+      // bare word. ;; overlays the indicator, so the two now diverge.
+      expect(svgEq('TestWord1;B86', 'TestWord1')).toBe(true);
+      expect(svgEq('TestWord1;;B86', 'TestWord1')).toBe(false);
     });
   });
 
@@ -210,14 +215,17 @@ describe('BlissParser ;; syntax', () => {
       expect(svgEq('H^/C;;B86', 'TestWord1;;B86')).toBe(true);
     });
 
-    it('applies modifier-skip heuristics on inline B486/H;;B86 like TestWord3;B86', () => {
-      expect(svgEq('B486/H;;B86', 'TestWord3;B86')).toBe(true);
+    it('applies modifier-skip heuristics on inline B486/H;;B86 like TestWord3;;B86', () => {
+      expect(svgEq('B486/H;;B86', 'TestWord3;;B86')).toBe(true);
     });
   });
 
   describe('when distinguishing ; from ;;', () => {
     it('attaches ; to the last character (character-level), not the head', () => {
-      // ;B86 bakes onto the last glyph (character-level), not the ^-marked head.
+      // Inline `;` is dumb part-composition on the LAST character, not on a word
+      // unit: B291/.../B291;B86 appends B86 to the final glyph. This is NOT the
+      // misplaced-on-an-alias case (an alias token like WORD;B86 is misplaced);
+      // do not "fix" it to MISPLACED. The ^-marked head is unaffected.
       expect(baseGlyphParts('B291/B291^/B291;B86')).toEqual([['B291'], ['B291'], ['B291', 'B86']]);
       expect(BlissParser.parse('B291/B291^/B291;B86').groups[0].wordIndicators).toBeUndefined();
     });
@@ -396,12 +404,17 @@ describe('BlissParser ;; syntax', () => {
     });
   });
 
-  describe('scope fence: single ; on a pre-defined word still bakes', () => {
-    it('bakes the indicator onto the head with no overlay (TestWord1;B86)', () => {
-      // The single-; WORD;INDICATORS path is out of R14 scope and unchanged.
+  describe('single ; on a pre-defined multi-glyph word is misplaced', () => {
+    it('warns MISPLACED, stores no overlay, and does not bake onto the head (TestWord1;B86)', () => {
+      // TestWord1 = 'H^/C' is a multi-glyph word, so a char-level ;-part has no
+      // single character to attach to: it is misplaced (warn + drop), the head
+      // keeps only its base part, and no overlay is stored. Use ;; for a word
+      // indicator.
       const parsed = BlissParser.parse('TestWord1;B86');
       expect(parsed.groups[0].wordIndicators).toBeUndefined();
-      expect(parsed.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['H', 'B86']);
+      expect(parsed.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['H']);
+      expect(new BlissSVGBuilder('TestWord1;B86').warnings.map(w => w.code))
+        .toContain('MISPLACED_CHARACTER_INDICATOR');
     });
   });
 });

@@ -22,9 +22,10 @@ import { resolveHeadIndex } from '../src/lib/bliss-head-glyph-exclusions.js';
  * Plus the conditional-exclusion exception: B10 (one) is normally
  * excluded but is NOT excluded when followed immediately by B4.
  *
- * Each input-pattern scenario exercises both inline DSL (`;;` / `;`)
- * and defined-word forms (where applicable) to pin parity across
- * surfaces.
+ * Each input-pattern scenario exercises both inline DSL and defined-word
+ * forms with the word-level `;;` indicator (the head-scan surface) to pin
+ * parity across surfaces. (Char-level `;` is misplaced on a multi-glyph word,
+ * so it no longer places a head indicator; see the strict-separation suite.)
  *
  * Covers:
  * - All-exclusions words: regular + regular pairs (B486/B368,
@@ -171,10 +172,6 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('TestNarrowness;;B86')).toBe(1);
       });
 
-      it('places the indicator on the second character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestNarrowness;B86')).toBe(1);
-      });
-
       it('marks the second glyph as head with an explicit ^ marker', () => {
         const result = BlissParser.parse('B486/B368^');
         expect(result.groups[0].glyphs[1].isHeadGlyph).toBe(true);
@@ -186,8 +183,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B486/B937;;B86')).toBe(1);
       });
 
-      it('places the indicator on the second character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestMoreOpposite;B86')).toBe(1);
+      it('places the indicator on the second character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestMoreOpposite;;B86')).toBe(1);
       });
     });
 
@@ -196,8 +193,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B449/B937;;B86')).toBe(1);
       });
 
-      it('places the indicator on the second character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestWithoutMore;B86')).toBe(1);
+      it('places the indicator on the second character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestWithoutMore;;B86')).toBe(1);
       });
     });
 
@@ -206,8 +203,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B493/B368;;B86')).toBe(1);
       });
 
-      it('places the indicator on the second character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestOverMany;B86')).toBe(1);
+      it('places the indicator on the second character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestOverMany;;B86')).toBe(1);
       });
     });
   });
@@ -218,8 +215,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B486/B208;;B86')).toBe(1);
       });
 
-      it('places the indicator on the second character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestOppositeB208;B86')).toBe(1);
+      it('places the indicator on the second character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestOppositeB208;;B86')).toBe(1);
       });
     });
 
@@ -228,8 +225,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B368/B208;;B86')).toBe(1);
       });
 
-      it('places the indicator on the second character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestManyB208;B86')).toBe(1);
+      it('places the indicator on the second character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestManyB208;;B86')).toBe(1);
       });
     });
   });
@@ -240,8 +237,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B578/B348/B225;;B86')).toBe(2);
       });
 
-      it('places the indicator on the third character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestSameGenB225;B86')).toBe(2);
+      it('places the indicator on the third character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestSameGenB225;;B86')).toBe(2);
       });
     });
 
@@ -250,8 +247,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B486/B449/B208;;B86')).toBe(2);
       });
 
-      it('places the indicator on the third character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestDoubleExclB208;B86')).toBe(2);
+      it('places the indicator on the third character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestDoubleExclB208;;B86')).toBe(2);
       });
     });
 
@@ -260,8 +257,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B1060/B578/B303/B208;;B86')).toBe(3);
       });
 
-      it('places the indicator on the fourth character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestMultiCharPattern;B86')).toBe(3);
+      it('places the indicator on the fourth character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestMultiCharPattern;;B86')).toBe(3);
       });
     });
   });
@@ -272,8 +269,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B120/B401/B401;;B86')).toBe(0);
       });
 
-      it('places the indicator on the first character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestWithNeverHead;B86')).toBe(0);
+      it('places the indicator on the first character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestWithNeverHead;;B86')).toBe(0);
       });
     });
 
@@ -282,8 +279,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B208/B401;;B86')).toBe(0);
       });
 
-      it('places the indicator on the first character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestB208NeverHead;B86')).toBe(0);
+      it('places the indicator on the first character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestB208NeverHead;;B86')).toBe(0);
       });
     });
   });
@@ -398,8 +395,8 @@ describe('BlissParser head-glyph exclusions', () => {
         expect(getHeadGlyphIndex('B208/B368;;B86')).toBe(0);
       });
 
-      it('places the indicator on the first character with the defined word and ; syntax', () => {
-        expect(getHeadGlyphIndex('TestB208Many;B86')).toBe(0);
+      it('places the indicator on the first character with the defined word and ;; syntax', () => {
+        expect(getHeadGlyphIndex('TestB208Many;;B86')).toBe(0);
       });
     });
   });

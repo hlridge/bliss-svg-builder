@@ -1,46 +1,42 @@
-import { afterAll, beforeAll, describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins the R15 word-slot-model invariant that building one word by `/`
- * composition is byte-identical to building it by `//` plus mergeWithNext:
- * the same first-wins rule governs both the word-level `;;` slot and the `^`
- * head marker, so the two surfaces cannot silently diverge.
+ * Pins the word-slot-model invariant that merging two word-level-overlay words
+ * with `//`+mergeWithNext converges to exactly the canonical single-overlay word
+ * written directly by `/` composition: byte-identical toString and svgCode.
  *
- * This is the cross-path tie the sibling suites assert only in prose: the
- * promotion suite pins the `/`-compose result against fixed strings and the
- * structure suite pins mergeWithNext against fixed strings, but neither runs
- * the same content through both paths and compares them. A regression that
- * touches only one path (the Finding A class) survives the per-path pins and
- * is caught only here (feedback_dsl_api_parity, feedback_invariant_over_blast_radius).
+ * Under Strict Indicator Separation a single `/`-composed word carries at most
+ * one trailing `;;` overlay (a non-trailing `;;` is malformed), so the canonical
+ * compose side never collides. The first-wins collision is therefore exercised
+ * only on the merge side: when two overlay words merge, the first overlay wins
+ * and the rest are dropped (DROPPED_WORD_INDICATOR). The render still matches the
+ * canonical compose, so the two construction paths cannot silently diverge
+ * (feedback_invariant_over_blast_radius, feedback_dsl_api_parity).
  *
  * Covers:
- * - Word-slot first-wins parity: two promoted overlays colliding, a leading
- *   empty slot dropping a later overlay, a lone surviving overlay, and a
- *   strip-semantic overlay, each byte-identical in toString, svgCode, and the
- *   DROPPED_WORD_INDICATOR sources across `/` and `//`+mergeWithNext.
- * - Head-marker first-wins parity: colliding `^` markers and a lone `^` resolve
- *   to the same serialized word on both paths (the `^` drop stays silent).
+ * - Merge-converges-to-canonical for a word-level overlay: two overlays colliding
+ *   (second dropped), a leading plain slot dropping a trailing overlay, a lone
+ *   surviving overlay, and a surviving strip-semantic overlay - each byte-identical
+ *   in toString and svgCode, with the DROPPED_WORD_INDICATOR sources on the merge
+ *   side and none on the canonical compose side.
+ * - Head-marker first-wins parity: colliding `^` markers and a lone `^` resolve to
+ *   the same serialized word on both paths (the `^` drop stays silent).
  *
  * Does NOT cover:
- * - The concrete per-path values and the promotion mechanism, see
- *   `BlissSVGBuilder.indicator-promotion.test.js`.
+ * - The per-path overlay values and the ;; store mechanism, see
+ *   `BlissParser.double-semicolon.test.js`.
  * - mergeWithNext / splitAt overlay mechanics and the split<->merge round-trip,
  *   see `ElementHandle.word-indicator-structure.test.js`.
  * - Overlay render / serialize internals, see
  *   `BlissSVGBuilder.word-indicator-overlay.test.js`.
+ * - The removed `;`-on-alias promotion that used to be the compose-side collision
+ *   source, see `BlissSVGBuilder.indicator-promotion.test.js`.
  */
 describe('BlissSVGBuilder compose-merge parity', () => {
-  const PARITY_DEFS = {
-    NOUN_BI: { codeString: 'B291;B81' }, // base + grammatical (verbal) indicator
-    NOUN_S: { codeString: 'B291;B97' },  // base + semantic ('thing') indicator
-  };
-
-  beforeAll(() => BlissSVGBuilder.define(PARITY_DEFS));
-  afterAll(() => Object.keys(PARITY_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
-
-  // Builds the same word two ways: `/`-composition (one parse) and
-  // `//`+mergeWithNext (two words merged), returning both builders to compare.
+  // Builds the same word two ways: `/`-composition (one parse, the canonical
+  // single-overlay form) and `//`+mergeWithNext (two overlay words merged),
+  // returning both builders to compare.
   const composeVsMerge = (composeStr, mergeStr) => {
     const composed = new BlissSVGBuilder(composeStr);
     const merged = new BlissSVGBuilder(mergeStr);
@@ -51,45 +47,46 @@ describe('BlissSVGBuilder compose-merge parity', () => {
   const dropSources = (builder) =>
     builder.warnings.filter(w => w.code === 'DROPPED_WORD_INDICATOR').map(w => w.source);
 
-  describe('when a word-level slot is built by composition versus merge', () => {
-    it('holds for two promoted slots colliding (second dropped)', () => {
+  describe('when a word-level overlay is built by composition versus merge', () => {
+    it('converges for two overlays colliding (second dropped on merge)', () => {
       const { composed, merged } = composeVsMerge(
-        'NOUN_BI;B97/NOUN_BI;B86', 'NOUN_BI;B97//NOUN_BI;B86');
+        'B291;B81/B291;B81;;B97', 'B291;B81;;B97//B291;B81;;B86');
       expect(composed.toString()).toBe('B291;B81/B291;B81;;B97');
       expect(merged.toString()).toBe(composed.toString());
       expect(merged.svgCode).toBe(composed.svgCode);
-      expect(dropSources(merged)).toEqual(dropSources(composed));
-      expect(dropSources(composed)).toEqual([';;B86']);
+      // The canonical compose has no collision; the merge collides first-wins.
+      expect(dropSources(composed)).toEqual([]);
+      expect(dropSources(merged)).toEqual([';;B86']);
     });
 
-    it('holds for a leading empty slot dropping a later overlay', () => {
+    it('converges for a leading plain slot dropping a trailing overlay', () => {
       const { composed, merged } = composeVsMerge(
-        'H/NOUN_BI;B97', 'H//NOUN_BI;B97');
+        'H/B291;B81', 'H//B291;B81;;B97');
       expect(composed.toString()).toBe('H/B291;B81');
       expect(merged.toString()).toBe(composed.toString());
       expect(merged.svgCode).toBe(composed.svgCode);
-      expect(dropSources(merged)).toEqual(dropSources(composed));
-      expect(dropSources(composed)).toEqual([';;B97']);
+      expect(dropSources(composed)).toEqual([]);
+      expect(dropSources(merged)).toEqual([';;B97']);
     });
 
-    it('holds for a single promoted slot surviving with no collision', () => {
+    it('converges for a single overlay surviving with no collision', () => {
       const { composed, merged } = composeVsMerge(
-        'NOUN_BI;B97/E', 'NOUN_BI;B97//E');
+        'B291;B81/E;;B97', 'B291;B81;;B97//E');
       expect(composed.toString()).toBe('B291;B81/E;;B97');
       expect(merged.toString()).toBe(composed.toString());
       expect(merged.svgCode).toBe(composed.svgCode);
-      expect(dropSources(merged)).toEqual(dropSources(composed));
       expect(dropSources(composed)).toEqual([]);
+      expect(dropSources(merged)).toEqual([]);
     });
 
-    it('holds for a surviving slot that strips the semantic root', () => {
+    it('converges for a surviving overlay that strips the semantic root', () => {
       const { composed, merged } = composeVsMerge(
-        'NOUN_S;!B81/NOUN_S;B86', 'NOUN_S;!B81//NOUN_S;B86');
+        'B291;B97/B291;B97;;!B81', 'B291;B97;;!B81//B291;B97;;B86');
       expect(composed.toString()).toBe('B291;B97/B291;B97;;!B81');
       expect(merged.toString()).toBe(composed.toString());
       expect(merged.svgCode).toBe(composed.svgCode);
-      expect(dropSources(merged)).toEqual(dropSources(composed));
-      expect(dropSources(composed)).toEqual([';;B86']);
+      expect(dropSources(composed)).toEqual([]);
+      expect(dropSources(merged)).toEqual([';;B86']);
     });
   });
 

@@ -1,35 +1,35 @@
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
-import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
- * Pins compound-indicator application parity (R15 Task 3b-5): a compound
- * indicator - a `type:'glyph'` definition flagged `isIndicator`, or a built-in
- * like B98 - is an ATOMIC indicator unit. Applying an indicator at the use site,
- * or carrying it as a word head, decomposes/stacks consistently so the result
- * renders identically to the same indicators written as standalone B-codes: no
- * doubling, reordering, or dropping. Strip-semantic (`;!`) has no base semantic
- * indicator to strip on such a unit, so it follows the general rule SILENTLY
- * (stacks like `;`; no special warning).
+ * Pins how a compound indicator (a `type:'glyph'` definition flagged
+ * `isIndicator`, or a built-in like B98) behaves as a single-character `;` base
+ * versus as the head of a multi-glyph word, under Strict Indicator Separation.
+ *
+ * A compound indicator is an ATOMIC single character. As a `;` base it
+ * dumb-appends the part (COMBO_IND;B81 -> B86;B97;B81), rendering identically to
+ * the same indicators written as standalone B-codes (no doubling/reordering/
+ * dropping). As the HEAD of a multi-glyph word alias (WORD_CI = COMBO_IND/B291),
+ * a char-level `;`-part has no single character to attach to, so it is MISPLACED
+ * (warn + drop + render the word bare). A trailing `;` is inert.
  *
  * Covers:
- * - Word alias with a flagged compound-indicator head (COMBO_IND/B291): an
- *   applied indicator stacks (render == standalone); an empty strip keeps it.
- * - Word alias with an unflagged all-indicator head (BARE_AI/B291): stacks
- *   without reordering the baked indicators.
- * - Strip-semantic at a compound-indicator word head: stacks silently, no drop.
- * - Single baseless compound indicator (COMBO_IND;B81) renders == standalone,
- *   including a baked sub-part offset (the x===undefined element-layer guard).
- * - The .every all-indicator gate: a MIXED (base+indicator) composite is NOT
- *   laid out as a baseless stack.
- * - Guard: no definable indicator-first base reaches the single-glyph replace
- *   path, and no built-in carries an indicator-first all-indicator codeString.
+ * - Single baseless compound-indicator glyph as a `;` base: dumb-appends and
+ *   renders == standalone, including a baked sub-part offset (the x===undefined
+ *   element-layer guard) and the `.every` all-indicator baseless-stack gate.
+ * - `;!` on a compound-indicator glyph: `!CODE` is an invalid part, so it
+ *   dumb-appends and warns UNKNOWN_CODE (no special strip parse).
+ * - A char-`;`-part on a multi-glyph word with a compound-indicator head
+ *   (flagged or unflagged): MISPLACED + drop + render bare; `;!`/lone-`!` parts
+ *   are dropped-before-validation (MISPLACED only, no UNKNOWN_CODE, per D3);
+ *   trailing `;` is inert.
+ * - Guard: define() rejects a glyph that bakes an indicator-first codeString.
  *
  * Does NOT cover:
+ * - The general MISPLACED-on-a-word contract, see
+ *   `BlissParser.strict-indicator-separation.test.js`.
  * - Single-glyph strip-semantic silence on a baseless compound-indicator glyph,
  *   see `BlissSVGBuilder.custom-glyphs.test.js`.
- * - Promotion of a single all-indicator bare alias to a `;;` overlay (3b-1),
- *   see `BlissSVGBuilder.indicator-promotion.test.js`.
  * - The from-origin x layout of a baseless indicator stack, see
  *   `BlissElement.indicator-positioning.test.js`.
  */
@@ -55,90 +55,66 @@ afterAll(() => {
 
 describe('BlissSVGBuilder compound indicator application', () => {
 
-  describe('when an indicator is applied to a word alias with a flagged compound-indicator head', () => {
-    it('stacks the indicator, rendering as the indicators written standalone', () => {
+  describe('when a char-indicator (;) targets a multi-glyph word with a compound-indicator head', () => {
+    it('is misplaced on a flagged compound-indicator head, rendering the word bare', () => {
       const word = new BlissSVGBuilder('WORD_CI;B81');
-      expect(word.toString()).toBe('B86;B97;B81/B291');
-      expect(word.svgCode).toBe(new BlissSVGBuilder('B86;B97;B81/B291').svgCode);
+      expect(word.warnings.map(w => w.code)).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(word.toString()).toBe('B86;B97/B291');
+      expect(word.svgCode).toBe(new BlissSVGBuilder('WORD_CI').svgCode);
     });
 
-    it('preserves the compound indicator under an empty strip', () => {
-      expect(new BlissSVGBuilder('WORD_CI;').toString()).toBe('B86;B97/B291');
-    });
-  });
-
-  describe('when an indicator is applied to a word alias with an unflagged all-indicator head', () => {
-    it('stacks without reordering the baked indicators', () => {
+    it('is misplaced on an unflagged all-indicator head too (the flag no longer matters)', () => {
       const word = new BlissSVGBuilder('WORD_BARE;B81');
-      expect(word.toString()).toBe('B86;B97;B81/B291');
-      expect(word.svgCode).toBe(new BlissSVGBuilder('B86;B97;B81/B291').svgCode);
-    });
-  });
-
-  describe('when a strip-semantic indicator is applied to a compound-indicator word head', () => {
-    it('stacks without dropping the baked indicator, silently', () => {
-      const word = new BlissSVGBuilder('WORD_BARE;!B81');
-      expect(word.toString()).toBe('B86;B97;B81/B291');
-      expect(word.warnings).toEqual([]);
+      expect(word.warnings.map(w => w.code)).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(word.toString()).toBe('B86;B97/B291');
     });
 
-    it('stacks the same for a flagged compound-indicator head', () => {
-      const word = new BlissSVGBuilder('WORD_CI;!B81');
-      expect(word.toString()).toBe('B86;B97;B81/B291');
-      expect(word.warnings).toEqual([]);
-    });
-
-    it('keeps the compound indicator on an empty strip-semantic', () => {
-      const word = new BlissSVGBuilder('WORD_CI;!');
+    it('leaves a trailing ; inert, keeping the compound-indicator head', () => {
+      const word = new BlissSVGBuilder('WORD_CI;');
       expect(word.toString()).toBe('B86;B97/B291');
       expect(word.warnings).toEqual([]);
     });
   });
 
-  describe('when an indicator-first base could reach the single-glyph replace path', () => {
-    it('rejects a glyph definition that bakes an indicator-first codeString', () => {
-      // guard for the bliss-parser.js single-glyph replace/strip path
-      // (the `.slice(1)` "segment 0 is the base" sites): D-S1a makes such a
-      // base undefinable, so the path is unreachable.
-      const result = BlissSVGBuilder.define({ IND_FIRST_GLYPH: { type: 'glyph', codeString: 'B86;B291' } });
-      expect(result.errors).toHaveLength(1);
+  describe('when a !-prefixed or lone-! ;-part targets a compound-indicator word head', () => {
+    // D3: a misplaced ;-part is dropped BEFORE its content is validated, so only
+    // MISPLACED fires - never UNKNOWN_CODE for the invalid !CODE / lone !.
+    it('drops a ;!CODE part as misplaced only, with no UNKNOWN_CODE', () => {
+      const word = new BlissSVGBuilder('WORD_CI;!B81');
+      expect(word.warnings.map(w => w.code)).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(word.warnings.map(w => w.code)).not.toContain('UNKNOWN_CODE');
+      expect(word.toString()).toBe('B86;B97/B291');
     });
 
-    it('carries no indicator-first all-indicator codeString among the built-in glyphs', () => {
-      // pins the parser's "no built-in reaches the .slice(1) sites" invariant
-      // (R15 3b-5): an unflagged built-in GLYPH whose every ;-segment is an
-      // indicator would slip an indicator-first base through the single-glyph
-      // replace path. Bare aliases are exempt (they route through promotion);
-      // flagged compound indicators are atomic, so both are excluded here.
-      const isInd = (seg) => blissElementDefinitions[seg.split(':')[0]]?.isIndicator === true;
-      const offenders = Object.entries(blissElementDefinitions).filter(([, def]) => {
-        if (!def.isBlissGlyph || def.isIndicator || typeof def.codeString !== 'string') return false;
-        const segs = def.codeString.split(';');
-        return segs.length > 1 && segs.every(isInd);
-      });
-      expect(offenders).toEqual([]);
+    it('drops a lone ;! part as misplaced only, with no UNKNOWN_CODE', () => {
+      const word = new BlissSVGBuilder('WORD_CI;!');
+      expect(word.warnings.map(w => w.code)).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(word.warnings.map(w => w.code)).not.toContain('UNKNOWN_CODE');
+      expect(word.toString()).toBe('B86;B97/B291');
     });
 
-    it('stacks rather than char-replaces an indicator on a flagged compound indicator', () => {
-      // toString proves stacking (B86;B97;B81), not char-replace (which would
-      // drop the baked B97 -> B86;B81).
-      const single = new BlissSVGBuilder('COMBO_IND;B81');
-      expect(single.toString()).toBe('B86;B97;B81');
+    it('drops the same on an unflagged all-indicator head', () => {
+      const word = new BlissSVGBuilder('WORD_BARE;!B81');
+      expect(word.warnings.map(w => w.code)).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(word.toString()).toBe('B86;B97/B291');
     });
   });
 
-  describe('when an indicator is applied to a single baseless compound-indicator glyph', () => {
-    it('renders identically to the indicators written as standalone B-codes', () => {
-      // The compound indicator's unpositioned sub-parts must lay out as a
-      // baseless stack even when nested as a glyph part, so a directly-stacked
-      // indicator does not overlap (R15 3b-5 element-layer fix).
-      expect(new BlissSVGBuilder('COMBO_IND;B81').svgCode)
-        .toBe(new BlissSVGBuilder('B86;B97;B81').svgCode);
+  describe('when a single baseless compound-indicator glyph is a ; base', () => {
+    it('dumb-appends the part, rendering as the indicators written standalone', () => {
+      // toString proves stacking (B86;B97;B81), not char-replace (which would
+      // drop the baked B97 -> B86;B81); the render matches the standalone form.
+      const single = new BlissSVGBuilder('COMBO_IND;B81');
+      expect(single.toString()).toBe('B86;B97;B81');
+      expect(single.svgCode).toBe(new BlissSVGBuilder('B86;B97;B81').svgCode);
     });
 
-    it('renders the strip-semantic form identically too', () => {
-      expect(new BlissSVGBuilder('COMBO_IND;!B81').svgCode)
-        .toBe(new BlissSVGBuilder('B86;B97;B81').svgCode);
+    it('warns UNKNOWN_CODE for a ;!-part (no special strip parse), keeping the base', () => {
+      // `!B81` is an invalid code dumb-appended onto the glyph; it is not a
+      // strip-semantic operation. The base compound indicator is unchanged.
+      const single = new BlissSVGBuilder('COMBO_IND;!B81');
+      expect(single.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
+      expect(single.toString()).toBe('B86;B97');
     });
 
     it('keeps a baked sub-part offset instead of the from-origin stack position', () => {
@@ -160,6 +136,17 @@ describe('BlissSVGBuilder compound indicator application', () => {
       // (viewBox 6.5 -> 7.5).
       expect(new BlissSVGBuilder('MIX_CI;B81').svgCode)
         .toContain('viewBox="-0.75 -0.75 6.5 21.5"');
+    });
+  });
+
+  describe('when a glyph definition would bake an indicator-first codeString', () => {
+    it('is rejected by define() (such a base is undefinable)', () => {
+      // D-S1a: a glyph cannot bake an indicator, so an indicator-first base never
+      // exists; the dumb-; base case never meets one. (The earlier "no built-in
+      // reaches the .slice(1) replace path" scan was dropped as vacuous: that
+      // single-glyph replace path no longer exists under dumb ;.)
+      const result = BlissSVGBuilder.define({ IND_FIRST_GLYPH: { type: 'glyph', codeString: 'B86;B291' } });
+      expect(result.errors).toHaveLength(1);
     });
   });
 });
