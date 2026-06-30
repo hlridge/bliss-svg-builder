@@ -98,6 +98,8 @@ describe('BlissSVGBuilder indicator round-trip', () => {
       // ;! on a bare alias is misplaced (dropped before content validation), so
       // the baked B97 is kept - there is no character-level strip.
       expect(roundTripPreserve('_IRT_NOUN;!').str).toBe('B291;B97');
+      expect(new BlissSVGBuilder('_IRT_NOUN;!').warnings.map(w => w.code))
+        .toContain('MISPLACED_CHARACTER_INDICATOR');
     });
 
     it('decomposes the alias when the applied delta is empty or absent', () => {
@@ -196,9 +198,12 @@ describe('BlissSVGBuilder indicator round-trip', () => {
     });
 
     it.each(glyphStripInputs)('warns UNKNOWN_CODE and drops the invalid part on a glyph for "%s"', (input) => {
-      // `;!`/`;!B81` on a glyph dumb-appends an invalid code: UNKNOWN_CODE at
-      // parse, dropped from toString to a stable fixpoint (B291), so the render
-      // does not round-trip the invalid part (the contract-file F1 behavior).
+      // `;!`/`;!B81` on a glyph dumb-appends an invalid code (UNKNOWN_CODE at
+      // parse). The invalid part fails the WHOLE character (empty render - the
+      // "fail the character if any part fails" rule), and is dropped from toString
+      // to a stable fixpoint (B291); so the render does not round-trip. We pin only
+      // the documented invariants (UNKNOWN_CODE + fixpoint), not the render, which
+      // the contract leaves unspecified ("render may differ").
       const b = new BlissSVGBuilder(input);
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
       expect(b.toString()).toBe('B291');

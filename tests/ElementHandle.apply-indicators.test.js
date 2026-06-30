@@ -180,6 +180,13 @@ describe('ElementHandle apply indicators', () => {
       // B81 is verbal, semantic goes last
       expect(partCodes(b)).toEqual(['B291', 'B81', 'B6436']);
     });
+
+    // Review #4 (A1-F1): a compound semantic BASE (B98) is currently decomposed to
+    // its B97 root during preservation (B291;B98 + applyIndicators('B81') ->
+    // [B291,B81,B97], not atomic [B291,B81,B98]). Whether that is correct, or a
+    // compound should stay atomic per the compound-indicator-atomic-unit decision,
+    // is an open design question; pin it once decided. Tracked in backlog.md.
+    it.todo('pins whether a compound semantic base (B98) stays atomic or decomposes to B97 during preservation');
   });
 
   describe('when applyIndicators is called on an invalid handle or input', () => {
