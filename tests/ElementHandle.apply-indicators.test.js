@@ -181,12 +181,15 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B81', 'B6436']);
     });
 
-    // Review #4 (A1-F1): a compound semantic BASE (B98) is currently decomposed to
-    // its B97 root during preservation (B291;B98 + applyIndicators('B81') ->
-    // [B291,B81,B97], not atomic [B291,B81,B98]). Whether that is correct, or a
-    // compound should stay atomic per the compound-indicator-atomic-unit decision,
-    // is an open design question; pin it once decided. Tracked in backlog.md.
-    it.todo('pins whether a compound semantic base (B98) stays atomic or decomposes to B97 during preservation');
+    it('decomposes a compound semantic base (B98) to its B97 root during preservation', () => {
+      // user-confirmed intended (2026-06-30, Review #4 A1-F1): applyIndicators
+      // treats a composed indicator as if decomposed, so an existing compound
+      // semantic B98 is preserved as its B97 root, not kept atomic. (Atomicity in
+      // the compound-indicator-atomic-unit decision is a LAYOUT rule, orthogonal.)
+      const b = new BlissSVGBuilder('B291;B98');
+      b.group(0).glyph(0).applyIndicators('B81');
+      expect(partCodes(b)).toEqual(['B291', 'B81', 'B97']);
+    });
   });
 
   describe('when applyIndicators is called on an invalid handle or input', () => {
