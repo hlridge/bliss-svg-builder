@@ -2258,6 +2258,18 @@ class BlissSVGBuilder {
       if (typeof newCodeString !== 'string' || newCodeString.length === 0) {
         throw new Error(`patchDefinition("${code}"): "codeString" must be a non-empty string.`);
       }
+      // A glyph/shape is a single character; `/` (word separator) and `;;`
+      // (word-level indicator) cannot appear in its codeString. Mirror the
+      // #defineGlyph/#defineShape guards so patchDefinition cannot construct a
+      // state define() forbids. (Strict Indicator Separation.)
+      if (type === 'glyph' || type === 'shape') {
+        if (newCodeString.includes('/')) {
+          throw new Error(`patchDefinition("${code}"): a ${type} definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"${type}").`);
+        }
+        if (newCodeString.includes(';;')) {
+          throw new Error(`patchDefinition("${code}"): a ${type} definition cannot contain a word-level indicator (";;"); a ${type} is a single character.`);
+        }
+      }
       const allowedRefTypes = type === 'glyph' ? ['glyph', 'shape']
         : type === 'shape' ? ['shape']
         : ['glyph', 'shape', 'bare', 'externalGlyph'];

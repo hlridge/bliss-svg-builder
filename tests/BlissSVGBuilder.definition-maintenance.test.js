@@ -312,6 +312,55 @@ describe('BlissSVGBuilder definition maintenance', () => {
         .toThrow(/composition/i);
     });
 
+    it('rejects patching a glyph codeString to a multi-character word', () => {
+      // mirrors define()'s strict-separation guard so both definition surfaces
+      // agree: a glyph is one character, so its codeString cannot contain `/`
+      // (otherwise patch is a "way in" the guard forbids)
+      const code = trackCode('PATCHGWORD1');
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'H' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: 'B291/B313' }))
+        .toThrow(/multi-character word/i);
+    });
+
+    it('rejects patching a glyph codeString to contain a word-level indicator', () => {
+      const code = trackCode('PATCHGWI1');
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'H' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: 'B303;;B291' }))
+        .toThrow(/word-level indicator/i);
+    });
+
+    it('rejects patching a shape codeString to a multi-character word', () => {
+      const code = trackCode('PATCHSWORD1');
+      BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: 'HL4' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: 'HL4/VL4' }))
+        .toThrow(/multi-character word/i);
+    });
+
+    it('rejects patching a shape codeString to contain a word-level indicator', () => {
+      const code = trackCode('PATCHSWI1');
+      BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: 'HL4' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: 'HL8;;VL8' }))
+        .toThrow(/word-level indicator/i);
+    });
+
+    it('allows patching a bare codeString to a multi-character word', () => {
+      // the strict-separation guard is glyph/shape-only; a bare alias IS a word,
+      // so `/` is legal in its codeString
+      const code = trackCode('PATCHBWORD1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B431' } });
+      BlissSVGBuilder.patchDefinition(code, { codeString: 'B291/B313' });
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('B291/B313');
+    });
+
+    it('allows patching a glyph codeString to a single-; composite', () => {
+      // `;;` is the trigger, not single `;`: a one-character composite glyph
+      // (H;S2) is still a valid patch
+      const code = trackCode('PATCHGCOMP1');
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'H' } });
+      BlissSVGBuilder.patchDefinition(code, { codeString: 'H;S2' });
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('H;S2');
+    });
+
     it('patches the codeString of a bare definition and keeps its type bare', () => {
       const code = trackCode('PATCHBARE1');
       BlissSVGBuilder.define({ [code]: { codeString: 'B431' } });
