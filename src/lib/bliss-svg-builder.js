@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
-import { getSemanticRoot, mergeWordIndicatorsOntoHead } from "./indicator-utils.js";
+import { mergeWordIndicatorsOntoHead } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -1357,12 +1357,20 @@ class BlissSVGBuilder {
           && currentInds.every((c, i) => c === bakedInds[i])) {
         return glyph.codeName;
       }
-      const semanticRoot = getSemanticRoot(bakedInds, blissElementDefinitions);
-      const nonSemantic = currentInds.filter(c => c !== semanticRoot);
-      // `;!` only when the baked semantic was stripped; otherwise `;` re-applies
-      // semantic preservation on re-parse.
-      const semanticStripped = !!semanticRoot && !currentInds.includes(semanticRoot);
-      return glyph.codeName + (semanticStripped ? ';!' : ';') + nonSemantic.join(';');
+      // The smart API changed the indicator state. Only a compound-indicator
+      // glyph bakes indicators (D-S1a), and the API can reorder or strip those
+      // baked parts; a dumb char-level `;` delta against the name can no longer
+      // encode that (re-appending a baked code doubles it, a `;!` strip becomes
+      // an invalid append), so decompose to primitives, which dumb `;` rebuilds
+      // exactly. (Strict Indicator Separation; supersedes the old `;`/`;!` delta.)
+      if (bakedInds.length > 0) {
+        return serializeParts(glyph.parts);
+      }
+      // A base-only glyph bakes no indicator, so the API only appends: a dumb
+      // `;` delta against the name round-trips faithfully and keeps the local
+      // name, which `preserve` must do independently of `flattenIndicators`
+      // (R3b2-2 orthogonality).
+      return glyph.codeName + ';' + currentInds.join(';');
     }
 
     // Serialize a glyph: B-codes emit their code, compositions emit parts.

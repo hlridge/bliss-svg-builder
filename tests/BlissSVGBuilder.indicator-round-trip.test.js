@@ -20,6 +20,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   not a dropped word-slot overlay.
  * - Negative control: a typeless multi-glyph alias decomposes under preserve.
  * - A built-in glyph modified via applyIndicators decomposes under preserve.
+ * - A compound-indicator glyph (the only glyph that may bake indicators)
+ *   modified via the smart API decomposes to primitives under preserve, so the
+ *   round-trip renders identically with no UNKNOWN_CODE; an unmodified glyph
+ *   keeps its bare name (D2).
  * - Default-mode round-trip of the char-level delta family (`;`, `;B81`) on a
  *   plain glyph (dumb append) and on aliases (misplaced): SVG identity + toString
  *   stability. The invalid `;!`/`;!B81` delta on a glyph is a UNKNOWN_CODE
@@ -46,8 +50,9 @@ import { BlissSVGBuilder } from '../src/index.js';
 describe('BlissSVGBuilder indicator round-trip', () => {
   const IRT_DEFS = {
     // Base+indicator alias baking B97 (the 'thing'/nominal semantic indicator).
-    // R15 D-S1a: a base+indicator combo is an alias, not a glyph; applying a `;`
-    // indicator to it promotes into the reversible `;;` overlay (3b-1).
+    // R15 D-S1a: a base+indicator combo is an alias, not a glyph; a char-level
+    // `;` on it is MISPLACED (dropped, the alias renders as defined) - it does
+    // NOT promote; the smart API (applyIndicators) is the only way to add one.
     _IRT_NOUN: { codeString: 'B291;B97' },
     // Typeless multi-glyph alias: decomposes at parse, carries no glyph
     // identity. Negative control for preserve-mode name scoping.
@@ -58,6 +63,11 @@ describe('BlissSVGBuilder indicator round-trip', () => {
     // three differently (plain / semantic-rooted / non-semantic-baked).
     _IRT_PLAIN: { type: 'glyph', codeString: 'B291' },
     _IRT_NONSEM: { codeString: 'B291;B86' },
+    // A compound-indicator glyph: the only glyph that may bake indicators (the
+    // D-S1a exemption). Pins the preserve-mode delta decomposition (D2) - a
+    // smart-API modification can no longer be encoded as a `;` delta against the
+    // name once `;` is dumb, so preserve must emit the primitive parts instead.
+    _IRT_CI: { type: 'glyph', codeString: 'B86;B97', isIndicator: true },
   };
   beforeAll(() => BlissSVGBuilder.define(IRT_DEFS));
   afterAll(() => Object.keys(IRT_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
@@ -168,6 +178,45 @@ describe('BlissSVGBuilder indicator round-trip', () => {
       const b = new BlissSVGBuilder('B291');
       b.group(0).glyph(0).applyIndicators('B81');
       expect(b.toString({ preserve: true })).toBe('B291;B81');
+    });
+  });
+
+  describe('when a compound-indicator glyph is modified via the smart API', () => {
+    // D2: a custom glyph that bakes indicators (only a compound indicator may,
+    // per the D-S1a exemption) cannot encode a smart applyIndicators/
+    // clearIndicators change as a `;` delta against its name once `;` is dumb -
+    // a re-appended baked code doubles it, and a `;!CODE` strip turns into an
+    // invalid append (UNKNOWN_CODE). Preserve must decompose the modified glyph
+    // to primitives, which dumb `;` reconstructs faithfully.
+    const MODIFIERS = [
+      ['applyIndicators with a stripped semantic', g => g.applyIndicators('B81', { stripSemantic: true })],
+      ['applyIndicators preserving the semantic', g => g.applyIndicators('B81')],
+      ['clearIndicators with a stripped semantic', g => g.clearIndicators({ stripSemantic: true })],
+    ];
+    const buildModified = (op) => {
+      const b = new BlissSVGBuilder('_IRT_CI');
+      op(b.group(0).glyph(0));
+      return b;
+    };
+
+    it.each(MODIFIERS)('renders identically after a preserve round-trip when modified via %s', (_label, op) => {
+      const b = buildModified(op);
+      const str = b.toString({ preserve: true });
+      expect(new BlissSVGBuilder(str).svgCode).toBe(b.svgCode);
+    });
+
+    it.each(MODIFIERS)('emits a preserve-stable form with no UNKNOWN_CODE when modified via %s', (_label, op) => {
+      const b = buildModified(op);
+      const str = b.toString({ preserve: true });
+      const rebuilt = new BlissSVGBuilder(str);
+      expect(rebuilt.toString({ preserve: true })).toBe(str);
+      expect(rebuilt.warnings.map(w => w.code)).not.toContain('UNKNOWN_CODE');
+    });
+
+    it('keeps the bare name for an unmodified compound-indicator glyph', () => {
+      // the early-out: an untouched glyph serializes to its name, not its parts,
+      // so name retention still holds for the common (unmodified) case.
+      expect(new BlissSVGBuilder('_IRT_CI').toString({ preserve: true })).toBe('_IRT_CI');
     });
   });
 
