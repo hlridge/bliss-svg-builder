@@ -1369,7 +1369,17 @@ class BlissSVGBuilder {
       // A base-only glyph bakes no indicator, so the API only appends: a dumb
       // `;` delta against the name round-trips faithfully and keeps the local
       // name, which `preserve` must do independently of `flattenIndicators`
-      // (R3b2-2 orthogonality).
+      // (R3b2-2 orthogonality). But `name;codes` maps each part's bare codeName
+      // and re-references the base opaquely at 0,0, so it cannot encode a baked
+      // base offset, a per-instance indicator coord, or a part-level option. If
+      // any part would emit a `:x,y` / `[opts]>` suffix (the same test
+      // serializeParts uses), decompose to primitives, which DO carry it,
+      // instead of silently dropping it; the bare case still keeps the name.
+      const carriesPositionOrOptions = (p) =>
+        (p.x ?? 0) !== 0 || (p.y ?? 0) !== 0 || serializeOptions(p.options) !== '';
+      if (glyph.parts.some(carriesPositionOrOptions)) {
+        return serializeParts(glyph.parts);
+      }
       return glyph.codeName + ';' + currentInds.join(';');
     }
 
@@ -1406,13 +1416,17 @@ class BlissSVGBuilder {
           code = serializeCustomGlyphDelta(glyph);
         }
         if (!code) {
-          // A built-in glyph can re-acquire identity while its sole part still
-          // holds a relocation offset and/or a part-level option (e.g.
-          // clearIndicators on `[color=red]>B291:2,3;B86` restores codeName
-          // 'B291' but parts[0] keeps x/y + options). Route the single-part case
-          // through serializeParts so both round-trip, instead of emitting the
-          // bare codeName and dropping them. (Subsumes the N13 offset path.)
-          code = glyph.parts?.length === 1
+          // A built-in glyph can re-acquire identity while its parts still hold
+          // detail the bare code would drop: a sole part with a relocation
+          // offset and/or a part-level option (N13, e.g. clearIndicators on
+          // `[color=red]>B291:2,3;B86` restores codeName 'B291' but parts[0]
+          // keeps x/y + options), or an applied indicator part beyond the bare
+          // identity (a base-only custom glyph whose codeName collapsed to its
+          // built-in base after `applyIndicators`). Route any non-empty parts
+          // through serializeParts so all of them round-trip. No UNMODIFIED
+          // built-in reaches here multi-part (its snapshot part is a single
+          // self-reference), so this never over-decomposes a plain composite.
+          code = glyph.parts?.length
             ? serializeParts(glyph.parts)
             : glyph.codeName;
         }
