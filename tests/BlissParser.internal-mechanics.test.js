@@ -5,16 +5,15 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
 /**
  * Pins the internal-mechanics behaviors of BlissParser that fall outside
  * the feature-cross-cutting sibling files: parsePartString grammar,
- * head-glyph detection mechanics, the WORD;INDICATORS (`;`) reattach-and-
- * strip code path through replaceWithDefinitionHelpers (getBaseCode /
- * getIndicatorParts), post-expand glyph object construction in
+ * head-glyph detection mechanics, post-expand glyph object construction in
  * fromStringPostprocess, and the small public utility methods (parse
  * caller-options merge, expandParts defensive guards).
  *
- * Note: the getBaseCode / getIndicatorParts `;`-reattach mechanics this file
- * once exercised are dead under Strict Indicator Separation (a char-level `;`
- * on a multi-glyph word is MISPLACED, not a reattach), so those scenarios were
- * dropped here; head-glyph detection and the generic parse mechanics remain.
+ * Note: the char-level `;`-reattach mechanics this file once exercised are
+ * dead under Strict Indicator Separation (a char-level `;` on a multi-glyph
+ * word is MISPLACED, not a reattach), so those scenarios were dropped here and
+ * the parser helpers that backed them removed; head-glyph detection and the
+ * generic parse mechanics remain.
  *
  * Covers:
  * - parsePartString DSL-fragment parsing: option-bracket extraction with

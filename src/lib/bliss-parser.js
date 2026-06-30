@@ -9,13 +9,6 @@ import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js"
 import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
-import {
-  getSemanticRoot,
-  hasSemantic,
-  filterToIndicators,
-  buildWithSemantic,
-  getBareCode
-} from "./indicator-utils.js";
 import { MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 
 export class BlissParser {
@@ -431,47 +424,6 @@ export class BlissParser {
             }
           }
           crownWordChunk(chunk, label);
-        };
-
-        // Helper to get base code from an expanded glyph, stripping the indicator
-        // parts. The base is the NON-indicator parts and the strippable
-        // indicators are the indicator parts, derived position-independently (not
-        // by assuming segment 0 is the base) so an indicator-first or all-indicator
-        // head is read correctly. Defined at top level for use in ;; handling and
-        // expand().
-        const getBaseCode = (glyph) => {
-          const parts = glyph.part.split(';');
-          const nonIndicatorParts = parts.filter(p => {
-            const bareCode = p.split(':')[0];
-            return !definitions[bareCode]?.isIndicator;
-          });
-          // Atomic compound indicator: every part is an indicator, so there is no
-          // base to strip - the stack itself IS the base. Decompose to the parts
-          // (do NOT keep the glyph-identity fast-path here: a glyph-identity head
-          // keeps its parts as one composite unit and mis-positions a later
-          // stacked indicator, so it must render as a flat baseless stack). R15 3b-5.
-          if (nonIndicatorParts.length === 0) return glyph.part;
-          // Normal base-first head: preserve the glyph-identity fast-path so a
-          // composite glyph (e.g. B502 = 'DOT:2,10;HL4:0,12;DOT:2,14') keeps its
-          // code. Simple code only (no / or ; that indicate words/codeStrings).
-          const isSimpleGlyphCode = glyph.glyphCode &&
-            !glyph.glyphCode.includes('/') &&
-            !glyph.glyphCode.includes(';');
-          if (isSimpleGlyphCode) return glyph.glyphCode;
-          return nonIndicatorParts.join(';');
-        };
-
-        // Extract the strippable indicator parts of a glyph (position-independent).
-        // An all-indicator (atomic compound indicator) glyph has no strippable
-        // applied indicator - the stack itself is the base - so it returns []. R15 3b-5.
-        const getIndicatorParts = (glyph) => {
-          const parts = glyph.part.split(';');
-          const indicatorParts = parts.filter(p => {
-            const bareCode = p.split(':')[0];
-            return definitions[bareCode]?.isIndicator === true;
-          });
-          if (indicatorParts.length === parts.length) return [];
-          return indicatorParts;
         };
 
         // Helper: resolve codeString through aliases to check if it's a word

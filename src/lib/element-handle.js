@@ -819,9 +819,9 @@ export class ElementHandle {
 
     // Classify parts: the first part is always the base (even when it is itself
     // an indicator), so scan for the first TRAILING indicator from index 1.
-    // Mirrors mergeWordIndicatorsOntoHead and the parser's getBaseCode i===0
-    // guard, so a lone indicator or an empty glyph carries a further indicator
-    // rather than no-opping (the atypical-base contract, R15 Task 5).
+    // Mirrors mergeWordIndicatorsOntoHead, so a lone indicator or an empty glyph
+    // carries a further indicator rather than no-opping (the atypical-base
+    // contract, R15 Task 5).
     const firstIndicatorIndex = glyph.parts.findIndex((p, i) => i > 0 && p.isIndicator === true);
 
     let baseParts, indicatorParts;

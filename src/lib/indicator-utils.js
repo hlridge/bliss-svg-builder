@@ -141,8 +141,8 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
   const parts = headGlyph?.parts ?? [];
   // The first part is always the base, even when it is itself an indicator
   // (e.g. a head whose bareCode is B85): scan for the first trailing indicator
-  // from index 1. Mirrors the parser's getBaseCode `i === 0` guard so a
-  // word-level overlay onto an indicator base adds rather than replaces it.
+  // from index 1, so a word-level overlay onto an indicator base adds rather
+  // than replaces it.
   const firstIndicatorIndex = parts.findIndex((p, i) => i > 0 && p.isIndicator === true);
   const baseParts = firstIndicatorIndex === -1 ? parts.slice() : parts.slice(0, firstIndicatorIndex);
   const existingIndicatorParts = firstIndicatorIndex === -1 ? [] : parts.slice(firstIndicatorIndex);
