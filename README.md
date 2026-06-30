@@ -77,7 +77,7 @@ For complete documentation including DSL syntax, mutation API, element inspectio
 
 ## Stability Notice
 
-**Release Candidate**: The API is considered stable. Breaking changes are unlikely but possible before the final 1.0.0 release.
+**Release Candidate**: The API is stabilizing toward 1.0.0, but breaking changes may still occur before the final 1.0.0 release while remaining behavior is finalized. Pin an exact version if you depend on current behavior during the RC window.
 
 ## License
 
