@@ -1307,7 +1307,14 @@ class BlissSVGBuilder {
         if (!options.preserve && part.codeName && !builtInCodes.has(part.codeName)) {
           // Custom code with nested parts (e.g., positioned custom glyph)
           if (part.parts) {
-            return serializeParts(part.parts, x, y);
+            const inner = serializeParts(part.parts, x, y);
+            // A part-level option on the custom base must survive decomposition,
+            // but `[opts]>` binds to ONE code, so wrap only a single-code result;
+            // a multi-code (`;`) decomposition can't carry one option faithfully
+            // (a multi-part custom base does not apply the option on render
+            // either), so it is left unwrapped. (TF-3.)
+            const optPrefix = serializeOptions(part.options);
+            return optPrefix && inner && !inner.includes(';') ? `${optPrefix}>${inner}` : inner;
           }
           // Custom composite shape (has codeString, no getPath)
           const def = blissElementDefinitions[part.codeName];

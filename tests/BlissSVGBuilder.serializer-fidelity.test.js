@@ -100,4 +100,24 @@ describe('BlissSVGBuilder serializer fidelity', () => {
       expect(applied('_FID_PLAIN', 'B81').toString({ preserve: true })).toBe('_FID_PLAIN;B81');
     });
   });
+
+  describe('when a part-level option decorates a custom-glyph base', () => {
+    it('re-emits the option on a bare custom-glyph base in default toString', () => {
+      // regression: external review follow-up TF-3 (2026-07-01) - the
+      // serializeParts recursive branch dropped part.options when decomposing a
+      // custom glyph, so the option vanished from default output.
+      const b = new BlissSVGBuilder('[color=blue]>_FID_PLAIN');
+      const str = b.toString();
+      expect(str).toContain('color=blue');
+      expect(new BlissSVGBuilder(str).svgCode).toBe(b.svgCode);
+    });
+
+    it('re-emits the option when the decorated base also carries an applied indicator', () => {
+      const b = new BlissSVGBuilder('[color=blue]>_FID_PLAIN');
+      b.group(0).glyph(0).applyIndicators('B81');
+      const str = b.toString();
+      expect(str).toContain('color=blue');
+      expect(new BlissSVGBuilder(str).svgCode).toBe(b.svgCode);
+    });
+  });
 });
