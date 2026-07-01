@@ -43,6 +43,9 @@ describe('BlissSVGBuilder serializer fidelity', () => {
     // Base-only custom glyph whose definition bakes a base position offset: the
     // preserve `name;codes` delta cannot restore the 2,3 (the F-D path).
     _FID_OFFSET: { type: 'glyph', codeString: 'B291:2,3' },
+    // Multi-base `;`-composition: its default decomposition is multi-code, which
+    // one `[opts]>` cannot carry faithfully (the TF-3G guard case).
+    _FID_TWOBASE: { type: 'glyph', codeString: 'B291;C8' },
   };
   beforeAll(() => BlissSVGBuilder.define(FIDELITY_DEFS));
   afterAll(() => Object.keys(FIDELITY_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
@@ -118,6 +121,18 @@ describe('BlissSVGBuilder serializer fidelity', () => {
       const str = b.toString();
       expect(str).toContain('color=blue');
       expect(new BlissSVGBuilder(str).svgCode).toBe(b.svgCode);
+    });
+
+    it('drops (does not mis-wrap) a part-level option on a multi-base custom glyph', () => {
+      // TF-3G (review follow-up): a custom glyph that is a `;`-composition of
+      // multiple non-indicator bases decomposes to multi-code; one `[opts]>` can't
+      // carry it and render applies the option to the whole character. The guard
+      // DROPS the option rather than mis-wrap it onto only the first code
+      // (`[color=blue]>B291;C8`, which round-trips to a DIFFERENT render). Pinning
+      // the drop guards against that mis-wrap; the faithful per-part round-trip is
+      // a known gap (backlog: multi-base custom-glyph part-option round-trip).
+      const b = new BlissSVGBuilder('[color=blue]>_FID_TWOBASE');
+      expect(b.toString()).toBe('B291;C8');
     });
   });
 });

@@ -434,6 +434,14 @@ describe('BlissParser ;; syntax', () => {
       expect(overlay('H;;[color=red;stroke-width=2]>B81').codes).toEqual(['[color=red;stroke-width=2]>B81']);
     });
 
+    it('restores the option on every code when the overlay carries more than one', () => {
+      // SIB-2U (review follow-up): restoration maps over the whole code list, so a
+      // second option-bearing indicator must also come back; a "restore only the
+      // first code" mutant would leave the second placeholder unrestored.
+      expect(overlay('H;;[color=red]>B81;[color=blue]>B97').codes)
+        .toEqual(['[color=red]>B81', '[color=blue]>B97']);
+    });
+
     it('applies the option on the resolved head indicator through a round-trip', () => {
       const b = new BlissSVGBuilder('H');
       b.group(0).applyIndicators('[color=red]>B81');

@@ -78,10 +78,11 @@ describe('BlissElement indicator positioning', () => {
       });
       const [, indicator] = element.snapshot().children[0].children[0].children;
 
-      // offsetX centers over the base's true span: the base is a single-child
-      // composite, so its HL4:2 offset now survives (SIB-3 fix) instead of being
-      // re-origined to 0. Base spans [2,6] => center 3, anchorX 3+(-1)=2, single
-      // indicator currentX 2 - 2/2 + (-1) = 0. (Was -1 when HL4 normalized to 0.)
+      // offsetX centers over the base's REPORTED span. The base is a single-child
+      // composite whose HL4:2 offset now survives (SIB-3), so it reports width 6
+      // from its origin (span [0,6], center 3) -- not HL4's content span [2,6]
+      // (center 4). anchorX = 3 + (-1) = 2; a single indicator lands at
+      // 2 - 2/2 + (-1) = 0. (Was -1 when HL4 was re-origined to 0, width 4.)
       expect(indicator.offsetX).toBe(0);
       // The Y contract this test pins is unchanged: base anchorOffsetY -3 minus
       // indicator anchorOffsetY 2, minus the default indicator drop 4 => -5.

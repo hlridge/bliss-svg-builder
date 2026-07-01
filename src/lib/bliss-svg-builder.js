@@ -1309,10 +1309,13 @@ class BlissSVGBuilder {
           if (part.parts) {
             const inner = serializeParts(part.parts, x, y);
             // A part-level option on the custom base must survive decomposition,
-            // but `[opts]>` binds to ONE code, so wrap only a single-code result;
-            // a multi-code (`;`) decomposition can't carry one option faithfully
-            // (a multi-part custom base does not apply the option on render
-            // either), so it is left unwrapped. (TF-3.)
+            // but `[opts]>` binds to ONE code, so wrap only a single-code result.
+            // A multi-code (`;`) decomposition can't carry one option faithfully:
+            // render DOES apply it (to the whole `;`-character, one wrapping <g>),
+            // but re-emitting needs per-part (`[opts]>B291;[opts]>C8`). Drop it
+            // here rather than mis-wrap onto only the first code (which round-trips
+            // to a DIFFERENT render). The multi-code round-trip is a known gap
+            // (TF-3G, backlog). (TF-3.)
             const optPrefix = serializeOptions(part.options);
             return optPrefix && inner && !inner.includes(';') ? `${optPrefix}>${inner}` : inner;
           }
