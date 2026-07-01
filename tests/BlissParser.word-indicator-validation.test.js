@@ -19,7 +19,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Covers:
  * - Recognized non-indicator after ;; -> NON_INDICATOR_AS_WORD_INDICATOR
  *   (named source), dropped from serialization, base still renders.
- * - Unrecognized code after ;; -> UNKNOWN_CODE (named source), dropped.
+ * - Unrecognized code after ;; -> UNKNOWN_CODE (named source), dropped; an
+ *   inherited Object.prototype name (toString/constructor/__proto__) classifies
+ *   as UNKNOWN_CODE, not a recognized non-indicator.
  * - Mixed valid + non-indicator -> only the offender dropped; the valid
  *   indicator survives in the overlay and serialization.
  * - Negative control: a valid word-level indicator is unchanged (no warning,
@@ -70,11 +72,28 @@ describe('BlissParser word-indicator validation', () => {
       const w = warnings('B303;;ZZ9').find((x) => x.code === 'UNKNOWN_CODE');
       expect(w).toBeDefined();
       expect(w.source).toBe('ZZ9');
+      // the marker in the message reads `after ;;`, never a `;;;` run.
+      expect(w.message).toContain('after ;;');
+      expect(w.message).not.toContain(';;;');
     });
 
     it('drops the unknown code so it does not re-serialize', () => {
       expect(new BlissSVGBuilder('B303;;ZZ9').toString()).toBe('B303');
     });
+  });
+
+  describe('when ;; carries a prototype-property name', () => {
+    // regression: chunk-2 external review F5. `toString`/`constructor`/`__proto__`
+    // are not OWN registered codes; a plain definitions[name] lookup would hit
+    // Object.prototype and misclassify them as recognized non-indicators.
+    it.each(['toString', 'constructor', '__proto__'])(
+      'classifies the inherited name %s as UNKNOWN_CODE, not a non-indicator',
+      (name) => {
+        const codes = warningCodes(`B303;;${name}`);
+        expect(codes).toContain('UNKNOWN_CODE');
+        expect(codes).not.toContain('NON_INDICATOR_AS_WORD_INDICATOR');
+      }
+    );
   });
 
   describe('when ;; mixes a valid indicator with a non-indicator', () => {

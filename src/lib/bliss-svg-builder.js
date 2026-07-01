@@ -7,9 +7,9 @@
 import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
-import { mergeWordIndicatorsOntoHead } from "./indicator-utils.js";
+import { mergeWordIndicatorsOntoHead, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -408,6 +408,34 @@ class BlissSVGBuilder {
     // Reverse toJSON() normalization: codeName → internal field names
     if (typeof input !== 'string' && blissObj.groups) {
       BlissSVGBuilder.#normalizeGlyphCodes(blissObj.groups);
+    }
+
+    // A `wordIndicators` overlay from object input (persisted toJSON, or hand-
+    // authored) must pass the same "a `;;` code must BE an indicator" rule as the
+    // DSL and API, so all three input surfaces agree. Older/hand-authored data can
+    // carry a non-indicator overlay code; validate + drop it here via the shared
+    // resolver, routing warnings through `_parseWarnings` like the parser (they
+    // surface in `warnings` and are stripped from `toJSON()`).
+    if (typeof input !== 'string' && blissObj.groups) {
+      for (const group of blissObj.groups) {
+        if (!group.wordIndicators) continue;
+        const { codes = [], stripSemantic = false } = group.wordIndicators;
+        const overlay = resolveWordIndicatorOverlay(codes, stripSemantic, blissElementDefinitions, ({ code: badCode, reason }) => {
+          (blissObj._parseWarnings ??= []).push(reason === 'non-indicator'
+            ? {
+                code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
+                message: `Word-level indicator "${badCode}" is not an indicator; it is ignored. A ;; code must be an indicator (e.g. B81).`,
+                source: badCode,
+              }
+            : {
+                code: WARNING_CODES.UNKNOWN_CODE,
+                message: `Word-level indicator "${badCode}" is not a known code; it is ignored.`,
+                source: badCode,
+              });
+        });
+        if (overlay) group.wordIndicators = overlay;
+        else delete group.wordIndicators;
+      }
     }
 
     // Merge: defaults (lowest) < string options (middle) < overrides (highest)
@@ -1549,6 +1577,12 @@ class BlissSVGBuilder {
    */
   toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
+
+    // Internal parse-warning record: consumed by #rebuild to repopulate
+    // `warnings`, never part of the public composition data (absent from the
+    // BlissJSON type). Strip it so toJSON() is clean authoring data and a JSON
+    // round-trip does not re-emit a warning for an offender already dropped.
+    delete obj._parseWarnings;
 
     // Strip keys from all levels (keys are runtime identity, not composition data)
     delete obj.key;

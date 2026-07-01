@@ -6,7 +6,7 @@
 
 import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
-import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators } from "./indicator-utils.js";
+import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -826,9 +826,7 @@ export class ElementHandle {
     // Determine the final indicator code list (replace-all with semantic
     // preservation; clearIndicators passes no new codes), then parse each
     // into a proper part node with metadata.
-    const requestedCodes = code !== null
-      ? code.split(';').map(s => s.trim()).filter(Boolean)
-      : [];
+    const requestedCodes = code !== null ? splitTopLevelSemicolons(code) : [];
 
     const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
 
@@ -934,9 +932,7 @@ export class ElementHandle {
       // else the overlay is kept rather than silently destroyed (R15 Task 5).
       const head = this.headGlyph();
       const hadOverlay = group.wordIndicators !== undefined;
-      const requestedCodes = code === null
-        ? []
-        : code.split(';').map(s => s.trim()).filter(Boolean);
+      const requestedCodes = code === null ? [] : splitTopLevelSemicolons(code);
       const bakeApplies = code === null
         || filterToIndicators(requestedCodes, this.#ctx.getDefinitions()).length > 0;
       if (bakeApplies) delete group.wordIndicators;
@@ -966,11 +962,12 @@ export class ElementHandle {
       else delete group.wordIndicators;
     } else {
       // A `;;` overlay code must BE an indicator (same rule as the DSL `;;`
-      // parser path). Validate + drop non-indicators here, warning on the
-      // persistent mutation channel so the warning survives the rebuild below.
-      const requestedCodes = code.split(';').map(s => s.trim()).filter(Boolean);
-      const { valid, rejected } = partitionWordIndicators(requestedCodes, this.#ctx.getDefinitions());
-      for (const { code: badCode, reason } of rejected) {
+      // parser path). Tokenize bracket-aware so a multi-key option block's inner
+      // `;` is not split (DSL/API parity), then validate + drop non-indicators
+      // via the shared resolver, warning on the persistent mutation channel so
+      // the warning survives the rebuild below.
+      const requestedCodes = splitTopLevelSemicolons(code);
+      const overlay = resolveWordIndicatorOverlay(requestedCodes, stripSemantic, this.#ctx.getDefinitions(), ({ code: badCode, reason }) => {
         this.#ctx.addMutationWarning(reason === 'non-indicator'
           ? {
               code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
@@ -982,13 +979,15 @@ export class ElementHandle {
               message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it is ignored.`,
               source: badCode,
             });
-      }
-      // Store the overlay only when it carries meaning: a surviving indicator or
-      // an explicit strip. An apply whose codes are ALL non-indicators asked for
-      // nothing valid, so it warns and leaves any existing overlay untouched
-      // rather than silently destroying it (mirrors the flatten N15 rule).
-      if (valid.length > 0 || stripSemantic) {
-        group.wordIndicators = { codes: valid, stripSemantic };
+      });
+      // Store only a MEANINGFUL overlay (a surviving indicator or an explicit
+      // strip). An apply whose codes are all non-indicators (resolver null), or
+      // whose token list is empty, asked for nothing valid: warn and leave any
+      // existing overlay untouched rather than silently destroying it (the
+      // resolver's bare-`;;` empty-clear arm is a DSL-only concept). Mirrors the
+      // flatten N15 rule.
+      if (overlay && (overlay.codes.length > 0 || overlay.stripSemantic)) {
+        group.wordIndicators = overlay;
       }
     }
 

@@ -68,14 +68,78 @@ export function partitionWordIndicators(codes, definitions) {
   const valid = [];
   const rejected = [];
   for (const code of codes) {
-    const definition = definitions[getBareCode(code)];
+    const bare = getBareCode(code);
+    // Own-property check: a normal definitions object inherits Object.prototype
+    // members (toString, constructor, __proto__), so a plain `definitions[bare]`
+    // lookup would classify those names as recognized non-indicators. Only an
+    // OWN key is a real registered code; everything else is unknown.
+    const definition = Object.prototype.hasOwnProperty.call(definitions, bare)
+      ? definitions[bare]
+      : undefined;
     if (definition?.isIndicator === true) {
       valid.push(code);
     } else {
-      rejected.push({ code: getBareCode(code), reason: definition ? 'non-indicator' : 'unknown' });
+      rejected.push({ code: bare, reason: definition ? 'non-indicator' : 'unknown' });
     }
   }
   return { valid, rejected };
+}
+
+/**
+ * Resolve a `;;` word-level indicator overlay from raw codes plus a stripSemantic
+ * flag: validate each code (a `;;` code must BE an indicator) and apply the store
+ * decision. The single source of truth shared by the DSL parser, the API
+ * (`applyIndicators` overlay), and the object constructor, so all three input
+ * surfaces classify and store a `;;` overlay identically (DSL/API/object parity).
+ *
+ * Each rejected code is reported via `onReject({ code, reason })` so the caller
+ * emits a surface-appropriate warning (parser `parseWarnings` vs the API mutation
+ * channel vs the object `_parseWarnings` channel).
+ *
+ * Store decision: return an overlay only when it carries meaning -- a surviving
+ * indicator, an explicit strip, or a deliberately-empty input (`rawCodes` empty,
+ * a bare `;;` clear). An input whose codes were ALL dropped as invalid (and no
+ * strip) returns null: the overlay is discarded, not rewritten as an empty one.
+ *
+ * @param {string[]} rawCodes
+ * @param {boolean} stripSemantic
+ * @param {Object} definitions
+ * @param {(rejected: { code: string, reason: 'non-indicator'|'unknown' }) => void} [onReject]
+ * @returns {{ codes: string[], stripSemantic: boolean } | null}
+ */
+export function resolveWordIndicatorOverlay(rawCodes, stripSemantic, definitions, onReject) {
+  const { valid, rejected } = partitionWordIndicators(rawCodes, definitions);
+  if (onReject) for (const r of rejected) onReject(r);
+  if (valid.length > 0 || stripSemantic || rawCodes.length === 0) {
+    return { codes: valid, stripSemantic };
+  }
+  return null;
+}
+
+/**
+ * Split a `;`-separated indicator code list on TOP-LEVEL semicolons only, leaving
+ * a `;` inside an option block (`[color=red;stroke-width=2]>B81`) intact. The DSL
+ * parser protects option-block semicolons with placeholders before splitting; the
+ * API receives raw strings, so it needs this bracket-aware split to tokenize a
+ * multi-key-option indicator the same way (DSL/API parity). Trims and drops empty
+ * segments, matching the prior naive `code.split(';').map(trim).filter(Boolean)`.
+ */
+export function splitTopLevelSemicolons(code) {
+  const result = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of code) {
+    if (ch === '[') depth++;
+    else if (ch === ']') { if (depth > 0) depth--; }
+    if (ch === ';' && depth === 0) {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result.map(s => s.trim()).filter(Boolean);
 }
 
 /**

@@ -14,7 +14,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   render-path readers that index the resolved head cannot silently regress.
  * - Constructor ingestion: default toJSON carries `group.wordIndicators`, and
  *   rebuilding from it renders identically and re-emits `;;` (authoring-faithful
- *   default round-trip).
+ *   default round-trip). An object overlay carrying a non-indicator or unknown
+ *   code is validated + dropped (warn), matching the DSL/API surfaces.
  * - getElementByKey on a `;;` head: base parts stay addressable by key; the
  *   overlay-injected indicator part returns null (lives only in the resolved
  *   tree, no raw node to mutate).
@@ -82,6 +83,53 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
         groups: [{ glyphs: [], wordIndicators: { codes: ['B81'], stripSemantic: false } }],
         options: {},
       })).not.toThrow();
+    });
+  });
+
+  describe('when ingesting an object overlay that carries a non-indicator code', () => {
+    // regression: chunk-2 external review F3. Object input (persisted toJSON, or
+    // hand-authored) must pass the same `;;`-must-be-an-indicator rule as the DSL
+    // and API, so all three input surfaces agree. Older data can carry an invalid
+    // overlay code; the constructor validates + drops it (warn + no re-serialize),
+    // matching `new BlissSVGBuilder('B303;;<code>')`.
+    const objectWithOverlay = (codes, stripSemantic = false) => new BlissSVGBuilder({
+      groups: [{ glyphs: [{ parts: [{ codeName: 'B303' }] }], wordIndicators: { codes, stripSemantic } }],
+      options: {},
+    });
+
+    it('warns NON_INDICATOR_AS_WORD_INDICATOR and drops a recognized non-indicator', () => {
+      const b = objectWithOverlay(['B291']);
+      const w = b.warnings.filter(x => x.code === 'NON_INDICATOR_AS_WORD_INDICATOR');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B291');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(b.toString()).toBe('B303');
+    });
+
+    it('warns UNKNOWN_CODE and drops an unrecognized overlay code', () => {
+      const b = objectWithOverlay(['ZZ9']);
+      expect(b.warnings.filter(x => x.code === 'UNKNOWN_CODE')).toHaveLength(1);
+      expect(b.toString()).toBe('B303');
+    });
+
+    it('keeps only the valid indicators from a mixed overlay', () => {
+      const b = objectWithOverlay(['B81', 'B291']);
+      expect(b.toJSON().groups[0].wordIndicators).toEqual({ codes: ['B81'], stripSemantic: false });
+      expect(b.toString()).toBe('B303;;B81');
+    });
+
+    it('renders and serializes identically to the DSL constructor for the same invalid overlay', () => {
+      const obj = objectWithOverlay(['B291']);
+      const dsl = new BlissSVGBuilder('B303;;B291');
+      expect(obj.toString()).toBe(dsl.toString());
+      expect(obj.svgCode).toBe(dsl.svgCode);
+      expect(obj.toJSON().groups[0].wordIndicators).toBeUndefined();
+    });
+
+    it('leaves a valid overlay untouched (no over-reach)', () => {
+      const b = objectWithOverlay(['B81']);
+      expect(b.warnings.filter(x => x.code === 'NON_INDICATOR_AS_WORD_INDICATOR')).toHaveLength(0);
+      expect(b.toJSON().groups[0].wordIndicators).toEqual({ codes: ['B81'], stripSemantic: false });
     });
   });
 

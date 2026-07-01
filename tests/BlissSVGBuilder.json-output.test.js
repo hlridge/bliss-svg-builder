@@ -385,6 +385,27 @@ describe('BlissSVGBuilder JSON output', () => {
     });
   });
 
+  describe('when the input produced a parse warning', () => {
+    it('does not leak the internal _parseWarnings array into toJSON', () => {
+      // regression: chunk-2 external review F1. _parseWarnings is an internal
+      // record consumed to repopulate `warnings`, never public composition data
+      // (absent from the BlissJSON type). A misplaced head marker (^ before the
+      // indicator) is a general parse warning, so this pins the leak fix beyond
+      // the ;; case that surfaced it.
+      const json = new BlissSVGBuilder('B291^;B81').toJSON();
+      expect('_parseWarnings' in json).toBe(false);
+    });
+
+    it('does not re-warn when a normalized JSON is rebuilt', () => {
+      // the offending token is resolved at the first parse, so the clean
+      // composition data must not re-emit the warning on reconstruction.
+      const b = new BlissSVGBuilder('B291^;B81');
+      expect(b.warnings.length).toBeGreaterThan(0);
+      const rebuilt = new BlissSVGBuilder(b.toJSON());
+      expect(rebuilt.warnings).toEqual([]);
+    });
+  });
+
   describe('when handling unknown or unresolvable codes in JSON input', () => {
     it('unknown codeName in JSON input produces warning, not crash', () => {
       const json = {

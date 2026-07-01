@@ -25,7 +25,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   semantic the overlay's `!` strip had suppressed (N12); { stripSemantic }
  *   keeps a reversible empty-codes strip overlay.
  * - DSL/API parity: the overlay set by the API is byte-identical (toString,
- *   svgCode, toJSON) to the equivalent `;;` / `;;!` DSL marker.
+ *   svgCode, toJSON) to the equivalent `;;` / `;;!` DSL marker, including the
+ *   invalid-code case (no internal _parseWarnings leaking) and a clean JSON
+ *   rebuild; and a multi-key option block (`[color=red;stroke-width=2]>B81`) is
+ *   tokenized on top-level `;` only, matching the DSL.
  * - The glyph-level (character) applyIndicators path is unchanged.
  *
  * Does NOT cover:
@@ -125,12 +128,25 @@ describe('ElementHandle word indicators', () => {
       expect(b.toString()).toBe('B303;;B81');
     });
 
-    it('matches the DSL `;;` non-indicator handling in toString and svgCode', () => {
+    it('matches the DSL `;;` non-indicator handling in toString, svgCode, and toJSON', () => {
+      // regression: chunk-2 external review F1. The invalid DSL and API forms
+      // must be byte-identical composition data, incl. toJSON (no internal
+      // _parseWarnings leaking on either side).
       const api = new BlissSVGBuilder('B303');
       api.group(0).applyIndicators('B291');
       const dsl = new BlissSVGBuilder('B303;;B291');
       expect(api.toString()).toBe(dsl.toString());
       expect(api.svgCode).toBe(dsl.svgCode);
+      expect(JSON.stringify(api.toJSON())).toBe(JSON.stringify(dsl.toJSON()));
+    });
+
+    it('rebuilds the dropped-overlay JSON without re-warning', () => {
+      // regression: chunk-2 external review F1. The offender is dropped, so the
+      // normalized JSON is clean and reconstructing it emits no warning.
+      const dsl = new BlissSVGBuilder('B303;;B291');
+      const rebuilt = new BlissSVGBuilder(dsl.toJSON());
+      expect(rebuilt.warnings).toEqual([]);
+      expect(rebuilt.toString()).toBe('B303');
     });
   });
 
@@ -229,6 +245,33 @@ describe('ElementHandle word indicators', () => {
       expect(mut.toString()).toBe(dsl.toString());
       expect(mut.svgCode).toBe(dsl.svgCode);
       expect(mut.toJSON()).toEqual(dsl.toJSON());
+    });
+  });
+
+  describe('when applying an option-bearing word-level indicator', () => {
+    // regression: chunk-2 external review F2. The API must tokenize a multi-key
+    // option block the same way the DSL does -- splitting only on TOP-LEVEL `;`,
+    // not the `;` inside `[color=red;stroke-width=2]`. A naive code.split(';')
+    // shattered the option into unknown fragments and broke DSL/API parity.
+    it('keeps a multi-key option intact, matching the DSL `;;` marker', () => {
+      const code = '[color=red;stroke-width=2]>B81';
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators(code);
+      const dsl = new BlissSVGBuilder(`B303;;${code}`);
+      expect(api.toString()).toBe(dsl.toString());
+      expect(api.svgCode).toBe(dsl.svgCode);
+      expect(JSON.stringify(api.toJSON())).toBe(JSON.stringify(dsl.toJSON()));
+      expect(overlay(api)).toEqual({ codes: [code], stripSemantic: false });
+    });
+
+    it('warns once for a rejected multi-key-option non-indicator, naming the bare code', () => {
+      // the bare code (B291) is the offender, not the option fragments; a naive
+      // split emitted two UNKNOWN warnings for `[color=red` and `stroke-width=2]>B291`.
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('[color=red;stroke-width=2]>B291');
+      const w = api.warnings.filter((x) => x.code === 'NON_INDICATOR_AS_WORD_INDICATOR');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B291');
     });
   });
 

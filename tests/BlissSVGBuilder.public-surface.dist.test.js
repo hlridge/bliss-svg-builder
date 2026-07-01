@@ -72,6 +72,12 @@ const HANDLE_METHODS = [
   'setOptions', 'removeOptions',
 ];
 
+// Removed in rc.4 (Chunk 2): the built bundle must NOT expose these. The
+// positive HANDLE_METHODS check only asserts presence, so absence needs its own
+// pin (external review F4) -- otherwise a stale or reintroduced built surface
+// goes undetected.
+const REMOVED_HANDLE_METHODS = ['applyHeadIndicators', 'clearHeadIndicators'];
+
 const HANDLE_GETTERS = [
   'level', 'isGroup', 'isGlyph', 'isPart', 'codeName', 'char', 'key',
   'isIndicator', 'indicatorLevel', 'indicatorKind', 'isShape', 'isBlissGlyph',
@@ -148,6 +154,10 @@ describe.skipIf(distMissing)('BlissSVGBuilder public surface', () => {
     it.each(HANDLE_METHODS)('exposes the %s handle method', (name) => {
       const d = Object.getOwnPropertyDescriptor(handleProto, name);
       expect(typeof d?.value).toBe('function');
+    });
+
+    it.each(REMOVED_HANDLE_METHODS)('no longer exposes the removed %s handle method', (name) => {
+      expect(Object.getOwnPropertyDescriptor(handleProto, name)).toBeUndefined();
     });
 
     it.each(HANDLE_GETTERS)('exposes the %s handle getter', (name) => {
