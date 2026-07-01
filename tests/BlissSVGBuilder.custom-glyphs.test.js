@@ -358,6 +358,29 @@ describe('BlissSVGBuilder custom glyphs', () => {
     });
   });
 
+  describe('when rendering a positioned single-part custom glyph with a baked base offset', () => {
+    it('adds the use-site displacement to the baked base offset on both axes', () => {
+      // regression: SIB-3 - the single-part composite re-origined its baked X to
+      // zero, so the use-site x REPLACED the baked x (B291 rendered at 1,5)
+      // instead of adding it (3,5); the Y axis already added correctly. Renders
+      // identically to the equivalent absolute B-code.
+      defineAndTrack({ INNERGLYPH: { type: 'glyph', codeString: 'B291:2,3' } });
+      const displaced = new BlissSVGBuilder('INNERGLYPH:1,2');
+      const absolute = new BlissSVGBuilder('B291:3,5');
+      expect(displaced.svgCode).toBe(absolute.svgCode);
+    });
+
+    it('round-trips its default decomposed toString', () => {
+      // The serializer already added both axes (B291:3,5); the render now
+      // matches, so the portable string reproduces the SVG.
+      defineAndTrack({ INNERGLYPH: { type: 'glyph', codeString: 'B291:2,3' } });
+      const original = new BlissSVGBuilder('INNERGLYPH:1,2');
+      const portable = original.toString();
+      expect(portable).toBe('B291:3,5');
+      expect(new BlissSVGBuilder(portable).svgCode).toBe(original.svgCode);
+    });
+  });
+
   describe('when round-tripping a custom glyph through portable toString', () => {
     it('reproduces the same SVG from a portable B-code-backed string with no definition', () => {
       defineAndTrack({ 'LOVE': { type: 'glyph', codeString: 'B431' } });

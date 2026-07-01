@@ -1285,9 +1285,16 @@ export class BlissElement {
     // If so, skip normalization here - let level 2 handle the positioning
     const isIndicatorAtLevel3 = this.#level === 3 && this.isIndicator;
 
-    // Normalize: shift all child parts so the leftmost part starts at x=0
-    // Skip normalization for indicators that will be positioned by the parent's #positionIndicatorGroup
-    if (!isIndicatorAtLevel3 && this.#children.length > 0) {
+    // Normalize: shift all child parts so the leftmost part starts at x=0.
+    // Only for MULTI-child groups (length > 1): re-origining aligns several
+    // parts against their shared leftmost, but a lone child has no relative
+    // layout to align -- its x is pure displacement (a baked base offset on a
+    // custom glyph), so zeroing it would drop the offset and make a use-site
+    // coord REPLACE rather than ADD it (SIB-3). A single child therefore keeps
+    // its x, matching the y axis (never re-origined) and the level-2 rule that
+    // only negative offsets are normalized. Skip too for indicators the parent
+    // #positionIndicatorGroup will place.
+    if (!isIndicatorAtLevel3 && this.#children.length > 1) {
       const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
       if (minX !== 0) {
         for (const child of this.#children) {

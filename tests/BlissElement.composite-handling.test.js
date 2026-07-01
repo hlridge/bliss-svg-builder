@@ -5,14 +5,15 @@ import { BlissElement } from '../src/lib/bliss-element.js';
  *
  * Pins how BlissElement assigns level numbers and codeName identity to
  * nested composite parts, and how composite children are positioned:
- * non-indicator composites and indicators below level 3 are normalized
- * to the leftmost child, but level-3 indicators preserve explicit x
- * offsets on their children.
+ * multi-child non-indicator composites and multi-child indicators below
+ * level 3 are re-origined to the leftmost child, but a single child (and
+ * level-3 indicators) preserve their explicit x offsets.
  *
  * Covers:
  * - level numbering increments with each nested composite layer
  * - composite parts surface an empty codeName while their leaf children keep theirs
- * - non-indicator composite children at level 3 are shifted so the leftmost lands at zero
+ * - multi-child non-indicator composites at level 3 are shifted so the leftmost lands at zero
+ * - a single-child composite keeps its child's explicit x offset (nothing to re-origin against)
  * - indicator composite children at level 3 keep their explicit x offsets
  * - indicator composite children below level 3 are normalized like non-indicators
  *
@@ -98,6 +99,22 @@ describe('BlissElement composite handling', () => {
       expect(nestedIndicator.isIndicator).toBe(true);
       expect(nestedIndicator.children.map(child => child.offsetX)).toEqual([0, 2]);
       expect(element.getSvgContent()).toBe('M0,0h2M2,0h2');
+    });
+  });
+
+  describe('when a composite has a single non-indicator child with an explicit x offset', () => {
+    test('keeps the child offset instead of re-origining it to zero', () => {
+      // regression: SIB-3 - a single child was re-origined to the leftmost
+      // (itself), zeroing a baked base offset so it replaced rather than added
+      // the use-site displacement. Only multi-child groups have relative layout
+      // to align; one part's offset is pure displacement and must survive.
+      const element = new BlissElement(treeWithParts([{
+        parts: [{ codeName: 'HL2', x: 5 }]
+      }]));
+      const composite = element.snapshot().children[0].children[0].children[0];
+
+      expect(composite.children[0].offsetX).toBe(5);
+      expect(element.getSvgContent()).toBe('M5,0h2');
     });
   });
 });
