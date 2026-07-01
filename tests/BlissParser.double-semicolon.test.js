@@ -417,4 +417,28 @@ describe('BlissParser ;; syntax', () => {
         .toContain('MISPLACED_CHARACTER_INDICATOR');
     });
   });
+
+  describe('when a ;; overlay indicator carries a part-level option', () => {
+    it('stores the restored option in the overlay codes, not a placeholder token', () => {
+      // regression: SIB-2 (serializer-fidelity external review 2026-07-01).
+      // Options are placeholder-substituted early (`[color=red]` -> `[PLACEHOLDER_n]`);
+      // the ;; overlay stored the code with the placeholder unrestored, so the
+      // option never applied on resolve. The overlay must restore it.
+      expect(overlay('H;;[color=red]>B81').codes).toEqual(['[color=red]>B81']);
+    });
+
+    it('keeps a multi-key option (internal ;) intact by restoring after the split', () => {
+      // pins split-before-restore: the ; inside the option is protected by the
+      // placeholder, so the code list must be split before the option is restored
+      // (restoring first would split the option on its internal ;).
+      expect(overlay('H;;[color=red;stroke-width=2]>B81').codes).toEqual(['[color=red;stroke-width=2]>B81']);
+    });
+
+    it('applies the option on the resolved head indicator through a round-trip', () => {
+      const b = new BlissSVGBuilder('H');
+      b.group(0).applyIndicators('[color=red]>B81');
+      const rebuilt = new BlissSVGBuilder(b.toString());
+      expect(rebuilt.svgCode).toContain('stroke="red"');
+    });
+  });
 });

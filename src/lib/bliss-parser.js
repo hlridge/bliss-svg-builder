@@ -546,7 +546,11 @@ export class BlissParser {
           // word-level slot, so this explicit `;;` overlay always wins here. (A
           // `/`-composition of two explicit `;;` overlays is still resolved
           // first-wins by the assembly loop below.) (Strict Indicator Separation.)
-          const codes = indicators.split(';').filter(Boolean);
+          // Restore each code's placeholders AFTER splitting: a part-level
+          // option (`[color=red]>B81`) is placeholder-substituted early, so its
+          // internal `;` is safe to split on here; restoring before the split
+          // would re-expose that `;` and break a multi-key option. (SIB-2.)
+          const codes = indicators.split(';').filter(Boolean).map((c) => restorePlaceholders(c));
           if (expandedParts.length > 0) {
             expandedParts[0]._wordIndicators = { codes, stripSemantic };
           }
