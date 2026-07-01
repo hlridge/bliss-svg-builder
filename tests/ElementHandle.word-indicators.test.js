@@ -7,13 +7,17 @@ import { BlissSVGBuilder } from '../src/index';
  * `group.wordIndicators` overlay (the DSL `;;` channel), not on the head
  * glyph's baked parts. The base glyphs stay intact, so a later clear restores
  * them (including a semantic the overlay suppressed). A `flatten` flag bakes
- * the overlay onto the head as character-level parts instead, reproducing the
- * pre-overlay `applyHeadIndicators` shape.
+ * the overlay onto the head as character-level parts instead (the pre-overlay,
+ * character-level shape).
  *
  * Covers:
  * - apply default: stores the requested codes as an overlay, base parts
  *   untouched; replace-all over an existing overlay; { stripSemantic: true }
  *   stores the strip flag.
+ * - apply of a non-indicator code: warns NON_INDICATOR_AS_WORD_INDICATOR and
+ *   drops it (a mixed list keeps the valid indicators), mirroring the DSL `;;`
+ *   non-indicator rule instead of silently storing an unrenderable overlay; an
+ *   unrecognized code warns UNKNOWN_CODE and is dropped (DSL/API parity).
  * - apply { flatten: true }: bakes onto the head, no overlay; drops a
  *   pre-existing overlay before baking, but keeps it when the flattened code
  *   applies no indicator (N15).
@@ -28,8 +32,10 @@ import { BlissSVGBuilder } from '../src/index';
  * - Character-level applyIndicators / clearIndicators on a glyph handle, see
  *   `ElementHandle.apply-indicators.test.js` and
  *   `ElementHandle.clear-indicators.test.js`.
- * - The deprecated baking aliases applyHeadIndicators / clearHeadIndicators,
- *   see `ElementHandle.head-indicators.test.js`.
+ * - The flatten (head-baking) variant in depth, see
+ *   `ElementHandle.head-indicators.test.js`; the removal of the former
+ *   applyHeadIndicators / clearHeadIndicators aliases, see
+ *   `ElementHandle.head-indicator-removal.test.js`.
  * - Parser grammar for `;;` and overlay render/serialize internals, see
  *   `BlissParser.double-semicolon.test.js` and
  *   `BlissSVGBuilder.word-indicator-overlay.test.js`.
@@ -83,6 +89,51 @@ describe('ElementHandle word indicators', () => {
     });
   });
 
+  describe('when applying a non-indicator as a word-level overlay', () => {
+    // A `;;` word-level indicator must BE an indicator. Applying a real base
+    // (B291) as one warns and drops it rather than silently storing it in the
+    // overlay (where it can never render), mirroring the DSL `;;` non-indicator
+    // rule. (feedback_error_granularity: a bad decoration on valid content.)
+    it('warns NON_INDICATOR_AS_WORD_INDICATOR and stores no overlay', () => {
+      const b = new BlissSVGBuilder('B303');
+      b.group(0).applyIndicators('B291');
+      const w = b.warnings.filter((x) => x.code === 'NON_INDICATOR_AS_WORD_INDICATOR');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B291');
+      expect(overlay(b)).toBeUndefined();
+      expect(b.toString()).toBe('B303');
+    });
+
+    it('warns UNKNOWN_CODE and stores no overlay for an unrecognized code', () => {
+      // parity with the DSL `;;ZZ9` path: an unrecognized ;; code warns
+      // UNKNOWN_CODE (not NON_INDICATOR) and is dropped.
+      const b = new BlissSVGBuilder('B303');
+      b.group(0).applyIndicators('ZZ9');
+      const w = b.warnings.filter((x) => x.code === 'UNKNOWN_CODE');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('ZZ9');
+      expect(overlay(b)).toBeUndefined();
+      expect(b.toString()).toBe('B303');
+    });
+
+    it('drops only the offender in a mixed apply, keeping the valid indicator', () => {
+      const b = new BlissSVGBuilder('B303');
+      b.group(0).applyIndicators('B81;B291');
+      expect(overlay(b)).toEqual({ codes: ['B81'], stripSemantic: false });
+      const w = b.warnings.filter((x) => x.code === 'NON_INDICATOR_AS_WORD_INDICATOR');
+      expect(w[0]?.source).toBe('B291');
+      expect(b.toString()).toBe('B303;;B81');
+    });
+
+    it('matches the DSL `;;` non-indicator handling in toString and svgCode', () => {
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('B291');
+      const dsl = new BlissSVGBuilder('B303;;B291');
+      expect(api.toString()).toBe(dsl.toString());
+      expect(api.svgCode).toBe(dsl.svgCode);
+    });
+  });
+
   describe('when applying with the flatten flag', () => {
     it('bakes the indicator onto the head as character-level parts with no overlay', () => {
       const b = new BlissSVGBuilder('B313/B1103');
@@ -92,13 +143,14 @@ describe('ElementHandle word indicators', () => {
       expect(b.toString()).toBe('B313;B86/B1103');
     });
 
-    it('matches the pre-overlay applyHeadIndicators output', () => {
+    it('renders identically to the character-level ;-baked DSL form', () => {
+      // the flatten bake is byte-identical to writing the indicator as a
+      // character-level `;` part on the head glyph (DSL/API parity).
       const flat = new BlissSVGBuilder('B313/B1103');
       flat.group(0).applyIndicators('B86', { flatten: true });
-      const head = new BlissSVGBuilder('B313/B1103');
-      head.group(0).applyHeadIndicators('B86');
-      expect(flat.toString()).toBe(head.toString());
-      expect(flat.svgCode).toBe(head.svgCode);
+      const baked = new BlissSVGBuilder('B313;B86/B1103');
+      expect(flat.toString()).toBe(baked.toString());
+      expect(flat.svgCode).toBe(baked.svgCode);
     });
 
     it('drops a pre-existing overlay before baking the new indicator', () => {
@@ -191,24 +243,22 @@ describe('ElementHandle word indicators', () => {
 
   describe('when the word head is itself a lone indicator', () => {
     // R15 Task 5: the two surfaces now AGREE. The overlay (default) path treats
-    // the first part as the base and APPENDS; the flatten path (and its legacy
-    // applyHeadIndicators alias) bakes onto the head, which under the symmetric
-    // i>0 rule also treats the lone indicator as the base and attaches. The old
-    // flatten no-op (the new code was dropped) is gone.
+    // the first part as the base and APPENDS; the flatten path bakes onto the
+    // head, which under the symmetric i>0 rule also treats the lone indicator as
+    // the base and attaches. The old flatten no-op (the new code was dropped) is
+    // gone.
     it('appends via the overlay path', () => {
       const b = new BlissSVGBuilder('B81');
       b.group(0).applyIndicators('B86');
       expect(b.toString()).toBe('B81;;B86');
     });
 
-    it('bakes onto the lone-indicator head via the flatten path, matching legacy applyHeadIndicators', () => {
+    it('bakes onto the lone-indicator head via the flatten path', () => {
       const flat = new BlissSVGBuilder('B81');
       flat.group(0).applyIndicators('B86', { flatten: true });
-      const legacy = new BlissSVGBuilder('B81');
-      legacy.group(0).applyHeadIndicators('B86');
+      const baked = new BlissSVGBuilder('B81;B86');
       expect(flat.toString()).toBe('B81;B86');
-      expect(flat.toString()).toBe(legacy.toString());
-      expect(flat.svgCode).toBe(legacy.svgCode);
+      expect(flat.svgCode).toBe(baked.svgCode);
     });
   });
 });

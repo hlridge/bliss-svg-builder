@@ -186,14 +186,14 @@ describe('ElementHandle indicator no-op warning', () => {
       // The overlay removal is the real effect; the delegated char-level
       // clear-nothing must be suppressed so it is not reported as a no-op.
       const b = new BlissSVGBuilder('B291/B303;;B86');
-      b.group(0).clearHeadIndicators();
+      b.group(0).clearIndicators({ flatten: true });
       expect(b.toString()).toBe('B291/B303');
       expect(noopWarnings(b)).toHaveLength(0);
     });
 
     it('still warns when there is no overlay and no baked indicator to clear', () => {
       const b = new BlissSVGBuilder('B291/B303');
-      b.group(0).clearHeadIndicators();
+      b.group(0).clearIndicators({ flatten: true });
       expect(noopWarnings(b)).toHaveLength(1);
     });
 
@@ -202,7 +202,7 @@ describe('ElementHandle indicator no-op warning', () => {
       // nothing to clear; the suppress signal keeps that from warning, because
       // removing the overlay is the real effect.
       const b = new BlissSVGBuilder('B81;;B86');
-      b.group(0).clearHeadIndicators();
+      b.group(0).clearIndicators({ flatten: true });
       expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
       expect(noopWarnings(b)).toHaveLength(0);
     });
@@ -211,7 +211,7 @@ describe('ElementHandle indicator no-op warning', () => {
       // The suppress signal must also reach the invalid-pattern site. Head
       // B291;B86;B303 has a non-indicator (B303) after an indicator (B86).
       const b = new BlissSVGBuilder('B291;B86;B303;;B85');
-      b.group(0).clearHeadIndicators();
+      b.group(0).clearIndicators({ flatten: true });
       expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
       expect(noopWarnings(b)).toHaveLength(0);
     });

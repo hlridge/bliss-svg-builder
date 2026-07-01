@@ -68,7 +68,7 @@ const HANDLE_METHODS = [
   'measure', 'headGlyph', 'glyph', 'part', 'addGlyph', 'insertGlyph', 'addPart',
   'insertPart', 'remove', 'detach', 'replace', 'removeGlyph', 'replaceGlyph',
   'removePart', 'replacePart', 'applyIndicators', 'clearIndicators',
-  'applyHeadIndicators', 'clearHeadIndicators', 'splitAt', 'mergeWithNext',
+  'splitAt', 'mergeWithNext',
   'setOptions', 'removeOptions',
 ];
 

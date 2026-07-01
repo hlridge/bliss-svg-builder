@@ -24,8 +24,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   fallback scan (modifier-exclusion and index-0 defaults; fallback heads
  *   carry no parser isHeadGlyph flag, resolved at render instead).
  * - Multiple indicators resolving onto the head in one overlay.
- * - Non-indicator codes filtered at resolve (render unchanged), with an
- *   existing grammatical indicator dropped and a semantic root preserved.
+ * - Non-indicator codes after ;; warned + dropped at parse (no overlay stored),
+ *   leaving the base render unchanged; the dropped overlay does NOT clear the
+ *   head's own indicators. (The warning contract lives in
+ *   `BlissParser.word-indicator-validation.test.js`.)
  * - Single-character ;; storing an overlay (kept reversible).
  * - Positioning and glyph-level options surviving alongside the overlay.
  * - Pre-defined words: ;; stores an overlay; the single-; form is misplaced on
@@ -162,19 +164,28 @@ describe('BlissParser ;; syntax', () => {
   });
 
   describe('when ;; supplies only non-indicators', () => {
-    it('filters them out at resolve, leaving the render unchanged', () => {
-      // C8 is a shape, not an indicator; it stores but renders as nothing.
-      expect(overlay('H/C;;C8')).toEqual({ codes: ['C8'], stripSemantic: false });
+    // Chunk 2 (rc.4): a ;; non-indicator is warned + DROPPED at parse, not
+    // stored-and-filtered-at-render. The whole ;; construct is discarded (no
+    // overlay stored), so the base renders exactly as written -- its own
+    // character-level indicators are untouched. See
+    // BlissParser.word-indicator-validation.test.js for the warning contract.
+    const warningCodesFor = (dsl) => new BlissSVGBuilder(dsl).warnings.map((w) => w.code);
+
+    it('drops the non-indicator, stores no overlay, and leaves the render unchanged', () => {
+      // C8 is a known shape, not an indicator; the ;; overlay is dropped.
+      expect(overlay('H/C;;C8')).toBeUndefined();
+      expect(warningCodesFor('H/C;;C8')).toContain('NON_INDICATOR_AS_WORD_INDICATOR');
       expect(svgEq('H/C;;C8', 'H/C')).toBe(true);
     });
 
-    it('drops an existing grammatical indicator from the head at resolve', () => {
-      // B81 lives in the base; the empty-effect overlay clears it at render.
+    it('leaves an existing grammatical indicator on the head intact', () => {
+      // The dropped overlay has no effect, so the base keeps its own B81 (the old
+      // stored-empty-overlay behavior that cleared it at resolve is gone).
       expect(baseGlyphParts('B291;B81/C;;C8')[0]).toEqual(['B291', 'B81']);
-      expect(svgEq('B291;B81/C;;C8', 'B291/C')).toBe(true);
+      expect(svgEq('B291;B81/C;;C8', 'B291;B81/C')).toBe(true);
     });
 
-    it('preserves an existing semantic root on the head at resolve', () => {
+    it('leaves an existing semantic root on the head intact', () => {
       expect(svgEq('B291;B97/C;;C8', 'B291;B97/C')).toBe(true);
     });
   });

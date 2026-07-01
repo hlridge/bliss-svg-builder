@@ -184,6 +184,9 @@ export const WARNING_CODES = Object.freeze({
   // illegal operand in a ;-part slot (also used as an internal part.errorCode)
   COMPOSITE_AS_PART: 'COMPOSITE_AS_PART',
   WORD_AS_PART: 'WORD_AS_PART',
+  // illegal operand in a ;; word-indicator slot: a recognized non-indicator
+  // (a real base) supplied where a word-level indicator is required
+  NON_INDICATOR_AS_WORD_INDICATOR: 'NON_INDICATOR_AS_WORD_INDICATOR',
 });
 
 /**

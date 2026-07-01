@@ -343,6 +343,16 @@ describe('BlissSVGBuilder definition maintenance', () => {
         .toThrow(/word-level indicator/i);
     });
 
+    it('rejects patching a bare codeString to contain a word-level indicator', () => {
+      // the `;;` guard is universal (unlike `/`, which is glyph/shape-only): a
+      // bare alias IS a word, but `;;` is a use-site construct no definition may
+      // bake in, so patch cannot construct what #defineBare now forbids.
+      const code = trackCode('PATCHBWI1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B431' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: 'B303;;B291' }))
+        .toThrow(/word-level indicator/i);
+    });
+
     it('allows patching a bare codeString to a multi-character word', () => {
       // the strict-separation guard is glyph/shape-only; a bare alias IS a word,
       // so `/` is legal in its codeString

@@ -9,6 +9,7 @@ import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js"
 import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
+import { partitionWordIndicators } from "./indicator-utils.js";
 import { MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 
 export class BlissParser {
@@ -550,8 +551,37 @@ export class BlissParser {
           // option (`[color=red]>B81`) is placeholder-substituted early, so its
           // internal `;` is safe to split on here; restoring before the split
           // would re-expose that `;` and break a multi-key option. (SIB-2.)
-          const codes = indicators.split(';').filter(Boolean).map((c) => restorePlaceholders(c));
-          if (expandedParts.length > 0) {
+          const rawCodes = indicators.split(';').filter(Boolean).map((c) => restorePlaceholders(c));
+
+          // A `;;` word-level indicator must BE an indicator. Validate each code
+          // here (not silently at render): a recognized non-indicator (a real
+          // base) warns NON_INDICATOR_AS_WORD_INDICATOR, an unrecognized code
+          // warns UNKNOWN_CODE, and either way the offender is DROPPED so it does
+          // not re-serialize. The base still renders as written -- a bad
+          // decoration on valid content is dropped, not fail-rendered
+          // ([[feedback_error_granularity]]). The render path (filterToIndicators)
+          // then sees an already-clean list. (Strict Indicator Separation.)
+          const { valid: codes, rejected } = partitionWordIndicators(rawCodes, definitions);
+          for (const { code: badCode, reason } of rejected) {
+            parseWarnings.push(reason === 'non-indicator'
+              ? {
+                  code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
+                  message: `Word-level indicator "${badCode}" after ;; is not an indicator; it is ignored. A ;; code must be an indicator (e.g. B81).`,
+                  source: badCode,
+                }
+              : {
+                  code: WARNING_CODES.UNKNOWN_CODE,
+                  message: `Unknown word-level indicator code "${badCode}" after ;;; it is ignored.`,
+                  source: badCode,
+                });
+          }
+
+          // Store the overlay only when it carries meaning: a surviving indicator,
+          // an explicit strip (`;;!`), or a deliberately-empty bare `;;` (nothing
+          // was written -- an intentional clear that keeps the semantic root). A
+          // `;;` whose codes were ALL dropped as invalid is discarded entirely
+          // (the base renders as written), NOT rewritten as a bare empty overlay.
+          if (expandedParts.length > 0 && (codes.length > 0 || stripSemantic || rawCodes.length === 0)) {
             expandedParts[0]._wordIndicators = { codes, stripSemantic };
           }
 

@@ -43,8 +43,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   form), see the indicator round-trip tests.
  * - The character-level applyIndicators API in isolation (without the
  *   stripSemantic option), see `ElementHandle.apply-indicators.test.js`.
- * - The group-level head-indicator API (applyHeadIndicators with
- *   stripSemantic), see `ElementHandle.head-indicators.test.js`.
+ * - The group-level flatten (head-baking) indicator API
+ *   (applyIndicators(code, { flatten: true, stripSemantic }) on a group), see
+ *   `ElementHandle.head-indicators.test.js`.
  *
  * @regression: 2026-05-04 strip-semantic-bug
  */

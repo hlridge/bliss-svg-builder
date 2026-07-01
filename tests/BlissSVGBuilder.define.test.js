@@ -19,7 +19,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   (skipped without overwrite, replaced with overwrite: true).
  * - Content guards: a glyph definition cannot bake in an indicator part (D-S1a);
  *   a definition cannot use a composed unflagged alias as a ; part (part-merge
- *   operand rule) - a word-member via / or a flagged glyph part is fine.
+ *   operand rule) - a word-member via / or a flagged glyph part is fine; no
+ *   definition (glyph, shape, or bare alias) may carry a ;; word-level indicator
+ *   (a use-site construct: WORD;;IND), regardless of whether the code after ;; is
+ *   itself an indicator.
  * - Acceptance of finite numeric fields on a typed glyph definition
  *   (negative anchorOffsetX, positive width).
  * - Batch define iterates own keys only, not properties inherited via
@@ -253,6 +256,39 @@ describe('BlissSVGBuilder.define', () => {
     it('names the word-level indicator in the message', () => {
       const code = trackCode('GLYPH_WORDIND_MSG');
       const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B303;;B291' } });
+      expect(result.errors[0]).toContain(';;');
+    });
+  });
+
+  describe('when a bare definition contains a word-level indicator (;;)', () => {
+    // A `;;` word-level indicator is a USE-SITE construct (applied to a word in a
+    // given usage: WORD;;IND), never baked into a stored definition -- the same
+    // rule the glyph and shape guards enforce, extended to bare aliases. Baking
+    // it in is nonsensical: referencing such a definition with a further use-site
+    // `;;` would nest word-indicators (`((BAKED;;IND);;IND);;IND`), yet a word
+    // carries only one. So ANY `;;` in a definition's codeString is rejected,
+    // whether or not the code after it is itself an indicator. (Strict Indicator
+    // Separation.)
+    it('rejects a bare alias whose codeString contains ;; (non-indicator code)', () => {
+      const code = trackCode('BARE_WORDIND');
+      const result = BlissSVGBuilder.define({ [code]: { codeString: 'B303;;B291' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('rejects a bare alias whose codeString contains ;; even with a valid indicator', () => {
+      // the ban is on the `;;` construct inside a definition, not on the code
+      // after it: B81 IS an indicator, but `WORD;;IND` belongs at the use site,
+      // so baking it into a def is still rejected.
+      const code = trackCode('BARE_WORDIND_VALID');
+      const result = BlissSVGBuilder.define({ [code]: { codeString: 'B303;;B81' } });
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(BlissSVGBuilder.getDefinition(code)).toBeNull();
+    });
+
+    it('names the word-level indicator in the rejection message', () => {
+      const code = trackCode('BARE_WORDIND_MSG');
+      const result = BlissSVGBuilder.define({ [code]: { codeString: 'B303;;B291' } });
       expect(result.errors[0]).toContain(';;');
     });
   });

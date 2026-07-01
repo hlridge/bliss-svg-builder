@@ -2052,6 +2052,16 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
     }
 
+    // `;;` is a word-level indicator applied at the USE SITE (WORD;;INDICATOR),
+    // never baked into a stored definition -- the same rule #defineGlyph and
+    // #defineShape enforce, extended to bare aliases. Baking it in is nonsensical:
+    // a further use-site `;;` on such a definition would nest word-indicators, yet
+    // a word carries only one. Reject ANY `;;`, whether or not the code after it
+    // is itself an indicator. (Strict Indicator Separation.)
+    if (definition.codeString.includes(';;')) {
+      throw new Error(`define("${code}"): a definition cannot contain a word-level indicator (";;"); apply a word indicator at the use site (WORD;;INDICATOR).`);
+    }
+
     // Reject a definition cycle at define time. Bare aliases can reference any
     // type (glyph/shape/bare), so unlike #defineGlyph/#defineShape this path had
     // no cycle guard: a cycle (CA -> CB -> CA, or a direct self-reference) was
@@ -2290,17 +2300,17 @@ class BlissSVGBuilder {
       if (typeof newCodeString !== 'string' || newCodeString.length === 0) {
         throw new Error(`patchDefinition("${code}"): "codeString" must be a non-empty string.`);
       }
-      // A glyph/shape is a single character; `/` (word separator) and `;;`
-      // (word-level indicator) cannot appear in its codeString. Mirror the
-      // #defineGlyph/#defineShape guards so patchDefinition cannot construct a
-      // state define() forbids. (Strict Indicator Separation.)
-      if (type === 'glyph' || type === 'shape') {
-        if (newCodeString.includes('/')) {
-          throw new Error(`patchDefinition("${code}"): a ${type} definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"${type}").`);
-        }
-        if (newCodeString.includes(';;')) {
-          throw new Error(`patchDefinition("${code}"): a ${type} definition cannot contain a word-level indicator (";;"); a ${type} is a single character.`);
-        }
+      // A `;;` word-level indicator is a use-site construct (WORD;;INDICATOR);
+      // NO definition of any type may bake one in, so this guard is universal.
+      // A `/` word separator is glyph/shape-only (a bare alias may itself be a
+      // word). Mirror the #defineGlyph/#defineShape/#defineBare guards so
+      // patchDefinition cannot construct a state define() forbids. (Strict
+      // Indicator Separation.)
+      if (newCodeString.includes(';;')) {
+        throw new Error(`patchDefinition("${code}"): a definition cannot contain a word-level indicator (";;"); apply a word indicator at the use site (WORD;;INDICATOR).`);
+      }
+      if ((type === 'glyph' || type === 'shape') && newCodeString.includes('/')) {
+        throw new Error(`patchDefinition("${code}"): a ${type} definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"${type}").`);
       }
       const allowedRefTypes = type === 'glyph' ? ['glyph', 'shape']
         : type === 'shape' ? ['shape']

@@ -6,7 +6,7 @@
 
 import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
-import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators } from "./indicator-utils.js";
+import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators } from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -762,32 +762,6 @@ export class ElementHandle {
     return this.#applyOrClearIndicators(null, opts);
   }
 
-  /**
-   * @deprecated Use `applyIndicators(code, { flatten: true })`. This is now an
-   * alias for the flatten variant: it bakes onto the head glyph AND drops any
-   * `;;` word-level overlay (so a `;;`-authored word no longer keeps a stale
-   * overlay beside the baked indicator). For the reversible word-level overlay,
-   * use `applyIndicators(code)` without `flatten`.
-   */
-  applyHeadIndicators(code, opts) {
-    this.#assertReachable();
-    if (this.#level !== 1) return this;
-    return this.applyIndicators(code, { ...opts, flatten: true });
-  }
-
-  /**
-   * @deprecated Use `clearIndicators({ flatten: true })`. This is now an alias
-   * for the flatten variant: it clears both the head glyph's baked indicator
-   * parts AND any `;;` word-level overlay (so a `;;`-authored word is actually
-   * cleared rather than silently no-opped). For the reversible word-level
-   * overlay only, use `clearIndicators()` without `flatten`.
-   */
-  clearHeadIndicators(opts) {
-    this.#assertReachable();
-    if (this.#level !== 1) return this;
-    return this.clearIndicators({ ...opts, flatten: true });
-  }
-
   // `suppressNoop` is set by the flatten-clear delegation when it has already
   // removed a `;;` overlay: that removal is the real effect, so a char-level
   // no-op here is not an overall no-op and must not be reported. It is a private
@@ -944,9 +918,9 @@ export class ElementHandle {
   // `group.wordIndicators` overlay (the DSL `;;` form), leaving the base glyphs
   // intact so a later clear restores them (N12). `flatten` opts out of the
   // overlay and bakes onto the head as character-level parts instead (the
-  // pre-overlay shape; the deprecated applyHeadIndicators behavior). `code` is
-  // null for clear. Mirrors the parser overlay store so the API and the `;;`
-  // DSL marker produce byte-identical state (DSL/API parity).
+  // pre-overlay, character-level shape). `code` is null for clear. Mirrors the
+  // parser overlay store -- including `;;` non-indicator validation -- so the API
+  // and the `;;` DSL marker produce byte-identical state (DSL/API parity).
   #applyOrClearWordIndicators(code, opts) {
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
@@ -991,8 +965,31 @@ export class ElementHandle {
       if (stripSemantic) group.wordIndicators = { codes: [], stripSemantic: true };
       else delete group.wordIndicators;
     } else {
-      const codes = code.split(';').map(s => s.trim()).filter(Boolean);
-      group.wordIndicators = { codes, stripSemantic };
+      // A `;;` overlay code must BE an indicator (same rule as the DSL `;;`
+      // parser path). Validate + drop non-indicators here, warning on the
+      // persistent mutation channel so the warning survives the rebuild below.
+      const requestedCodes = code.split(';').map(s => s.trim()).filter(Boolean);
+      const { valid, rejected } = partitionWordIndicators(requestedCodes, this.#ctx.getDefinitions());
+      for (const { code: badCode, reason } of rejected) {
+        this.#ctx.addMutationWarning(reason === 'non-indicator'
+          ? {
+              code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
+              message: `applyIndicators('${code}'): "${badCode}" is not an indicator; it is ignored. A word-level indicator code must be an indicator (e.g. B81).`,
+              source: badCode,
+            }
+          : {
+              code: WARNING_CODES.UNKNOWN_CODE,
+              message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it is ignored.`,
+              source: badCode,
+            });
+      }
+      // Store the overlay only when it carries meaning: a surviving indicator or
+      // an explicit strip. An apply whose codes are ALL non-indicators asked for
+      // nothing valid, so it warns and leaves any existing overlay untouched
+      // rather than silently destroying it (mirrors the flatten N15 rule).
+      if (valid.length > 0 || stripSemantic) {
+        group.wordIndicators = { codes: valid, stripSemantic };
+      }
     }
 
     this.#ctx.rebuild();

@@ -49,6 +49,36 @@ export function filterToIndicators(codes, definitions) {
 }
 
 /**
+ * Partition a list of `;;` word-level indicator codes into the ones that are
+ * real indicators (kept) and the ones that must be rejected. A word-level
+ * indicator must BE an indicator (isIndicator: true); a recognized non-indicator
+ * (a real base such as B291) is rejected as `'non-indicator'`, an unrecognized
+ * code as `'unknown'`. Shared by the DSL `;;` parser path and the API
+ * `applyIndicators` overlay path so the two classify a `;;` code identically
+ * (DSL/API parity). The kept-code test mirrors `filterToIndicators`, so a code
+ * accepted here always survives the later resolve.
+ *
+ * @param {string[]} codes - raw `;;` codes (may carry options/coords)
+ * @param {Object} definitions
+ * @returns {{ valid: string[], rejected: Array<{ code: string, reason: 'non-indicator'|'unknown' }> }}
+ *   `valid` preserves each code verbatim (options/coords intact); each rejected
+ *   `code` is the bare offending code (options/coords stripped).
+ */
+export function partitionWordIndicators(codes, definitions) {
+  const valid = [];
+  const rejected = [];
+  for (const code of codes) {
+    const definition = definitions[getBareCode(code)];
+    if (definition?.isIndicator === true) {
+      valid.push(code);
+    } else {
+      rejected.push({ code: getBareCode(code), reason: definition ? 'non-indicator' : 'unknown' });
+    }
+  }
+  return { valid, rejected };
+}
+
+/**
  * Determine whether auto-preserved semantic root goes before or after new indicators.
  * Default: semantic first (nominal). If ALL non-semantic new indicators are verbal or
  * adjectival, semantic goes last (the word is being used as a verb/adjective).

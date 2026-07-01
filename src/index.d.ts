@@ -331,9 +331,9 @@ export declare class ElementHandle {
    *   overlay (the DSL `;;` channel), leaving the base glyphs intact so a later
    *   `clearIndicators()` restores them. `{ flatten: true }` opts out of the
    *   overlay and bakes onto the head glyph as character-level parts instead
-   *   (the pre-overlay shape; mirrors the deprecated `applyHeadIndicators`). A
-   *   `flatten` apply keeps the overlay when its code applies no indicator (it
-   *   would bake nothing), rather than silently dropping the overlay.
+   *   (the pre-overlay, character-level shape). A `flatten` apply keeps the
+   *   overlay when its code applies no indicator (it would bake nothing), rather
+   *   than silently dropping the overlay.
    *
    * The per-surface `flatten` asymmetry is deliberate: it applies only to the
    * group/word-level overlay, the only surface with a portable `;;` form to
@@ -364,27 +364,6 @@ export declare class ElementHandle {
    * `NOOP_INDICATOR_MUTATION` warning to `warnings`.
    */
   clearIndicators(opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
-
-  /**
-   * Applies indicators to the head glyph of this group. Preserves semantic
-   * indicators by default. Only valid on group handles.
-   *
-   * @deprecated Alias for `applyIndicators(code, { ...opts, flatten: true })`.
-   * Bakes onto the head glyph and drops any `;;` word-level overlay. For the
-   * reversible word-level overlay, use `applyIndicators(code)` without `flatten`.
-   */
-  applyHeadIndicators(code: string, opts?: { stripSemantic?: boolean }): this;
-
-  /**
-   * Removes grammatical indicators from the head glyph of this group. Preserves
-   * semantic indicators by default. Only valid on group handles.
-   *
-   * @deprecated Alias for `clearIndicators({ ...opts, flatten: true })`. Clears
-   * both the head glyph's baked indicator parts and any `;;` word-level overlay.
-   * For the reversible word-level overlay only, use `clearIndicators()` without
-   * `flatten`.
-   */
-  clearHeadIndicators(opts?: { stripSemantic?: boolean }): this;
 
   // --- Mutation: space/word structure ---
 
@@ -573,7 +552,8 @@ export type WarningCode =
   | 'UNSUPPORTED_TEXT_BLOCKS'
   | 'NOOP_INDICATOR_MUTATION'
   | 'COMPOSITE_AS_PART'
-  | 'WORD_AS_PART';
+  | 'WORD_AS_PART'
+  | 'NON_INDICATOR_AS_WORD_INDICATOR';
 
 /** A warning generated when the builder encounters a problem it can recover from. */
 export interface Warning {
