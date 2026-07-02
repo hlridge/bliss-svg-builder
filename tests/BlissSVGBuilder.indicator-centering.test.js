@@ -17,22 +17,24 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - NEGATIVE displacement: a baked negative offset overstates the reported
  *   width's right edge (span size, not edge coordinate), so the ink END is
  *   read symmetrically; covered plain and nested.
- * - Multi-part (re-origined) composite head: centering unchanged.
+ * - Multi-part (re-origined) composite head: centering over the displaced
+ *   ink span (the common baked min rides the composite since XC-2).
  * - Non-displaced head: centering unchanged.
  *
  * Does NOT cover:
- * - Canvas width/viewBox truthfulness for a NEGATIVE-displaced composite (the
- *   reported width counts the frame gap, so the full svg still diverges from
- *   the absolute form) — separate width-semantics defect, see the backlog
- *   "negative composite canvas width" row; the pins here compare ink geometry.
+ * - Canvas width/viewBox truthfulness for a NEGATIVE-displaced SINGLE-child
+ *   composite (the reported width counts the frame gap, so the full svg still
+ *   diverges from the absolute form) — separate width-semantics defect, see
+ *   the backlog "negative composite canvas width" row; the pins here compare
+ *   ink geometry.
  * - Multi-indicator stacking math, see
  *   `BlissSVGBuilder.multiple-indicators.test.js`.
  * - Element-tree offsetX/offsetY positioning contract, see
  *   `BlissElement.indicator-positioning.test.js`.
- * - The multi-part displaced composite BASE round-trip (the L3 re-origin
- *   eats a common baked min-x that the serializer adds back) — a distinct
- *   composite-normalization quirk, backlog "multi-part composite common
- *   offset" row; only indicator centering is pinned here.
+ * - The multi-part displaced composite BASE render/round-trip contract
+ *   (XC-2 displacement), see
+ *   `BlissSVGBuilder.composite-displacement.test.js`; only indicator
+ *   centering is pinned here.
  */
 
 const customCodes = [];
@@ -50,6 +52,10 @@ function defineAndTrack(definitions) {
 
 // all path data of a build, in document order (ink geometry without the canvas)
 const inkPathsOf = (builder) => (builder.svgCode.match(/ d="[^"]*"/g) || []).join(' ');
+
+// concatenated path data (ink geometry tolerant of <path> split boundaries)
+const inkOf = (builder) =>
+  (builder.svgCode.match(/ d="[^"]*"/g) || []).map((s) => s.slice(4, -1)).join('');
 
 describe('BlissSVGBuilder indicator centering', () => {
   describe('when a word-level overlay indicator sits on a displaced custom-glyph head', () => {
@@ -151,16 +157,22 @@ describe('BlissSVGBuilder indicator centering', () => {
 
   describe('when the composite head is multi-part (re-origined)', () => {
     it('keeps the indicator centered over the rendered ink span', () => {
-      // a multi-child composite re-origins its children (leading offset 0), so
-      // centering must read the leftmost child's ink edge, not the rightmost
+      // a multi-child composite re-origins its children against their common
+      // min, which rides the composite as displacement (XC-2) — centering
+      // reads the composite's offset plus the leftmost child's ink edge
       defineAndTrack({ SHIFTPAIR: { type: 'glyph', codeString: 'B291:2,3;C8:10,3' } });
       const builder = new BlissSVGBuilder('SHIFTPAIR:1,2');
       builder.group(0).applyIndicators('[color=red]>B81');
+      const absolute = new BlissSVGBuilder('B291:3,5;C8:11,5');
+      absolute.group(0).applyIndicators('[color=red]>B81');
 
-      // rendered base ink spans [1,17] (center 9); indicator starts at 8.
-      // The BASE's own round-trip quirk (re-origin vs serializer add) is out
-      // of scope here — see the file header.
-      expect(builder.svgCode).toContain('<g stroke="red"><path d="M8,6l1,-2M9,4l1,2"/></g>');
+      // rendered base ink spans [3,19] (center 11); indicator starts at 10
+      expect(builder.svgCode).toContain('<g stroke="red"><path d="M10,6l1,-2M11,4l1,2"/></g>');
+      // ink parity, not full-svg parity: the composite joins its parts into
+      // one <path> while the decomposed form emits one per part (pre-existing
+      // DOM nesting, visually identical); base render/round-trip parity is
+      // pinned in `BlissSVGBuilder.composite-displacement.test.js`
+      expect(inkOf(builder)).toBe(inkOf(absolute));
     });
   });
 

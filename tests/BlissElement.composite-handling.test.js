@@ -6,13 +6,14 @@ import { BlissElement } from '../src/lib/bliss-element.js';
  * Pins how BlissElement assigns level numbers and codeName identity to
  * nested composite parts, and how composite children are positioned:
  * multi-child non-indicator composites and multi-child indicators below
- * level 3 are re-origined to the leftmost child, but a single child (and
- * level-3 indicators) preserve their explicit x offsets.
+ * level 3 are re-origined to the leftmost child with the stripped common
+ * offset kept as the composite's own displacement (XC-2), while a single
+ * child (and level-3 indicators) preserve their explicit x offsets.
  *
  * Covers:
  * - level numbering increments with each nested composite layer
  * - composite parts surface an empty codeName while their leaf children keep theirs
- * - multi-child non-indicator composites at level 3 are shifted so the leftmost lands at zero
+ * - multi-child non-indicator composites at level 3 are shifted so the leftmost lands at zero, the common offset moving onto the composite
  * - a single-child composite keeps its child's explicit x offset (nothing to re-origin against)
  * - indicator composite children at level 3 keep their explicit x offsets
  * - indicator composite children below level 3 are normalized like non-indicators
@@ -57,7 +58,7 @@ describe('BlissElement composite handling', () => {
   });
 
   describe('when composite children carry explicit x offsets', () => {
-    test('aligns non-indicator children so the leftmost lands at zero', () => {
+    test('aligns non-indicator children so the leftmost lands at zero and displaces the composite', () => {
       const element = new BlissElement(treeWithParts([{
         parts: [
           { codeName: 'HL2', x: 5 },
@@ -67,7 +68,11 @@ describe('BlissElement composite handling', () => {
       const composite = element.snapshot().children[0].children[0].children[0];
 
       expect(composite.children.map(child => child.offsetX)).toEqual([0, 2]);
-      expect(element.getSvgContent()).toBe('M0,0h2M2,0h2');
+      // pins the kept common min (XC-2): the re-origin's stripped 5 ADDS to
+      // the composite's own offset instead of vanishing, so absolute render
+      // positions match the un-wrapped parts
+      expect(composite.offsetX).toBe(5);
+      expect(element.getSvgContent()).toBe('M5,0h2M7,0h2');
     });
 
     test('preserves child offsets for indicator composites at level 3', () => {
@@ -98,6 +103,11 @@ describe('BlissElement composite handling', () => {
       expect(nestedIndicator.level).toBe(4);
       expect(nestedIndicator.isIndicator).toBe(true);
       expect(nestedIndicator.children.map(child => child.offsetX)).toEqual([0, 2]);
+      // note: the XC-2 displacement the re-origin keeps (min 5) is then
+      // overridden by the parent's all-indicator stack layout — an indicator
+      // unit without an explicit x is auto-positioned (atomic-unit contract),
+      // so its internal common offset stays internal
+      expect(nestedIndicator.offsetX).toBe(0);
       expect(element.getSvgContent()).toBe('M0,0h2M2,0h2');
     });
   });

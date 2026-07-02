@@ -1320,12 +1320,19 @@ export class BlissElement {
     // its x, matching the y axis (never re-origined) and the level-2 rule that
     // only negative offsets are normalized. Skip too for indicators the parent
     // #positionIndicatorGroup will place.
+    // The stripped common min is NOT discarded: it moves onto the composite as
+    // displacement, either sign (XC-2) -- the serializer's decompose uniformly
+    // ADDS baked and use-site coords, so dropping the min here made the render
+    // disagree with its own toString. Level 2's negatives-only normalization
+    // then acts on the resulting final absolute position, which is exactly how
+    // the decomposed form is treated.
     if (!isIndicatorAtLevel3 && this.#children.length > 1) {
       const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
       if (minX !== 0) {
         for (const child of this.#children) {
           child.#relativeToParentX -= minX;
         }
+        this.#relativeToParentX += minX;
       }
     }
 
