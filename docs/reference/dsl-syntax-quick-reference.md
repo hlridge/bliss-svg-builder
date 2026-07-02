@@ -78,7 +78,7 @@ There is no character-level strip form. `;` composes literally, so there is noth
 An option bracket binds to a single unit of its scope, and the builder checks that the unit matches:
 
 - A **character** option on a code that expands to a whole word, or a **part** option (`[opts]>`) on one, is dropped with a `MISPLACED_CHARACTER_OPTION` / `MISPLACED_PART_OPTION` warning; the word still renders. A **word** option (`[opts]|`) on a code that expands to multiple words is dropped with `MISPLACED_GROUP_OPTION`, and all the words render.
-- **Canvas-wide options** (`margin`, `crop`, `grid` and `grid-*`, `background*`, `center`, `min-width`, `char-space`, `word-space`, `svg-*`, `error-placeholder`) configure the whole SVG, so they only work at global scope (`[opts]||`). At word, character, or part scope they are dropped with a `MISPLACED_GLOBAL_OPTION` warning; the content still renders.
+- **Canvas-wide options** (`margin`, `crop`, `grid` and `grid-*`, `background*`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-*`, `error-placeholder`) configure the whole SVG, so they only work at global scope (`[opts]||`). At word, character, or part scope they are dropped with a `MISPLACED_GLOBAL_OPTION` warning; the content still renders.
 - **One bracket per scope.** `[grid][grid-color=red]||B313` warns `MULTIPLE_OPTION_BRACKETS` and applies only the first bracket. Combine options in one bracket instead: `[grid;grid-color=red]||B313`.
 
 A dropped option does not come back: `toString()` re-emits only what actually applies.
