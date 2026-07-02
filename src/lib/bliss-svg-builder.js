@@ -1956,7 +1956,12 @@ class BlissSVGBuilder {
   // so a camelCase key is just as inert).
   static #assertNoGlobalOnlyDefaultOptions(callName, code, defaultOptions) {
     for (const key of Object.keys(defaultOptions)) {
-      if (GLOBAL_ONLY_OPTION_KEYS.has(key) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(key))) {
+      // Trim before matching: the serializer emits a padded key as
+      // '[ margin=2]' and #parseOptions reads that as plain 'margin', so a
+      // whitespace-padded spelling IS the global-only key at the next
+      // boundary (round-3 review F1).
+      const normalized = key.trim();
+      if (GLOBAL_ONLY_OPTION_KEYS.has(normalized) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(normalized))) {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include the global-only option "${key}"; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
     }
@@ -2411,11 +2416,18 @@ class BlissSVGBuilder {
       changes = { ...changes, codeString: BlissSVGBuilder.#resolveBareAliases(changes.codeString) };
     }
 
+    // Validate BEFORE the apply loop, like every other patch guard: a
+    // rejected patch must leave the definition fully unchanged, not partially
+    // mutated depending on property order (round-3 review F2).
+    if (changes.defaultOptions && typeof changes.defaultOptions === 'object'
+        && Object.keys(changes.defaultOptions).length > 0) {
+      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, changes.defaultOptions);
+    }
+
     // Apply changes
     for (const [key, value] of Object.entries(changes)) {
       if (key === 'defaultOptions') {
         if (value && typeof value === 'object' && Object.keys(value).length > 0) {
-          BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, value);
           def.defaultOptions = { ...value };
         } else {
           delete def.defaultOptions;

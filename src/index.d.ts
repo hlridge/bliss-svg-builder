@@ -420,6 +420,12 @@ export interface GlyphDefinition {
   width?: number;
   shrinksPrecedingWordSpace?: boolean;
   kerningRules?: Record<string, any>;
+  /**
+   * Default options merged into each use of the definition. May not include a
+   * global-only (builder-canvas) option key such as `margin` or `grid` — those
+   * configure the whole SVG and would be inert on a definition; `define()`
+   * reports the violation in its `errors` result, `patchDefinition()` throws.
+   */
   defaultOptions?: BlissOptions;
 }
 
@@ -433,6 +439,7 @@ export interface ShapeDefinition {
   x?: number;
   y?: number;
   extraPathOptions?: Record<string, any>;
+  /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
@@ -446,12 +453,14 @@ export interface ExternalGlyphDefinition {
   y?: number;
   height?: number;
   kerningRules?: Record<string, any>;
+  /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
 /** Bare alias definition (maps a code name to a code string). */
 export interface BareDefinition {
   codeString: string;
+  /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 

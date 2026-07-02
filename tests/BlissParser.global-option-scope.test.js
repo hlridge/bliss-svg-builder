@@ -203,6 +203,15 @@ describe('BlissParser global option scope', () => {
       expect(baseless.toString()).toBe('B303');
     });
 
+    it('leaves a baseless character-form bracket to the unknown-code path', () => {
+      // pins the char-form arm's (.+) requirement symmetrically (round-3
+      // review F3): a bracket-only code has no code to keep, so it must not
+      // strip to an empty string with a spurious placement warning
+      const baseless = build('B303;;[margin=2]');
+      expect(baseless.warnings.map((w) => w.code)).toEqual(['UNKNOWN_CODE']);
+      expect(baseless.toString()).toBe('B303');
+    });
+
     it('drops a character-form option prefix from an overlay code', () => {
       // regression: external review 2026-07-02 F2 — the [...]-without-> form
       // slipped the gate, re-serializing forever with no warning anywhere
@@ -339,6 +348,36 @@ describe('BlissParser global option scope', () => {
       expect(() => BlissSVGBuilder.patchDefinition('GOPT_DEFPATCH', { defaultOptions: { 'svg-title': 'hi' } }))
         .toThrow(/svg-title/);
       BlissSVGBuilder.removeDefinition('GOPT_DEFPATCH');
+    });
+
+    it('rejects a whitespace-padded spelling of a global-only key', () => {
+      // regression: round-3 review F1 — the serializer emits '[ margin=2]',
+      // which the option parser reads as plain margin, so a padded key is the
+      // same key at the next boundary (and a ;; overlay never reaches one)
+      for (const key of [' margin', 'margin ']) {
+        const result = BlissSVGBuilder.define({
+          GOPT_DEFPAD: { codeString: 'B291', defaultOptions: { [key]: 2 } },
+        });
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0]).toContain('margin');
+        expect(BlissSVGBuilder.isDefined('GOPT_DEFPAD')).toBe(false);
+      }
+    });
+
+    it('leaves the definition untouched when a patch is rejected', () => {
+      // regression: round-3 review F2 — the guard used to run inside the
+      // apply loop, so a rejected patch had already committed earlier
+      // properties (property order decided the damage)
+      BlissSVGBuilder.define({ GOPT_DEFATOMIC: { codeString: 'B291', defaultOptions: { color: 'blue' } } });
+      for (const changes of [
+        { codeString: 'C8', defaultOptions: { margin: 2 } },
+        { defaultOptions: { margin: 2 }, codeString: 'C8' },
+      ]) {
+        expect(() => BlissSVGBuilder.patchDefinition('GOPT_DEFATOMIC', changes)).toThrow(/margin/);
+        expect(BlissSVGBuilder.getDefinition('GOPT_DEFATOMIC').codeString).toBe('B291');
+        expect(BlissSVGBuilder.getDefinition('GOPT_DEFATOMIC').defaultOptions).toEqual({ color: 'blue' });
+      }
+      BlissSVGBuilder.removeDefinition('GOPT_DEFATOMIC');
     });
 
     it('accepts per-element defaultOptions unchanged', () => {
