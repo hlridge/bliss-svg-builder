@@ -1347,9 +1347,20 @@ class BlissSVGBuilder {
             // `;`-character, and per-part emission computes to the same ink.
             // Merging structurally, inner keys winning, keeps a part's own
             // option authoritative, the order nested <g> attribute inheritance
-            // resolves to. (TF-3G / TF-3.)
+            // resolves to. Keys collide at the ATTRIBUTE level, not the key
+            // level: `color` aliases `stroke` (and camel `strokeWidth` its
+            // kebab form), and the renderer dedupes explicit-beats-alias, so an
+            // outer `stroke` merged next to a part's own `color` would flip the
+            // part's paint on round-trip unless it yields here. (TF-3G / TF-3.)
+            const attrChannel = (k) =>
+              k === 'color' ? 'stroke' : k === 'strokeWidth' ? 'stroke-width' : k;
             const innerParts = part.options
-              ? part.parts.map(p => ({ ...p, options: { ...part.options, ...p.options } }))
+              ? part.parts.map(p => {
+                  const ownChannels = new Set(Object.keys(p.options ?? {}).map(attrChannel));
+                  const outer = Object.entries(part.options)
+                    .filter(([k]) => !ownChannels.has(attrChannel(k)));
+                  return { ...p, options: { ...Object.fromEntries(outer), ...p.options } };
+                })
               : part.parts;
             return serializeParts(innerParts, x, y);
           }

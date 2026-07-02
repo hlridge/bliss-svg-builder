@@ -27,7 +27,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Default `toString()` of a multi-base custom glyph re-emits a part-level
  *   option before EACH decomposed part (`[opts]>B291;[opts]>C8`), reparse-stable;
  *   an outer option merges beneath a part's own options (inner keys win, the
- *   nearest-ancestor-wins order SVG attribute inheritance computes). [TF-3G]
+ *   nearest-ancestor-wins order SVG attribute inheritance computes), colliding
+ *   at the ATTRIBUTE level (`color` yields to/over `stroke`, not only to an
+ *   identical key). [TF-3G]
  * - An invalid part (no codeName) decorated by `[opts]>` and/or a coordinate is
  *   dropped from `toString()` instead of emitting a literal `undefined`. [F3]
  *
@@ -45,7 +47,12 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissParser.strict-indicator-separation.test.js`.
  * - Byte-identical SVG round-trip of the one-wrapper form: per-part emission
  *   reparses to per-part wrappers (same computed styling for inheritable
- *   attributes; group-vs-per-part `opacity` can differ where part ink overlaps).
+ *   attributes). Accepted inherent limits of the per-part form: compositing
+ *   attributes (`opacity`, `filter`) apply per part instead of once over the
+ *   combined ink, and per-element semantics multiply (`id` duplicates, `href`
+ *   anchors and `pointer-events` hit regions split per part). Old behavior
+ *   dropped these options entirely; preserve mode round-trips the one-wrapper
+ *   form losslessly. [external review 2026-07-02, accepted + documented]
  */
 describe('BlissSVGBuilder serializer fidelity', () => {
   const FIDELITY_DEFS = {
@@ -182,6 +189,26 @@ describe('BlissSVGBuilder serializer fidelity', () => {
       // round-trip (render computed red, the inner <g> being nearest the ink).
       const b = new BlissSVGBuilder('[color=blue]>_FID_INNEROPT');
       expect(b.toString()).toBe('[color=red]>B291;[color=blue]>C8');
+    });
+
+    it('yields an outer key to a part\'s own key aliasing the same attribute', () => {
+      // regression: external review 2026-07-02 F1 - `color` aliases the stroke
+      // attribute, so an outer [stroke=blue] merged NEXT TO a part's own
+      // [color=red] let the renderer's explicit-beats-alias dedup flip the part
+      // blue on round-trip; the collision resolves at the attribute level.
+      const b = new BlissSVGBuilder('[stroke=blue]>_FID_INNEROPT');
+      const first = b.toString();
+      expect(first).toBe('[color=red]>B291;[stroke=blue]>C8');
+      expect(new BlissSVGBuilder(first).svgCode)
+        .toContain('<g stroke="red"><path d="M0,8h8M0,16h8M0,8v8M8,8v8"/></g>');
+    });
+
+    it('adds a use-site coordinate to a baked base offset beneath the option', () => {
+      // pins the recursive call's offset forwarding (external review 2026-07-02
+      // low finding: dropping the x,y arguments survived every other pin here).
+      const b = new BlissSVGBuilder('[color=blue]>_FID_OFFSET:1,2');
+      expect(b.toString()).toBe('[color=blue]>B291:3,5');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
     it('keeps the custom name and single option wrap under preserve', () => {
