@@ -103,7 +103,7 @@ When you use `;;`, the library determines which character is the head glyph. It 
 
 ### The Head Marker (`^`)
 
-The head marker belongs to characters. It attaches to a B-code, a composed character, or a predefined code that resolves to a single character (which behaves exactly as that character). Writing `^` on a code that expands to multiple characters has no meaning: the marker is dropped and the parser records a `HEAD_MARKER_ON_WORD` warning.
+The head marker belongs to characters. It attaches to a B-code, a composed character, or a predefined code that resolves to a single character (which behaves exactly as that character). Writing `^` on a code that expands to multiple characters has no meaning: the marker is dropped and the parser records a `MISPLACED_HEAD_MARKER` warning.
 
 Each word has one head. The leftmost `^` written in a word wins; later markers in the same word are dropped with a `MULTIPLE_HEAD_MARKERS` warning. Words separated by `//` each resolve their own head independently.
 

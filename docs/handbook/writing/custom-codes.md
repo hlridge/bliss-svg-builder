@@ -195,6 +195,48 @@ BlissSVGBuilder.define({
 });
 ```
 
+## Definition Rules
+
+`define()` validates every entry. A failed entry is reported in the returned `errors` array (the other entries still register), so check it when defining dynamically:
+
+```js
+const result = BlissSVGBuilder.define({ 'BAD': { type: 'glyph', codeString: 'B313/B1103' } });
+result.errors;
+// ['"BAD": define("BAD"): a glyph definition cannot be a multi-character word …']
+```
+
+The rules keep definitions portable and unambiguous:
+
+- **No word-level indicators in definitions.** A `codeString` cannot contain `;;`. A word indicator is a live, reversible overlay, so it belongs at the use site: `MYWORD;;B81`.
+- **A glyph or shape is a single character.** Its `codeString` cannot contain `/`. Define a multi-character word as a bare code (omit `type`).
+- **A glyph cannot bake in an indicator.** Indicators attach to characters at the use site (`SMILEY;B81`) or to words (`;;`). To create a new indicator of its own, flag the glyph with `isIndicator: true`; it then behaves as one atomic indicator unit.
+- **`defaultOptions` keys must be valid option names**, and cannot include canvas-wide global-only options like `margin` or `grid` (they configure the whole SVG and would be inert on a definition).
+
+`patchDefinition()` enforces the same rules and validates before applying, so a rejected patch changes nothing.
+
+## Indicators and Options on Custom Codes
+
+Custom codes take indicators and options at the use site just like built-ins:
+
+- `SMILEY;B81` attaches the action indicator to the custom character; `B313/SMILEY;;B81` puts a word-level indicator on the word. Indicator positioning is computed from the glyph's actual rendered ink, including glyphs whose definition displaces its parts.
+- `[color=blue]>SMILEY` styles the whole glyph as one part. On serialization the option is re-emitted before each decomposed part so the styling survives portably; see [Part Options on Custom Glyphs](/handbook/syntax-options/options-system#part-options-on-custom-glyphs).
+
+## Coordinates in Definitions
+
+A coordinate baked into a definition is a real position offset and survives serialization. A use-site coordinate adds to it:
+
+```js
+BlissSVGBuilder.define({
+  'INNER': { type: 'glyph', codeString: 'B291:2,3' }
+});
+
+const builder = new BlissSVGBuilder('INNER:1,2');
+builder.toString();
+// 'B291:3,5' — baked (2,3) + use-site (1,2); re-parsing renders identically
+```
+
+The same holds for a multi-part definition whose parts share a common offset: the offset shifts the rendered glyph and the decomposed output re-renders in exactly the same place.
+
 ## Managing Definitions
 
 Definitions can be overwritten, altered, removed, and inspected. See the [API Documentation](/reference/api-documentation#define-definitions-options) for `define()` options, [Query API](/reference/api-documentation#query-api) for `getDefinition()`, `listDefinitions()`, and `removeDefinition()`.

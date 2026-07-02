@@ -4,6 +4,8 @@ Quick reference for all available options.
 
 Options can be set in the [DSL string](/handbook/syntax-options/options-system) or [programmatically](/handbook/syntax-options/programmatic-options) via the constructor.
 
+**Scope:** the [Rendering](#rendering) and [Dots](#dots) options (plus [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through)) cascade at every scope: global `[opts]||`, word `[opts]|`, character `[opts]`, part `[opts]>`. Everything else on this page is canvas-wide and takes effect only at global scope; at any other scope the key is dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning.
+
 ---
 
 ## Rendering
@@ -142,6 +144,8 @@ Options cascade from least to most specific:
 
 Grid color/stroke options have their own hierarchy:
 - Bulk (`grid-color`) → Category (`grid-major-color`) → Specific (`grid-sky-color`)
+
+One bracket per scope: combine options with `;` (`[grid;grid-color=red]||`); a second bracket at the same scope is ignored with a [`MULTIPLE_OPTION_BRACKETS`](/reference/warning-codes#multiple-option-brackets) warning. Misplaced options are dropped with a warning and the content still renders; see [Option Placement Is Checked](/handbook/syntax-options/options-system#option-placement-is-checked).
 
 ---
 

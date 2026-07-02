@@ -92,6 +92,7 @@ export default defineConfig({
             { text: 'Head Glyph Exclusions', link: '/reference/head-glyph-exclusions' },
             { text: 'Options Quick Reference', link: '/reference/options-quick-reference' },
             { text: 'DSL Syntax Quick Reference', link: '/reference/dsl-syntax-quick-reference' },
+            { text: 'Warning Codes', link: '/reference/warning-codes' },
             { text: 'API Documentation', link: '/reference/api-documentation' }
           ]
         }

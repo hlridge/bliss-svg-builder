@@ -240,7 +240,7 @@ new BlissSVGBuilder('B486/B208^').toString();
 // 'B486/B208'
 ```
 
-A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `HEAD_MARKER_ON_WORD` warning and never reappears on export.
+A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `MISPLACED_HEAD_MARKER` warning and never reappears on export.
 
 Use for: serializing back to DSL format, portable exchange, logging.
 
@@ -982,7 +982,7 @@ builder.glyph(0).applyIndicators('B81;B86');
 builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 ```
 
-Non-indicator codes are silently filtered out. If the call cannot apply any indicator (the codes are not indicators and the indicator list is left unchanged, or the glyph has no base part to carry one), it adds an `INDICATOR_MUTATION_NOOP` warning to `warnings` instead of silently doing nothing.
+If the call cannot apply any indicator (none of the given codes is a recognized indicator, or the glyph has no base part to carry one), it adds a `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing nothing.
 
 On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
 
@@ -994,6 +994,8 @@ builder.group(0).applyIndicators('B86', { flatten: true });       // bake onto t
 
 `{ flatten: true }` opts out of the overlay and bakes the indicator onto the head glyph's parts (the pre-overlay shape).
 
+The group-level call validates its codes the same way the DSL `;;` does: a recognized code that is not an indicator is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning, and an unknown code with `UNKNOWN_CODE`. See [Warning Codes](/reference/warning-codes).
+
 #### `.clearIndicators(opts?)`
 
 On a **glyph handle**, removes all grammatical indicators. Semantic indicators are preserved by default; `{ stripSemantic: true }` removes them too:
@@ -1004,28 +1006,6 @@ builder.glyph(0).clearIndicators({ stripSemantic: true });
 ```
 
 On a **group handle**, removes the word-level `;;` overlay and restores the base (including a semantic that a `;;!` strip had suppressed). `{ stripSemantic: true }` keeps a reversible empty-codes strip overlay; `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
-
-#### `.applyHeadIndicators(code, opts?)` <Badge type="warning" text="deprecated" />
-
-::: warning Deprecated
-Alias for `applyIndicators(code, { ...opts, flatten: true })` on a group handle. It bakes onto the head glyph and drops any `;;` overlay. For the reversible word-level overlay, use `applyIndicators(code)` without `flatten`.
-:::
-
-```js
-builder.group(0).applyHeadIndicators('B86');
-// same as builder.group(0).applyIndicators('B86', { flatten: true });
-```
-
-#### `.clearHeadIndicators(opts?)` <Badge type="warning" text="deprecated" />
-
-::: warning Deprecated
-Alias for `clearIndicators({ ...opts, flatten: true })` on a group handle. It clears both the head glyph's baked indicator parts and any `;;` overlay. For the reversible word-level overlay only, use `clearIndicators()` without `flatten`.
-:::
-
-```js
-builder.group(0).clearHeadIndicators();
-builder.group(0).clearHeadIndicators({ stripSemantic: true });
-```
 
 ### Options
 
@@ -1118,6 +1098,18 @@ For adding characters from external font systems. Requires providing your own SV
 - Has `getPath` + `char` → external glyph
 - Has `getPath` (no `char`) → shape
 
+### Definition validation
+
+`define()` validates each entry and reports failures per code in `result.errors` (other entries in the same call still register). The rules:
+
+- **No word-level indicators in definitions.** A `codeString` cannot contain `;;`; apply word indicators at the use site (`WORD;;B81`).
+- **A glyph or shape is a single character.** Its `codeString` cannot contain `/`; define a multi-character word as a bare code (omit `type`).
+- **A glyph cannot bake in an indicator.** Define a base+indicator combination as a bare code, attach the indicator at the use site (`BASE;B81`), or flag a compound indicator glyph with `isIndicator: true`.
+- **`defaultOptions` keys must be valid option names**, and cannot include the canvas-wide global-only options (`margin`, `grid`, `svg-title`, …): those configure the whole SVG and would be inert on a definition. Set them in the global bracket (`[opts]||`) or the builder options instead.
+- References are checked: circular reference chains are rejected. A reference to a not-yet-defined code is allowed, so definitions can be registered in any order.
+
+`patchDefinition()` applies the same rules and validates before changing anything, so a rejected patch leaves the definition untouched.
+
 ### Metadata propagation
 
 The fields above are the input surface. This is how each one shows up (or
@@ -1130,7 +1122,7 @@ parser output (`toJSON()`), rendering (`svgCode`), serialization
 | `codeString` | parser, rendering, serialization | the composition; a non-glyph code decomposes to it on export, a `type: 'glyph'` keeps its name in the tree but still decomposes on export |
 | `getPath` / `width` / `height` | rendering, measurements | path geometry and `width`/`height`/`bounds` on snapshot nodes and handles |
 | `anchorOffsetX` / `anchorOffsetY` | rendering (composition) | the anchor point an applied indicator positions against |
-| `isIndicator: true` | parser (part-merge, head-glyph exclusion, `;`→`;;` promotion) | `indicatorKind` / `indicatorLevel` on the resolved part; an `isIndicator` glyph is an atomic indicator unit |
+| `isIndicator: true` | parser (part-merge, head-glyph exclusion) | `indicatorKind` / `indicatorLevel` on the resolved part; an `isIndicator` glyph is an atomic indicator unit |
 | `char` | rendering (text path) | the rendered Unicode character on the snapshot node's `.char` (external glyphs) |
 | `kerningRules` | rendering | inter-glyph positions only (no field on the tree) |
 | `shrinksPrecedingWordSpace: true` | rendering (spacing) | the auto-shrunk word space before the glyph |
@@ -1310,6 +1302,8 @@ new BlissSVGBuilder('B313').warnings; // []
 ```
 
 Warnings are recalculated on each rebuild, so fixing an issue via a handle mutation clears the corresponding warning.
+
+Every code the builder can emit, with its trigger and an example, is listed in the [Warning Codes reference](/reference/warning-codes). In TypeScript, `code` is typed as the `WarningCode` union.
 
 ## Error Handling
 

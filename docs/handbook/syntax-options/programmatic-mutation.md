@@ -29,7 +29,7 @@ For example, `B313/B1103//B431;B81` creates:
 - **Group 0**: B313, B1103
 - **Group 1**: one glyph with parts B431 and B81
 
-Indicators are parts within a glyph, marked with `isIndicator: true`. Word-level indicator syntax (`;;`) resolves so indicators are always attached to a specific glyph in the tree. See [DSL Syntax Quick Reference](/reference/dsl-syntax-quick-reference#indicator-resolution) for details.
+Character-level indicators (`;`) are parts within a glyph, marked with `isIndicator: true`. A word-level indicator (`;;`) is different: it is stored on its group as a reversible `wordIndicators` overlay and resolved onto the head glyph only when the SVG is rendered, so it has no part node in the tree. See [How `;;` is stored and serialized](/reference/dsl-syntax-quick-reference#how-is-stored-and-serialized) for details.
 
 ## Navigating the Tree
 
@@ -423,11 +423,7 @@ builder.group(0).clearIndicators();
 
 Pass `{ stripSemantic: true }` for the `;;!` strip form, or `{ flatten: true }` to bake the indicator onto the head glyph's parts instead of keeping the reversible overlay.
 
-::: warning Deprecated
-`applyHeadIndicators()` / `clearHeadIndicators()` are deprecated aliases for the `{ flatten: true }` variant (`applyIndicators(code, { flatten: true })` and `clearIndicators({ flatten: true })`). Prefer `applyIndicators` / `clearIndicators` without `flatten` for the reversible overlay.
-:::
-
-If an indicator call cannot apply or remove anything (for example, applying a non-indicator code, or clearing a glyph that has no indicators), it records an `INDICATOR_MUTATION_NOOP` entry in `builder.warnings` rather than failing silently.
+Indicator calls never fail silently. A group-level `applyIndicators()` validates its codes the same way the DSL `;;` does: a recognized non-indicator code is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning (an unknown code with `UNKNOWN_CODE`). A call that cannot apply or remove anything (for example, clearing a glyph that has no indicators) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`.
 
 ### Inspecting Indicators
 
