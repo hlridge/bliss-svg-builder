@@ -54,20 +54,23 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
   });
 
   describe('when stroke-width is set on a ;-composed part', () => {
-    it('renders the value on the part <g> and round-trips', () => {
+    it('renders the value on the indicator part alone and round-trips', () => {
       const b = new BlissSVGBuilder('H;[stroke-width=1.2]>B81');
       expect(b.warnings).toEqual([]);
-      expect(b.svgCode).toContain('<g stroke-width="1.2">');
+      // Full-snippet pin: the wrapper holds exactly the B81 path, the H base
+      // path stays a bare sibling — an option leaking to character level
+      // (wrapping both paths) would pass a bare toContain('<g stroke-width').
+      expect(b.svgCode).toContain('<g stroke-width="1.2"><path d="M3,6l1,-2M4,4l1,2"/></g>');
       expect(b.toString()).toBe('H;[stroke-width=1.2]>B81');
       expect(roundTripSvg(b)).toBe(b.svgCode);
     });
   });
 
   describe('when stroke-width is set via the ;; word-indicator overlay', () => {
-    it('renders the value on the overlay part <g> and round-trips', () => {
+    it('renders the value on the overlay part alone and round-trips', () => {
       const b = new BlissSVGBuilder('H;;[stroke-width=1.2]>B81');
       expect(b.warnings).toEqual([]);
-      expect(b.svgCode).toContain('<g stroke-width="1.2">');
+      expect(b.svgCode).toContain('<g stroke-width="1.2"><path d="M3,6l1,-2M4,4l1,2"/></g>');
       expect(b.toString()).toBe('H;;[stroke-width=1.2]>B81');
       expect(roundTripSvg(b)).toBe(b.svgCode);
     });
