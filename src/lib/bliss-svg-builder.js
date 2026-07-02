@@ -1330,22 +1330,28 @@ class BlissSVGBuilder {
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
     function serializeParts(parts, offsetX = 0, offsetY = 0) {
       return parts.map(part => {
+        // An invalid part (no codeName, e.g. the `!B81` in `B291;[x=2]>!B81`)
+        // must not let a coordinate suffix or `[opts]>` prefix decorate it into
+        // a truthy literal-`undefined` string; drop it before decoration. It
+        // already warned UNKNOWN_CODE at parse. (F3.)
+        if (!part.codeName) return '';
         const x = (part.x ?? 0) + offsetX;
         const y = (part.y ?? 0) + offsetY;
-        if (!options.preserve && part.codeName && !builtInCodes.has(part.codeName)) {
+        if (!options.preserve && !builtInCodes.has(part.codeName)) {
           // Custom code with nested parts (e.g., positioned custom glyph)
           if (part.parts) {
-            const inner = serializeParts(part.parts, x, y);
             // A part-level option on the custom base must survive decomposition,
-            // but `[opts]>` binds to ONE code, so wrap only a single-code result.
-            // A multi-code (`;`) decomposition can't carry one option faithfully:
-            // render DOES apply it (to the whole `;`-character, one wrapping <g>),
-            // but re-emitting needs per-part (`[opts]>B291;[opts]>C8`). Drop it
-            // here rather than mis-wrap onto only the first code (which round-trips
-            // to a DIFFERENT render). The multi-code round-trip is a known gap
-            // (TF-3G, backlog). (TF-3.)
-            const optPrefix = serializeOptions(part.options);
-            return optPrefix && inner && !inner.includes(';') ? `${optPrefix}>${inner}` : inner;
+            // but `[opts]>` binds to ONE code, so a multi-code (`;`) result
+            // re-emits the option before EACH decomposed part
+            // (`[opts]>B291;[opts]>C8`): render applied it to the whole
+            // `;`-character, and per-part emission computes to the same ink.
+            // Merging structurally, inner keys winning, keeps a part's own
+            // option authoritative, the order nested <g> attribute inheritance
+            // resolves to. (TF-3G / TF-3.)
+            const innerParts = part.options
+              ? part.parts.map(p => ({ ...p, options: { ...part.options, ...p.options } }))
+              : part.parts;
+            return serializeParts(innerParts, x, y);
           }
           // Custom composite shape (has codeString, no getPath)
           const def = blissElementDefinitions[part.codeName];
@@ -1354,7 +1360,7 @@ class BlissSVGBuilder {
           }
         }
         // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
-        let str = part.codeName?.startsWith('XTXT_')
+        let str = part.codeName.startsWith('XTXT_')
           ? 'X' + part.codeName.slice(5)
           : part.codeName;
         if (x !== 0 || y !== 0) {
@@ -1365,11 +1371,10 @@ class BlissSVGBuilder {
         if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
       })
-        // Drop parts that carry no serializable code: an invalid appended part
-        // (e.g. the `!B81` in a dumb `GPLAIN;!B81`) has no codeName, so it must
-        // not emit a dangling `;`. The part still warned UNKNOWN_CODE at parse;
-        // here it is normalized away so toString round-trips. (Strict Indicator
-        // Separation surfaced this; the empty-separator artifact predates it.)
+        // Drop empty entries (invalid parts dropped by the codeName guard above,
+        // or an inner decomposition that emitted nothing) so no dangling `;`
+        // appears and toString round-trips. (Strict Indicator Separation
+        // surfaced this; the empty-separator artifact predates it.)
         .filter(Boolean)
         .join(';');
     }
