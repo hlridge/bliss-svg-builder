@@ -19,6 +19,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   (`[stroke-width=1.2]>B291`), a ;-composed part (`H;[..]>B81`), the
  *   ;; word-indicator overlay (`H;;[..]>B81`), and the API overlay
  *   (`group().applyIndicators('[..]>B81')`), incl. API/DSL byte-parity.
+ * - The flatten paths keeping the option: `toString`/`toJSON` with
+ *   `{ flattenIndicators: true }` and `applyIndicators(code, { flatten:
+ *   true })` (Chunk 4 external review F1/F2 — distinct bake branches the
+ *   default-overlay pins above do not reach).
  * - The global `[stroke-width=1.2]||` path unchanged (content group).
  * - Dot glyphs: the dot ink tracks a part-level stroke-width linearly
  *   via the dot-sizing formula ((stroke-width + extra) / 2 on an inner
@@ -91,6 +95,27 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
       expect(api.svgCode).toBe(dsl.svgCode);
       expect(roundTripSvg(api)).toBe(api.svgCode);
       expect(roundTripJsonSvg(api)).toBe(api.svgCode);
+    });
+  });
+
+  describe('when the ;; overlay is flattened', () => {
+    // The flatten paths bake the overlay onto the head as character-level
+    // ; parts — serializer/mutation branches distinct from the default
+    // overlay paths above, so a flatten-only option drop would pass every
+    // other pin in this file (external review F1/F2).
+    it('keeps the part option through flattenIndicators serialization', () => {
+      const b = new BlissSVGBuilder('H;;[stroke-width=1.2]>B81');
+      expect(b.toString({ flattenIndicators: true })).toBe('H;[stroke-width=1.2]>B81');
+      expect(new BlissSVGBuilder(b.toString({ flattenIndicators: true })).svgCode).toBe(b.svgCode);
+      expect(new BlissSVGBuilder(b.toJSON({ flattenIndicators: true })).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps the part option through a flatten apply', () => {
+      const b = new BlissSVGBuilder('H');
+      b.group(0).applyIndicators('[stroke-width=1.2]>B81', { flatten: true });
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe('H;[stroke-width=1.2]>B81');
+      expect(b.svgCode).toBe(new BlissSVGBuilder('H;[stroke-width=1.2]>B81').svgCode);
     });
   });
 
