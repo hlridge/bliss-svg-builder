@@ -4,16 +4,22 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { SEMANTIC_INDICATOR_ROOTS } from './bliss-constants.js';
+import { OPTION_BRACKET_CONTENT, SEMANTIC_INDICATOR_ROOTS } from './bliss-constants.js';
+
+// Quote-aware option-prefix matchers: overlay codes arrive RESTORED, so a
+// quoted value may carry ']'/';'/':' and a lazy `\[.*?\]` would cut inside
+// it. Group 2 is the shared grammar's internal atom; group 3 the remainder.
+const PART_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])>(.+)$`);
+const CHAR_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)`);
 
 /**
  * Extract the bare B-code from a code string that may include
  * option prefixes (e.g. '[color=red]>B81') and position suffixes (':0,4').
  */
 export function getBareCode(str) {
-  const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
-  if (partLevelMatch) return partLevelMatch[2].split(':')[0].split(';')[0];
-  const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
+  const partLevelMatch = str.match(PART_OPTION_PREFIX);
+  if (partLevelMatch) return partLevelMatch[3].split(':')[0].split(';')[0];
+  const optionsMatch = str.match(CHAR_OPTION_PREFIX);
   const code = optionsMatch ? str.slice(optionsMatch[1].length) : str;
   return code.split(':')[0].split(';')[0];
 }

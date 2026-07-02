@@ -52,6 +52,45 @@ export const escapeHtml = (str) => String(str)
 export const camelToKebab = (str) => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
 
 /**
+ * Serializes one option VALUE for DSL emission (`[key=value]` brackets).
+ * A value carrying characters the DSL grammar would otherwise claim (`;`
+ * splits options and parts, `]` ends the bracket, `[` opens one, `|` splits
+ * groups and the global prefix, quotes confuse the value grammar) or
+ * leading/trailing whitespace (trimmed on parse) is wrapped in double
+ * quotes with inner `"` escaped as `\"` — the exact spelling the option
+ * parser strips and unescapes on the way back in. Everything else emits
+ * byte-unchanged. Lives here because both the builder (toString) and the
+ * parser (`;;`-overlay rebuild) emit option values, and the builder already
+ * imports the parser. Known residue: a backslash abutting the escaping
+ * (`a\"b` class, trailing `\`) cannot round-trip — the parser unescapes
+ * ONLY `\"`.
+ */
+export const serializeOptionValue = (value) => {
+  const str = String(value);
+  return /[;\[\]|"']/.test(str) || /^\s|\s$/.test(str)
+    ? `"${str.replace(/"/g, '\\"')}"`
+    : str;
+};
+
+/**
+ * Bracket-content grammar (a regex SOURCE fragment) shared by every site
+ * that tokenizes or (re-)extracts one `[option]` bracket: a quoted span
+ * ("..." or '...', with \-escapes) may carry `]` `;` `|` `[` — mirroring
+ * the option parser's value grammar so tokenization and value parsing agree
+ * on where a bracket ends (a quoted `]` used to truncate the bracket).
+ * Each step commits through an atomic lookahead ((?=(?<atom>...))\k<atom>):
+ * ECMAScript lookaheads discard their interior choice points once matched,
+ * so an UNCLOSED bracket fails in LINEAR time — the plain alternation form
+ * backtracks exponentially there (measured ~2s at 40 stray quotes, hours at
+ * 60). Trade-off: an unclosed bracket whose only `]`s sit inside complete
+ * quoted spans no longer half-tokenizes; it falls through whole to the
+ * malformed/unknown warn paths (visible, not silently truncated).
+ * Embed at most once per composed regex (the group is named); the counterpart
+ * of [[serializeOptionValue]] above.
+ */
+export const OPTION_BRACKET_CONTENT = String.raw`(?:(?=(?<atom>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\]]))\k<atom>)*`;
+
+/**
  * Generates a random 8-character key for element identity.
  * ~2.8 trillion combinations — negligible collision probability.
  */

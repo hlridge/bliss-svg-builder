@@ -451,11 +451,12 @@ describe('BlissParser bracket options', () => {
     });
 
     it('does not warn when a quoted value contains ][ in one global bracket', () => {
-      // regression: external review of e5d937c. A quoted ']' splits the single
-      // bracket in the quote-unaware placeholder pre-pass, so the tokenized
-      // form shows two brackets; the quote grammar must veto the warning.
-      // (The value itself is truncated by the same pre-pass — a pre-existing
-      // tokenizer limitation, tracked in backlog, deliberately not pinned.)
+      // regression: external review of e5d937c. A quoted ']' used to split
+      // the single bracket in the then-quote-unaware placeholder pre-pass, so
+      // the tokenized form showed two brackets; the restored-form quote
+      // grammar vetoed the warning. The pre-pass is quote-aware since Chunk
+      // 11 (both arms now agree; the value itself round-trips, pinned in
+      // BlissSVGBuilder.option-value-quoting.test.js).
       const r = BlissParser.parse('[k="]["]||B291');
 
       expect(r._parseWarnings).toBeUndefined();

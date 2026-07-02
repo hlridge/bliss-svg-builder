@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -24,6 +24,19 @@ const COORD_SUFFIX_PATTERN = /:(?:-?(?:\d+(?:\.\d*)?|\.\d+))?(?:,(?:-?(?:\d+(?:\
 // token. Shared by the string parser and the object-rebuild expansion paths so
 // a toJSON() round-trip reconstructs what the string parser accepted.
 const PART_OPTION_CODESTRING = /^\[.*?\]>/;
+
+// Quote-aware bracket matchers built from the shared grammar (see
+// OPTION_BRACKET_CONTENT in bliss-constants.js for the rationale and the
+// linear-time guarantee; probe: probe-chunk11-option-value-quoting.mjs).
+// The tokenizer pre-pass and #parseOptions' own extraction must agree, or a
+// quoted `]` truncates at one layer even when the other accepts it.
+const BRACKET_TOKEN_PATTERN = new RegExp(String.raw`\{(.*)\}|\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`, 'g');
+const BRACKET_EXTRACT_PATTERN = new RegExp(String.raw`\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`);
+// The overlay prefix matchers run on RESTORED strings (the `;;` store keeps
+// codes verbatim), so they need the same quote-aware grammar; group 2 is the
+// grammar's internal atom, group 3 the remainder after the bracket.
+const OVERLAY_CHAR_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.+)$`);
+const OVERLAY_PART_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])>(.+)$`);
 
 // Strips one layer of syntactic decoration from a codeString reference (an
 // option prefix, a trailing head marker, a coordinate suffix) so a DECORATED
@@ -62,9 +75,11 @@ export class BlissParser {
   // bracket — braces are opaque placeholders there, so a '[' inside {…} never
   // counts — AND the restored form still shows more than one top-level '['
   // once quoted values are stripped with #parseOptions's own quote grammar.
-  // The second condition vetoes the quote-unaware pre-pass: a quoted ']'
-  // splits ONE user bracket into two tokenized ones ([k="]["] is a single
-  // bracket, not a duplicate).
+  // The second condition was added to veto the then-quote-unaware pre-pass
+  // (a quoted ']' split ONE user bracket into two tokenized ones); the
+  // pre-pass is quote-aware since Chunk 11, so both arms now agree on
+  // [k="]["]-class inputs and the veto is belt-and-suspenders (kept; the
+  // Phase 6 Stryker re-baseline adjudicates its reachability).
   static #hasMultipleOptionBrackets(tokenized, restored) {
     const QUOTED_SPAN = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
     return (tokenized.match(/\[/g) || []).length > 1
@@ -74,7 +89,7 @@ export class BlissParser {
   static #parseOptions(optionsString) {
     if (!optionsString) return;
 
-    const bracketMatch = optionsString.match(/\[([^\]]*)\]/);
+    const bracketMatch = optionsString.match(BRACKET_EXTRACT_PATTERN);
     // Stryker disable next-line all: internal invariant, unreachable from public API
     if (!bracketMatch) {
       throw new Error(`#parseOptions: expected bracketed input, got: ${optionsString}`);
@@ -182,7 +197,7 @@ export class BlissParser {
         source: inputString,
       });
     }
-    inputString = inputString.replace(/\{(.*)\}|\[([^\]]*)\]/g, (match, textContent, optionContent) => {
+    inputString = inputString.replace(BRACKET_TOKEN_PATTERN, (match, textContent, optionContent) => {
       let placeholder = `PLACEHOLDER_${placeholderCount++}`;
       if (textContent !== undefined) {
         placeholderMap[placeholder] = { content: textContent, openBracket: '{', closeBracket: '}' };
@@ -650,7 +665,9 @@ export class BlissParser {
           // render-merge), so a gated key must be stripped from the stored
           // string itself or toString would re-serialize the warned no-op
           // forever. Clean codes pass through untouched (SIB-2 fidelity); a
-          // stripped prefix is rebuilt with toString's own key=value emission.
+          // stripped prefix is rebuilt with the shared quote-aware key=value
+          // emission (serializeOptionValue), so a kept quoted value survives
+          // the rebuild.
           const gatedCodes = rawCodes.map((code) => {
             // A CHARACTER-form prefix ([opts]CODE, no >) is inert in overlay
             // position for EVERY key -- the render-merge extracts parts only,
@@ -666,23 +683,23 @@ export class BlissParser {
             // with the misplaced first one (review-fix round 2, F2).
             let current = code;
             let charPrefix;
-            while ((charPrefix = current.match(/^(\[.*?\])(?!>)(.+)$/)) !== null) {
+            while ((charPrefix = current.match(OVERLAY_CHAR_OPTION_PATTERN)) !== null) {
               parseWarnings.push({
                 code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
-                message: `Character option (${charPrefix[1]}) ignored on the word indicator "${charPrefix[2]}": a ;; code has no character to style. Use ${charPrefix[1]}>${charPrefix[2]} to style the indicator part.`,
+                message: `Character option (${charPrefix[1]}) ignored on the word indicator "${charPrefix[3]}": a ;; code has no character to style. Use ${charPrefix[1]}>${charPrefix[3]} to style the indicator part.`,
                 source: current,
               });
-              current = charPrefix[2];
+              current = charPrefix[3];
             }
-            const optionPrefix = current.match(/^(\[.*?\])>(.+)$/);
+            const optionPrefix = current.match(OVERLAY_PART_OPTION_PATTERN);
             if (!optionPrefix) return current;
             const parsed = BlissParser.#parseOptions(optionPrefix[1]) ?? {};
             const keyCount = Object.keys(parsed).length;
             const kept = dropMisplacedGlobalKeys(parsed, 'part');
             const keptEntries = kept ? Object.entries(kept) : [];
             if (keptEntries.length === keyCount) return current;
-            if (keptEntries.length === 0) return optionPrefix[2];
-            return `[${keptEntries.map(([k, v]) => v === true ? k : `${k}=${v}`).join(';')}]>${optionPrefix[2]}`;
+            if (keptEntries.length === 0) return optionPrefix[3];
+            return `[${keptEntries.map(([k, v]) => v === true ? k : `${k}=${serializeOptionValue(v)}`).join(';')}]>${optionPrefix[3]}`;
           });
 
           // A `;;` word-level indicator must BE an indicator. Validate + drop here

@@ -34,8 +34,8 @@ import { GLOBAL_ONLY_OPTION_KEYS } from '../src/lib/bliss-constants.js';
  *   `BlissSVGBuilder.grid.test.js`, margins/crop in the options suites).
  * - The group-option bracket-placement arm, see
  *   `BlissParser.group-option-placement.test.js`.
- * - Quoted option values with special characters (pre-existing serializeOptions
- *   emission class; backlog "Quoted ] inside an option value").
+ * - Quoted option values with special characters, see
+ *   `BlissSVGBuilder.option-value-quoting.test.js` (Chunk 11).
  *
  * The 36-key matrix exceeds the ~30-test soft cap as one it.each data table
  * (the guide's sanctioned inline-table form); splitting it would separate the
@@ -180,9 +180,9 @@ describe('BlissParser global option scope', () => {
     });
 
     it('keeps a clean quoted value byte-identical instead of rebuilding it', () => {
-      // pins the nothing-dropped short-circuit: the rebuild emission is
-      // unquoted (toString's serializeOptions class), so a clean code that
-      // went through it would lose its quotes
+      // pins the nothing-dropped short-circuit: a rebuild only quotes values
+      // that NEED it (Chunk 11), so a clean interior-space value routed
+      // through it would emit unquoted and lose its written spelling
       const quoted = build('B303;;[data-t="a b"]>B81');
       expect(quoted.warnings).toEqual([]);
       expect(quoted.toString()).toBe('B303;;[data-t="a b"]>B81');
