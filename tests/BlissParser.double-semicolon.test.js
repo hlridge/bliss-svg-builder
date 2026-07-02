@@ -368,6 +368,27 @@ describe('BlissParser ;; syntax', () => {
       expect(malformed).toHaveLength(1);
       expect(builder.snapshot().children[0].children).toEqual([]);
     });
+
+    // regression: chunk-5a external review 2026-07-02 F4 (pre-existing) — the
+    // malformed handler stored the PLACEHOLDERIZED string in its warning and
+    // errorSource, so an option bracket round-tripped as a literal
+    // [PLACEHOLDER_0] token, silently corrupting the option.
+    it('restores option text in the malformed re-emit instead of a placeholder token', () => {
+      const builder = new BlissSVGBuilder('B313/[color=red]C8;;B81/B291');
+      const emitted = builder.toString();
+      expect(emitted).toBe('B313/[color=red]C8;;B81/B291');
+      const reparsed = new BlissSVGBuilder(emitted);
+      expect(reparsed.toString()).toBe(emitted);
+      expect(reparsed.warnings.map((w) => w.code)).toEqual(['MALFORMED_WORD_INDICATOR']);
+    });
+
+    it('restores option text in a multi-word-alias ;; fail source', () => {
+      blissElementDefinitions['PHWORDS'] = { codeString: 'B291//C8' };
+      const builder = new BlissSVGBuilder('PHWORDS;;[color=red]>B81');
+      expect(builder.toString()).toBe('PHWORDS;;[color=red]>B81');
+      expect(builder.warnings[0].source).not.toContain('PLACEHOLDER');
+      expect(builder.warnings[0].message).not.toContain('PLACEHOLDER');
+    });
   });
 
   describe('when ;; is bound to a multi-word alias', () => {

@@ -12,6 +12,28 @@ import {
 import { resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 
+// The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
+// optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
+// suffix before a definition lookup must strip this SAME grammar, or
+// equivalent spellings take different semantic paths (a y-only ':,2' used to
+// bypass the misplacement gates while ':0,2' met them).
+const COORD_SUFFIX_PATTERN = /:(?:-?(?:\d+(?:\.\d*)?|\.\d+))?(?:,(?:-?(?:\d+(?:\.\d*)?|\.\d+))?)?$/;
+
+// A codeString beginning with a part option ([color=red]>B291) must nest-parse
+// like a multi-code string; treated as a plain codeName it becomes one unknown
+// token. Shared by the string parser and the object-rebuild expansion paths so
+// a toJSON() round-trip reconstructs what the string parser accepted.
+const PART_OPTION_CODESTRING = /^\[.*?\]>/;
+
+// Strips one layer of syntactic decoration from a codeString reference (an
+// option prefix, a trailing head marker, a coordinate suffix) so a DECORATED
+// alias hop ('[color=green]WORD', 'WORD^', 'WORD:1,2') still resolves for
+// wordness; define() inlines only undecorated direct references.
+const stripReferenceDecoration = (s) => s
+  .replace(/^(?:\[.*?\]>?)+/, '')
+  .replace(/\^+$/, '')
+  .replace(COORD_SUFFIX_PATTERN, '');
+
 export class BlissParser {
   static parse(codeStr, options) {
       const result = this.fromString(codeStr);
@@ -460,13 +482,23 @@ export class BlissParser {
           crownWordChunk(chunk, label);
         };
 
-        // Helper: resolve codeString through aliases to check if it's a word
+        // Helper: resolve codeString through aliases to check if it's a word.
+        // A hop that is not itself a registry key may still be a DECORATED
+        // reference ('[color=green]WORD', 'WORD^', 'WORD:1,2') — strip the
+        // decoration and keep resolving, else a decorated word alias escapes
+        // wordness detection (external review 2026-07-02 F2).
         const resolveToFinalCodeString = (code, visited = new Set()) => {
           if (visited.has(code)) return null;
           visited.add(code);
           const def = definitions[code];
           if (!def?.codeString) return null;
-          if (!definitions[def.codeString]) return def.codeString;
+          if (!definitions[def.codeString]) {
+            const core = stripReferenceDecoration(def.codeString);
+            if (core !== def.codeString && definitions[core]) {
+              return resolveToFinalCodeString(core, visited) ?? def.codeString;
+            }
+            return def.codeString;
+          }
           return resolveToFinalCodeString(def.codeString, visited);
         };
 
@@ -493,10 +525,12 @@ export class BlissParser {
           // and are inert anyway, since a placeholder renders for the unit.
           const collapsed = parts.filter(p => !p._wordBreak);
           if (collapsed.length > 0) {
+            // Restore placeholders: errorSource re-emits from toString, so a
+            // stored placeholder token would replace the user's option text.
             collapsed[0]._wordError = {
               code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
-              message: `Indicator bound to the multi-word unit "${wordCode}": an indicator targets a single word, but this expands to multiple words.`,
-              source: wordCode,
+              message: `Indicator bound to the multi-word unit "${restorePlaceholders(wordCode)}": an indicator targets a single word, but this expands to multiple words.`,
+              source: restorePlaceholders(wordCode),
             };
           }
           return collapsed;
@@ -546,10 +580,12 @@ export class BlissParser {
             }
             crownWordChunks(fallbackParts, wordCode);
             if (fallbackParts.length > 0) {
+              // Restore placeholders: errorSource re-emits from toString, so a
+              // stored placeholder token would replace the user's option text.
               fallbackParts[0]._wordError = {
                 code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
-                message: `Malformed word-level indicator in "${str}": ;; must be the trailing part of a word.`,
-                source: str,
+                message: `Malformed word-level indicator in "${restorePlaceholders(str)}": ;; must be the trailing part of a word.`,
+                source: restorePlaceholders(str),
               };
             }
             return fallbackParts;
@@ -680,10 +716,10 @@ export class BlissParser {
             // option on the base; scoped to top level in parity with the `;`
             // gate below.
             const [gateBaseRaw, ...gateParts] = partContent.split(';');
-            const gateCoordMatch = gateBaseRaw.match(
-              /^(.+?)(:-?(?:\d+(?:\.\d*)?|\.\d+)(?:,-?(?:\d+(?:\.\d*)?|\.\d+))?)$/
-            );
-            const gateBase = gateCoordMatch ? gateCoordMatch[1] : gateBaseRaw;
+            const gateCoordMatch = gateBaseRaw.match(COORD_SUFFIX_PATTERN);
+            const gateBase = gateCoordMatch && gateCoordMatch.index > 0
+              ? gateBaseRaw.slice(0, gateCoordMatch.index)
+              : gateBaseRaw;
             if (resolveToFinalCodeString(gateBase)?.includes('/')) {
               parseWarnings.push({
                 code: WARNING_CODES.MISPLACED_PART_OPTION,
@@ -730,13 +766,16 @@ export class BlissParser {
           // after a single `;` is just part of an (invalid) appended code.
           const filteredIndicators = rawIndicators.filter(ind => ind !== '');
 
-          // Strip position modifier (e.g. ":2,0" or ":-1.5,3") from base code
-          // so definition lookup works for codes like "WORD:2,0"
-          const posMatch = potentialBaseCodeRaw.match(
-            /^(.+?)(:-?(?:\d+(?:\.\d*)?|\.\d+)(?:,-?(?:\d+(?:\.\d*)?|\.\d+))?)$/
-          );
-          const potentialBaseCode = posMatch ? posMatch[1] : potentialBaseCodeRaw;
-          const positionSuffix = posMatch ? posMatch[2] : '';
+          // Strip position modifier (e.g. ":2,0", ":,2", ":-1.5,3") from base
+          // code so definition lookup works for codes like "WORD:2,0"; the
+          // shared pattern matches the full grammar parsePartString accepts,
+          // so a y-only ":,2" resolves the same definition as ":0,2".
+          const posMatch = potentialBaseCodeRaw.match(COORD_SUFFIX_PATTERN);
+          const hasPosSuffix = posMatch && posMatch.index > 0;
+          const potentialBaseCode = hasPosSuffix
+            ? potentialBaseCodeRaw.slice(0, posMatch.index)
+            : potentialBaseCodeRaw;
+          const positionSuffix = hasPosSuffix ? posMatch[0] : '';
 
           const resolvedCodeString = resolveToFinalCodeString(potentialBaseCode);
           const isWordDefinition = resolvedCodeString?.includes('/') ?? false;
@@ -1106,10 +1145,7 @@ export class BlissParser {
                 // Word codeString at part level — cannot be expanded here.
                 // Keep original codeName; post-parse decomposition resolves it.
               } else if (codeString.includes(';') || codeString.includes(':')
-                  // A single code carrying its own part option ([color=red]>B291)
-                  // must nest-parse like a multi-code string; treated as a plain
-                  // codeName it becomes one unknown token.
-                  || /^\[.*?\]>/.test(codeString)
+                  || PART_OPTION_CODESTRING.test(codeString)
                   || blissElementDefinitions[codeString]?.codeString ) {
                 part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
@@ -1300,7 +1336,9 @@ export class BlissParser {
     // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
     if (codeString.includes('/')) return;
 
-    if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString) {
+    if (codeString.includes(';') || codeString.includes(':')
+        || PART_OPTION_CODESTRING.test(codeString)
+        || blissElementDefinitions[codeString]?.codeString) {
       part.parts = BlissParser.#parseCodeStringToParts(codeString);
     } else {
       part.codeName = codeString;
@@ -1331,7 +1369,9 @@ export class BlissParser {
       if (innerCodeString) {
         if (innerCodeString.includes('/')) {
           // Word codeString — skip expansion at part level
-        } else if (innerCodeString.includes(';') || innerCodeString.includes(':') || blissElementDefinitions[innerCodeString]?.codeString) {
+        } else if (innerCodeString.includes(';') || innerCodeString.includes(':')
+            || PART_OPTION_CODESTRING.test(innerCodeString)
+            || blissElementDefinitions[innerCodeString]?.codeString) {
           part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, depth + 1);
         } else {
           part.codeName = innerCodeString;
