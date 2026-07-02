@@ -350,6 +350,21 @@ describe('BlissParser global option scope', () => {
       BlissSVGBuilder.removeDefinition('GOPT_DEFPATCH');
     });
 
+    it('rejects a key that is not a well-formed option name', () => {
+      // regression: round-4 self-review — a key like 'margin=2;color' is not
+      // in the curated set, but the serializer emits it unquoted, so the
+      // bracket '[margin=2;color=red]' parses as a REAL margin key at the
+      // next boundary; definition keys must be option names, full stop
+      for (const key of ['margin=2;color', 'mar gin', '-margin', 'b]ad']) {
+        const result = BlissSVGBuilder.define({
+          GOPT_DEFSMUG: { codeString: 'B291', defaultOptions: { [key]: 'red' } },
+        });
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0]).toContain('not a valid option name');
+        expect(BlissSVGBuilder.isDefined('GOPT_DEFSMUG')).toBe(false);
+      }
+    });
+
     it('rejects a whitespace-padded spelling of a global-only key', () => {
       // regression: round-3 review F1 — the serializer emits '[ margin=2]',
       // which the option parser reads as plain margin, so a padded key is the

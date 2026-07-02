@@ -1961,6 +1961,14 @@ class BlissSVGBuilder {
       // whitespace-padded spelling IS the global-only key at the next
       // boundary (round-3 review F1).
       const normalized = key.trim();
+      // A key must be a well-formed option name at all (camelCase names pass
+      // the same test): anything else — '=', ';', brackets, inner spaces —
+      // would smuggle arbitrary option text into the serialized bracket,
+      // where the parser can read a key this guard never saw
+      // ('margin=2;color' emits as '[margin=2;color=red]').
+      if (!isSafeAttributeName(normalized)) {
+        throw new Error(`${callName}("${code}"): defaultOptions key "${key}" is not a valid option name.`);
+      }
       if (GLOBAL_ONLY_OPTION_KEYS.has(normalized) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(normalized))) {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include the global-only option "${key}"; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
