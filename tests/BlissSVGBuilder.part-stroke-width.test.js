@@ -14,7 +14,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * per-part path by inheriting another level's clamped value.
  *
  * Covers:
- * - Render + toString + svg round-trip stability for a standalone part
+ * - Render + toString + svg round-trip stability (through both the
+ *   toString re-parse and the toJSON rebuild) for a standalone part
  *   (`[stroke-width=1.2]>B291`), a ;-composed part (`H;[..]>B81`), the
  *   ;; word-indicator overlay (`H;;[..]>B81`), and the API overlay
  *   (`group().applyIndicators('[..]>B81')`), incl. API/DSL byte-parity.
@@ -39,6 +40,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 // equality with the original svgCode is the round-trip stability pin.
 const roundTripSvg = (builder) => new BlissSVGBuilder(builder.toString()).svgCode;
 
+// Same stability pin through the object serializer (toJSON rebuild).
+const roundTripJsonSvg = (builder) => new BlissSVGBuilder(builder.toJSON()).svgCode;
+
 // Extracts the filled external-glyph path (stroke="none" + path data).
 const filledPath = (svg) => svg.match(/<path stroke="none"[^>]*d="[^"]*"/)[0];
 
@@ -50,6 +54,7 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
       expect(b.svgCode).toContain('<g stroke-width="1.2">');
       expect(b.toString()).toBe('[stroke-width=1.2]>B291');
       expect(roundTripSvg(b)).toBe(b.svgCode);
+      expect(roundTripJsonSvg(b)).toBe(b.svgCode);
     });
   });
 
@@ -63,6 +68,7 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
       expect(b.svgCode).toContain('<g stroke-width="1.2"><path d="M3,6l1,-2M4,4l1,2"/></g>');
       expect(b.toString()).toBe('H;[stroke-width=1.2]>B81');
       expect(roundTripSvg(b)).toBe(b.svgCode);
+      expect(roundTripJsonSvg(b)).toBe(b.svgCode);
     });
   });
 
@@ -73,6 +79,7 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
       expect(b.svgCode).toContain('<g stroke-width="1.2"><path d="M3,6l1,-2M4,4l1,2"/></g>');
       expect(b.toString()).toBe('H;;[stroke-width=1.2]>B81');
       expect(roundTripSvg(b)).toBe(b.svgCode);
+      expect(roundTripJsonSvg(b)).toBe(b.svgCode);
     });
 
     it('renders byte-identically through group().applyIndicators()', () => {
@@ -83,6 +90,7 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
       expect(api.toString()).toBe('H;;[stroke-width=1.2]>B81');
       expect(api.svgCode).toBe(dsl.svgCode);
       expect(roundTripSvg(api)).toBe(api.svgCode);
+      expect(roundTripJsonSvg(api)).toBe(api.svgCode);
     });
   });
 
@@ -93,6 +101,7 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
       expect(b.svgCode).toMatch(/<g class="bliss-content"[^>]*stroke-width="1\.2"/);
       expect(b.toString()).toBe('[stroke-width=1.2]||H');
       expect(roundTripSvg(b)).toBe(b.svgCode);
+      expect(roundTripJsonSvg(b)).toBe(b.svgCode);
     });
   });
 
