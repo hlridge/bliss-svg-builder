@@ -14,10 +14,17 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   positioning path as the overlay).
  * - Nested displacement (a displaced glyph referencing a displaced glyph):
  *   leading ink offsets accumulate through nesting.
+ * - NEGATIVE displacement: a baked negative offset overstates the reported
+ *   width's right edge (span size, not edge coordinate), so the ink END is
+ *   read symmetrically; covered plain and nested.
  * - Multi-part (re-origined) composite head: centering unchanged.
  * - Non-displaced head: centering unchanged.
  *
  * Does NOT cover:
+ * - Canvas width/viewBox truthfulness for a NEGATIVE-displaced composite (the
+ *   reported width counts the frame gap, so the full svg still diverges from
+ *   the absolute form) — separate width-semantics defect, see the backlog
+ *   "negative composite canvas width" row; the pins here compare ink geometry.
  * - Multi-indicator stacking math, see
  *   `BlissSVGBuilder.multiple-indicators.test.js`.
  * - Element-tree offsetX/offsetY positioning contract, see
@@ -40,6 +47,9 @@ function defineAndTrack(definitions) {
   customCodes.push(...Object.keys(definitions));
   return BlissSVGBuilder.define(definitions);
 }
+
+// all path data of a build, in document order (ink geometry without the canvas)
+const inkPathsOf = (builder) => (builder.svgCode.match(/ d="[^"]*"/g) || []).join(' ');
 
 describe('BlissSVGBuilder indicator centering', () => {
   describe('when a word-level overlay indicator sits on a displaced custom-glyph head', () => {
@@ -96,6 +106,46 @@ describe('BlissSVGBuilder indicator centering', () => {
       const absolute = new BlissSVGBuilder('B291:4,5;B81');
 
       expect(displaced.svgCode).toBe(absolute.svgCode);
+    });
+  });
+
+  describe('when the displaced custom glyph carries a negative baked offset', () => {
+    // regression: external review F1 (2026-07-02). The reported width of a
+    // negative-min composite is a span SIZE (max - min), not the right-edge
+    // coordinate, so reading it as the ink end centered the indicator 1 right.
+    //
+    // These pins compare INK GEOMETRY (all path data), not the full svg: the
+    // composite's reported width still counts its frame gap, so the CANVAS
+    // (svg width/viewBox) diverges from the absolute form — a separate
+    // pre-existing width-semantics defect, backlogged (out of XC-1's scope).
+    it('centers the indicator identically to the absolute form', () => {
+      defineAndTrack({ NEGSHIFT: { type: 'glyph', codeString: 'B291:-2,3' } });
+      const displaced = new BlissSVGBuilder('NEGSHIFT:1,2;B81');
+      const absolute = new BlissSVGBuilder('B291:-1,5;B81');
+
+      // base ink spans [-1,7] (center 3); the indicator (width 2) starts at 2
+      expect(displaced.svgCode).toContain('M2,6l1,-2M3,4l1,2');
+      expect(inkPathsOf(displaced)).toBe(inkPathsOf(absolute));
+    });
+
+    it('round-trips the `;` form ink-identity-true', () => {
+      defineAndTrack({ NEGSHIFT: { type: 'glyph', codeString: 'B291:-2,3' } });
+      const displaced = new BlissSVGBuilder('NEGSHIFT:1,2;B81');
+
+      expect(displaced.toString()).toBe('B291:-1,5;B81');
+      const reparsed = new BlissSVGBuilder(displaced.toString());
+      expect(inkPathsOf(reparsed)).toBe(inkPathsOf(displaced));
+    });
+
+    it('accumulates a nested negative offset into the ink end', () => {
+      // pins the recursive ink-end walk: reading the outer child's reported
+      // width (span 8) instead of its true right edge (6) mis-centers
+      defineAndTrack({ NEGSHIFT: { type: 'glyph', codeString: 'B291:-2,3' } });
+      defineAndTrack({ NEGNEST: { type: 'glyph', codeString: 'NEGSHIFT:1,1' } });
+      const displaced = new BlissSVGBuilder('NEGNEST:1,1;B81');
+      const absolute = new BlissSVGBuilder('B291:0,5;B81');
+
+      expect(inkPathsOf(displaced)).toBe(inkPathsOf(absolute));
     });
   });
 

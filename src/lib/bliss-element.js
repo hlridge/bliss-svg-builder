@@ -259,6 +259,17 @@ export class BlissElement {
   }
 
   /**
+   * True ink end within this element's own frame: the width for a leaf; for a
+   * composite, the rightmost child ink edge. A negative-min composite reports
+   * its width as a span SIZE (max - min), not a right-edge coordinate, so
+   * position + width overstates where the ink stops (XC-1 review F1).
+   */
+  get #inkEndX() {
+    if (!this.#children || this.#children.length === 0) return this.width;
+    return Math.max(...this.#children.map(child => child.#relativeToParentX + child.#inkEndX));
+  }
+
+  /**
    * Positions indicator parts as a centered group above the glyph.
    * First indicator is positioned so the entire group is centered over the glyph anchor.
    * Subsequent indicators are positioned relative to the previous indicator.
@@ -269,15 +280,16 @@ export class BlissElement {
   #positionIndicatorGroup(glyphParts, indicatorParts) {
     if (indicatorParts.length === 0) return;
 
-    // Calculate base glyph metrics over the TRUE INK SPAN: the left edge adds
-    // each part's internal leading ink offset (XC-1) so a displaced composite
-    // base does not count its leading gap; the right edge is the reported
-    // width, which already ends at the right ink edge.
+    // Calculate base glyph metrics over the TRUE INK SPAN (XC-1): both edges
+    // add each part's internal ink offsets so a displaced composite base does
+    // not count a leading gap (positive baked offset) as ink, and a negative
+    // baked offset does not overstate the right edge (its reported width is a
+    // span size, not an edge coordinate).
     const glyphMinX = glyphParts.length > 0
       ? Math.min(...glyphParts.map(p => p.#relativeToParentX + p.#inkStartX))
       : 0;
     const glyphMaxX = glyphParts.length > 0
-      ? Math.max(...glyphParts.map(p => p.#relativeToParentX + p.width))
+      ? Math.max(...glyphParts.map(p => p.#relativeToParentX + p.#inkEndX))
       : 0;
     const glyphWidth = glyphMaxX - glyphMinX;
     const glyphCenterX = glyphMinX + glyphWidth / 2;
