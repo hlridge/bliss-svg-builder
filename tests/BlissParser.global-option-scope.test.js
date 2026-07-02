@@ -1,0 +1,310 @@
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
+import { BlissSVGBuilder } from '../src/index.js';
+import { GLOBAL_ONLY_OPTION_KEYS } from '../src/lib/bliss-constants.js';
+
+/**
+ * Pins the global-only option KEY gate (audit N-2): a builder-canvas option
+ * key written at group, character, or part level warns MISPLACED_GLOBAL_OPTION,
+ * is dropped from the bracket, and the content still renders byte-identically
+ * (every gated key is inert at those levels; the drop is render-neutral).
+ *
+ * Covers:
+ * - The curated key set as an exact-set pin against GLOBAL_ONLY_OPTION_KEYS.
+ * - Every curated key at group `[k]|`, character `[k]`, and part `[k]>` level:
+ *   warn + drop + byte-identical render + the key never re-serializes.
+ * - Mixed brackets drop only the global-only key(s), one warning per key.
+ * - `;;`-overlay codes (`B303;;[k]>B81`): the key is stripped from the STORED
+ *   overlay string (SIB-2 stores codes verbatim, parsed only at render-merge),
+ *   clean overlay codes stay verbatim.
+ * - Definition-baked keys gate at use (uniform key-scope rule; unlike the 5a
+ *   B4 bracket-placement precedent, a canvas key never renders at these
+ *   levels, so the def-baked drop is render-neutral).
+ * - toJSON object rebuilds do not resurrect a dropped key (5a review F1 class).
+ * - Exclusions stay untouched: `text` (silent no-op stub at EVERY level incl.
+ *   global), the dot-sizing family, per-element keys, x/y positioning.
+ * - The setOptions scope boundary: an API-stored key serializes and surfaces
+ *   the warning at the NEXT parse of the serialized form.
+ *
+ * Does NOT cover:
+ * - Gating of structured API input itself (setOptions objects, hand-authored
+ *   toJSON input): the trusted structured surface is deliberately ungated;
+ *   only its serialized form warns on reparse (boundary pinned here and in
+ *   `ElementHandle.mutation-parse-warnings.test.js`).
+ * - What each key DOES at the global level (grid rendering in
+ *   `BlissSVGBuilder.grid.test.js`, margins/crop in the options suites).
+ * - The group-option bracket-placement arm, see
+ *   `BlissParser.group-option-placement.test.js`.
+ * - Quoted option values with special characters (pre-existing serializeOptions
+ *   emission class; backlog "Quoted ] inside an option value").
+ *
+ * The 36-key matrix exceeds the ~30-test soft cap as one it.each data table
+ * (the guide's sanctioned inline-table form); splitting it would separate the
+ * set pin from the behavior it pins.
+ */
+describe('BlissParser global option scope', () => {
+  // Kebab keys as written in the DSL. Deliberately a literal list, asserted
+  // set-equal to the exported registry below: a key wrongly ADDED to the
+  // registry fails the set pin instead of silently passing its own gate tests.
+  const CURATED_KEYS = [
+    'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+    'crop', 'crop-top', 'crop-bottom', 'crop-left', 'crop-right',
+    'grid', 'grid-color', 'grid-major-color', 'grid-medium-color',
+    'grid-minor-color', 'grid-sky-color', 'grid-earth-color',
+    'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
+    'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
+    'background', 'background-top', 'background-mid', 'background-bottom',
+    'center', 'min-width', 'char-space', 'word-space', 'external-glyph-space',
+    'svg-title', 'svg-desc', 'svg-height', 'error-placeholder',
+  ];
+  const BOOLEAN_KEYS = new Set(['grid', 'center', 'error-placeholder', 'crop']);
+  // Bracket text for a key: boolean keys use the bare form, color-like keys
+  // get a color value, the rest a small number ('hi' for the svg-text pair).
+  const bracketFor = (key) => {
+    if (BOOLEAN_KEYS.has(key)) return `[${key}]`;
+    if (/color|background/.test(key)) return `[${key}=red]`;
+    if (/title|desc/.test(key)) return `[${key}=hi]`;
+    return `[${key}=2]`;
+  };
+
+  const FIXTURES = {
+    GOPT_PARTOPT: { codeString: '[margin=2]>B291' },     // def baking a part-level canvas key
+    GOPT_NESTCHAR: { codeString: '[margin=2]B291/C8' },  // def carrying a char-level canvas key on a word
+  };
+  beforeAll(() => BlissSVGBuilder.define(FIXTURES));
+  afterAll(() => Object.keys(FIXTURES).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
+
+  const build = (input) => new BlissSVGBuilder(input);
+  const codes = (input) => build(input).warnings.map((w) => w.code);
+
+  describe('when the curated key set is compared to the exported registry', () => {
+    it('matches GLOBAL_ONLY_OPTION_KEYS as an exact set', () => {
+      expect([...GLOBAL_ONLY_OPTION_KEYS].sort()).toEqual([...CURATED_KEYS].sort());
+    });
+  });
+
+  describe('when a global-only key is written at a non-global level', () => {
+    // pins render-neutrality: every gated key is inert at group/char/part, so
+    // the drop must leave the svg byte-identical to the bare control.
+    it.each(CURATED_KEYS)('gates %s at group, character, and part level', (key) => {
+      const forms = [
+        { input: `${bracketFor(key)}|B291/C8`, bare: 'B291/C8' },
+        { input: `${bracketFor(key)}B291`, bare: 'B291' },
+        { input: `${bracketFor(key)}>B291`, bare: 'B291' },
+      ];
+      for (const { input, bare } of forms) {
+        const gated = build(input);
+        expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+        expect(gated.toString()).toBe(bare);
+        expect(gated.svgCode).toBe(build(bare).svgCode);
+      }
+    });
+
+    it('suggests the global form in the warning message', () => {
+      const [warning] = build('[margin=2]>B291').warnings;
+      expect(warning.message).toContain('[margin=2]||');
+      expect(warning.message).toContain('part level');
+      expect(warning.source).toBe('margin=2');
+    });
+
+    it('names the level the key was written at', () => {
+      expect(build('[margin=2]|B291/C8').warnings[0].message).toContain('group level');
+      expect(build('[margin=2]B291').warnings[0].message).toContain('character level');
+    });
+
+    it('gates a part bracket inside a ;-composition', () => {
+      const gated = build('H;[grid]>B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      // pins the boolean written form: a bare key reports itself bare, not key=true
+      expect(gated.warnings[0].source).toBe('grid');
+      expect(gated.warnings[0].message).toContain('[grid]||');
+      expect(gated.toString()).toBe('H;B81');
+      expect(gated.svgCode).toBe(build('H;B81').svgCode);
+    });
+
+    it('reparses its own toString without warnings', () => {
+      const roundTripped = build(build('[margin=2]B291').toString());
+      expect(roundTripped.warnings).toEqual([]);
+      expect(roundTripped.toString()).toBe('B291');
+    });
+  });
+
+  describe('when a bracket mixes a global-only key with per-element keys', () => {
+    it('drops only the global-only key at part level', () => {
+      const gated = build('[margin=2;color=red]>B291');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('[color=red]>B291');
+      expect(gated.svgCode).toBe(build('[color=red]>B291').svgCode);
+    });
+
+    it('drops only the global-only key at character level', () => {
+      const gated = build('[svg-title=hi;color=red]B291');
+      expect(gated.toString()).toBe('[color=red]B291');
+      expect(gated.svgCode).toBe(build('[color=red]B291').svgCode);
+    });
+
+    it('warns once per dropped key', () => {
+      const gated = build('[margin=2;crop-top=1]B291');
+      expect(gated.warnings.map((w) => w.code))
+        .toEqual(['MISPLACED_GLOBAL_OPTION', 'MISPLACED_GLOBAL_OPTION']);
+      expect(gated.warnings.map((w) => w.source)).toEqual(['margin=2', 'crop-top=1']);
+      expect(gated.toString()).toBe('B291');
+    });
+  });
+
+  describe('when a ;; overlay code carries a global-only key in its part option', () => {
+    // The overlay stores code STRINGS verbatim and parses them only at
+    // render-merge (SIB-2), so the key must be stripped from the STORED string
+    // or toString would re-serialize the warned no-op forever.
+    it('strips the key from the stored overlay code and warns', () => {
+      const gated = build('B303;;[margin=2]>B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('B303;;B81');
+      expect(gated.svgCode).toBe(build('B303;;B81').svgCode);
+    });
+
+    it('keeps the remaining option keys on the overlay code', () => {
+      const gated = build('B303;;[margin=2;color=red]>B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('B303;;[color=red]>B81');
+      expect(gated.svgCode).toBe(build('B303;;[color=red]>B81').svgCode);
+    });
+
+    it('stores a clean overlay code verbatim', () => {
+      // regression control: SIB-2 option preservation must survive the gate
+      const clean = build('B303;;[color=red]>B81');
+      expect(clean.warnings).toEqual([]);
+      expect(clean.toString()).toBe('B303;;[color=red]>B81');
+    });
+
+    it('keeps a clean quoted value byte-identical instead of rebuilding it', () => {
+      // pins the nothing-dropped short-circuit: the rebuild emission is
+      // unquoted (toString's serializeOptions class), so a clean code that
+      // went through it would lose its quotes
+      const quoted = build('B303;;[data-t="a b"]>B81');
+      expect(quoted.warnings).toEqual([]);
+      expect(quoted.toString()).toBe('B303;;[data-t="a b"]>B81');
+    });
+
+    it('re-emits a kept bare key in its bare form', () => {
+      const gated = build('B303;;[margin=2;data-flag]>B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('B303;;[data-flag]>B81');
+    });
+
+    it('leaves a baseless option prefix to the unknown-code path', () => {
+      // pins the (.+) base requirement: '[margin=2]>' has no code to keep, so
+      // it stays verbatim and classifies UNKNOWN_CODE instead of stripping to
+      // an empty string (which would store a deliberate-clear overlay)
+      const baseless = build('B303;;[margin=2]>');
+      expect(baseless.warnings.map((w) => w.code)).toEqual(['UNKNOWN_CODE']);
+      expect(baseless.toString()).toBe('B303');
+    });
+  });
+
+  describe('when a definition bakes a global-only key', () => {
+    // note: unlike the 5a B4 precedent (baked CHARACTER options keep their
+    // legacy prepend because they render), a canvas key renders at no
+    // non-global level, so the uniform key-scope rule gates baked keys too.
+    it('drops the key at use and decomposes without it', () => {
+      const gated = build('GOPT_PARTOPT');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('B291');
+    });
+
+    it('keeps the definition name under preserve', () => {
+      // The definition itself still carries the key, so each use re-warns; the
+      // preserve form re-emits the NAME, not the gated expansion.
+      const gated = build('H;GOPT_PARTOPT');
+      expect(gated.toString()).toBe('H;B291');
+      expect(gated.toString({ preserve: true })).toBe('H;GOPT_PARTOPT');
+    });
+
+    it('drops a nested character-level key carried by a word alias', () => {
+      const gated = build('GOPT_NESTCHAR');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('B291/C8');
+      expect(gated.svgCode).toBe(build('B291/C8').svgCode);
+    });
+  });
+
+  describe('when the parse result is rebuilt from toJSON', () => {
+    it('does not resurrect the dropped key', () => {
+      const gated = build('[margin=2]B291');
+      const rebuilt = new BlissSVGBuilder(gated.toJSON());
+      expect(rebuilt.warnings).toEqual([]);
+      expect(rebuilt.toString()).toBe('B291');
+      expect(rebuilt.svgCode).toBe(build('B291').svgCode);
+    });
+
+    it('stores no empty options object for a fully gated bracket', () => {
+      expect(build('[margin=2]B291').toJSON().groups[0].glyphs[0].options).toBeUndefined();
+      expect(build('[margin=2]>B291').toJSON().groups[0].glyphs[0].parts[0].options).toBeUndefined();
+    });
+  });
+
+  describe('when valid placements use the same keys', () => {
+    it.each(CURATED_KEYS)('keeps %s at the global level', (key) => {
+      const valid = build(`${bracketFor(key)}||B291`);
+      expect(valid.warnings).toEqual([]);
+      expect(valid.toString()).toContain(key);
+      const roundTripped = build(valid.toString());
+      expect(roundTripped.warnings).toEqual([]);
+      expect(roundTripped.svgCode).toBe(valid.svgCode);
+    });
+
+    it('leaves per-element keys untouched at every level', () => {
+      for (const input of ['[color=red]|B291/C8', '[color=red]B291',
+        '[stroke-width=1.2]>B291', '[data-foo=1]>B291']) {
+        const valid = build(input);
+        expect(valid.warnings).toEqual([]);
+        expect(valid.toString()).toBe(input);
+      }
+    });
+
+    it('leaves the dot-sizing family untouched at character and part level', () => {
+      const partDot = build('[dot-width=1.4]>B270');
+      expect(partDot.warnings).toEqual([]);
+      expect(partDot.svgCode).not.toBe(build('B270').svgCode);
+      const charDot = build('[sdot-extra-width=0.8]B83');
+      expect(charDot.warnings).toEqual([]);
+      expect(charDot.svgCode).not.toBe(build('B83').svgCode);
+    });
+
+    it('leaves x and y positioning untouched at part level', () => {
+      const positioned = build('[x=2;y=3]>B291');
+      expect(positioned.warnings).toEqual([]);
+      expect(positioned.svgCode).toBe(build('B291:2,3').svgCode);
+    });
+
+    it('keeps text as a silent no-op at every level', () => {
+      // `text` is an unimplemented stub at EVERY level including global, so it
+      // is not "misplaced" anywhere; it stays un-warned until the feature lands.
+      for (const { input, bare } of [
+        { input: '[text=hello]||B291', bare: 'B291' },
+        { input: '[text=hello]|B291/C8', bare: 'B291/C8' },
+        { input: '[text=hello]B291', bare: 'B291' },
+        { input: '[text=hello]>B291', bare: 'B291' },
+      ]) {
+        const stub = build(input);
+        expect(stub.warnings).toEqual([]);
+        expect(stub.svgCode).toBe(build(bare).svgCode);
+        expect(stub.toString()).toContain('text=hello');
+      }
+    });
+  });
+
+  describe('when the API stores a global-only key without a parse boundary', () => {
+    it('surfaces the warning at the next parse of the serialized form', () => {
+      // pins the scope boundary: structured input is trusted as written; the
+      // gate lives in the parser, so the key warns when its serialized form
+      // crosses the next parse.
+      const stored = build('B291');
+      stored.glyph(0).setOptions({ margin: 2 });
+      expect(stored.warnings).toEqual([]);
+      expect(stored.toString()).toBe('[margin=2]B291');
+      const reparsed = build(stored.toString());
+      expect(reparsed.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(reparsed.toString()).toBe('B291');
+    });
+  });
+});

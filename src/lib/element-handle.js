@@ -303,6 +303,16 @@ export class ElementHandle {
     return null;
   }
 
+  // Surface a mutation parse's warnings on the builder's persistent mutation
+  // channel. The parse result is otherwise discarded, which would make a
+  // parser-side drop (e.g. the global-only option key gate) silent when the
+  // string arrives through the API instead of the constructor.
+  #forwardParseWarnings(parsed) {
+    for (const warning of parsed?._parseWarnings ?? []) {
+      this.#ctx.addMutationWarning(warning);
+    }
+  }
+
   // Parse a DSL code string and extract glyphs from a single group.
   // Accepts multi-glyph codes (e.g. "H/C8" or word definitions).
   // Rejects multi-group input (e.g. "H//C8").
@@ -315,6 +325,7 @@ export class ElementHandle {
     if (!group.glyphs || group.glyphs.length === 0) {
       throw new Error(`Code "${code}" produced no glyphs`);
     }
+    this.#forwardParseWarnings(parsed);
     return group.glyphs;
   }
 
@@ -343,8 +354,11 @@ export class ElementHandle {
     }
 
     if (rawGroup.glyphs.length === 1) {
-      // Single glyph — use helper approach for proper part-level expansion
+      // Single glyph — use helper approach for proper part-level expansion.
+      // Forward only THIS parse's warnings: the probe parse above ran the
+      // same gates on the same code, so forwarding both would double-warn.
       const parsed = this.#ctx.parse(`H;${code}`);
+      this.#forwardParseWarnings(parsed);
       const glyph = parsed.groups?.[0]?.glyphs?.[0];
       if (glyph?.parts?.length >= 2) {
         return glyph.parts.slice(1);
@@ -856,6 +870,7 @@ export class ElementHandle {
     const newIndicatorParts = [];
     for (const indCode of finalCodes) {
       const parsed = this.#ctx.parse(indCode);
+      this.#forwardParseWarnings(parsed);
       const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
       if (partNode) newIndicatorParts.push(partNode);
     }

@@ -198,8 +198,12 @@ describe('BlissParser bracket options', () => {
     });
 
     it('parses bare key at part level', () => {
-      const result = BlissParser.parse('[grid]>C8:0,8');
-      expect(result.groups[0].glyphs[0].parts[0].options).toEqual({ grid: true });
+      // retargeted from [grid]> in rc.4 Chunk 5b: a global-only key at part
+      // level is now warned + dropped (MISPLACED_GLOBAL_OPTION; pinned in
+      // BlissParser.global-option-scope.test.js), so the bare-key=true
+      // mechanics are pinned with a passthrough key instead.
+      const result = BlissParser.parse('[data-flag]>C8:0,8');
+      expect(result.groups[0].glyphs[0].parts[0].options).toEqual({ 'data-flag': true });
     });
   });
 

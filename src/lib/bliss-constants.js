@@ -63,6 +63,32 @@ export function generateKey() {
 }
 
 /**
+ * Builder-canvas option keys (kebab-case, as written in the DSL) that take
+ * effect ONLY in the global `[opts]||` bracket. Written at group `[opts]|`,
+ * character `[opts]`, or part `[opts]>` level they are inert, so the parser
+ * warns MISPLACED_GLOBAL_OPTION and drops the key (audit N-2).
+ *
+ * Deliberately curated, NOT INTERNAL_OPTIONS verbatim:
+ * - `text` is excluded: it is an unimplemented stub at EVERY level including
+ *   global (the deferred `{text}` overlay), so it is not "misplaced" anywhere.
+ * - The dot-sizing family (dot-width/dot-extra-width/sdot-*) is excluded: it
+ *   genuinely applies per element via option inheritance.
+ * - x/y/key and kerning are excluded: positioning and identity, handled by
+ *   their own extraction logic.
+ */
+export const GLOBAL_ONLY_OPTION_KEYS = new Set([
+  'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+  'crop', 'crop-top', 'crop-bottom', 'crop-left', 'crop-right',
+  'grid', 'grid-color', 'grid-major-color', 'grid-medium-color',
+  'grid-minor-color', 'grid-sky-color', 'grid-earth-color',
+  'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
+  'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
+  'background', 'background-top', 'background-mid', 'background-bottom',
+  'center', 'min-width', 'char-space', 'word-space', 'external-glyph-space',
+  'svg-title', 'svg-desc', 'svg-height', 'error-placeholder'
+]);
+
+/**
  * Options that should NOT be rendered as SVG attributes.
  *
  * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)
@@ -172,6 +198,10 @@ export const WARNING_CODES = Object.freeze({
   MISPLACED_CHARACTER_INDICATOR: 'MISPLACED_CHARACTER_INDICATOR',
   MISPLACED_PART_OPTION: 'MISPLACED_PART_OPTION',
   MISPLACED_CHARACTER_OPTION: 'MISPLACED_CHARACTER_OPTION',
+  MISPLACED_GROUP_OPTION: 'MISPLACED_GROUP_OPTION',
+  // a global-only (builder-canvas) option KEY inside a group/character/part
+  // bracket: the key is well-formed but its scope is the whole SVG
+  MISPLACED_GLOBAL_OPTION: 'MISPLACED_GLOBAL_OPTION',
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',

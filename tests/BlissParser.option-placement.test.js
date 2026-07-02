@@ -24,9 +24,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Valid placements stay warn-free and byte-unchanged.
  *
  * Does NOT cover:
- * - Builder-canvas option KEYS at element level (N-2 scope gate), a separate
- *   arm (rc.4 pre-Phase-D Chunk 5b; backlog "Builder-canvas options ...
- *   silently inert").
+ * - Global-only (builder-canvas) option KEYS inside an otherwise-valid
+ *   bracket (MISPLACED_GLOBAL_OPTION), see
+ *   `BlissParser.global-option-scope.test.js`.
+ * - Group options on a multi-word alias (MISPLACED_GROUP_OPTION), see
+ *   `BlissParser.group-option-placement.test.js`.
  * - Multi-character X-text words (`[opts]>Xab`), which keep WORD_AS_PART; the
  *   gate covers alias-based words only.
  * - `[opts]>WORD` in a `;`-part slot (`B291;[opts]>WORD`), which keeps

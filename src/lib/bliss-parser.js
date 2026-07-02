@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -209,6 +209,28 @@ export class BlissParser {
       });
     };
 
+    // Builder-canvas option keys configure the whole SVG, so they are valid
+    // only in the global [opts]|| bracket. At group/character/part level they
+    // are inert but used to serialize + round-trip silently (audit N-2): warn
+    // per key and drop it, keeping the bracket's other options. Returns the
+    // mutated object, or undefined when every key was dropped, so call sites
+    // store "no options" instead of an empty artifact. `text` is exempt via
+    // the curated set (an unimplemented stub at EVERY level, not misplaced).
+    const dropMisplacedGlobalKeys = (options, levelName) => {
+      if (!options) return options;
+      for (const key of Object.keys(options)) {
+        if (!GLOBAL_ONLY_OPTION_KEYS.has(key)) continue;
+        const written = options[key] === true ? key : `${key}=${options[key]}`;
+        parseWarnings.push({
+          code: WARNING_CODES.MISPLACED_GLOBAL_OPTION,
+          message: `Global option (${written}) ignored at ${levelName} level: it configures the whole SVG. Use [${written}]|| to apply it globally.`,
+          source: written,
+        });
+        delete options[key];
+      }
+      return Object.keys(options).length > 0 ? options : undefined;
+    };
+
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
     if (globalOptionsString && globalOptionsString.match(/^\[.*\]$/)) {
@@ -295,7 +317,7 @@ export class BlissParser {
               source: restoredBeforePipe,
             });
           }
-          group.options = this.#parseOptions(restoredBeforePipe);
+          group.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredBeforePipe), 'group');
           groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
@@ -622,6 +644,25 @@ export class BlissParser {
           // would re-expose that `;` and break a multi-key option. (SIB-2.)
           const rawCodes = indicators.split(';').filter(Boolean).map((c) => restorePlaceholders(c));
 
+          // An overlay code may carry a part option ([opts]>B81, SIB-2). Its
+          // bracket meets the same global-only key gate as any part bracket,
+          // but the overlay stores code STRINGS verbatim (parsed only at
+          // render-merge), so a gated key must be stripped from the stored
+          // string itself or toString would re-serialize the warned no-op
+          // forever. Clean codes pass through untouched (SIB-2 fidelity); a
+          // stripped prefix is rebuilt with toString's own key=value emission.
+          const gatedCodes = rawCodes.map((code) => {
+            const optionPrefix = code.match(/^(\[.*?\])>(.+)$/);
+            if (!optionPrefix) return code;
+            const parsed = BlissParser.#parseOptions(optionPrefix[1]) ?? {};
+            const keyCount = Object.keys(parsed).length;
+            const kept = dropMisplacedGlobalKeys(parsed, 'part');
+            const keptEntries = kept ? Object.entries(kept) : [];
+            if (keptEntries.length === keyCount) return code;
+            if (keptEntries.length === 0) return optionPrefix[2];
+            return `[${keptEntries.map(([k, v]) => v === true ? k : `${k}=${v}`).join(';')}]>${optionPrefix[2]}`;
+          });
+
           // A `;;` word-level indicator must BE an indicator. Validate + drop here
           // (not silently at render): a recognized non-indicator (a real base)
           // warns NON_INDICATOR_AS_WORD_INDICATOR, an unrecognized code warns
@@ -632,7 +673,7 @@ export class BlissParser {
           // DSL, API, and object surfaces all use it, so they agree); it returns
           // null when the codes were all dropped and there is no strip. (Strict
           // Indicator Separation.)
-          const overlay = resolveWordIndicatorOverlay(rawCodes, stripSemantic, definitions, ({ code: badCode, reason }) => {
+          const overlay = resolveWordIndicatorOverlay(gatedCodes, stripSemantic, definitions, ({ code: badCode, reason }) => {
             parseWarnings.push(reason === 'non-indicator'
               ? {
                   code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
@@ -1019,6 +1060,27 @@ export class BlissParser {
       const processedGroupCodeString = processXCodes(groupCodeString);
       const expandedGlyphParts = replaceWithDefinition(processedGroupCodeString, blissElementDefinitions);
 
+      // A group option binds to ONE word-group. Bound to an alias whose
+      // expansion crosses a word break (a multi-word // alias), there is no
+      // single group to carry it -- it used to style only the FIRST word,
+      // silently. Warn + drop the bracket + render every word. The written
+      // [opts]|a//b form never reaches this gate: a top-level // splits
+      // groups BEFORE option parsing, so that bracket binds to group 1 by
+      // syntax (the same alias-vs-written split as the character-level gate).
+      // The malformed-;; fail path collapses its word breaks, so a
+      // fail-rendered unit keeps its bracket (errorSource round-trips it).
+      if (group.options && expandedGlyphParts.some(p => p._wordBreak)) {
+        const written = Object.entries(group.options)
+          .map(([k, v]) => v === true ? k : `${k}=${v}`).join(';');
+        const aliasSource = restorePlaceholders(groupCodeString);
+        parseWarnings.push({
+          code: WARNING_CODES.MISPLACED_GROUP_OPTION,
+          message: `Group option ([${written}]) ignored on "${aliasSource}": | applies options to a single word, but this expands to multiple words. Use [${written}]|| to apply them to the whole content.`,
+          source: aliasSource,
+        });
+        delete group.options;
+      }
+
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
@@ -1118,8 +1180,14 @@ export class BlissParser {
         let glyphCodeString = part;
         const glyphMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
         if (glyphMatch) {
-          const parsedOptions = this.#parseOptions(restorePlaceholders(glyphMatch[1]));
-          glyphObj.options = { ...glyphObj.options, ...parsedOptions };
+          const parsedOptions = dropMisplacedGlobalKeys(
+            this.#parseOptions(restorePlaceholders(glyphMatch[1])), 'character');
+          // Merge only when something remains: a bracket fully emptied by the
+          // gate (or written empty) must not leave an options: {} artifact on
+          // the glyph -- the gated form's toJSON matches the bare form's.
+          if (glyphObj.options || parsedOptions) {
+            glyphObj.options = { ...glyphObj.options, ...parsedOptions };
+          }
           glyphCodeString = glyphMatch[2];
         }
 
@@ -1134,6 +1202,10 @@ export class BlissParser {
           const twoPartPartStrings = partsString.split(';').filter(s => s !== '');
           for (const [partIndex, twoPartPartString] of twoPartPartStrings.entries()) {
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
+            if (part.options) {
+              part.options = dropMisplacedGlobalKeys(part.options, 'part');
+              if (!part.options) delete part.options;
+            }
 
             const definition = part.codeName?.startsWith('XTXT_')
               ? (() => { const g = createTextFallbackGlyph(part.codeName.slice(5)); g.isShape = true; return g; })()
