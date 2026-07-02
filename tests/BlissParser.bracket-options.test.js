@@ -42,8 +42,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   before |): warns MULTIPLE_OPTION_BRACKETS, applies the first bracket
  *   (first-wins), still renders the content, and the dropped bracket does
  *   not re-serialize or re-warn on round-trip. Adjacent brackets at
- *   different levels ([char][part]>) are valid and do not warn; a bracket
- *   character inside a quoted option value is not miscounted.
+ *   different levels ([char][part]>) are valid and do not warn; bracket
+ *   characters ('[', ']', '][') inside a quoted option value or inside a
+ *   brace block are not miscounted, while a genuine duplicate alongside
+ *   quote junk still warns.
  *
  * Does NOT cover:
  * - Coordinate suffix parsing (:x,y) on parts that carry bracket
@@ -442,6 +444,47 @@ describe('BlissParser bracket options', () => {
 
       expect(r._parseWarnings).toBeUndefined();
       expect(r.options).toEqual({ k: 'a[b' });
+    });
+
+    it('does not warn when a quoted value contains ][ in one global bracket', () => {
+      // regression: external review of e5d937c. A quoted ']' splits the single
+      // bracket in the quote-unaware placeholder pre-pass, so the tokenized
+      // form shows two brackets; the quote grammar must veto the warning.
+      // (The value itself is truncated by the same pre-pass — a pre-existing
+      // tokenizer limitation, tracked in backlog, deliberately not pinned.)
+      const r = BlissParser.parse('[k="]["]||B291');
+
+      expect(r._parseWarnings).toBeUndefined();
+    });
+
+    it('does not warn when a quoted value contains ][ in one group bracket', () => {
+      const r = BlissParser.parse('[k="]["]|B291');
+
+      expect(r._parseWarnings).toBeUndefined();
+    });
+
+    it('does not warn when a quoted value contains a closing bracket', () => {
+      const r = BlissParser.parse('[k="a]b"]||B291');
+
+      expect(r._parseWarnings).toBeUndefined();
+    });
+
+    it('still warns on a genuine duplicate bracket that also carries quote junk', () => {
+      // '[k="]"]' is one complete bracket (quoted ']'), '[x=2]' is a real
+      // second bracket; the quote-aware veto must not swallow this one.
+      const r = BlissParser.parse('[k="]"][x=2]||B291');
+
+      expect(r._parseWarnings?.map(w => w.code)).toEqual(['MULTIPLE_OPTION_BRACKETS']);
+    });
+
+    it('does not count a bracket inside a brace block in the option region', () => {
+      // A single {…} in the option region tokenizes to one opaque placeholder,
+      // so the tokenized-form count must stay authoritative for it (the
+      // restored form alone would see the '[' inside the braces).
+      const r = BlissParser.parse('[k={a[b}]||B291');
+
+      expect(r._parseWarnings).toBeUndefined();
+      expect(r.options).toEqual({ k: '{a[b}' });
     });
 
     it('does not warn on adjacent brackets at different levels ([char][part]>)', () => {

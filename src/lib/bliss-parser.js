@@ -34,6 +34,21 @@ export class BlissParser {
     }
   }
 
+  // Only one option bracket is allowed per level ([a][b]|| is invalid; the
+  // canonical multi-option form is [a;b]||). A duplicate is detected only when
+  // BOTH forms agree: the tokenized (placeholder) form shows more than one
+  // bracket — braces are opaque placeholders there, so a '[' inside {…} never
+  // counts — AND the restored form still shows more than one top-level '['
+  // once quoted values are stripped with #parseOptions's own quote grammar.
+  // The second condition vetoes the quote-unaware pre-pass: a quoted ']'
+  // splits ONE user bracket into two tokenized ones ([k="]["] is a single
+  // bracket, not a duplicate).
+  static #hasMultipleOptionBrackets(tokenized, restored) {
+    const QUOTED_SPAN = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+    return (tokenized.match(/\[/g) || []).length > 1
+      && (restored.replace(QUOTED_SPAN, '').match(/\[/g) || []).length > 1;
+  }
+
   static #parseOptions(optionsString) {
     if (!optionsString) return;
 
@@ -175,19 +190,16 @@ export class BlissParser {
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
     if (globalOptionsString && globalOptionsString.match(/^\[.*\]$/)) {
-      // Only one option bracket is allowed per level; [a][b]|| is invalid
-      // syntax (the canonical multi-option form is [a;b]||). Count brackets on
-      // the placeholder form so a '[' inside a quoted value is not miscounted;
-      // #parseOptions already keeps the first, so warn and drop the extras.
-      if ((globalOptionsString.match(/\[/g) || []).length > 1) {
-        const restored = restorePlaceholders(globalOptionsString);
+      const restoredGlobal = restorePlaceholders(globalOptionsString);
+      // #parseOptions keeps the first bracket, so a duplicate warns and drops.
+      if (BlissParser.#hasMultipleOptionBrackets(globalOptionsString, restoredGlobal)) {
         parseWarnings.push({
           code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
-          message: `Multiple option brackets before ||: "${restored}". Only the first is applied; combine options in one bracket, e.g. [a;b]||.`,
-          source: restored,
+          message: `Multiple option brackets before ||: "${restoredGlobal}". Only the first is applied; combine options in one bracket, e.g. [a;b]||.`,
+          source: restoredGlobal,
         });
       }
-      result.options = this.#parseOptions(restorePlaceholders(globalOptionsString)) || {};
+      result.options = this.#parseOptions(restoredGlobal) || {};
     } else {
       if (globalOptionsString && globalOptionsString.length > 0) {
         const restored = restorePlaceholders(globalOptionsString);
@@ -252,17 +264,16 @@ export class BlissParser {
       if (twoPartGroupString.includes('|')) {
         const [beforePipe, afterPipe] = twoPartGroupString.split("|", 2);
         if (beforePipe.match(/^\[.*\]$/)) {
-          // One option bracket per level; [a][b]| is invalid (use [a;b]|).
-          // Count on the placeholder form; keep the first, warn on extras.
-          if ((beforePipe.match(/\[/g) || []).length > 1) {
-            const restoredBeforePipe = restorePlaceholders(beforePipe);
+          const restoredBeforePipe = restorePlaceholders(beforePipe);
+          // #parseOptions keeps the first bracket, so a duplicate warns and drops.
+          if (BlissParser.#hasMultipleOptionBrackets(beforePipe, restoredBeforePipe)) {
             parseWarnings.push({
               code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
               message: `Multiple option brackets before |: "${restoredBeforePipe}". Only the first is applied; combine options in one bracket, e.g. [a;b]|.`,
               source: restoredBeforePipe,
             });
           }
-          group.options = this.#parseOptions(restorePlaceholders(beforePipe));
+          group.options = this.#parseOptions(restoredBeforePipe);
           groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
