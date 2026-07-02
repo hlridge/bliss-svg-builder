@@ -170,8 +170,11 @@ describe('BlissSVGBuilder indicator centering', () => {
       expect(builder.svgCode).toContain('<g stroke="red"><path d="M10,6l1,-2M11,4l1,2"/></g>');
       // ink parity, not full-svg parity: the composite joins its parts into
       // one <path> while the decomposed form emits one per part (pre-existing
-      // DOM nesting, visually identical); base render/round-trip parity is
-      // pinned in `BlissSVGBuilder.composite-displacement.test.js`
+      // DOM nesting; raster-identical here because the ink is opaque and these
+      // parts never overlap — a semi-transparent stroke on OVERLAPPING parts
+      // compounds differently per <path>, see the backlog "path grouping
+      // varies" row); base render/round-trip parity is pinned in
+      // `BlissSVGBuilder.composite-displacement.test.js`
       expect(inkOf(builder)).toBe(inkOf(absolute));
     });
   });
