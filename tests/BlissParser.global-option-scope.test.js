@@ -228,6 +228,30 @@ describe('BlissParser global option scope', () => {
       expect(gated.toString()).toBe('B303;;B81');
     });
 
+    it('normalizes stacked brackets in one pass, keeping the valid part option', () => {
+      // regression: review-fix round 2, F2 — the part-form regex backtracked
+      // across [a][b]>CODE as one prefix, so bracket order decided whether a
+      // misplaced key re-serialized forever or a VALID later bracket was lost
+      const misplacedFirst = build('B303;;[margin=2][color=red]>B81');
+      expect(misplacedFirst.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(misplacedFirst.toString()).toBe('B303;;[color=red]>B81');
+      expect(misplacedFirst.svgCode).toBe(build('B303;;[color=red]>B81').svgCode);
+
+      const misplacedSecond = build('B303;;[color=red][margin=2]>B81');
+      expect(misplacedSecond.warnings.map((w) => w.code))
+        .toEqual(['MISPLACED_CHARACTER_OPTION', 'MISPLACED_GLOBAL_OPTION']);
+      expect(misplacedSecond.toString()).toBe('B303;;B81');
+      expect(build(misplacedSecond.toString()).warnings).toEqual([]);
+    });
+
+    it('strips every stacked character-form bracket in one pass', () => {
+      const stacked = build('B303;;[a][b]B81');
+      expect(stacked.warnings.map((w) => w.code))
+        .toEqual(['MISPLACED_CHARACTER_OPTION', 'MISPLACED_CHARACTER_OPTION']);
+      expect(stacked.toString()).toBe('B303;;B81');
+      expect(build(stacked.toString()).warnings).toEqual([]);
+    });
+
     it('surfaces a definition-baked key when the definition rides the overlay', () => {
       // regression: external review 2026-07-02 F1 — the overlay stores the def
       // NAME, so the def's baked key is first observable at the render-merge
@@ -266,6 +290,46 @@ describe('BlissParser global option scope', () => {
       expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
       expect(gated.toString()).toBe('B291/C8');
       expect(gated.svgCode).toBe(build('B291/C8').svgCode);
+    });
+  });
+
+  describe('when a definition supplies global-only defaultOptions', () => {
+    // regression: review-fix round 2, F1 — defaultOptions carry no parse
+    // warning, and a ;; overlay stores the definition NAME, so a global-only
+    // key in defaultOptions never reached any warning boundary (silent
+    // forever). A definition must be clean: reject at the source, like the
+    // codeString guards.
+    it('rejects define() with a global-only key', () => {
+      const result = BlissSVGBuilder.define({
+        GOPT_DEFBAD: { type: 'glyph', codeString: 'B81', isIndicator: true, defaultOptions: { margin: 2 } },
+      });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('margin');
+      expect(BlissSVGBuilder.isDefined('GOPT_DEFBAD')).toBe(false);
+    });
+
+    it('rejects the camelCase spelling of a global-only key', () => {
+      const result = BlissSVGBuilder.define({
+        GOPT_DEFCAMEL: { codeString: 'B291', defaultOptions: { marginTop: 2 } },
+      });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('marginTop');
+      expect(BlissSVGBuilder.isDefined('GOPT_DEFCAMEL')).toBe(false);
+    });
+
+    it('rejects patchDefinition() adding a global-only key', () => {
+      BlissSVGBuilder.define({ GOPT_DEFPATCH: { codeString: 'B291' } });
+      expect(() => BlissSVGBuilder.patchDefinition('GOPT_DEFPATCH', { defaultOptions: { 'svg-title': 'hi' } }))
+        .toThrow(/svg-title/);
+      BlissSVGBuilder.removeDefinition('GOPT_DEFPATCH');
+    });
+
+    it('accepts per-element defaultOptions unchanged', () => {
+      BlissSVGBuilder.define({
+        GOPT_DEFOK: { type: 'glyph', codeString: 'B81', isIndicator: true, defaultOptions: { color: 'red' } },
+      });
+      expect(new BlissSVGBuilder('GOPT_DEFOK').warnings).toEqual([]);
+      BlissSVGBuilder.removeDefinition('GOPT_DEFOK');
     });
   });
 

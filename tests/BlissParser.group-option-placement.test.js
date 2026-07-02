@@ -45,6 +45,12 @@ describe('BlissParser group option placement', () => {
     GOPP_LEAD: { codeString: 'TSP/B291' },       // leading space: ONE inked word
     GOPP_SPONLY: { codeString: 'TSP' },          // pure space, no inked word
     GOPP_TRAILBREAK: { codeString: 'B291//' },   // trailing word break: ONE inked word
+    // review-fix round 2, F3: neither of these spans words — a kerning marker
+    // is not ink, and a COMPOSED space (TSP;B81) stays one in-group token on
+    // reparse (only a bare TSP/QSP token re-splits into its own group)
+    GOPP_TRAILKERN: { codeString: 'B291/TSP/RK' },   // trailing kerning marker after a space
+    GOPP_TRAILKERNAK: { codeString: 'B291/TSP/AK' }, // absolute-kerning variant
+    GOPP_COMPSPACE: { codeString: 'B291/TSP;B81/C8' },    // composed space glyph mid-word
   };
   beforeAll(() => BlissSVGBuilder.define(FIXTURES));
   afterAll(() => Object.keys(FIXTURES).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
@@ -150,6 +156,28 @@ describe('BlissParser group option placement', () => {
       expect(styled.warnings).toEqual([]);
       expect(styled.svgCode).toContain('stroke="red"');
       expect(build(styled.toString()).svgCode).toContain('stroke="red"');
+    });
+
+    it('keeps the option when only a kerning marker follows a trailing space', () => {
+      // regression: review-fix round 2, F3 — RK/AK counted as inked content
+      // after the space, so the arm fired and dropped a round-trip-stable style
+      const styled = build('[color=red]|GOPP_TRAILKERN');
+      expect(styled.warnings).toEqual([]);
+      expect(build(styled.toString()).svgCode).toBe(styled.svgCode);
+      const absolute = build('[color=red]|GOPP_TRAILKERNAK');
+      expect(absolute.warnings).toEqual([]);
+    });
+
+    it('keeps the option when the space is a composed glyph', () => {
+      // regression: review-fix round 2, F3 — a composed TSP;B81 serializes as
+      // one in-group token (no bare /TSP/ boundary), so nothing rebinds on
+      // reparse; the old _scanCode check mistook it for a separator
+      const styled = build('[color=red]|GOPP_COMPSPACE');
+      expect(styled.warnings).toEqual([]);
+      expect(styled.groups.length).toBe(1);
+      const reparsed = build(styled.toString());
+      expect(reparsed.groups.length).toBe(1);
+      expect(reparsed.svgCode).toBe(styled.svgCode);
     });
 
     it('does not fire on a pure-space alias', () => {

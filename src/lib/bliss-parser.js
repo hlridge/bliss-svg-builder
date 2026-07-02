@@ -652,30 +652,35 @@ export class BlissParser {
           // forever. Clean codes pass through untouched (SIB-2 fidelity); a
           // stripped prefix is rebuilt with toString's own key=value emission.
           const gatedCodes = rawCodes.map((code) => {
-            const optionPrefix = code.match(/^(\[.*?\])>(.+)$/);
-            if (!optionPrefix) {
-              // A CHARACTER-form prefix ([opts]CODE, no >) is inert in overlay
-              // position for EVERY key -- the render-merge extracts parts only,
-              // so the bracket styles nothing, yet it used to re-serialize
-              // forever with no warning anywhere (external review 2026-07-02
-              // F2). The whole bracket is misplaced (a word-indicator code has
-              // no character to bind to); [opts]> is the styled form.
-              const charPrefix = code.match(/^(\[.*?\])(?!>)(.+)$/);
-              if (charPrefix) {
-                parseWarnings.push({
-                  code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
-                  message: `Character option (${charPrefix[1]}) ignored on the word indicator "${charPrefix[2]}": a ;; code has no character to style. Use ${charPrefix[1]}>${charPrefix[2]} to style the indicator part.`,
-                  source: code,
-                });
-                return charPrefix[2];
-              }
-              return code;
+            // A CHARACTER-form prefix ([opts]CODE, no >) is inert in overlay
+            // position for EVERY key -- the render-merge extracts parts only,
+            // so the bracket styles nothing, yet it used to re-serialize
+            // forever with no warning anywhere (external review 2026-07-02
+            // F2). The whole bracket is misplaced (a word-indicator code has
+            // no character to bind to); [opts]> is the styled form. EVERY
+            // leading char-form bracket strips in this ONE pass (one warning
+            // each) BEFORE the part-form gate runs: the part-form regex would
+            // otherwise backtrack across stacked brackets ([a][b]>CODE read
+            // as one prefix whose #parseOptions sees only bracket one),
+            // leaving later keys unreached or losing a valid later bracket
+            // with the misplaced first one (review-fix round 2, F2).
+            let current = code;
+            let charPrefix;
+            while ((charPrefix = current.match(/^(\[.*?\])(?!>)(.+)$/)) !== null) {
+              parseWarnings.push({
+                code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+                message: `Character option (${charPrefix[1]}) ignored on the word indicator "${charPrefix[2]}": a ;; code has no character to style. Use ${charPrefix[1]}>${charPrefix[2]} to style the indicator part.`,
+                source: current,
+              });
+              current = charPrefix[2];
             }
+            const optionPrefix = current.match(/^(\[.*?\])>(.+)$/);
+            if (!optionPrefix) return current;
             const parsed = BlissParser.#parseOptions(optionPrefix[1]) ?? {};
             const keyCount = Object.keys(parsed).length;
             const kept = dropMisplacedGlobalKeys(parsed, 'part');
             const keptEntries = kept ? Object.entries(kept) : [];
-            if (keptEntries.length === keyCount) return code;
+            if (keptEntries.length === keyCount) return current;
             if (keptEntries.length === 0) return optionPrefix[2];
             return `[${keptEntries.map(([k, v]) => v === true ? k : `${k}=${v}`).join(';')}]>${optionPrefix[2]}`;
           });
@@ -1097,8 +1102,15 @@ export class BlissParser {
         let sawWord = false;
         let sawSeparatorAfterWord = false;
         for (const p of parts) {
+          // A part re-splits into its own group on reparse ONLY as a bare
+          // space token (the top-level split matches the exact token), so a
+          // composed (TSP;B81) or decorated space stays in-group and
+          // separates nothing; kerning markers are neither ink nor a
+          // separator (they decorate the next glyph). (Review-fix round 2,
+          // F3: matching _scanCode over-classified both.)
           const partCode = p._scanCode ?? (p.part ? p.part.split(';')[0].split(':')[0] : '');
-          if (p._wordBreak || isSpaceCode(partCode)) {
+          if (partCode === 'RK' || partCode === 'AK') continue;
+          if (p._wordBreak || isSpaceCode(p.part)) {
             if (sawWord) sawSeparatorAfterWord = true;
           } else if (p.part !== '') {
             if (sawSeparatorAfterWord) return true;

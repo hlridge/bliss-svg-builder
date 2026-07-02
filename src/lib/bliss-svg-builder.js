@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES } from "./bliss-constants.js";
 import { ElementHandle } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -1940,10 +1940,26 @@ class BlissSVGBuilder {
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
         && Object.keys(definition.defaultOptions).length > 0) {
+      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
       entry.defaultOptions = { ...definition.defaultOptions };
     }
 
     blissElementDefinitions[code] = entry;
+  }
+
+  // A definition's defaultOptions attach at glyph/part level, where a
+  // builder-canvas (global-only) option key is inert at EVERY use form — and a
+  // ;; overlay stores the definition NAME, so such a key would never reach a
+  // parse boundary that could warn (silent forever; review-fix round 2, F1).
+  // A definition must be clean: reject at the source, like the codeString
+  // guards. Both spellings are checked (defaultOptions are stored verbatim,
+  // so a camelCase key is just as inert).
+  static #assertNoGlobalOnlyDefaultOptions(callName, code, defaultOptions) {
+    for (const key of Object.keys(defaultOptions)) {
+      if (GLOBAL_ONLY_OPTION_KEYS.has(key) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(key))) {
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include the global-only option "${key}"; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
+      }
+    }
   }
 
   static #defineGlyph(code, definition, options = {}) {
@@ -2010,6 +2026,7 @@ class BlissSVGBuilder {
     }
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
         && Object.keys(definition.defaultOptions).length > 0) {
+      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
       entry.defaultOptions = { ...definition.defaultOptions };
     }
 
@@ -2046,6 +2063,7 @@ class BlissSVGBuilder {
     }
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
         && Object.keys(definition.defaultOptions).length > 0) {
+      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
       entry.defaultOptions = { ...definition.defaultOptions };
     }
 
@@ -2159,6 +2177,7 @@ class BlissSVGBuilder {
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
         && Object.keys(definition.defaultOptions).length > 0) {
+      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
       entry.defaultOptions = { ...definition.defaultOptions };
     }
 
@@ -2396,6 +2415,7 @@ class BlissSVGBuilder {
     for (const [key, value] of Object.entries(changes)) {
       if (key === 'defaultOptions') {
         if (value && typeof value === 'object' && Object.keys(value).length > 0) {
+          BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, value);
           def.defaultOptions = { ...value };
         } else {
           delete def.defaultOptions;
