@@ -69,6 +69,9 @@ describe('BlissParser global option scope', () => {
   const FIXTURES = {
     GOPT_PARTOPT: { codeString: '[margin=2]>B291' },     // def baking a part-level canvas key
     GOPT_NESTCHAR: { codeString: '[margin=2]B291/C8' },  // def carrying a char-level canvas key on a word
+    // compound indicator baking a canvas key: reaches the gate only through the
+    // ;; render-merge parse (external review 2026-07-02 F1)
+    GOPT_BAKEDIND: { type: 'glyph', codeString: '[margin=2]>B81', isIndicator: true },
   };
   beforeAll(() => BlissSVGBuilder.define(FIXTURES));
   afterAll(() => Object.keys(FIXTURES).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
@@ -198,6 +201,45 @@ describe('BlissParser global option scope', () => {
       const baseless = build('B303;;[margin=2]>');
       expect(baseless.warnings.map((w) => w.code)).toEqual(['UNKNOWN_CODE']);
       expect(baseless.toString()).toBe('B303');
+    });
+
+    it('drops a character-form option prefix from an overlay code', () => {
+      // regression: external review 2026-07-02 F2 — the [...]-without-> form
+      // slipped the gate, re-serializing forever with no warning anywhere
+      const gated = build('B303;;[margin=2]B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(gated.toString()).toBe('B303;;B81');
+      expect(gated.svgCode).toBe(build('B303;;B81').svgCode);
+    });
+
+    it('drops a character-form prefix regardless of its keys', () => {
+      // a char-form prefix is inert in overlay position even for stylable
+      // keys (the merge extracts parts only; [opts]> is the styled form), so
+      // the whole bracket is misplaced, not just canvas keys
+      const gated = build('B303;;[color=red]B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(gated.toString()).toBe('B303;;B81');
+      expect(gated.svgCode).toBe(build('B303;;B81').svgCode);
+    });
+
+    it('warns once per character-form bracket, not per key', () => {
+      const gated = build('B303;;[margin=2;color=red]B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(gated.toString()).toBe('B303;;B81');
+    });
+
+    it('surfaces a definition-baked key when the definition rides the overlay', () => {
+      // regression: external review 2026-07-02 F1 — the overlay stores the def
+      // NAME, so the def's baked key is first observable at the render-merge
+      // parse; its warnings now reach builder.warnings (re-derived per rebuild)
+      const gated = build('B303;;GOPT_BAKEDIND');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.svgCode).toBe(build('B303;;B81').svgCode);
+      // the name (not the key) round-trips; the definition still carries the
+      // key, so each use re-warns — the def-baked accepted class
+      expect(gated.toString()).toBe('B303;;GOPT_BAKEDIND');
+      expect(build(gated.toString()).warnings.map((w) => w.code))
+        .toEqual(['MISPLACED_GLOBAL_OPTION']);
     });
   });
 

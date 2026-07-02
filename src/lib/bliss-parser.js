@@ -653,7 +653,24 @@ export class BlissParser {
           // stripped prefix is rebuilt with toString's own key=value emission.
           const gatedCodes = rawCodes.map((code) => {
             const optionPrefix = code.match(/^(\[.*?\])>(.+)$/);
-            if (!optionPrefix) return code;
+            if (!optionPrefix) {
+              // A CHARACTER-form prefix ([opts]CODE, no >) is inert in overlay
+              // position for EVERY key -- the render-merge extracts parts only,
+              // so the bracket styles nothing, yet it used to re-serialize
+              // forever with no warning anywhere (external review 2026-07-02
+              // F2). The whole bracket is misplaced (a word-indicator code has
+              // no character to bind to); [opts]> is the styled form.
+              const charPrefix = code.match(/^(\[.*?\])(?!>)(.+)$/);
+              if (charPrefix) {
+                parseWarnings.push({
+                  code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+                  message: `Character option (${charPrefix[1]}) ignored on the word indicator "${charPrefix[2]}": a ;; code has no character to style. Use ${charPrefix[1]}>${charPrefix[2]} to style the indicator part.`,
+                  source: code,
+                });
+                return charPrefix[2];
+              }
+              return code;
+            }
             const parsed = BlissParser.#parseOptions(optionPrefix[1]) ?? {};
             const keyCount = Object.keys(parsed).length;
             const kept = dropMisplacedGlobalKeys(parsed, 'part');
@@ -1069,7 +1086,28 @@ export class BlissParser {
       // syntax (the same alias-vs-written split as the character-level gate).
       // The malformed-;; fail path collapses its word breaks, so a
       // fail-rendered unit keeps its bracket (errorSource round-trips it).
-      if (group.options && expandedGlyphParts.some(p => p._wordBreak)) {
+      // Two separator kinds span words: a // word break AND an explicit space
+      // code between glyphs (external review 2026-07-02 F3: an in-alias TSP is
+      // not a _wordBreak, but its serialized /TSP/ splits groups on reparse,
+      // silently rebinding the bracket to the first word). A separator with
+      // inked content on ONE side only (a trailing space or //) does NOT span
+      // words: the bracket still binds the only inked word and round-trips
+      // stably, so it keeps its option.
+      const expansionSpansWords = (parts) => {
+        let sawWord = false;
+        let sawSeparatorAfterWord = false;
+        for (const p of parts) {
+          const partCode = p._scanCode ?? (p.part ? p.part.split(';')[0].split(':')[0] : '');
+          if (p._wordBreak || isSpaceCode(partCode)) {
+            if (sawWord) sawSeparatorAfterWord = true;
+          } else if (p.part !== '') {
+            if (sawSeparatorAfterWord) return true;
+            sawWord = true;
+          }
+        }
+        return false;
+      };
+      if (group.options && expansionSpansWords(expandedGlyphParts)) {
         const written = Object.entries(group.options)
           .map(([k, v]) => v === true ? k : `${k}=${v}`).join(';');
         const aliasSource = restorePlaceholders(groupCodeString);

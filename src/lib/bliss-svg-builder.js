@@ -551,8 +551,17 @@ class BlissSVGBuilder {
         const marked = group.glyphs.findIndex(g => g.isHeadGlyph === true);
         const headIndex = marked !== -1 ? marked : resolveHeadIndex(group.glyphs.map(getHeadCode));
         const head = group.glyphs[headIndex];
+        // The overlay stores code STRINGS (SIB-2); this render-merge parse is
+        // where a definition-baked misplacement (e.g. a global-only option
+        // key inside an indicator definition) first becomes observable, so
+        // its parse warnings must reach builder.warnings. #warnings was reset
+        // above, so they re-derive per rebuild instead of accumulating.
         head.parts = mergeWordIndicatorsOntoHead(
-          head, group.wordIndicators, blissElementDefinitions, (code) => BlissParser.parse(code)
+          head, group.wordIndicators, blissElementDefinitions, (code) => {
+            const parsed = BlissParser.parse(code);
+            this.#warnings.push(...(parsed._parseWarnings ?? []));
+            return parsed;
+          }
         );
       }
     }

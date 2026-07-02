@@ -88,14 +88,16 @@ describe('ElementHandle mutation parse warnings', () => {
   });
 
   describe('when the group overlay stores an option-prefixed code', () => {
-    it('defers the warning to the next parse of the serialized form', () => {
-      // pins the scope boundary: the ;; overlay stores code strings verbatim
-      // (SIB-2) with no parse at store time, so the API call itself cannot
-      // warn; the parser's ;; gate strips + warns when the serialized form is
-      // next parsed.
+    it('surfaces the warning at the rebuild that resolves the overlay', () => {
+      // The ;; overlay stores code strings verbatim (SIB-2) with no parse at
+      // store time; the render-merge parse resolves them on every rebuild and
+      // forwards its warnings (external review 2026-07-02 F1), so the storing
+      // builder warns immediately. The stored string keeps the key (structured
+      // input is kept as written); the parser's ;; gate strips it at the next
+      // parse of the serialized form.
       const builder = build('B303');
       builder.group(0).applyIndicators('[margin=2]>B81');
-      expect(builder.warnings).toEqual([]);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
       expect(builder.toString()).toBe('B303;;[margin=2]>B81');
       const reparsed = build(builder.toString());
       expect(reparsed.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);

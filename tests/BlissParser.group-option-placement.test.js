@@ -36,6 +36,15 @@ describe('BlissParser group option placement', () => {
     GOPP_WORD: { codeString: 'B291/C8' },     // bare alias -> ONE word, two characters
     GOPP_MULTI: { codeString: 'B291//C8' },   // bare alias -> TWO words
     GOPP_CHAIN: { codeString: 'GOPP_MULTI' }, // alias chain ending in two words
+    // explicit space codes inside an alias (external review 2026-07-02 F3):
+    // serialization splits them into separate groups, so a group option on the
+    // alias rebinds to the first word on reparse unless gated
+    GOPP_SPACE: { codeString: 'B291/TSP/C8' },   // two words around an explicit thin space
+    GOPP_QSPACE: { codeString: 'B291/QSP/C8' },  // quarter-space variant
+    GOPP_TRAIL: { codeString: 'B291/TSP' },      // trailing space: ONE inked word
+    GOPP_LEAD: { codeString: 'TSP/B291' },       // leading space: ONE inked word
+    GOPP_SPONLY: { codeString: 'TSP' },          // pure space, no inked word
+    GOPP_TRAILBREAK: { codeString: 'B291//' },   // trailing word break: ONE inked word
   };
   beforeAll(() => BlissSVGBuilder.define(FIXTURES));
   afterAll(() => Object.keys(FIXTURES).forEach((k) => BlissSVGBuilder.removeDefinition(k)));
@@ -88,6 +97,68 @@ describe('BlissParser group option placement', () => {
       expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GROUP_OPTION']);
       expect(gated.toString()).toBe('B291//C8/C8');
       expect(gated.svgCode).toBe(build('B291//C8/C8').svgCode);
+    });
+
+    it('gates an alias whose words are separated by an explicit thin space', () => {
+      // regression: external review 2026-07-02 F3 — an in-alias TSP is not a
+      // _wordBreak, but its serialized /TSP/ splits groups on reparse, so the
+      // bracket silently rebound to the first word (svg-rt false)
+      const gated = build('[color=red]|GOPP_SPACE');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GROUP_OPTION']);
+      expect(gated.toString()).toBe('B291/TSP/C8');
+      expect(gated.svgCode).toBe(build('GOPP_SPACE').svgCode);
+      const reparsed = build(gated.toString());
+      expect(reparsed.warnings).toEqual([]);
+      expect(reparsed.svgCode).toBe(gated.svgCode);
+    });
+
+    it('gates the quarter-space variant identically', () => {
+      const gated = build('[color=red]|GOPP_QSPACE');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GROUP_OPTION']);
+      expect(gated.toString()).toBe('B291/QSP/C8');
+      expect(gated.svgCode).toBe(build('GOPP_QSPACE').svgCode);
+    });
+  });
+
+  describe('when the alias holds only one inked word', () => {
+    it('keeps the option on an alias with a trailing space', () => {
+      // a trailing space splits off on reparse, but the bracket still binds
+      // the only inked word — round-trip stable, so the gate must not fire
+      const styled = build('[color=red]|GOPP_TRAIL');
+      expect(styled.warnings).toEqual([]);
+      expect(build(styled.toString()).svgCode).toBe(styled.svgCode);
+    });
+
+    it('keeps the option on an alias with a leading space', () => {
+      // pins the separator-AFTER-word condition: a leading space precedes any
+      // inked content, so it separates nothing
+      const styled = build('[color=red]|GOPP_LEAD');
+      expect(styled.warnings).toEqual([]);
+      expect(styled.svgCode).toContain('stroke="red"');
+      expect(build(styled.toString()).svgCode).toBe(styled.svgCode);
+    });
+
+    it('keeps the option on an alias with a trailing word break', () => {
+      // same one-inked-word rule for a trailing //: a separator with no
+      // content after it does not span words. The option survives the round
+      // trip functionally; byte identity is NOT asserted because the BARE
+      // trailing-// alias itself round-trips unstably (the expansion keeps a
+      // trailing space group the written form prunes) — a pre-existing,
+      // option-independent parity defect (backlog "trailing // in an alias
+      // codeString keeps a trailing space group").
+      const styled = build('[color=red]|GOPP_TRAILBREAK');
+      expect(styled.warnings).toEqual([]);
+      expect(styled.svgCode).toContain('stroke="red"');
+      expect(build(styled.toString()).svgCode).toContain('stroke="red"');
+    });
+
+    it('does not fire on a pure-space alias', () => {
+      // note: '[color=red]|GOPP_SPONLY' serializes to '//' today — a
+      // PRE-EXISTING standalone-space collapse (the deferred QSP/TSP family,
+      // extended on that backlog row); the placement gate only asserts it
+      // stays out of MISPLACED_GROUP_OPTION's scope
+      const spaceOnly = build('[color=red]|GOPP_SPONLY');
+      expect(spaceOnly.warnings.map((w) => w.code)).not.toContain('MISPLACED_GROUP_OPTION');
     });
   });
 
