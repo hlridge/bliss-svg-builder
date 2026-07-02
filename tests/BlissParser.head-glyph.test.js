@@ -536,13 +536,16 @@ describe('BlissParser head-glyph marker', () => {
     });
 
     it('keeps the fallback head when the alias is invoked with an options prefix', () => {
-      // Same composite-first word; the [color=red] prefix lands on the first
-      // part string after expansion, so the head pick must already be done. The
-      // fused composite heads the word at index 0.
+      // Same composite-first word. retargeted: rc.4 option-placement gate (B4)
+      // — the [color=red] prefix on a word alias is MISPLACED (warn + drop),
+      // no longer prepended to the first part string; the head pick must be
+      // unaffected either way. See BlissParser.option-placement.test.js.
       const r = BlissParser.parse('[color=red]_HG_COMPOSITE_FIRST');
       const glyphs = r.groups[0].glyphs;
 
-      expect(glyphs[0].options.color).toBe('red');
+      expect(glyphs[0].options).toBeUndefined();
+      expect(new BlissSVGBuilder('[color=red]_HG_COMPOSITE_FIRST').warnings.map(w => w.code))
+        .toContain('MISPLACED_CHARACTER_OPTION');
       // R15 WS-4: no parser fallback stamp; the element layer crowns exactly
       // one head (index 0, the fused composite) after the composite-first scan.
       expect(glyphs.every(g => !Object.hasOwn(g, 'isHeadGlyph'))).toBe(true);

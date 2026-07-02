@@ -222,13 +222,14 @@ describe('BlissParser strict indicator separation', () => {
   });
 
   describe('when a part-level options prefix [...]> wraps a ;-bearing base', () => {
-    // Deferred gap (F2): the parser's part-level-options early return bypasses
-    // the strict-separation model, so an options-prefixed base does not reach the
-    // MISPLACED gate. Tracked in .claude/backlog/backlog.md; convert this todo to
-    // a real assertion when the [...]> path is integrated. (External review
-    // 2026-06-30.) The F3 serializer half (options-prefixed invalid part leaked a
-    // literal "undefined") is fixed and pinned in
-    // `BlissSVGBuilder.serializer-fidelity.test.js`.
-    it.todo('warns MISPLACED on an options-prefixed ; over a bare alias (F2)');
+    // regression: F2 — the parser's part-level-options early return used to
+    // bypass the strict-separation MISPLACED gate (external review 2026-06-30;
+    // fixed rc.4 pre-Phase-D Chunk 5a). Full option-placement coverage lives in
+    // `BlissParser.option-placement.test.js`.
+    it('warns MISPLACED on an options-prefixed ; over a bare alias (F2)', () => {
+      const warned = codes('[color=red]>NOUN;B97');
+      expect(warned).toContain('MISPLACED_CHARACTER_INDICATOR');
+      expect(new BlissSVGBuilder('[color=red]>NOUN;B97').toString()).not.toContain('B97');
+    });
   });
 });

@@ -551,11 +551,15 @@ describe('BlissParser word-indicator syntax', () => {
       expect(partCodes(result.groups[0].glyphs[0])).toEqual(['NonExistentWord', 'B86']);
     });
 
-    it('preserves glyph-level options while dropping the misplaced part on a word', () => {
+    it('drops both the glyph-level option and the misplaced part on a word', () => {
+      // retargeted: rc.4 option-placement gate (B4) — the char option on a
+      // word alias is MISPLACED (warn + drop), no longer kept on the first
+      // character. See BlissParser.option-placement.test.js.
       const result = BlissParser.parse('[color=red]TestWord1;B86');
 
       expect(warningCodes('[color=red]TestWord1;B86')).toContain('MISPLACED_CHARACTER_INDICATOR');
-      expect(result.groups[0].glyphs[0].options.color).toBe('red');
+      expect(warningCodes('[color=red]TestWord1;B86')).toContain('MISPLACED_CHARACTER_OPTION');
+      expect(result.groups[0].glyphs[0].options).toBeUndefined();
       expect(partCodes(result.groups[0].glyphs[0])).toEqual(['H']);
     });
   });

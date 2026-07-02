@@ -596,17 +596,21 @@ describe('BlissParser definition expansion', () => {
       expect(r.groups[0].glyphs[0].parts[0].y).toBe(0);
     });
 
-    it('prepends glyph options to the first split word and drops the head marker', () => {
+    it('drops both the glyph options and the head marker on a split-word alias', () => {
       // Head-marker contract rule 1: a multi-word definition expands to
       // multiple characters, so the outer ^ is dropped with a warning.
+      // retargeted: rc.4 option-placement gate (B4) — a char option on a word
+      // alias is MISPLACED (warn + drop), no longer prepended to the first
+      // word; see BlissParser.option-placement.test.js.
       const r = BlissParser.parse('[color=red]_C15B_SENTENCE^');
       const firstGlyph = r.groups[0].glyphs[0];
 
-      expect(firstGlyph.options).toEqual({ color: 'red' });
+      expect(firstGlyph.options).toBeUndefined();
       expect(Object.hasOwn(firstGlyph, 'isHeadGlyph')).toBe(false);
       expect(r.groups[2].glyphs[0].options).toBeUndefined();
       expect(Object.hasOwn(r.groups[2].glyphs[0], 'isHeadGlyph')).toBe(false);
       expect(r._parseWarnings).toEqual([
+        expect.objectContaining({ code: 'MISPLACED_CHARACTER_OPTION' }),
         expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' }),
       ]);
     });

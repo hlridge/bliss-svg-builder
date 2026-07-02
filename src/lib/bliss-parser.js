@@ -665,11 +665,54 @@ export class BlissParser {
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
           const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
           if (partLevelMatch) {
-            const codeForKerning = partLevelMatch[2].split(':')[0];
+            const optionBracket = partLevelMatch[1];
+            let partContent = partLevelMatch[2];
+            // Option-placement scope gate (mirrors the char-level `;` MISPLACED
+            // gate below). A part option binds to a single part, so `[opts]>` on
+            // an alias that expands to a WORD is MISPLACED: warn, drop the
+            // option, and expand the rest as if written bare (a trailing
+            // `;`-part then meets the normal gate). The word check runs at ANY
+            // level -- a definition baking `[opts]>WORDALIAS` behaves like the
+            // written form (the old WORD_AS_PART fail serialized to a form that
+            // re-parsed differently). A `;`-part behind a validly placed
+            // `[opts]>` on a bare alias meets the same MISPLACED rule this
+            // early return used to bypass (F2): warn, drop the parts, keep the
+            // option on the base; scoped to top level in parity with the `;`
+            // gate below.
+            const [gateBaseRaw, ...gateParts] = partContent.split(';');
+            const gateCoordMatch = gateBaseRaw.match(
+              /^(.+?)(:-?(?:\d+(?:\.\d*)?|\.\d+)(?:,-?(?:\d+(?:\.\d*)?|\.\d+))?)$/
+            );
+            const gateBase = gateCoordMatch ? gateCoordMatch[1] : gateBaseRaw;
+            if (resolveToFinalCodeString(gateBase)?.includes('/')) {
+              parseWarnings.push({
+                code: WARNING_CODES.MISPLACED_PART_OPTION,
+                message: `Part option (${restorePlaceholders(optionBracket)}>) ignored on "${restorePlaceholders(gateBase)}": > applies an option to a single part, but this is a word. Use ${restorePlaceholders(optionBracket)}|| to apply it to the whole content.`,
+                source: restorePlaceholders(gateBase),
+              });
+              return expandSegment(partContent, definitions, isTopLevel, depth);
+            }
+            if (isTopLevel) {
+              const gateDef = definitions[gateBase];
+              const gateBaseIsBareAlias = !!gateDef && gateDef.codeString !== undefined
+                && !gateDef.isBlissGlyph && !gateDef.isShape
+                && !gateDef.isExternalGlyph && !gateDef.glyphCode;
+              const droppedParts = gateParts.filter(p => p !== '');
+              if (gateBaseIsBareAlias && droppedParts.length > 0) {
+                parseWarnings.push({
+                  code: WARNING_CODES.MISPLACED_CHARACTER_INDICATOR,
+                  message: `Character indicator (;${droppedParts.join(';')}) ignored on "${restorePlaceholders(gateBase)}": ; composes onto a single character, but this is a word. Use ;; for a word-level indicator.`,
+                  source: restorePlaceholders(gateBase),
+                });
+                partContent = gateBaseRaw;
+                str = `${optionBracket}>${gateBaseRaw}`;
+              }
+            }
+            const codeForKerning = partContent.split(':')[0];
             const definition = definitions[codeForKerning] || {};
             return [{
               part: str,
-              _scanCode: partLevelMatch[2].split(';')[0].split(':')[0],
+              _scanCode: partContent.split(';')[0].split(':')[0],
               ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
               ...(definition.char && { char: definition.char }),
               ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
@@ -789,8 +832,19 @@ export class BlissParser {
                   firstReal.part = semiParts.join(';');
                 }
               }
+              // A char-level option on a multi-word (//) alias is MISPLACED
+              // (B4): a character option applies to a single character. Warn +
+              // drop at top level; nested expansion keeps its prepend behavior.
               if (optionsPrefix && allParts.length > 0) {
-                allParts[0].part = optionsPrefix + allParts[0].part;
+                if (isTopLevel) {
+                  parseWarnings.push({
+                    code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+                    message: `Character option (${restorePlaceholders(optionsPrefix)}) ignored on "${restorePlaceholders(potentialBaseCode)}": it applies to a single character, but this expands to multiple words. Use ${restorePlaceholders(optionsPrefix)}|| to apply it to the whole content.`,
+                    source: restorePlaceholders(potentialBaseCode),
+                  });
+                } else {
+                  allParts[0].part = optionsPrefix + allParts[0].part;
+                }
               }
               // A char-level `;`-part on a multi-word (//) alias is MISPLACED
               // (warned up front): render every word and drop the part. D1.
@@ -871,9 +925,21 @@ export class BlissParser {
               expandedParts[0].defaultOptions = definition.defaultOptions;
             }
 
-            // Prepend options to the first expanded part
+            // Prepend options to the first expanded part. A char-level option
+            // is valid on a single character only: on an alias expanding to a
+            // multi-character word it is MISPLACED (B4; folds audit N-3 -- it
+            // used to land silently on the FIRST character). Warn + drop at
+            // top level; nested expansion keeps its prepend behavior.
             if (optionsPrefix && expandedParts.length > 0) {
-              expandedParts[0].part = optionsPrefix + expandedParts[0].part;
+              if (isTopLevel && isMultiGlyphWord) {
+                parseWarnings.push({
+                  code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+                  message: `Character option (${restorePlaceholders(optionsPrefix)}) ignored on "${restorePlaceholders(potentialBaseCode)}": it applies to a single character, but this expands to a word. Use ${restorePlaceholders(optionsPrefix)}|| to apply it to the whole content.`,
+                  source: restorePlaceholders(potentialBaseCode),
+                });
+              } else {
+                expandedParts[0].part = optionsPrefix + expandedParts[0].part;
+              }
             }
 
             return expandedParts;
@@ -1039,7 +1105,12 @@ export class BlissParser {
               if (codeString.includes('/')) {
                 // Word codeString at part level — cannot be expanded here.
                 // Keep original codeName; post-parse decomposition resolves it.
-              } else if (codeString.includes(';') || codeString.includes(':') || blissElementDefinitions[codeString]?.codeString ) {
+              } else if (codeString.includes(';') || codeString.includes(':')
+                  // A single code carrying its own part option ([color=red]>B291)
+                  // must nest-parse like a multi-code string; treated as a plain
+                  // codeName it becomes one unknown token.
+                  || /^\[.*?\]>/.test(codeString)
+                  || blissElementDefinitions[codeString]?.codeString ) {
                 part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {

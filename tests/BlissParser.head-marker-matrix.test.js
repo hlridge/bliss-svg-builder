@@ -247,10 +247,16 @@ describe('BlissParser head-marker matrix', () => {
 
   describe('when alias invocations carry decorations', () => {
     it('keeps the designation active under an options prefix', () => {
+      // retargeted: rc.4 option-placement gate (B4) — the char option on a
+      // word alias is MISPLACED (warn + drop); the designation is unaffected.
+      // See BlissParser.option-placement.test.js.
       const r = BlissParser.parse('[color=red]_HMM_CDH');
 
       expect(markedIndexes(r)).toEqual([1]);
-      expect(r.groups[0].glyphs[0].options).toEqual({ color: 'red' });
+      expect(r.groups[0].glyphs[0].options).toBeUndefined();
+      expect(r._parseWarnings).toEqual([
+        expect.objectContaining({ code: 'MISPLACED_CHARACTER_OPTION' }),
+      ]);
     });
 
     it('keeps the designation active under a position suffix', () => {
@@ -274,12 +280,17 @@ describe('BlissParser head-marker matrix', () => {
       expect(r._parseWarnings).toBeUndefined();
     });
 
-    it('drops a marker on a decorated multi-character alias and keeps the decoration', () => {
+    it('drops both the marker and the decoration on a multi-character alias', () => {
+      // retargeted: rc.4 option-placement gate (B4) — the decoration is now
+      // dropped alongside the marker, each with its own warning.
       const r = BlissParser.parse('[color=red]_HMM_CDH^');
 
       expect(markedIndexes(r)).toEqual([1]);
-      expect(r.groups[0].glyphs[0].options).toEqual({ color: 'red' });
-      expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
+      expect(r.groups[0].glyphs[0].options).toBeUndefined();
+      expect(r._parseWarnings).toEqual([
+        expect.objectContaining({ code: 'MISPLACED_CHARACTER_OPTION' }),
+        expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' }),
+      ]);
     });
 
     it('drops a marker on a position-suffixed multi-character alias and keeps the position', () => {
