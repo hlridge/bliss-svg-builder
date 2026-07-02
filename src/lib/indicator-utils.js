@@ -11,6 +11,11 @@ import { OPTION_BRACKET_CONTENT, SEMANTIC_INDICATOR_ROOTS } from './bliss-consta
 // it. Group 2 is the shared grammar's internal atom; group 3 the remainder.
 const PART_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])>(.+)$`);
 const CHAR_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)`);
+// Like CHAR_OPTION_PREFIX but requiring a non-empty remainder (group 3), the
+// strip form used by the overlay store gate: a baseless bracket (`[opts]`)
+// stays whole and classifies UNKNOWN_CODE instead of stripping to nothing
+// (mirrors the DSL gate's `(.+)` requirement, round-3 review F3).
+const CHAR_OPTION_STRIP = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.+)$`);
 
 /**
  * Extract the bare B-code from a code string that may include
@@ -107,14 +112,35 @@ export function partitionWordIndicators(codes, definitions) {
  * a bare `;;` clear). An input whose codes were ALL dropped as invalid (and no
  * strip) returns null: the overlay is discarded, not rewritten as an empty one.
  *
+ * A CHARACTER-form option prefix (`[opts]CODE`, no `>`) is inert in overlay
+ * position for every key -- the render-merge extracts parts only, so the
+ * bracket styles nothing (`[opts]>` is the styled form). The DSL `;;` store
+ * gate strips + warns these before storing; the API and object surfaces reach
+ * this resolver with raw codes, so the same strip applies here for parity
+ * (external review of ce80c1b, F2: the quote-aware bare-code lookup otherwise
+ * silently stored the inert prefix). Every leading char-form bracket strips
+ * (one `onCharOptionStrip` report each) BEFORE validation; the code itself is
+ * kept and validated normally. The parser's codes arrive pre-stripped, so the
+ * pass is a no-op on the DSL path (no double warning).
+ *
  * @param {string[]} rawCodes
  * @param {boolean} stripSemantic
  * @param {Object} definitions
  * @param {(rejected: { code: string, reason: 'non-indicator'|'unknown' }) => void} [onReject]
+ * @param {(stripped: { bracket: string, code: string, source: string }) => void} [onCharOptionStrip]
  * @returns {{ codes: string[], stripSemantic: boolean } | null}
  */
-export function resolveWordIndicatorOverlay(rawCodes, stripSemantic, definitions, onReject) {
-  const { valid, rejected } = partitionWordIndicators(rawCodes, definitions);
+export function resolveWordIndicatorOverlay(rawCodes, stripSemantic, definitions, onReject, onCharOptionStrip) {
+  const gatedCodes = rawCodes.map((code) => {
+    let current = code;
+    let charPrefix;
+    while ((charPrefix = current.match(CHAR_OPTION_STRIP)) !== null) {
+      if (onCharOptionStrip) onCharOptionStrip({ bracket: charPrefix[1], code: charPrefix[3], source: current });
+      current = charPrefix[3];
+    }
+    return current;
+  });
+  const { valid, rejected } = partitionWordIndicators(gatedCodes, definitions);
   if (onReject) for (const r of rejected) onReject(r);
   if (valid.length > 0 || stripSemantic || rawCodes.length === 0) {
     return { codes: valid, stripSemantic };
@@ -127,15 +153,29 @@ export function resolveWordIndicatorOverlay(rawCodes, stripSemantic, definitions
  * a `;` inside an option block (`[color=red;stroke-width=2]>B81`) intact. The DSL
  * parser protects option-block semicolons with placeholders before splitting; the
  * API receives raw strings, so it needs this bracket-aware split to tokenize a
- * multi-key-option indicator the same way (DSL/API parity). Trims and drops empty
+ * multi-key-option indicator the same way (DSL/API parity). Inside a bracket, a
+ * quoted span owns its characters — a `[`/`]`/`;` in a quoted option value
+ * (`[data-t="a[b"]>B81;B86`) must not move the depth or split (external review
+ * of ce80c1b, F1: a quoted `[` held the depth open across the real separator,
+ * joining two indicators into one stored code). Escapes (`\"`) consume the next
+ * character, matching the option parser's quote grammar. Trims and drops empty
  * segments, matching the prior naive `code.split(';').map(trim).filter(Boolean)`.
  */
 export function splitTopLevelSemicolons(code) {
   const result = [];
   let depth = 0;
+  let quote = null;
   let current = '';
-  for (const ch of code) {
-    if (ch === '[') depth++;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (quote !== null) {
+      current += ch;
+      if (ch === '\\' && i + 1 < code.length) current += code[++i];
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if ((ch === '"' || ch === "'") && depth > 0) quote = ch;
+    else if (ch === '[') depth++;
     else if (ch === ']') { if (depth > 0) depth--; }
     if (ch === ';' && depth === 0) {
       result.push(current);

@@ -432,6 +432,12 @@ class BlissSVGBuilder {
                 message: `Word-level indicator "${badCode}" is not a known code; it is ignored.`,
                 source: badCode,
               });
+        }, ({ bracket, code: keptCode, source }) => {
+          (blissObj._parseWarnings ??= []).push({
+            code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+            message: `Character option (${bracket}) ignored on the word indicator "${keptCode}": a ;; code has no character to style. Use ${bracket}>${keptCode} to style the indicator part.`,
+            source,
+          });
         });
         if (overlay) group.wordIndicators = overlay;
         else delete group.wordIndicators;

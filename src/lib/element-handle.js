@@ -994,6 +994,12 @@ export class ElementHandle {
               message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it is ignored.`,
               source: badCode,
             });
+      }, ({ bracket, code: keptCode, source }) => {
+        this.#ctx.addMutationWarning({
+          code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+          message: `applyIndicators('${code}'): character option (${bracket}) ignored on the word indicator "${keptCode}": a ;; code has no character to style. Use ${bracket}>${keptCode} to style the indicator part.`,
+          source,
+        });
       });
       // Store only a MEANINGFUL overlay (a surviving indicator or an explicit
       // strip). An apply whose codes are all non-indicators (resolver null), or

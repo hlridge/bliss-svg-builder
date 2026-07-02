@@ -22,6 +22,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Plain values stay byte-unchanged (no quoting churn).
  * - Unclosed-bracket inputs stay linear-time and fall through to the
  *   existing malformed/unknown warn paths.
+ * - API/object overlay parity (review-fix): `applyIndicators` splits its
+ *   `;`-list quote-aware, and a character-form prefix (`[opts]CODE`, no `>`)
+ *   warns MISPLACED_CHARACTER_OPTION and strips at apply/construct time on
+ *   the API and object surfaces exactly as the DSL `;;` store gate does.
+ * - Escaped quotes combined with a quoted `]` in one value (both atoms).
  *
  * Does NOT cover:
  * - Values where a backslash abuts the escaping (`a\"b` class, trailing
@@ -231,6 +236,99 @@ describe('BlissSVGBuilder option-value quoting', () => {
       expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
       expect(b.toString()).toBe('B303;;[data-t="a]>b"]>B81');
       expect(new BlissSVGBuilder(b.toString()).warnings).toEqual([]);
+    });
+  });
+
+  describe('when quoted values reach the overlay through the API or object input', () => {
+    it('splits API indicator lists on top-level ; only, not inside a quoted value', () => {
+      // regression: external review of ce80c1b, F1 — the API splitter tracked
+      // bracket depth but not quote state, so a quoted '[' held the depth
+      // open across the real separator and two indicators stored as ONE code
+      // (rendered only the first; svg changed after round-trip)
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('[data-t="a[b"]>B81;B86');
+      expect(api.warnings).toEqual([]);
+      expect(api.toJSON().groups[0].wordIndicators.codes)
+        .toEqual(['[data-t="a[b"]>B81', 'B86']);
+      expect(api.toString()).toBe('B303;;[data-t="a[b"]>B81;B86');
+
+      const dsl = new BlissSVGBuilder('B303;;[data-t="a[b"]>B81;B86');
+      expect(api.svgCode).toBe(dsl.svgCode);
+      expect(new BlissSVGBuilder(api.toString()).svgCode).toBe(api.svgCode);
+    });
+
+    it('honors an escaped quote inside an API value when splitting', () => {
+      // pins the splitter's escape consumption: without it the \" closes the
+      // quoted span early, the following [ re-opens bracket depth, and the
+      // re-opened quote swallows the real ; separator (one joined code)
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('[data-t="a\\"[b"]>B81;B86');
+      expect(api.warnings).toEqual([]);
+      expect(api.toJSON().groups[0].wordIndicators.codes)
+        .toEqual(['[data-t="a\\"[b"]>B81', 'B86']);
+      expect(api.toString()).toBe('B303;;[data-t="a\\"[b"]>B81;B86');
+    });
+
+    it('keeps a quoted ; inside an API option value as one value', () => {
+      // F1 companion: the quote-blind split cut INSIDE the value, so both
+      // fragments rejected as unknown codes
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('[data-t="a];b"]>B81');
+      expect(api.warnings).toEqual([]);
+      expect(api.toJSON().groups[0].wordIndicators.codes).toEqual(['[data-t="a];b"]>B81']);
+      expect(api.toString()).toBe('B303;;[data-t="a];b"]>B81');
+      expect(api.svgCode).toBe(new BlissSVGBuilder('B303;;[data-t="a];b"]>B81').svgCode);
+    });
+
+    it('warns and strips a character-form prefix at apply time, like the DSL', () => {
+      // regression: external review of ce80c1b, F2 — the quote-aware bare-code
+      // lookup made the API silently STORE an inert char-form prefix that only
+      // a later DSL reparse warned about; the DSL warns + strips immediately
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('[data-t="a]b"]B81');
+      expect(api.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(api.toJSON().groups[0].wordIndicators.codes).toEqual(['B81']);
+      expect(api.toString()).toBe('B303;;B81');
+      expect(api.svgCode).toBe(new BlissSVGBuilder('B303;;B81').svgCode);
+    });
+
+    it('applies the same char-form rule to a plain unquoted prefix', () => {
+      // the plain spelling was silently accepted even before ce80c1b; the
+      // shared strip closes the whole DSL/API asymmetry, not just the
+      // newly-reachable quoted form
+      const api = new BlissSVGBuilder('B303');
+      api.group(0).applyIndicators('[color=red]B81');
+      expect(api.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(api.toString()).toBe('B303;;B81');
+    });
+
+    it('gates a char-form prefix arriving through object input', () => {
+      const base = new BlissSVGBuilder('B303;;B81').toJSON();
+      base.groups[0].wordIndicators.codes = ['[data-t="a]b"]B81'];
+      const b = new BlissSVGBuilder(base);
+      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(b.toString()).toBe('B303;;B81');
+    });
+  });
+
+  describe('when an escaped quote and a quoted ] combine in one value', () => {
+    it('round-trips an escaped apostrophe next to a quoted ]', () => {
+      // pins the escape-aware single-quote atom of the bracket grammar; a
+      // naive '[^']*' mutant ends the span at the escaped quote and truncates
+      // at the following ] (external review of ce80c1b, note 3)
+      const b = new BlissSVGBuilder("[svg-title='it\\'s ] okay']||B291");
+      expect(b.warnings).toEqual([]);
+      expect(b.toJSON().options['svg-title']).toBe("it's ] okay");
+      expect(b.toString()).toBe('[svg-title="it\'s ] okay"]||B291');
+      expect(new BlissSVGBuilder(b.toString()).toJSON().options['svg-title']).toBe("it's ] okay");
+    });
+
+    it('round-trips an escaped double quote next to a quoted ]', () => {
+      // pins the escape-aware double-quote atom symmetrically
+      const b = new BlissSVGBuilder('[k="it\\"s ] ok"]||B291');
+      expect(b.warnings).toEqual([]);
+      expect(b.toJSON().options.k).toBe('it"s ] ok');
+      expect(b.toString()).toBe('[k="it\\"s ] ok"]||B291');
     });
   });
 
