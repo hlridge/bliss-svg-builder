@@ -422,10 +422,11 @@ export interface GlyphDefinition {
   kerningRules?: Record<string, any>;
   /**
    * Default options merged into each use of the definition. Keys must be
-   * well-formed option names (letters, digits, hyphens; camelCase accepted)
-   * and may not include a global-only (builder-canvas) option key such as
-   * `margin` or `grid` — those configure the whole SVG and would be inert on
-   * a definition; `define()` reports a violation in its `errors` result,
+   * well-formed option names (letters, digits, hyphens; camelCase accepted;
+   * names beginning with `on` are rejected, as for any attribute) and may not
+   * include a global-only (builder-canvas) option key such as `margin` or
+   * `grid` — those configure the whole SVG and would be inert on a
+   * definition; `define()` reports a violation in its `errors` result,
    * `patchDefinition()` throws.
    */
   defaultOptions?: BlissOptions;

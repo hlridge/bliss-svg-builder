@@ -374,9 +374,32 @@ describe('BlissParser global option scope', () => {
           GOPT_DEFPAD: { codeString: 'B291', defaultOptions: { [key]: 2 } },
         });
         expect(result.errors).toHaveLength(1);
+        // pins the trim-BEFORE-safe-name order: after trimming, ' margin' is
+        // the forbidden GLOBAL-ONLY key, not merely an invalid name
+        expect(result.errors[0]).toContain('global-only option');
         expect(result.errors[0]).toContain('margin');
         expect(BlissSVGBuilder.isDefined('GOPT_DEFPAD')).toBe(false);
       }
+    });
+
+    it('validates the exact snapshot it stores', () => {
+      // regression: round-4 review F1 — a Proxy whose ownKeys flip-flops
+      // between enumerations showed safe keys to validation and a global-only
+      // key to storage; snapshot-once closes accessor and Proxy variants
+      let reads = 0;
+      const target = { color: 'blue', margin: 2 };
+      const shifting = new Proxy(target, {
+        ownKeys: () => (++reads <= 1 ? ['color'] : ['margin']),
+        getOwnPropertyDescriptor: (_, key) => ({
+          configurable: true, enumerable: true, value: target[key], writable: true,
+        }),
+      });
+      BlissSVGBuilder.define({ GOPT_DEFPROXY: { codeString: 'B291', defaultOptions: shifting } });
+      const stored = BlissSVGBuilder.isDefined('GOPT_DEFPROXY')
+        ? BlissSVGBuilder.getDefinition('GOPT_DEFPROXY').defaultOptions
+        : undefined;
+      expect(stored?.margin).toBeUndefined();
+      if (BlissSVGBuilder.isDefined('GOPT_DEFPROXY')) BlissSVGBuilder.removeDefinition('GOPT_DEFPROXY');
     });
 
     it('leaves the definition untouched when a patch is rejected', () => {

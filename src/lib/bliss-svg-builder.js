@@ -1938,10 +1938,16 @@ class BlissSVGBuilder {
       entry.codeString = definition.codeString;
     }
 
-    if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
-        && Object.keys(definition.defaultOptions).length > 0) {
-      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
-      entry.defaultOptions = { ...definition.defaultOptions };
+    if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
+      // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
+      // guard must judge exactly what the registry keeps, or an accessor /
+      // Proxy could show one set of keys to validation and another to storage
+      // (round-4 review F1).
+      const defaultOptionsSnapshot = { ...definition.defaultOptions };
+      if (Object.keys(defaultOptionsSnapshot).length > 0) {
+        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        entry.defaultOptions = defaultOptionsSnapshot;
+      }
     }
 
     blissElementDefinitions[code] = entry;
@@ -2037,10 +2043,16 @@ class BlissSVGBuilder {
     if (definition.shrinksPrecedingWordSpace === true) {
       entry.shrinksPrecedingWordSpace = true;
     }
-    if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
-        && Object.keys(definition.defaultOptions).length > 0) {
-      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
-      entry.defaultOptions = { ...definition.defaultOptions };
+    if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
+      // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
+      // guard must judge exactly what the registry keeps, or an accessor /
+      // Proxy could show one set of keys to validation and another to storage
+      // (round-4 review F1).
+      const defaultOptionsSnapshot = { ...definition.defaultOptions };
+      if (Object.keys(defaultOptionsSnapshot).length > 0) {
+        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        entry.defaultOptions = defaultOptionsSnapshot;
+      }
     }
 
     blissElementDefinitions[code] = entry;
@@ -2074,10 +2086,16 @@ class BlissSVGBuilder {
     if (definition.kerningRules && typeof definition.kerningRules === 'object') {
       entry.kerningRules = { ...definition.kerningRules };
     }
-    if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
-        && Object.keys(definition.defaultOptions).length > 0) {
-      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
-      entry.defaultOptions = { ...definition.defaultOptions };
+    if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
+      // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
+      // guard must judge exactly what the registry keeps, or an accessor /
+      // Proxy could show one set of keys to validation and another to storage
+      // (round-4 review F1).
+      const defaultOptionsSnapshot = { ...definition.defaultOptions };
+      if (Object.keys(defaultOptionsSnapshot).length > 0) {
+        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        entry.defaultOptions = defaultOptionsSnapshot;
+      }
     }
 
     blissElementDefinitions[code] = entry;
@@ -2188,10 +2206,16 @@ class BlissSVGBuilder {
 
     const entry = { codeString: resolved };
 
-    if (definition.defaultOptions && typeof definition.defaultOptions === 'object'
-        && Object.keys(definition.defaultOptions).length > 0) {
-      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, definition.defaultOptions);
-      entry.defaultOptions = { ...definition.defaultOptions };
+    if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
+      // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
+      // guard must judge exactly what the registry keeps, or an accessor /
+      // Proxy could show one set of keys to validation and another to storage
+      // (round-4 review F1).
+      const defaultOptionsSnapshot = { ...definition.defaultOptions };
+      if (Object.keys(defaultOptionsSnapshot).length > 0) {
+        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        entry.defaultOptions = defaultOptionsSnapshot;
+      }
     }
 
     blissElementDefinitions[code] = entry;
@@ -2426,10 +2450,16 @@ class BlissSVGBuilder {
 
     // Validate BEFORE the apply loop, like every other patch guard: a
     // rejected patch must leave the definition fully unchanged, not partially
-    // mutated depending on property order (round-3 review F2).
-    if (changes.defaultOptions && typeof changes.defaultOptions === 'object'
-        && Object.keys(changes.defaultOptions).length > 0) {
-      BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, changes.defaultOptions);
+    // mutated depending on property order (round-3 review F2). The snapshot
+    // taken here REPLACES the caller's object in `changes`, so the apply loop
+    // stores exactly what was validated — an accessor / Proxy cannot show
+    // different keys to the two reads (round-4 review F1).
+    if (changes.defaultOptions && typeof changes.defaultOptions === 'object') {
+      const defaultOptionsSnapshot = { ...changes.defaultOptions };
+      if (Object.keys(defaultOptionsSnapshot).length > 0) {
+        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, defaultOptionsSnapshot);
+      }
+      changes = { ...changes, defaultOptions: defaultOptionsSnapshot };
     }
 
     // Apply changes
