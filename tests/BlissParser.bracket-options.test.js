@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
  * Pins the parser bracket-option grammar: how option key=value pairs and
@@ -37,6 +38,12 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   accepted as no options, text placeholders restored inside warning
  *   sources, prefix and suffix around an otherwise valid bracket block
  *   both rejected.
+ * - More than one option bracket at the same level (two before || or two
+ *   before |): warns MULTIPLE_OPTION_BRACKETS, applies the first bracket
+ *   (first-wins), still renders the content, and the dropped bracket does
+ *   not re-serialize or re-warn on round-trip. Adjacent brackets at
+ *   different levels ([char][part]>) are valid and do not warn; a bracket
+ *   character inside a quoted option value is not miscounted.
  *
  * Does NOT cover:
  * - Coordinate suffix parsing (:x,y) on parts that carry bracket
@@ -63,6 +70,18 @@ const invalidGroupOptionsWarning = source => ({
 const invalidGlobalOptionsWarning = source => ({
   code: 'MALFORMED_GLOBAL_OPTIONS',
   message: `Invalid global options syntax: "${source}||" - expected [options]|| format. Ignoring.`,
+  source
+});
+
+const multipleGlobalOptionBracketsWarning = source => ({
+  code: 'MULTIPLE_OPTION_BRACKETS',
+  message: `Multiple option brackets before ||: "${source}". Only the first is applied; combine options in one bracket, e.g. [a;b]||.`,
+  source
+});
+
+const multipleGroupOptionBracketsWarning = source => ({
+  code: 'MULTIPLE_OPTION_BRACKETS',
+  message: `Multiple option brackets before |: "${source}". Only the first is applied; combine options in one bracket, e.g. [a;b]|.`,
   source
 });
 
@@ -382,6 +401,55 @@ describe('BlissParser bracket options', () => {
       expect(parsed.options).toEqual({});
       expect(parsed._parseWarnings?.[0]?.code).toBe('MALFORMED_GLOBAL_OPTIONS');
       // pins end-anchor strictness; killed line 174 end-anchor regex mutant in 2026-05 Stryker run.
+    });
+  });
+
+  describe('when more than one option bracket appears at the same level', () => {
+    it('warns and applies only the first bracket when two brackets precede ||', () => {
+      // note: [a][b]|| is not valid syntax (one bracket per level); the
+      // canonical multi-option form is [a;b]||. First-wins matches the
+      // MULTIPLE_ verb ("resolved by picking the first").
+      const r = BlissParser.parse('[grid][grid-color=red]||B291');
+
+      expect(r._parseWarnings).toEqual([
+        multipleGlobalOptionBracketsWarning('[grid][grid-color=red]')
+      ]);
+      expect(r.options).toEqual({ grid: true });
+      expect(r.groups[0].glyphs[0].glyphCode).toBe('B291');
+    });
+
+    it('warns and applies only the first bracket when two brackets precede |', () => {
+      const r = BlissParser.parse('[color=red][color=blue]|B291');
+
+      expect(r._parseWarnings).toEqual([
+        multipleGroupOptionBracketsWarning('[color=red][color=blue]')
+      ]);
+      expect(r.groups[0].options).toEqual({ color: 'red' });
+      expect(r.groups[0].glyphs[0].parts[0].codeName).toBe('B291');
+    });
+
+    it('does not re-serialize or re-warn the dropped bracket after a round-trip', () => {
+      const builder = new BlissSVGBuilder('[grid][grid-color=red]||B291');
+
+      expect(builder.toString()).toBe('[grid]||B291');
+      expect(new BlissSVGBuilder(builder.toString()).warnings).toEqual([]);
+    });
+
+    it('counts top-level brackets, not a bracket inside a quoted option value', () => {
+      // The '[' inside the quoted value must not be miscounted as a second
+      // top-level bracket; counting happens on the placeholder form.
+      const r = BlissParser.parse('[k="a[b"]||B291');
+
+      expect(r._parseWarnings).toBeUndefined();
+      expect(r.options).toEqual({ k: 'a[b' });
+    });
+
+    it('does not warn on adjacent brackets at different levels ([char][part]>)', () => {
+      const r = BlissParser.parse('[color=red][stroke-width=0.6]>B291');
+
+      expect(r._parseWarnings).toBeUndefined();
+      expect(r.groups[0].glyphs[0].options).toEqual({ color: 'red' });
+      expect(r.groups[0].glyphs[0].parts[0].options).toEqual({ 'stroke-width': '0.6' });
     });
   });
 });

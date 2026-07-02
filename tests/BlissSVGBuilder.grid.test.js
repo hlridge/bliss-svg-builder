@@ -29,6 +29,13 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `grid-{sky,earth}-stroke-width` cascade (same shape as color).
  * - Combined color and stroke-width: orthogonal cascades compose
  *   independently.
+ * - DSL/API parity + round-trip: a grid option set via the canonical
+ *   single-bracket DSL (`[grid;grid-color=red]||`) renders byte-identically
+ *   to the JS-API form (`{ grid: true, gridColor: 'red' }`) and survives
+ *   toString (default + preserve) and toJSON round-trips. (Regression pin
+ *   for Chunk 9: the two-bracket form `[grid][grid-color=red]||` is invalid
+ *   syntax and warns MULTIPLE_OPTION_BRACKETS, see
+ *   `BlissParser.bracket-options.test.js`.)
  *
  * Does NOT cover:
  * - Grid alignment with `center` and `min-width`, see
@@ -241,6 +248,34 @@ describe('BlissSVGBuilder grid', () => {
       expect(svg).toContain('class="bliss-grid-line bliss-grid-line--major" stroke-width="1" stroke="red"');
       expect(svg).toContain('class="bliss-grid-line bliss-grid-line--medium" stroke-width="0.166" stroke="red"');
       expect(svg).toContain('class="bliss-grid-line bliss-grid-line--minor" stroke-width="0.166" stroke="red"');
+    });
+  });
+
+  describe('when the same grid option is set via the DSL and the JS API', () => {
+    const gridCases = [
+      ['grid-color bulk', '[grid;grid-color=red]||B291', { grid: true, gridColor: 'red' }],
+      ['grid-major-color category', '[grid;grid-major-color=blue]||B291', { grid: true, gridMajorColor: 'blue' }],
+      ['grid-sky-color specific', '[grid;grid-sky-color=green]||B291', { grid: true, gridSkyColor: 'green' }],
+      ['grid-earth-color specific', '[grid;grid-earth-color=orange]||B291', { grid: true, gridEarthColor: 'orange' }],
+      ['grid-medium-color category', '[grid;grid-medium-color=pink]||B291', { grid: true, gridMediumColor: 'pink' }],
+      ['grid-minor-color category', '[grid;grid-minor-color=cyan]||B291', { grid: true, gridMinorColor: 'cyan' }],
+      ['grid-stroke-width bulk', '[grid;grid-stroke-width=0.5]||B291', { grid: true, gridStrokeWidth: 0.5 }],
+    ];
+
+    it.each(gridCases)('renders %s byte-identically from the DSL and the JS API', (_label, dsl, apiOpts) => {
+      const fromDsl = new BlissSVGBuilder(dsl).svgCode;
+      const fromApi = new BlissSVGBuilder('B291', apiOpts).svgCode;
+
+      expect(fromDsl).toBe(fromApi);
+    });
+
+    it.each(gridCases)('round-trips %s through toString, preserve, and toJSON', (_label, dsl) => {
+      const builder = new BlissSVGBuilder(dsl);
+      const expected = builder.svgCode;
+
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(expected);
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(expected);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(expected);
     });
   });
 });
