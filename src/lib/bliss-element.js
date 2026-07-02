@@ -247,6 +247,18 @@ export class BlissElement {
   }
 
   /**
+   * True ink start within this element's own frame: 0 for a leaf (path data
+   * draws from the origin); for a composite, the leftmost child ink edge.
+   * A displaced single-child composite keeps its baked offset (SIB-3), so its
+   * ink begins right of x=0 while its reported width still spans from the
+   * origin — indicator centering reads this to skip the leading gap (XC-1).
+   */
+  get #inkStartX() {
+    if (!this.#children || this.#children.length === 0) return 0;
+    return Math.min(...this.#children.map(child => child.#relativeToParentX + child.#inkStartX));
+  }
+
+  /**
    * Positions indicator parts as a centered group above the glyph.
    * First indicator is positioned so the entire group is centered over the glyph anchor.
    * Subsequent indicators are positioned relative to the previous indicator.
@@ -257,10 +269,12 @@ export class BlissElement {
   #positionIndicatorGroup(glyphParts, indicatorParts) {
     if (indicatorParts.length === 0) return;
 
-    // Calculate base glyph metrics
-    // For glyph width, we need the combined width of all glyph parts
+    // Calculate base glyph metrics over the TRUE INK SPAN: the left edge adds
+    // each part's internal leading ink offset (XC-1) so a displaced composite
+    // base does not count its leading gap; the right edge is the reported
+    // width, which already ends at the right ink edge.
     const glyphMinX = glyphParts.length > 0
-      ? Math.min(...glyphParts.map(p => p.#relativeToParentX))
+      ? Math.min(...glyphParts.map(p => p.#relativeToParentX + p.#inkStartX))
       : 0;
     const glyphMaxX = glyphParts.length > 0
       ? Math.max(...glyphParts.map(p => p.#relativeToParentX + p.width))

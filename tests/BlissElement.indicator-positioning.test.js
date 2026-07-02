@@ -36,6 +36,8 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   anchorOffset.
  *
  * Does NOT cover:
+ * - Displaced-composite ink-span centering at the builder level (XC-1), see
+ *   `BlissSVGBuilder.indicator-centering.test.js`.
  * - Multi-indicator stacking math, see
  *   `BlissSVGBuilder.multiple-indicators.test.js`.
  * - Width-getter interaction with indicator overhang, see
@@ -78,12 +80,13 @@ describe('BlissElement indicator positioning', () => {
       });
       const [, indicator] = element.snapshot().children[0].children[0].children;
 
-      // offsetX centers over the base's REPORTED span. The base is a single-child
-      // composite whose HL4:2 offset now survives (SIB-3), so it reports width 6
-      // from its origin (span [0,6], center 3) -- not HL4's content span [2,6]
-      // (center 4). anchorX = 3 + (-1) = 2; a single indicator lands at
-      // 2 - 2/2 + (-1) = 0. (Was -1 when HL4 was re-origined to 0, width 4.)
-      expect(indicator.offsetX).toBe(0);
+      // offsetX centers over the base's TRUE INK SPAN (XC-1). The base is a
+      // single-child composite whose HL4:2 offset survives (SIB-3), so its ink
+      // spans [2,6] (center 4) -- the leading gap in the reported span [0,6]
+      // (center 3) no longer counts. anchorX = 4 + (-1) = 3; a single indicator
+      // lands at 3 - 2/2 + (-1) = 1. (Was 0 when centering read the reported
+      // span, and -1 before SIB-3 re-origined HL4 to 0.)
+      expect(indicator.offsetX).toBe(1);
       // The Y contract this test pins is unchanged: base anchorOffsetY -3 minus
       // indicator anchorOffsetY 2, minus the default indicator drop 4 => -5.
       expect(indicator.offsetY).toBe(-5);
