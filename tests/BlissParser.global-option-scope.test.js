@@ -317,6 +317,23 @@ describe('BlissParser global option scope', () => {
       expect(BlissSVGBuilder.isDefined('GOPT_DEFCAMEL')).toBe(false);
     });
 
+    it('rejects the shape and external-glyph define paths too', () => {
+      // pins the guard call on the remaining two define paths (one shared
+      // helper, four call sites; glyph and bare are pinned above)
+      const shape = BlissSVGBuilder.define({
+        GOPT_DEFSHAPE: { type: 'shape', codeString: 'HL4', defaultOptions: { center: true } },
+      });
+      expect(shape.errors).toHaveLength(1);
+      expect(shape.errors[0]).toContain('center');
+      const external = BlissSVGBuilder.define({
+        GOPT_DEFEXT: { type: 'externalGlyph', getPath: () => 'M0,0h1', char: 'x', width: 4, defaultOptions: { 'svg-height': 2 } },
+      });
+      expect(external.errors).toHaveLength(1);
+      expect(external.errors[0]).toContain('svg-height');
+      expect(BlissSVGBuilder.isDefined('GOPT_DEFSHAPE')).toBe(false);
+      expect(BlissSVGBuilder.isDefined('GOPT_DEFEXT')).toBe(false);
+    });
+
     it('rejects patchDefinition() adding a global-only key', () => {
       BlissSVGBuilder.define({ GOPT_DEFPATCH: { codeString: 'B291' } });
       expect(() => BlissSVGBuilder.patchDefinition('GOPT_DEFPATCH', { defaultOptions: { 'svg-title': 'hi' } }))
