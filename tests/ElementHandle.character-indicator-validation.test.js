@@ -8,18 +8,18 @@ import { BlissSVGBuilder } from '../src/index';
  * `NON_INDICATOR_AS_CHARACTER_INDICATOR`, an unknown code as `UNKNOWN_CODE` —
  * mirroring the group overlay's per-code classification (shared
  * `partitionWordIndicators`). These per-code warnings REPLACE the old single
- * "applied no indicator" NOOP arm; the replace-all mutation semantics are
- * unchanged (a non-indicator code still applies nothing while the valid
- * subset, possibly empty, replaces the existing grammatical indicators — the
- * deliberate R14-era contract pinned in
- * `ElementHandle.indicator-noop-warning.test.js`).
+ * "applied no indicator" NOOP arm. An apply whose requested codes are ALL
+ * rejected REFUSES the mutation (rc.4 indicator-mutation fidelity): the
+ * existing indicator stack stays untouched, matching the group overlay's
+ * refuse arm — explicit failed content is not deliberate emptiness (that
+ * spelling is `applyIndicators('')`, see
+ * `ElementHandle.indicator-mutation-fidelity.test.js`).
  *
  * Covers:
- * - A recognized non-indicator warns with the exact code + bare source and is
- *   excluded from the applied set (the replace still strips an existing
- *   grammatical indicator — semantics deliberately unchanged, warn-only fix).
+ * - A recognized non-indicator warns with the exact code + bare source and
+ *   refuses: the existing grammatical indicator stays.
  * - A mixed list applies the valid subset and warns only for the rejected code.
- * - An unknown code warns `UNKNOWN_CODE`.
+ * - An unknown code warns `UNKNOWN_CODE` and leaves the stack untouched.
  * - The no-change case (semantic-only glyph + non-indicator) warns the
  *   validation code and no longer NOOP-warns.
  * - A bare glyph + recognized non-indicator warns the validation code, not NOOP.
@@ -55,10 +55,12 @@ describe('ElementHandle character indicator validation', () => {
       expect(w[0].message).toContain('not an indicator');
     });
 
-    it('still replaces the existing grammatical indicator away (semantics unchanged)', () => {
+    it('refuses the mutation, keeping the existing grammatical indicator', () => {
+      // rc.4 retarget: the pre-rc.4 replace-all arm stripped B81 away on an
+      // all-invalid apply; a zero-valid-codes apply now mutates nothing.
       const b = new BlissSVGBuilder('B291;B81');
       b.group(0).glyph(0).applyIndicators('C8');
-      expect(b.toString()).toBe('B291');
+      expect(b.toString()).toBe('B291;B81');
       expect(noopWarnings(b)).toHaveLength(0);
     });
   });
@@ -77,7 +79,7 @@ describe('ElementHandle character indicator validation', () => {
   });
 
   describe('when applying an unknown code', () => {
-    it('warns UNKNOWN_CODE naming the code', () => {
+    it('warns UNKNOWN_CODE naming the code and leaves the stack untouched', () => {
       const b = new BlissSVGBuilder('B291;B81');
       b.group(0).glyph(0).applyIndicators('ZZ9');
       const w = unknownWarnings(b);
@@ -85,14 +87,15 @@ describe('ElementHandle character indicator validation', () => {
       expect(w[0].source).toBe('ZZ9');
       expect(w[0].message).toContain("applyIndicators('ZZ9')");
       expect(validationWarnings(b)).toHaveLength(0);
+      expect(b.toString()).toBe('B291;B81');
     });
   });
 
   describe('when a non-indicator code changes nothing on a semantic-only glyph', () => {
     it('warns the validation code instead of the old no-op warning', () => {
-      // The semantic root (B97) is preserved and there is no grammatical to
-      // strip, so the call changes nothing; visibility now comes from the
-      // per-code validation warning, not NOOP_INDICATOR_MUTATION.
+      // The all-invalid apply refuses (rc.4), so the call changes nothing;
+      // visibility comes from the per-code validation warning, not
+      // NOOP_INDICATOR_MUTATION.
       const b = new BlissSVGBuilder('B291;B97');
       b.group(0).glyph(0).applyIndicators('H');
       expect(b.toString()).toBe('B291;B97');

@@ -94,8 +94,9 @@ describe('BlissSVGBuilder compose-merge parity', () => {
     it('holds for two head markers colliding (first wins)', () => {
       // `^` is word-scoped and first-wins like the slot, but its drop is silent
       // (a structural re-derive, not lost data), so no DROPPED_WORD_INDICATOR.
+      // rc.4 head-marker fidelity: the surviving stored designation re-emits.
       const { composed, merged } = composeVsMerge('B313^/B431^', 'B313^//B431^');
-      expect(composed.toString()).toBe('B313/B431');
+      expect(composed.toString()).toBe('B313^/B431');
       expect(merged.toString()).toBe(composed.toString());
       expect(merged.svgCode).toBe(composed.svgCode);
       expect(dropSources(composed)).toEqual([]);
@@ -104,7 +105,7 @@ describe('BlissSVGBuilder compose-merge parity', () => {
 
     it('holds for a lone first-word head marker', () => {
       const { composed, merged } = composeVsMerge('B313^/B431', 'B313^//B431');
-      expect(composed.toString()).toBe('B313/B431');
+      expect(composed.toString()).toBe('B313^/B431');
       expect(merged.toString()).toBe(composed.toString());
       expect(merged.svgCode).toBe(composed.svgCode);
     });

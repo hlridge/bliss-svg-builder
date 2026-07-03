@@ -3,20 +3,25 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 import { BlissParser } from '../src/lib/bliss-parser.js';
 
 /**
- * Pins toString()/toJSON() re-emission of resolved head designations
- * under the head-marker contract: exports flatten aliases and re-emit `^`
- * on the designated character exactly when the bare codes would not
- * re-derive the same crown, so parse(toString(x)) always crowns the same
- * glyph.
+ * Pins toString()/toJSON() re-emission of stored head designations under the
+ * head-marker contract: exports flatten aliases and ALWAYS re-emit `^` on the
+ * designated character, matching toJSON's isHeadGlyph, so a string round-trip
+ * never loses the stored designation — even when the automatic head pick
+ * would re-derive the same glyph (rc.4 head-marker fidelity; the pre-rc.4
+ * rule emitted `^` only when the bare codes would not re-derive the crown).
+ * A word with no stored designation stays unmarked (the automatic pick is
+ * derived, not stored).
  *
  * Covers:
  * - `^` emission for a redirect-designated head (`B486/(CD^)` exports as
  *   `B486/B313/B208^`).
  * - `^` emission for a direct marker that deviates from the fallback.
- * - `^` omission when the fallback re-derives the same head (explicit
- *   marker on the fallback pick, and fallback-marked words).
+ * - `^` re-emission for a REDUNDANT designation (explicit marker on the
+ *   fallback pick, definition-baked index-0 designation, single-glyph word),
+ *   verbatim round-trip and toString fixpoint.
+ * - No `^` for a word with no stored designation (fallback-derived heads).
  * - Dropped word-markers never resurface on export.
- * - Crown stability across parse -> toString -> parse for redirect cases.
+ * - Crown stability across parse -> toString -> parse.
  * - toJSON preserving isHeadGlyph on the designated glyph.
  * - Per-word emission for multi-word inputs.
  *
@@ -63,25 +68,57 @@ describe('BlissSVGBuilder head-marker round-trip', () => {
     });
   });
 
-  describe('when the fallback re-derives the same head', () => {
-    it('omits ^ for an explicit marker on the fallback pick', () => {
+  describe('when the designation is redundant (the automatic pick re-derives it)', () => {
+    // rc.4 head-marker fidelity: a stored designation always re-emits, exactly
+    // as toJSON keeps isHeadGlyph — redundancy no longer drops it.
+    it('keeps ^ for an explicit marker on the fallback pick', () => {
       const b = new BlissSVGBuilder('B486/B208^');
 
-      expect(b.toString()).toBe('B486/B208');
+      expect(b.toString()).toBe('B486/B208^');
     });
 
-    it('omits ^ for a fallback-marked word', () => {
+    it('keeps ^ for a definition-baked designation the index-0 default re-derives', () => {
+      // (A^B) standalone crowns A at index 0; the designation is stored, so it
+      // re-emits even though a bare re-parse would default to the same crown.
+      const b = new BlissSVGBuilder('_HMR_AH');
+
+      expect(b.toString()).toBe('B291^/B313');
+    });
+
+    it('keeps ^ on a redundant index-0 marker, verbatim', () => {
+      const b = new BlissSVGBuilder('B313^/B1103');
+
+      expect(b.toString()).toBe('B313^/B1103');
+      expect(markedIndexes(BlissParser.parse(b.toString()))).toEqual([0]);
+    });
+
+    it('keeps ^ on a single-glyph designation', () => {
+      const b = new BlissSVGBuilder('B313^');
+
+      expect(b.toString()).toBe('B313^');
+    });
+
+    it('keeps ^ alongside a word-level ;; overlay', () => {
+      const b = new BlissSVGBuilder('B313^/B1103;;B81');
+
+      expect(b.toString()).toBe('B313^/B1103;;B81');
+    });
+
+    it('reaches a toString fixpoint (the re-emitted marker is stable)', () => {
+      const once = new BlissSVGBuilder('B313^/B1103').toString();
+      const twice = new BlissSVGBuilder(once).toString();
+
+      expect(twice).toBe(once);
+    });
+  });
+
+  describe('when the word has no stored designation', () => {
+    it('emits no ^ for a fallback-derived head', () => {
+      // The automatic pick is derived at query time, never stored, so a word
+      // written without ^ stays unmarked on export.
       const b = new BlissSVGBuilder('B486/B208');
 
       expect(b.toString()).toBe('B486/B208');
-    });
-
-    it('omits ^ for a designation the index-0 default re-derives', () => {
-      // (A^B) standalone crowns A at index 0; bare B291/B313 re-parses with
-      // no marks, and downstream defaults to index 0 — same crown, no ^.
-      const b = new BlissSVGBuilder('_HMR_AH');
-
-      expect(b.toString()).toBe('B291/B313');
     });
   });
 

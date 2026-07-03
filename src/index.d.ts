@@ -321,7 +321,7 @@ export declare class ElementHandle {
   // --- Mutation: indicators ---
 
   /**
-   * Replaces all indicators on this element with the given indicator codes,
+   * SETS the indicator state on this element from the given indicator codes,
    * preserving an existing semantic indicator unless `{ stripSemantic: true }`.
    *
    * Polymorphic by handle level:
@@ -335,35 +335,50 @@ export declare class ElementHandle {
    *   overlay when its code applies no indicator (it would bake nothing), rather
    *   than silently dropping the overlay.
    *
+   * An EMPTY code (omitted, `''`, or whitespace-only) is allowed as the
+   * deliberate empty indicator set: on a group handle it stores the empty `;;`
+   * overlay (render-significant — it hides the head's own character-level
+   * indicators and adds none; with `{ stripSemantic: true }` it stores the
+   * `;;!` strip overlay); on a glyph handle it has the same state effect as
+   * `clearIndicators()`, with `stripSemantic` additionally removing the
+   * semantic (a bare base stays a harmless silent no-op, like a trailing `;`).
+   *
+   * A NON-empty code whose codes are ALL invalid (non-indicators or unknown)
+   * REFUSES: nothing mutates (no clearing, no stripping) and each rejected
+   * code warns (`NON_INDICATOR_AS_CHARACTER_INDICATOR` /
+   * `NON_INDICATOR_AS_WORD_INDICATOR` / `UNKNOWN_CODE`). A mixed list applies
+   * the valid subset and warns per rejected code.
+   *
    * The per-surface `flatten` asymmetry is deliberate: it applies only to the
    * group/word-level overlay, the only surface with a portable `;;` form to
    * collapse.
    *
    * On a glyph handle the first part is always the base, so applying onto a lone
    * indicator or a detach-emptied glyph attaches the indicator (matching
-   * `addPart`). A call that still cannot apply any indicator (the requested
-   * codes are not indicators, or the target glyph is a space) adds an
+   * `addPart`). An apply that targets a glyph that cannot carry an indicator
+   * (a space glyph, or an invalid part pattern) adds an
    * `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing
    * nothing.
    */
-  applyIndicators(code: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
+  applyIndicators(code?: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
   /**
-   * Removes indicators, preserving an existing semantic indicator unless
-   * `{ stripSemantic: true }`.
+   * The PURE UNDO: removes indicators, always preserving an existing semantic
+   * indicator (clear takes no `stripSemantic` — the strip-everything spelling
+   * is `applyIndicators('', { stripSemantic: true })`).
    *
    * Polymorphic by handle level (see `applyIndicators`):
    * - **Glyph handle** — removes the glyph's grammatical indicator parts.
-   * - **Group handle** — removes the word-level `wordIndicators` overlay,
-   *   restoring the base. `{ stripSemantic: true }` keeps a reversible
-   *   empty-codes strip overlay (suppresses the base semantic at render but
-   *   keeps it recoverable). `{ flatten: true }` bakes the cleared state onto
-   *   the head glyph instead of leaving an overlay.
+   * - **Group handle** — removes the word-level `wordIndicators` overlay, and
+   *   thereby UN-HIDES the head glyph's own character-level indicators: while
+   *   the overlay existed it replaced them at render, so clearing it restores
+   *   the original characters. `{ flatten: true }` bakes the cleared state
+   *   onto the head glyph instead of leaving an overlay.
    *
-   * On a glyph handle, a clear that finds no indicators to remove adds an
-   * `NOOP_INDICATOR_MUTATION` warning to `warnings`.
+   * A clear that finds nothing to remove (a glyph with no indicators; a group
+   * with no overlay) adds an `NOOP_INDICATOR_MUTATION` warning to `warnings`.
    */
-  clearIndicators(opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
+  clearIndicators(opts?: { flatten?: boolean }): this;
 
   // --- Mutation: space/word structure ---
 

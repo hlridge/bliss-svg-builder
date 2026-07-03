@@ -22,8 +22,11 @@ import { BlissSVGBuilder } from '../src/index';
  *   pre-existing overlay before baking, but keeps it when the flattened code
  *   applies no indicator (N15).
  * - clear default: removes the overlay and restores the base, including a
- *   semantic the overlay's `!` strip had suppressed (N12); { stripSemantic }
- *   keeps a reversible empty-codes strip overlay.
+ *   semantic the overlay's `!` strip had suppressed (N12). Clear is the pure
+ *   undo (rc.4): the removed { stripSemantic } option is ignored — the
+ *   empty-codes strip overlay is now spelled
+ *   `applyIndicators('', { stripSemantic: true })`, see
+ *   `ElementHandle.indicator-mutation-fidelity.test.js`.
  * - DSL/API parity: the overlay set by the API is byte-identical (toString,
  *   svgCode, toJSON) to the equivalent `;;` / `;;!` DSL marker, including the
  *   invalid-code case (no internal _parseWarnings leaking) and a clean JSON
@@ -213,12 +216,15 @@ describe('ElementHandle word indicators', () => {
       expect(b.toString()).toBe('B313/B1103');
     });
 
-    it('keeps a reversible empty-codes strip overlay with { stripSemantic: true }', () => {
-      const b = new BlissSVGBuilder('B303;B97');
+    it('ignores the removed stripSemantic option and just removes the overlay', () => {
+      // rc.4 retarget: clearIndicators({stripSemantic:true}) used to INSTALL a
+      // `;;!` strip overlay (the opposite state effect of a clear); that
+      // spelling is now applyIndicators('', { stripSemantic: true }).
+      const b = new BlissSVGBuilder('B303;B97;;B81');
       b.group(0).clearIndicators({ stripSemantic: true });
-      expect(overlay(b)).toEqual({ codes: [], stripSemantic: true });
+      expect(overlay(b)).toBeUndefined();
       expect(glyphParts(b)).toEqual(['B303', 'B97']);
-      expect(b.toString()).toBe('B303;B97;;!');
+      expect(b.toString()).toBe('B303;B97');
     });
 
     it('returns the group handle for chaining', () => {

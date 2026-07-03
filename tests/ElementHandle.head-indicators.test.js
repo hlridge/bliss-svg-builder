@@ -7,7 +7,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * on a group handle bake onto the group's head glyph as character-level parts
  * (the pre-overlay shape) instead of setting the reversible `;;` overlay. Head is
  * the group's head glyph (the first glyph in every word used here). Semantic
- * indicators are preserved unless { stripSemantic: true }.
+ * indicators are preserved unless the APPLY carries { stripSemantic: true }
+ * (rc.4: clear is the pure undo and ignores stripSemantic; the flatten
+ * strip-everything spelling is
+ * `applyIndicators('', { flatten: true, stripSemantic: true })`).
  *
  * (These paths were formerly reached through the applyHeadIndicators /
  * clearHeadIndicators aliases, removed in rc.4; see
@@ -16,7 +19,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Covers:
  * - Baking onto multi-glyph and single-glyph groups (head = first glyph).
  * - Semantic indicator preservation and ordering; opt-in stripSemantic on the
- *   flatten apply and the flatten clear.
+ *   flatten apply (including the empty flatten apply); the flatten clear
+ *   ignores the removed stripSemantic option.
  * - Chaining (apply and clear both return the group handle) and handle stability
  *   across the mutation.
  * - Render/serialize parity with the `;;` word-level indicator marker (apply:
@@ -110,10 +114,18 @@ describe('ElementHandle head indicators', () => {
       expect(partCodes(b, 0, 1)).toEqual(['B303']);
     });
 
-    it('clears every indicator (grammatical and semantic) with { stripSemantic: true }', () => {
+    it('ignores the removed stripSemantic option on a flatten clear (semantic survives)', () => {
+      // rc.4 retarget: clear is the pure undo; stripSemantic lives on apply only.
       const b = new BlissSVGBuilder('B291;B86;B97/B303');
       b.group(0).clearIndicators({ flatten: true, stripSemantic: true });
+      expect(partCodes(b, 0, 0)).toEqual(['B291', 'B97']);
+    });
+
+    it('clears every indicator (grammatical and semantic) via the empty flatten apply with { stripSemantic: true }', () => {
+      const b = new BlissSVGBuilder('B291;B86;B97/B303');
+      b.group(0).applyIndicators('', { flatten: true, stripSemantic: true });
       expect(partCodes(b, 0, 0)).toEqual(['B291']);
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
     });
 
     it('returns the group handle for chaining', () => {
@@ -130,7 +142,7 @@ describe('ElementHandle head indicators', () => {
       expect(mut.svgCode).toBe(dsl.svgCode);
     });
 
-    it('chained apply then clear with stripSemantic restores the bare base', () => {
+    it('chained apply then clear restores the bare base (legacy stripSemantic ignored)', () => {
       const b = new BlissSVGBuilder('B291/B303');
       b.group(0).applyIndicators('B86', { flatten: true }).clearIndicators({ flatten: true, stripSemantic: true });
       expect(partCodes(b, 0, 0)).toEqual(['B291']);

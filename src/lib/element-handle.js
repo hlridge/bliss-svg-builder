@@ -761,17 +761,27 @@ export class ElementHandle {
 
   applyIndicators(code, opts) {
     this.#assertReachable();
-    if (code === undefined || code === null || code === '') {
-      throw new Error('applyIndicators() requires a code argument. Use clearIndicators() to remove indicators.');
-    }
+    // An empty request (no argument, '', or whitespace-only) is the deliberate
+    // spelling of the EMPTY indicator set, not an error: a group handle stores
+    // the empty `;;` overlay (hides the head's character-level indicators,
+    // adds none); a glyph handle gets the same state effect as
+    // clearIndicators() (a bare base stays a harmless no-op, like a trailing
+    // `;` in the DSL). stripSemantic lives on apply only, so
+    // applyIndicators('', { stripSemantic: true }) is the strip spelling
+    // (formerly clearIndicators({ stripSemantic: true })).
+    const normalized = (code === undefined || code === null
+      || (typeof code === 'string' && code.trim() === '')) ? '' : code;
     // Group handle (level 1): word-level overlay channel. Glyph handle
     // (level 2): character-level parts. Other levels: no-op via the level-2 path.
-    if (this.#level === 1) return this.#applyOrClearWordIndicators(code, opts);
-    return this.#applyOrClearIndicators(code, opts);
+    if (this.#level === 1) return this.#applyOrClearWordIndicators(normalized, opts);
+    return this.#applyOrClearIndicators(normalized, opts);
   }
 
   clearIndicators(opts) {
     this.#assertReachable();
+    // Clear is the PURE UNDO: it only removes (the `;;` overlay on a group
+    // handle, baked grammatical indicators on a glyph handle) and takes no
+    // stripSemantic (both #applyOrClear* paths force it off for a clear).
     if (this.#level === 1) return this.#applyOrClearWordIndicators(null, opts);
     return this.#applyOrClearIndicators(null, opts);
   }
@@ -788,7 +798,9 @@ export class ElementHandle {
     if (!glyph.parts) glyph.parts = [];
 
     const definitions = this.#ctx.getDefinitions();
-    const stripSemantic = opts?.stripSemantic === true;
+    // stripSemantic is an apply-only option: a clear (code === null) is the
+    // pure undo and never strips the semantic root.
+    const stripSemantic = code !== null && opts?.stripSemantic === true;
     const targetCode = glyph.codeName || glyph.parts[0]?.codeName || 'unknown';
 
     // A space glyph is not a base for indicators. Under the i>0 rule its single
@@ -847,11 +859,13 @@ export class ElementHandle {
     // parity). Each rejected code warns individually on the persistent
     // mutation channel; this REPLACES the old single "applied no indicator"
     // no-op arm (strictly more informative: it names each offending code even
-    // when the valid subset makes the call a real mutation). The replace-all
-    // semantics are deliberately unchanged: the valid subset (possibly empty)
-    // still replaces the existing grammatical indicators.
-    if (code !== null) {
-      const { rejected } = partitionWordIndicators(requestedCodes, definitions);
+    // when the valid subset makes the call a real mutation). An apply whose
+    // requested codes are ALL rejected REFUSES: explicit failed content is
+    // not deliberate emptiness (that spelling is applyIndicators('')), so the
+    // existing indicators stay untouched and nothing strips as a side effect
+    // (parity with the group overlay's null-resolver refuse arm).
+    if (code !== null && requestedCodes.length > 0) {
+      const { valid, rejected } = partitionWordIndicators(requestedCodes, definitions);
       for (const { code: badCode, reason } of rejected) {
         this.#ctx.addMutationWarning(reason === 'non-indicator'
           ? {
@@ -865,6 +879,7 @@ export class ElementHandle {
               source: badCode,
             });
       }
+      if (valid.length === 0) return this;
     }
 
     const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
@@ -946,24 +961,28 @@ export class ElementHandle {
   // `group.wordIndicators` overlay (the DSL `;;` form), leaving the base glyphs
   // intact so a later clear restores them (N12). `flatten` opts out of the
   // overlay and bakes onto the head as character-level parts instead (the
-  // pre-overlay, character-level shape). `code` is null for clear. Mirrors the
-  // parser overlay store -- including `;;` non-indicator validation -- so the API
-  // and the `;;` DSL marker produce byte-identical state (DSL/API parity).
+  // pre-overlay, character-level shape). `code` is null for clear, '' for the
+  // deliberate empty apply (== the DSL's bare `;;`). Mirrors the parser overlay
+  // store -- including `;;` non-indicator validation -- so the API and the `;;`
+  // DSL marker produce byte-identical state (DSL/API parity).
   #applyOrClearWordIndicators(code, opts) {
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
-    const stripSemantic = opts?.stripSemantic === true;
+    // stripSemantic is an apply-only option: a clear is the pure undo.
+    const stripSemantic = code !== null && opts?.stripSemantic === true;
 
     if (opts?.flatten === true) {
       // Bake onto the head; drop any overlay so the indicator is not applied
       // twice (once baked, once re-merged at render). N15: only drop the overlay
       // when the bake actually lands. A clear always bakes (removal is the
-      // effect); an apply bakes only if its code carries a recognized indicator,
-      // else the overlay is kept rather than silently destroyed (R15 Task 5).
+      // effect), and so does the empty apply (same clear state effect, strip
+      // honored); a code-carrying apply bakes only if it carries a recognized
+      // indicator, else the overlay is kept rather than silently destroyed
+      // (R15 Task 5).
       const head = this.headGlyph();
       const hadOverlay = group.wordIndicators !== undefined;
-      const requestedCodes = code === null ? [] : splitTopLevelSemicolons(code);
-      const bakeApplies = code === null
+      const requestedCodes = code === null || code === '' ? [] : splitTopLevelSemicolons(code);
+      const bakeApplies = code === null || code === ''
         || filterToIndicators(requestedCodes, this.#ctx.getDefinitions()).length > 0;
       if (bakeApplies) delete group.wordIndicators;
       if (head) {
@@ -972,10 +991,11 @@ export class ElementHandle {
         // suppress signal is passed as a private positional arg (not an opts
         // key), so it goes through the private method, not public clearIndicators.
         // An apply is left unsuppressed so an unrecognized code still warns; but
-        // stripSemantic is forwarded only when the bake applies, so a non-indicator
-        // apply stays a pure no-op (it must not strip the head as a side effect
-        // while keeping the overlay — F2). Use clearIndicators to strip instead.
-        if (code === null) head.#applyOrClearIndicators(null, { stripSemantic }, hadOverlay);
+        // stripSemantic is forwarded only when the bake applies, so a refused
+        // non-indicator apply stays a pure no-op (it must not strip the head as
+        // a side effect while keeping the overlay — F2). The strip spelling is
+        // applyIndicators('', { flatten: true, stripSemantic: true }).
+        if (code === null) head.#applyOrClearIndicators(null, {}, hadOverlay);
         else head.applyIndicators(code, { stripSemantic: bakeApplies && stripSemantic });
       } else if (hadOverlay && bakeApplies) {
         this.#ctx.rebuild();
@@ -985,11 +1005,20 @@ export class ElementHandle {
     }
 
     if (code === null) {
-      // Clear: removing the overlay fully restores the base. With stripSemantic,
-      // keep an empty-codes strip overlay so the base semantic is suppressed at
-      // render yet stays recoverable in the base parts (reversible, == `;;!`).
-      if (stripSemantic) group.wordIndicators = { codes: [], stripSemantic: true };
-      else delete group.wordIndicators;
+      // Clear: the pure undo. Removing the overlay fully restores the base --
+      // the head's own character-level indicators, replaced at render while
+      // the overlay existed, become visible again. A clear that finds no
+      // overlay warns (D4 parity with the glyph-level clear-nothing arm).
+      const hadOverlay = group.wordIndicators !== undefined;
+      delete group.wordIndicators;
+      if (!hadOverlay) {
+        const headNode = this.headGlyph()?.#nodeRef ?? group.glyphs[0];
+        const targetCode = headNode?.codeName || headNode?.parts?.[0]?.codeName || 'unknown';
+        this.#warnIndicatorNoop(
+          `clearIndicators() had no effect: the word has no word-level (;;) indicator overlay to clear.`,
+          targetCode,
+        );
+      }
     } else {
       // A `;;` overlay code must BE an indicator (same rule as the DSL `;;`
       // parser path). Tokenize bracket-aware so a multi-key option block's inner
@@ -1016,13 +1045,13 @@ export class ElementHandle {
           source,
         });
       });
-      // Store only a MEANINGFUL overlay (a surviving indicator or an explicit
-      // strip). An apply whose codes are all non-indicators (resolver null), or
-      // whose token list is empty, asked for nothing valid: warn and leave any
-      // existing overlay untouched rather than silently destroying it (the
-      // resolver's bare-`;;` empty-clear arm is a DSL-only concept). Mirrors the
-      // flatten N15 rule.
-      if (overlay && (overlay.codes.length > 0 || overlay.stripSemantic)) {
+      // Store every overlay the shared resolver returns: surviving indicators,
+      // an explicit strip, or the deliberately-empty set (the resolver's
+      // bare-`;;` arm — an empty apply IS the empty overlay, DSL parity). An
+      // apply whose codes are all non-indicators (resolver null) asked for
+      // nothing valid: warn and leave any existing overlay untouched rather
+      // than silently destroying it. Mirrors the flatten N15 rule.
+      if (overlay) {
         group.wordIndicators = overlay;
       }
     }

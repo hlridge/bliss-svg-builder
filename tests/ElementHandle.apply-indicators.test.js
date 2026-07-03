@@ -7,29 +7,32 @@ import { BlissSVGBuilder } from '../src/index';
  * indicator parts, preserves the existing semantic indicator unless the new
  * input is itself semantic, orders the semantic relative to the new
  * grammatical indicator by the new indicator's class (nominal / verbal /
- * adjectival), filters non-indicator codes silently, and clears glyph
- * identity once the part list no longer matches a known glyph.
+ * adjectival), warns per rejected non-indicator code while applying the
+ * valid subset (an ALL-invalid apply refuses, mutating nothing), and clears
+ * glyph identity once the part list no longer matches a known glyph.
  *
  * Covers:
  * - Basic application: single and multi-indicator inputs, replacement of
- *   existing indicator parts, silent filtering of non-indicator codes,
- *   preservation of multiple base parts, return-this for chaining, glyph
- *   identity clearance after part-list mutation.
+ *   existing indicator parts, filtering of non-indicator codes from a mixed
+ *   list, preservation of multiple base parts, return-this for chaining,
+ *   glyph identity clearance after part-list mutation.
  * - Semantic preservation: B97 (concrete) and B6436 (abstract) survive a
  *   non-semantic indicator application, ordered by the new indicator's
  *   class (nominal first, verbal last, adjectival last); a semantic input
  *   replaces an existing semantic; the compound B98 carries semantic
  *   identity and replaces an existing B97; { stripSemantic: true }
  *   suppresses preservation.
- * - Invalid handle or input: missing/empty codes throw; non-indicator-only
- *   inputs no-op (semantic preserved); apply on a part handle is a no-op that
+ * - Invalid handle or input: a missing/empty code is ALLOWED (rc.4) as the
+ *   deliberate empty set (same state effect as clearIndicators(), see
+ *   `ElementHandle.indicator-mutation-fidelity.test.js`); non-indicator-only
+ *   inputs refuse (nothing mutates); apply on a part handle is a no-op that
  *   still returns the handle; apply on a space glyph no-ops.
  * - Atypical/empty base (R15 Task 5): the first part is always the base (i>0
  *   rule), so apply onto a lone indicator, an indicator-led glyph, or a
  *   detach-emptied glyph attaches the indicator (matching addPart).
  * - Chaining: applyIndicators followed by applyIndicators replaces;
- *   clearIndicators({stripSemantic:true}).applyIndicators(...) yields a
- *   single new indicator over the bare base.
+ *   applyIndicators('', {stripSemantic:true}).applyIndicators(...) yields a
+ *   single new indicator over the bare base (clear no longer strips).
  * - Handle resilience: a second handle to the same glyph survives mutation
  *   by the first.
  * - DSL/API parity: mutation-built composition matches DSL-built
@@ -81,10 +84,11 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B81']);
     });
 
-    it('silently filters non-indicator codes from the input', () => {
+    it('filters non-indicator codes from a mixed input, applying the valid subset', () => {
       const b = new BlissSVGBuilder('B291');
       b.group(0).glyph(0).applyIndicators('H;B86');
-      // H is not an indicator, silently dropped
+      // H is not an indicator: dropped (it warns per-code, see
+      // ElementHandle.character-indicator-validation.test.js)
       expect(partCodes(b)).toEqual(['B291', 'B86']);
     });
 
@@ -201,20 +205,24 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B86']);
     });
 
-    it('throws when the codes argument is missing', () => {
-      const b = new BlissSVGBuilder('B291');
-      expect(() => b.group(0).glyph(0).applyIndicators()).toThrow();
+    it('accepts a missing codes argument as the empty set instead of throwing', () => {
+      // rc.4 retarget: empty apply is the deliberate empty indicator set
+      // (same state effect as clearIndicators()); the old throw is gone.
+      const b = new BlissSVGBuilder('B291;B86');
+      b.group(0).glyph(0).applyIndicators();
+      expect(partCodes(b)).toEqual(['B291']);
     });
 
-    it('throws when the codes argument is the empty string', () => {
-      const b = new BlissSVGBuilder('B291');
-      expect(() => b.group(0).glyph(0).applyIndicators('')).toThrow();
+    it('accepts the empty string as the empty set instead of throwing', () => {
+      const b = new BlissSVGBuilder('B291;B86');
+      b.group(0).glyph(0).applyIndicators('');
+      expect(partCodes(b)).toEqual(['B291']);
     });
 
-    it('strips existing grammatical indicators but preserves the semantic when all input codes are non-indicators', () => {
+    it('refuses the mutation when all input codes are non-indicators', () => {
       const b = new BlissSVGBuilder('B291;B97');
       b.group(0).glyph(0).applyIndicators('H');
-      // H filtered out, but semantic preserved, existing non-semantic indicators removed
+      // H rejected; the refuse leaves the semantic-only stack untouched
       expect(partCodes(b)).toEqual(['B291', 'B97']);
     });
 
@@ -261,11 +269,20 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291', 'B81']);
     });
 
-    it('applies a fresh indicator after a stripping clearIndicators', () => {
+    it('applies a fresh indicator after a stripping empty apply', () => {
+      // rc.4: the strip-everything spelling is applyIndicators('', {stripSemantic}).
+      const b = new BlissSVGBuilder('B291;B86;B97');
+      b.group(0).glyph(0).applyIndicators('', { stripSemantic: true }).applyIndicators('B81');
+      expect(partCodes(b)).toEqual(['B291', 'B81']);
+    });
+
+    it('keeps the semantic when chaining after a plain clearIndicators', () => {
+      // rc.4 retarget: clearIndicators no longer takes stripSemantic (pure
+      // undo); the preserved B97 rides along with the fresh B81 (verbal, so
+      // the semantic sorts last).
       const b = new BlissSVGBuilder('B291;B86;B97');
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true }).applyIndicators('B81');
-      // Clear strips all, then apply adds B81
-      expect(partCodes(b)).toEqual(['B291', 'B81']);
+      expect(partCodes(b)).toEqual(['B291', 'B81', 'B97']);
     });
   });
 

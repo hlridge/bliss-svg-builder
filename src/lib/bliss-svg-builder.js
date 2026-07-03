@@ -1550,20 +1550,16 @@ class BlissSVGBuilder {
       }
       const glyphArrays = group.glyphs.map(serializeGlyph);
       let groupStr = glyphArrays.flat().filter(Boolean).join('/');
-      // Re-emit ^ when the bare codes would not re-derive the marked head,
-      // so parse(toString(x)) always crowns the same glyph (head-marker
-      // contract round-trip). Fallback-derivable heads stay unmarked.
+      // Head-marker fidelity (rc.4): a stored designation ALWAYS re-emits as
+      // `^` on the marked glyph's last segment, matching toJSON's isHeadGlyph,
+      // so a string round-trip never loses the designation — even when the
+      // automatic head pick would re-derive the same glyph. Words without a
+      // stored designation stay unmarked (the automatic pick is derived at
+      // query time, never stored).
       const headIndex = group.glyphs.findIndex(g => g.isHeadGlyph === true);
       if (headIndex !== -1 && groupStr) {
-        const reparsedGlyphs = BlissParser.parse(groupStr).groups[0]?.glyphs ?? [];
-        // R15 WS-4: a bare re-parse no longer stamps a fallback head, so derive
-        // it the query-time way — would a fresh parse crown this designated head
-        // without the ^? If not, re-emit the ^.
-        const rederived = resolveHeadIndex(reparsedGlyphs.map(getHeadCode));
         const headSegments = glyphArrays[headIndex];
-        if (reparsedGlyphs.length === group.glyphs.length
-            && rederived !== headIndex
-            && headSegments[headSegments.length - 1]) {
+        if (headSegments.length && headSegments[headSegments.length - 1]) {
           headSegments[headSegments.length - 1] += '^';
           groupStr = glyphArrays.flat().filter(Boolean).join('/');
         }

@@ -12,15 +12,16 @@ import { BlissSVGBuilder } from '../src/index';
  *   NOOP-warns AT ALL: each rejected code now warns individually
  *   (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, strictly more
  *   informative), see `ElementHandle.character-indicator-validation.test.js`.
- *   This file pins the NOOP absence for those scenarios. Actual-effect
- *   semantics are unchanged: a non-indicator code that strips an existing
- *   indicator (replace-all / stripSemantic) is still a real mutation.
+ *   This file pins the NOOP absence for those scenarios. An all-invalid apply
+ *   REFUSES (rc.4 indicator-mutation fidelity): it mutates nothing, so the
+ *   per-code warnings are its only visible effect, see
+ *   `ElementHandle.indicator-mutation-fidelity.test.js`.
  * - apply on a glyph that cannot carry an indicator (a space glyph; a
  *   non-indicator code on an empty glyph). A lone indicator or empty glyph
  *   given a real indicator now attaches it (R15 Task 5), so it is not warned.
  * - apply on an invalid part pattern (a non-indicator part after an indicator).
- * - clear that finds no indicators to remove, including stripSemantic clearing
- *   a glyph that has no semantic.
+ * - clear that finds no indicators to remove, including with the removed
+ *   stripSemantic option (ignored on clear since rc.4; clear is the pure undo).
  * - The warning source falls back to a placeholder when the target part has no
  *   resolvable code name (malformed input).
  * - Negative controls: a real apply / real clear does NOT warn; a default clear
@@ -65,29 +66,30 @@ describe('ElementHandle indicator no-op warning', () => {
     });
   });
 
-  describe('when a non-indicator code changes the existing indicators', () => {
-    // regression: the warning gates on the ACTUAL effect, not merely on whether
-    // the requested codes are indicators. A non-indicator input that strips an
-    // existing indicator (replace-all / stripSemantic) is a real mutation, not a
-    // no-op, so it must NOT warn.
-    it('does not warn when a non-indicator code strips an existing grammatical indicator', () => {
+  describe('when a non-indicator code leaves the existing indicators untouched', () => {
+    // rc.4 retarget: an all-invalid apply REFUSES (mutates nothing), so there
+    // is never an "actual effect" to exempt. The per-code validation warning
+    // is the visibility channel; NOOP stays silent for apply.
+    it('does not NOOP-warn when a non-indicator code is refused over a grammatical indicator', () => {
       const b = new BlissSVGBuilder('B291;B97;B81');
       b.group(0).glyph(0).applyIndicators('H');
+      expect(b.toString()).toBe('B291;B97;B81');
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+
+    it('does not NOOP-warn and does not strip when a refused code requests stripSemantic', () => {
+      // F2 generalized (rc.4): failed content must not strip the semantic as a
+      // side effect; the deliberate spelling is applyIndicators('', { stripSemantic: true }).
+      const b = new BlissSVGBuilder('B291;B97');
+      b.group(0).glyph(0).applyIndicators('B303', { stripSemantic: true });
       expect(b.toString()).toBe('B291;B97');
       expect(noopWarnings(b)).toHaveLength(0);
     });
 
-    it('does not warn when stripSemantic removes the semantic via a non-indicator code', () => {
-      const b = new BlissSVGBuilder('B291;B97');
-      b.group(0).glyph(0).applyIndicators('B303', { stripSemantic: true });
-      expect(b.toString()).toBe('B291');
-      expect(noopWarnings(b)).toHaveLength(0);
-    });
-
     it('does not NOOP-warn when a non-indicator code leaves the indicators unchanged', () => {
-      // B97 (semantic) is preserved and there is no grammatical to strip, so the
-      // call changes nothing; visibility now comes from the per-code validation
-      // warning (ElementHandle.character-indicator-validation.test.js), not NOOP.
+      // The all-invalid apply refuses, so the call changes nothing; visibility
+      // comes from the per-code validation warning
+      // (ElementHandle.character-indicator-validation.test.js), not NOOP.
       const b = new BlissSVGBuilder('B291;B97');
       b.group(0).glyph(0).applyIndicators('H');
       expect(b.toString()).toBe('B291;B97');
@@ -140,7 +142,8 @@ describe('ElementHandle indicator no-op warning', () => {
       expect(w[0].message).toContain('clearIndicators()');
     });
 
-    it('warns when stripSemantic clears a glyph that has no semantic', () => {
+    it('warns when a clear with the removed stripSemantic option finds nothing to clear', () => {
+      // stripSemantic is ignored on clear since rc.4; the call is a plain clear.
       const b = new BlissSVGBuilder('B291');
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
       expect(noopWarnings(b)).toHaveLength(1);
@@ -160,9 +163,13 @@ describe('ElementHandle indicator no-op warning', () => {
       expect(noopWarnings(b)).toHaveLength(0);
     });
 
-    it('does not warn when stripSemantic clears an existing semantic', () => {
+    it('does not warn when an empty apply with stripSemantic clears an existing semantic', () => {
+      // rc.4: the strip-everything spelling moved from clearIndicators({stripSemantic})
+      // to applyIndicators('', { stripSemantic: true }); a real strip is a real
+      // mutation, so it does not NOOP-warn.
       const b = new BlissSVGBuilder('B291;B97');
-      b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
+      b.group(0).glyph(0).applyIndicators('', { stripSemantic: true });
+      expect(b.toString()).toBe('B291');
       expect(noopWarnings(b)).toHaveLength(0);
     });
 
@@ -240,7 +247,8 @@ describe('ElementHandle indicator no-op warning', () => {
     it('does not strip the head when the non-indicator code also requests stripSemantic', () => {
       // F2 (R15 Task 5 review): a non-indicator flatten apply is a pure no-op even
       // with stripSemantic — it must not strip the head's baked semantic as a side
-      // effect while keeping the overlay. Use clearIndicators({stripSemantic}) to strip.
+      // effect while keeping the overlay. The deliberate strip spelling is
+      // applyIndicators('', { flatten: true, stripSemantic: true }).
       const b = new BlissSVGBuilder('B291;B97;;B81');
       b.group(0).applyIndicators('B303', { flatten: true, stripSemantic: true });
       expect(b.toString()).toBe('B291;B97;;B81');

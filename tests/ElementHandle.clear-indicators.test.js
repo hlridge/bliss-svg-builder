@@ -2,21 +2,22 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { BlissSVGBuilder } from '../src/index';
 
 /**
- * Pins ElementHandle.clearIndicators on a glyph handle: the call removes
- * grammatical indicator parts from the glyph by default, preserves the
- * semantic indicator (B97 / B6436 / B98) unless { stripSemantic: true } is
- * passed, restores glyph identity once the part list reverts to a known
- * bare-glyph code, and is a no-op when there are no grammatical indicators
- * to remove.
+ * Pins ElementHandle.clearIndicators on a glyph handle: the call is the pure
+ * undo — it removes grammatical indicator parts from the glyph, always
+ * preserves the semantic indicator (B97 / B6436 / B98; the rc.4 contract
+ * removed the stripSemantic arm from clear — the strip-everything spelling is
+ * `applyIndicators('', { stripSemantic: true })`), restores glyph identity
+ * once the part list reverts to a known bare-glyph code, and is a no-op when
+ * there are no grammatical indicators to remove.
  *
  * Covers:
  * - Default behaviour: grammatical indicator parts removed, semantic
  *   preserved, no-op on a glyph without indicators or with only a semantic
  *   indicator, returns the handle for chaining.
- * - With { stripSemantic: true }: all indicator parts removed including
- *   the semantic; glyph identity restored when the cleared part list
- *   matches a known bare-glyph code; mutation-built output equals the
- *   DSL-built bare glyph byte-for-byte.
+ * - The removed { stripSemantic: true } option is ignored: the semantic
+ *   survives; glyph identity restored when the cleared part list matches a
+ *   known bare-glyph code; mutation-built output equals the DSL-built bare
+ *   glyph byte-for-byte.
  * - Restored base round-trips losslessly: clearing an indicator from a
  *   relocated base (built-in or custom) keeps its :x,y AND any part-level
  *   option in toString (R15 Task 3 for the offset; RR3-3 for the option,
@@ -76,11 +77,13 @@ describe('ElementHandle clear indicators', () => {
     });
   });
 
-  describe('when clearing with { stripSemantic: true }', () => {
-    it('removes all indicators including the semantic', () => {
+  describe('when clearing with the removed stripSemantic option', () => {
+    it('ignores the option and preserves the semantic like a plain clear', () => {
+      // rc.4 retarget: clear is the pure undo and takes no stripSemantic; the
+      // strip-everything spelling is applyIndicators('', { stripSemantic: true }).
       const b = new BlissSVGBuilder('B291;B86;B97');
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
-      expect(partCodes(b)).toEqual(['B291']);
+      expect(partCodes(b)).toEqual(['B291', 'B97']);
     });
 
     it('restores glyph identity once the cleared part list matches a known bare glyph', () => {

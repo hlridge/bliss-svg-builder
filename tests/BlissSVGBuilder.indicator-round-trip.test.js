@@ -191,7 +191,9 @@ describe('BlissSVGBuilder indicator round-trip', () => {
     const MODIFIERS = [
       ['applyIndicators with a stripped semantic', g => g.applyIndicators('B81', { stripSemantic: true })],
       ['applyIndicators preserving the semantic', g => g.applyIndicators('B81')],
-      ['clearIndicators with a stripped semantic', g => g.clearIndicators({ stripSemantic: true })],
+      // rc.4: the strip-everything spelling moved from clearIndicators({stripSemantic})
+      // to the empty apply (a plain clear would not modify _IRT_CI: B97 is semantic).
+      ['an empty applyIndicators with a stripped semantic', g => g.applyIndicators('', { stripSemantic: true })],
     ];
     const buildModified = (op) => {
       const b = new BlissSVGBuilder('_IRT_CI');
