@@ -421,6 +421,8 @@ builder.group(0).clearIndicators();
 // removes the overlay, back to 'B291/B303'
 ```
 
+Clearing is the undo of applying: any character-level indicators the head glyph carried before the overlay hid them show again.
+
 Pass `{ stripSemantic: true }` for the `;;!` strip form, or `{ flatten: true }` to bake the indicator onto the head glyph's parts instead of keeping the reversible overlay.
 
 Indicator calls never fail silently. `applyIndicators()` validates its codes at both levels: a recognized non-indicator warns `NON_INDICATOR_AS_WORD_INDICATOR` on a group handle and `NON_INDICATOR_AS_CHARACTER_INDICATOR` on a glyph handle (an unknown code warns `UNKNOWN_CODE`), and only real indicators apply. A call that cannot apply or remove anything for structural reasons (for example, clearing a glyph that has no indicators) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`. See [Warning Codes](/reference/warning-codes).

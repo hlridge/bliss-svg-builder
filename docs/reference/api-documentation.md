@@ -1005,7 +1005,7 @@ builder.glyph(0).clearIndicators();
 builder.glyph(0).clearIndicators({ stripSemantic: true });
 ```
 
-On a **group handle**, removes the word-level `;;` overlay and restores the base (including a semantic that a `;;!` strip had suppressed). `{ stripSemantic: true }` keeps a reversible empty-codes strip overlay; `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
+On a **group handle**, removes the word-level `;;` overlay — the pure undo of a group-level apply: the head glyph's own character-level indicators, hidden while the overlay was active, show again (including a semantic that a `;;!` strip had suppressed). `{ stripSemantic: true }` keeps a reversible empty-codes strip overlay; `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
 
 ### Options
 

@@ -27,7 +27,7 @@ A `;`-part must itself be a single part (a primitive or defined shape, or a defi
 A word has two indicator layers: each character's own parts (written with `;`) and the word's indicator (written with `;;`), which sits on top:
 
 - The builder picks the **head glyph** to display the indicator on; you don't name it. See [the head glyph algorithm](/handbook/writing/words-sentences#the-head-glyph-algorithm).
-- While a `;;` indicator is active, it **hides the head glyph's own grammatical indicators**: the word's grammar wins over the character's.
+- While a `;;` indicator is active, it **hides the head glyph's own grammatical indicators**: the word's grammar wins over the character's. Removing the overlay un-hides them (the overlay is a layer, not a rewrite).
 - The word's semantic root (`B97` thing / `B6436` abstract) is preserved; `;;!` strips it too (see below).
 - The code after `;;` must be an indicator. A base character there is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning; an unknown code with `UNKNOWN_CODE`. The word renders either way.
 
