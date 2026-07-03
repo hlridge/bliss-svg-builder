@@ -24,6 +24,28 @@ const ERROR_PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].
 const getHeadCode = (glyph) =>
   headScanCode(glyph.glyphCode, glyph.parts?.length ?? 0, glyph.parts?.[0]?.codeName);
 
+// Mirrors toString()'s glyph emission for an empty-parts glyph: it re-emits
+// a token only when some option survives serialization. `key` is stripped by
+// toJSON, the kerning keys emit as RK/AK segments (which cannot carry a `^`),
+// and `false` values are filtered by serializeOptions.
+const GLYPH_OPTION_KEYS_WITHOUT_TOKEN = new Set(['key', 'relativeKerning', 'absoluteKerning']);
+const glyphEmitsOptionsToken = (glyph) =>
+  Object.entries(glyph.options ?? {}).some(([k, v]) =>
+    v !== false && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
+
+// Resolves which glyph carries a word-level (`;;`) overlay. A stored
+// designation wins; the fallback resolves among content-bearing glyphs only,
+// because serialization omits a bare empty-parts glyph, so a reparse of
+// toString() resolves the head without it. Returns -1 when no glyph can
+// carry the overlay (every glyph is empty).
+const resolveOverlayHeadIndex = (glyphs) => {
+  const marked = glyphs.findIndex(g => g.isHeadGlyph === true);
+  if (marked !== -1) return marked;
+  const contentIndexes = glyphs.flatMap((g, i) => (g.parts?.length ? [i] : []));
+  if (!contentIndexes.length) return -1;
+  return contentIndexes[resolveHeadIndex(contentIndexes.map(i => getHeadCode(glyphs[i])))];
+};
+
 // Note: BlissSVGBuilder.LIB_VERSION is attached at the public entry point
 // (src/index.js), not declared here. Code that imports the class directly
 // from this file (e.g. internal tests) will see LIB_VERSION as undefined.
@@ -553,7 +575,11 @@ class BlissSVGBuilder {
   // mutation route and input surface passes through (parse and the indicator
   // API already gate their own ingestion):
   //  1. A space glyph never carries a designation (deleted silently, matching
-  //     the structural `^` drops in splitAt/mergeWithNext).
+  //     the structural `^` drops in splitAt/mergeWithNext). Likewise a glyph
+  //     serialization omits entirely (empty parts, no codeName, no options
+  //     that would re-emit it as an options-only token): its designation has
+  //     no serialized form, so it dies with the glyph's content (the
+  //     round-2 F4 contract, enforced here for hand-authored object input).
   //  2. An all-space word never carries a `;;` overlay (dropped LOUDLY,
   //     matching mergeWithNext's DROPPED_WORD_INDICATOR — data loss must be
   //     visible). The deletion makes the sweep warn once, not per rebuild.
@@ -575,6 +601,10 @@ class BlissSVGBuilder {
     for (const group of groups) {
       for (const glyph of group.glyphs ?? []) {
         if (glyph.isHeadGlyph === true && BlissSVGBuilder.#isSpaceGlyphNode(glyph)) {
+          delete glyph.isHeadGlyph;
+        }
+        if (glyph.isHeadGlyph === true && !glyph.parts?.length
+            && !glyph.glyphCode && !glyph.codeName && !glyphEmitsOptionsToken(glyph)) {
           delete glyph.isHeadGlyph;
         }
       }
@@ -694,8 +724,11 @@ class BlissSVGBuilder {
     // structural mutation re-derives it instead of floating onto a stale stamp.
     for (const group of blissObj.groups ?? []) {
       if (group.wordIndicators && group.glyphs?.length) {
-        const marked = group.glyphs.findIndex(g => g.isHeadGlyph === true);
-        const headIndex = marked !== -1 ? marked : resolveHeadIndex(group.glyphs.map(getHeadCode));
+        const headIndex = resolveOverlayHeadIndex(group.glyphs);
+        // Every glyph is empty: nothing can carry the rendered overlay. The
+        // stored overlay persists (F3 pure-state contract) but renders
+        // nothing, exactly like the reparse of the serialized form.
+        if (headIndex === -1) continue;
         const head = group.glyphs[headIndex];
         // The overlay stores code STRINGS (SIB-2); this render-merge parse is
         // where a definition-baked misplacement (e.g. a global-only option
@@ -1796,10 +1829,12 @@ class BlissSVGBuilder {
         // character-level parts and drops the field, reproducing the pre-overlay
         // (primitive) serialization. Default keeps the overlay (resolved at
         // render, re-emitted as `;;`).
-        if (options.flattenIndicators && group.wordIndicators && group.glyphs?.length) {
-          const marked = group.glyphs.findIndex(g => g.isHeadGlyph === true);
-          const headIndex = marked !== -1 ? marked : resolveHeadIndex(group.glyphs.map(getHeadCode));
-          const head = group.glyphs[headIndex];
+        // (An all-empty word keeps its unflattenable overlay: headIndex -1.)
+        const overlayHeadIndex = options.flattenIndicators && group.wordIndicators && group.glyphs?.length
+          ? resolveOverlayHeadIndex(group.glyphs)
+          : -1;
+        if (overlayHeadIndex !== -1) {
+          const head = group.glyphs[overlayHeadIndex];
           head.parts = mergeWordIndicatorsOntoHead(
             head, group.wordIndicators, blissElementDefinitions, (code) => BlissParser.parse(code)
           );

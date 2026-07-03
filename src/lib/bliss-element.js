@@ -40,6 +40,7 @@ export class BlissElement {
   #char
   #externalGlyphSpacing
   #isSpaceGroup
+  #isEmptyGlyph
   //#endregion
   #childStartOffset
   #parentElement;
@@ -218,7 +219,10 @@ export class BlissElement {
     const firstGroup = this.#children?.[0];
     if (!firstGroup) return null;
 
-    const firstCharacter = firstGroup.#children?.[0];
+    // Empty-parts glyphs are invisible to layout: the reparse of toString()
+    // (which omits them) computes indicator overhang from the first
+    // content-bearing character, so the live render must too.
+    const firstCharacter = firstGroup.#children?.find(c => !c.#isEmptyGlyph);
     if (!firstCharacter || !firstCharacter.#children) return null;
 
     return firstCharacter;
@@ -492,9 +496,14 @@ export class BlissElement {
         }
         // error-placeholder off: leave #children empty (invisible word).
       } else {
+        // Empty-parts glyphs are skipped in the sibling chain so surviving
+        // neighbors pair up for spacing and kerning exactly as they do when
+        // the serialized form (which omits empty glyphs) is reparsed.
+        let previousLayoutGlyph = null;
         for (const glyph of this.#blissObj.glyphs) {
-          const child = new BlissElement(glyph, { parentElement: this, previousElement: this.#children[this.#children.length - 1], level: this.#level + 1, sharedOptions: this.#sharedOptions });
+          const child = new BlissElement(glyph, { parentElement: this, previousElement: previousLayoutGlyph, level: this.#level + 1, sharedOptions: this.#sharedOptions });
           this.#children.push(child);
+          if (!child.#isEmptyGlyph) previousLayoutGlyph = child;
         }
       }
 
@@ -538,6 +547,10 @@ export class BlissElement {
           }
           return sum;
         }, 0);
+      } else if (this.#children.every(child => child.#isEmptyGlyph)) {
+        // A group whose every glyph is empty has no layout content: it
+        // advances nothing, matching its serialized form, which omits it.
+        this.#advanceX = 0;
       } else {
         this.#advanceX = this.baseGroupWidth + this.#sharedOptions.charSpace;
       }
@@ -591,6 +604,12 @@ export class BlissElement {
         if (!this.#blissObj.parts) {
           this.#blissObj = { parts: [this.#blissObj] };
         }
+
+        // A glyph whose parts array is empty (mutation-emptied, or a DSL
+        // options-only token like `[color=red]`) is invisible to layout:
+        // zero width, zero advance, no output. Serialization omits it, so
+        // the live render must not let it occupy a spacing slot.
+        this.#isEmptyGlyph = this.#blissObj.parts.length === 0;
 
         const warningCountBefore = this.#sharedOptions?.warnings?.length ?? 0;
 
@@ -651,11 +670,15 @@ export class BlissElement {
         if (!this.#previousElement) {
           this.#relativeToParentX = this.#parentElement.#relativeToParentX + (this.#blissObj.x ?? 0);
         } else {
-          if (this.isExternalGlyph && this.#previousElement.isExternalGlyph) {
+          // An empty-parts glyph must not re-space its neighbor: its serialized
+          // form is absent (or a glyphless options token), so the reparse never
+          // applies these identity-based adjustments. The RK/AK option blocks
+          // below stay ungated — their serialized markers re-apply on reparse.
+          if (this.isExternalGlyph && this.#previousElement.isExternalGlyph && !this.#isEmptyGlyph) {
             this.#previousElement.#advanceX = this.#previousElement.width + this.#externalGlyphSpacing;
           }
 
-          if (!this.isExternalGlyph && !this.#previousElement.isExternalGlyph &&
+          if (!this.#isEmptyGlyph && !this.isExternalGlyph && !this.#previousElement.isExternalGlyph &&
               this.#previousElement.kerningRules && this.codeName) {
             const kerningAdjustment = this.#previousElement.kerningRules[this.codeName] ?? 0;
             if (kerningAdjustment !== 0) {
@@ -680,6 +703,11 @@ export class BlissElement {
 
         if (hasFailedParts && !this.#sharedOptions?.errorPlaceholder) {
           // Invisible failed character takes zero space
+          this.#advanceX = 0;
+          this.getSvgContent = () => '';
+        } else if (this.#isEmptyGlyph) {
+          // Empty-parts glyph: no advance (not even charSpace) and no output,
+          // so the live render equals the reparse of toString().
           this.#advanceX = 0;
           this.getSvgContent = () => '';
         } else {
@@ -823,14 +851,21 @@ export class BlissElement {
     if (this.#leafWidth !== undefined) return this.#leafWidth;
     if (!this.#children || this.#children.length === 0) return 0;
 
-    const minRelativeX = Math.min(...this.#children.map(child => child.#relativeToParentX));
+    // Empty-parts glyphs contribute no extent (they render nothing and
+    // serialization omits them).
+    const layoutChildren = this.#level === 1
+      ? this.#children.filter(child => !child.#isEmptyGlyph)
+      : this.#children;
+    if (layoutChildren.length === 0) return 0;
+
+    const minRelativeX = Math.min(...layoutChildren.map(child => child.#relativeToParentX));
 
     let maxRelativeXPlusWidth;
     if (this.#level === 1) {
-      maxRelativeXPlusWidth = Math.max(...this.#children.map(child =>
+      maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
         child.#relativeToParentX + child.rightExtendedGlyphWidth));
     } else {
-      maxRelativeXPlusWidth = Math.max(...this.#children.map(child =>
+      maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
         child.#relativeToParentX + child.width));
     }
 
@@ -892,7 +927,9 @@ export class BlissElement {
     if (this.#level !== 1) throw new Error('baseGroupWidth can only be called on group elements (level 1)');
 
     const group = this;
-    const glyphs = group.#children;
+    // Empty-parts glyphs contribute no extent (they render nothing and
+    // serialization omits them).
+    const glyphs = group.#children.filter(glyph => !glyph.#isEmptyGlyph);
     if (glyphs.length === 0) return 0;
 
     const firstGlyph = glyphs[0];
@@ -1058,10 +1095,20 @@ export class BlissElement {
     if (this.#level === 1 && childSnapshots.length > 0) {
       const marked = childSnapshots.findIndex(c => c.isHeadGlyph);
       if (marked === -1) {
-        const headIndex = resolveHeadIndex(
-          childSnapshots.map(c => headScanCode(c.codeName, c.children?.length ?? 0, c.children?.[0]?.codeName))
-        );
-        childSnapshots[headIndex] = Object.freeze({ ...childSnapshots[headIndex], isHeadGlyph: true });
+        // Empty-parts glyphs cannot head a word (serialization omits them and
+        // the overlay resolver skips them); resolve among the others. A word
+        // of only empty glyphs has no head at all.
+        const contentIndexes = this.#children.flatMap((el, i) => (el.#isEmptyGlyph ? [] : [i]));
+        if (contentIndexes.length > 0) {
+          const headIndex = contentIndexes[resolveHeadIndex(
+            contentIndexes.map(i => headScanCode(
+              childSnapshots[i].codeName,
+              childSnapshots[i].children?.length ?? 0,
+              childSnapshots[i].children?.[0]?.codeName
+            ))
+          )];
+          childSnapshots[headIndex] = Object.freeze({ ...childSnapshots[headIndex], isHeadGlyph: true });
+        }
       }
     }
 

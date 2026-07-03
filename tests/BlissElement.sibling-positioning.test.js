@@ -175,7 +175,9 @@ describe('BlissElement sibling positioning', () => {
       expect(followingGroup.offsetX).toBe(10);
     });
 
-    test('advances a glyph with no parts by the character spacing alone', () => {
+    test('gives a glyph with no parts zero advance and no spacing slot', () => {
+      // Empty-parts glyphs are invisible to layout (rc.4 emptied-glyph fix):
+      // zero advance, and the following glyph positions as if it were absent.
       const element = new BlissElement({
         groups: [
           { glyphs: [{ parts: [] }, rawGlyph()] }
@@ -184,8 +186,8 @@ describe('BlissElement sibling positioning', () => {
       const [emptyGlyph, followingGlyph] = element.snapshot().children[0].children;
 
       expect(emptyGlyph.children).toEqual([]);
-      expect(emptyGlyph.advanceX).toBe(2);
-      expect(followingGlyph.offsetX).toBe(2);
+      expect(emptyGlyph.advanceX).toBe(0);
+      expect(followingGlyph.offsetX).toBe(0);
     });
 
     test('advances a non-space glyph by its width plus the character spacing', () => {

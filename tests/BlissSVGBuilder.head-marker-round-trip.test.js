@@ -24,17 +24,20 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Crown stability across parse -> toString -> parse.
  * - toJSON preserving isHeadGlyph on the designated glyph.
  * - A detach that empties a marked glyph deletes its designation too, keeping
- *   toString and toJSON in agreement (round-2 review F4); a partial detach
- *   keeps it.
+ *   toString, toJSON, and the rendered svg in agreement (round-2 review F4);
+ *   a partial detach keeps it.
+ * - Object input marking a bare empty glyph: the designation dies at rebuild
+ *   (no serialized form); an options-carrying empty glyph keeps it (its
+ *   `[opts]^` token re-emits).
  * - Per-word emission for multi-word inputs.
  *
  * Does NOT cover:
  * - Resolution semantics themselves (which glyph gets the crown), see
  *   `BlissParser.head-marker-contract.test.js` and
  *   `BlissParser.head-marker-matrix.test.js`.
- * - The emptied glyph's RENDER advance (an empty glyph still consumes
- *   charSpace, so live svg differs from the reparse of toString) — an open
- *   layout-fidelity finding, backlog-tracked, independent of the designation.
+ * - The full empty-glyph layout contract (zero advance in every position,
+ *   kerning across empties, group extents), see
+ *   `BlissSVGBuilder.empty-glyph-layout.test.js`.
  * - General toString flattening of aliases, options, and spaces, see
  *   `BlissSVGBuilder.string-output.test.js` and
  *   `BlissSVGBuilder.round-trip.test.js`.
@@ -182,6 +185,7 @@ describe('BlissSVGBuilder head-marker round-trip', () => {
       expect(b.toJSON().groups[0].glyphs.some(g => g.isHeadGlyph === true)).toBe(false);
       const reparsed = new BlissSVGBuilder(b.toString());
       expect(reparsed.toJSON().groups[0].glyphs.some(g => g.isHeadGlyph === true)).toBe(false);
+      expect(reparsed.svgCode).toBe(b.svgCode);
     });
 
     it('keeps the designation while the marked glyph still has parts', () => {
@@ -190,6 +194,42 @@ describe('BlissSVGBuilder head-marker round-trip', () => {
 
       expect(b.toJSON().groups[0].glyphs[0].isHeadGlyph).toBe(true);
       expect(b.toString()).toBe('B313^/B1103');
+    });
+  });
+
+  describe('when object input marks a glyph that serialization omits', () => {
+    // The rebuild-chokepoint mirror of the detach rule above: a designation
+    // on a bare empty-parts glyph has no serialized form, so it dies with
+    // the glyph's content no matter how the state was authored.
+    it('deletes the designation from a bare empty glyph', () => {
+      const b = new BlissSVGBuilder({ groups: [{ glyphs: [
+        { parts: [], isHeadGlyph: true },
+        { parts: [{ codeName: 'B1103' }], codeName: 'B1103' },
+      ], wordIndicators: { codes: ['B81'], stripSemantic: false } }] });
+
+      expect(b.toJSON().groups[0].glyphs.some(g => g.isHeadGlyph === true)).toBe(false);
+      expect(b.toString()).toBe('B1103;;B81');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps the designation on an options-carrying empty glyph', () => {
+      // `[color=red]^` re-emits both token and marker, so this designation
+      // has a serialized form and survives.
+      const b = new BlissSVGBuilder('B313/[color=red]^');
+
+      expect(b.toString()).toBe('B313/[color=red]^');
+      expect(b.toJSON().groups[0].glyphs[1].isHeadGlyph).toBe(true);
+    });
+
+    it('deletes the designation when the options serialize to nothing', () => {
+      // `key` never re-emits from toString, so `[key=k]^` on an empty glyph
+      // has no serialized form either — the designation dies and the `;;`
+      // overlay resolves onto the content glyph (adversarial review F5).
+      const b = new BlissSVGBuilder('B313/[key=k]^;;B81');
+
+      expect(b.toString()).toBe('B313;;B81');
+      expect(b.toJSON().groups[0].glyphs.some(g => g.isHeadGlyph === true)).toBe(false);
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
   });
 });
