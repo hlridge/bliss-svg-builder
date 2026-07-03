@@ -542,28 +542,43 @@ class BlissSVGBuilder {
     }
   }
 
-  // Space-invariant normalization (round-3 external review F1): a structural
-  // mutation (replaceGlyph/removeGlyph/replacePart/detach/addGlyph-on-empty)
-  // or hand-authored object input can turn an indicator-bearing word into a
-  // space, leaving state the space serialization ('//') eats — toString would
-  // diverge from toJSON, the reparse loses the state, and the clearIndicators
-  // space guard would refuse to remove the now-hidden overlay. Enforced HERE,
-  // the one chokepoint every mutation route and input surface passes through
-  // (parse and the indicator API already gate their own ingestion, so this is
-  // a no-op for them): a space glyph never carries a designation (deleted
-  // silently, matching the structural `^` drops in splitAt/mergeWithNext); an
-  // all-space word never carries a `;;` overlay (dropped LOUDLY, matching
-  // mergeWithNext's DROPPED_WORD_INDICATOR — data loss must be visible). The
-  // deletion makes the sweep warn once, not per rebuild. An EMPTY group keeps
-  // its overlay (the F3 pure-state-op contract; isRawSpaceGroup is false).
+  // Space-invariant normalization (round-3/round-4 external review F1): a
+  // structural mutation (replaceGlyph/removeGlyph/replacePart/detach/
+  // addGlyph-on-empty/insertGlyph), an alias expanding an in-word space, or
+  // hand-authored object input can leave space state the DSL cannot express —
+  // an overlay/designation on a space that '//' serialization eats, or a bare
+  // space glyph INSIDE a word whose serialized token the parser re-splits
+  // into separate groups (so toString diverges from toJSON and the reparse
+  // renders differently, silently). Enforced HERE, the one chokepoint every
+  // mutation route and input surface passes through (parse and the indicator
+  // API already gate their own ingestion):
+  //  1. A space glyph never carries a designation (deleted silently, matching
+  //     the structural `^` drops in splitAt/mergeWithNext).
+  //  2. An all-space word never carries a `;;` overlay (dropped LOUDLY,
+  //     matching mergeWithNext's DROPPED_WORD_INDICATOR — data loss must be
+  //     visible). The deletion makes the sweep warn once, not per rebuild.
+  //     An EMPTY group keeps its overlay (the F3 pure-state-op contract;
+  //     isRawSpaceGroup is false).
+  //  3. A bare space glyph never lives inside a word: the word is split at
+  //     its space runs into real space groups — canonicalization, SILENT
+  //     (nothing is lost: glyph nodes move; the first word run keeps the
+  //     group node, overlay, and options; later word runs get an options
+  //     copy, splitAt parity, and keep their own designations, which
+  //     round-trip per word). A fail-flagged group is exempt (terminal;
+  //     splitting it would duplicate its errorSource replay). A multi-part
+  //     glyph merely LED by a space-code part (`ZSA;B291`) is not a space
+  //     glyph and is never touched.
+  //  4. Adjacent space groups merge (a reparse groups consecutive space
+  //     tokens into ONE group, so separate neighbors could not round-trip).
   #normalizeSpaceInvariant() {
-    for (const group of this.#rawBlissObj.groups ?? []) {
+    const groups = this.#rawBlissObj.groups ?? [];
+    for (const group of groups) {
       for (const glyph of group.glyphs ?? []) {
         if (glyph.isHeadGlyph === true && BlissSVGBuilder.#isSpaceGlyphNode(glyph)) {
           delete glyph.isHeadGlyph;
         }
       }
-      if (group.wordIndicators && BlissSVGBuilder.#isRawSpaceGroup(group)) {
+      if (group.wordIndicators && !group.errorCode && BlissSVGBuilder.#isRawSpaceGroup(group)) {
         const { codes = [], stripSemantic } = group.wordIndicators;
         const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
         delete group.wordIndicators;
@@ -572,6 +587,87 @@ class BlissSVGBuilder {
           message: `A space cannot carry a word indicator: the word became a space, so its word-level indicator overlay (${dropped}) was dropped.`,
           source: dropped,
         });
+      }
+    }
+    // Pass 3: split mixed words at their space runs.
+    const createdSpaceGroups = [];
+    const movedSpaceGlyphs = [];
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i];
+      if (group.errorCode || !group.glyphs?.length) continue;
+      if (!group.glyphs.some(g => BlissSVGBuilder.#isSpaceGlyphNode(g))) continue;
+      if (BlissSVGBuilder.#isRawSpaceGroup(group)) continue;
+      const runs = [];
+      for (const glyph of group.glyphs) {
+        const isSpace = BlissSVGBuilder.#isSpaceGlyphNode(glyph);
+        const last = runs[runs.length - 1];
+        if (last && last.isSpace === isSpace) last.glyphs.push(glyph);
+        else runs.push({ isSpace, glyphs: [glyph] });
+      }
+      let keeperAssigned = false;
+      const replacement = runs.map((run) => {
+        if (run.isSpace) {
+          const spaceGroup = { glyphs: run.glyphs };
+          createdSpaceGroups.push(spaceGroup);
+          movedSpaceGlyphs.push(...run.glyphs);
+          return spaceGroup;
+        }
+        if (!keeperAssigned) {
+          keeperAssigned = true;
+          group.glyphs = run.glyphs;
+          return group;
+        }
+        const wordGroup = { glyphs: run.glyphs };
+        if (group.options) wordGroup.options = { ...group.options };
+        return wordGroup;
+      });
+      groups.splice(i, 1, ...replacement);
+      i += replacement.length - 1;
+    }
+    // Merge a CREATED space group into an adjacent space group (the native
+    // node survives, keeping its key): '//' serialization counts N spaces as
+    // N+1 slashes, so two separate neighbors would concatenate into a slash
+    // run the reparse reads as one bigger group. Only normalization-created
+    // groups merge — space groups the raw element API placed deliberately are
+    // its documented "no automatic space management" business (GH #19 owns
+    // reparse-side re-collapse).
+    if (createdSpaceGroups.length > 0) {
+      const created = new Set(createdSpaceGroups);
+      for (let i = groups.length - 1; i > 0; i--) {
+        const right = groups[i];
+        const left = groups[i - 1];
+        if (!created.has(right) && !created.has(left)) continue;
+        if (right.errorCode || left.errorCode) continue;
+        if (!BlissSVGBuilder.#isRawSpaceGroup(right) || !BlissSVGBuilder.#isRawSpaceGroup(left)) continue;
+        if (created.has(left) && !created.has(right)) {
+          right.glyphs.unshift(...left.glyphs);
+          groups.splice(i - 1, 1);
+        } else {
+          left.glyphs.push(...right.glyphs);
+          groups.splice(i, 1);
+        }
+      }
+    }
+    // Flag the moved space parts against their position's default space code
+    // (mirrors the parser's step-4 SP/QSP resolution): the serializer emits
+    // '//' only for the default, so an explicit QSP/ZSA must carry
+    // _differsFromDefault or its identity (and width) would be lost.
+    if (movedSpaceGlyphs.length > 0) {
+      const moved = new Set(movedSpaceGlyphs);
+      for (let i = 0; i < groups.length; i++) {
+        const group = groups[i];
+        if (!group.glyphs?.some(g => moved.has(g))) continue;
+        const nextGroup = groups[i + 1];
+        const isPunctuation = !!nextGroup && !BlissSVGBuilder.#isRawSpaceGroup(nextGroup)
+          && nextGroup.glyphs?.length > 0
+          && nextGroup.glyphs.every(g => g.shrinksPrecedingWordSpace === true);
+        const defaultCode = isPunctuation ? 'QSP' : 'TSP';
+        for (const glyph of group.glyphs) {
+          if (!moved.has(glyph)) continue;
+          const part = glyph.parts[0];
+          if (part.codeName !== defaultCode) part._differsFromDefault = true;
+          else delete part._differsFromDefault;
+        }
       }
     }
   }

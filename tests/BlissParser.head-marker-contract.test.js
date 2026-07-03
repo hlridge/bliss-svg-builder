@@ -259,11 +259,12 @@ describe('BlissParser head-marker contract', () => {
     });
 
     it('drops a marker on a space inside a mixed word too', () => {
-      // the designation itself is invalid on a space, even where the mixed
-      // word's serialization would have round-tripped it.
+      // the designation itself is invalid on a space; the in-word space then
+      // canonicalizes into a real space group (round-4 review F1), so the
+      // output is the word plus a trailing space.
       const b = new BlissSVGBuilder('B291/TSP^');
       expect(b.warnings.map(w => w.code)).toContain('MISPLACED_HEAD_MARKER');
-      expect(b.toString()).toBe('B291/TSP');
+      expect(b.toString()).toBe('B291//');
     });
 
     it('leaves ordinary space words untouched (no over-reach)', () => {

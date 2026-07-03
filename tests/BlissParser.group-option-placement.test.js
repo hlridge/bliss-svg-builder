@@ -108,10 +108,12 @@ describe('BlissParser group option placement', () => {
     it('gates an alias whose words are separated by an explicit thin space', () => {
       // regression: external review 2026-07-02 F3 — an in-alias TSP is not a
       // _wordBreak, but its serialized /TSP/ splits groups on reparse, so the
-      // bracket silently rebound to the first word (svg-rt false)
+      // bracket silently rebound to the first word (svg-rt false). The in-word
+      // TSP now canonicalizes into a real (default) space group at rebuild
+      // (round-4 review F1), so toString emits the '//' shorthand.
       const gated = build('[color=red]|GOPP_SPACE');
       expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GROUP_OPTION']);
-      expect(gated.toString()).toBe('B291/TSP/C8');
+      expect(gated.toString()).toBe('B291//C8');
       expect(gated.svgCode).toBe(build('GOPP_SPACE').svgCode);
       const reparsed = build(gated.toString());
       expect(reparsed.warnings).toEqual([]);
@@ -119,10 +121,14 @@ describe('BlissParser group option placement', () => {
     });
 
     it('gates the quarter-space variant identically', () => {
+      // QSP is a non-default space: canonicalization keeps its explicit token
+      // (collapsing it to '//' would change the rendered width).
       const gated = build('[color=red]|GOPP_QSPACE');
       expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GROUP_OPTION']);
       expect(gated.toString()).toBe('B291/QSP/C8');
       expect(gated.svgCode).toBe(build('GOPP_QSPACE').svgCode);
+      const reparsed = build(gated.toString());
+      expect(reparsed.svgCode).toBe(gated.svgCode);
     });
   });
 
