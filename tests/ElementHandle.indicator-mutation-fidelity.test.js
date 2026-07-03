@@ -65,6 +65,14 @@ describe('ElementHandle indicator mutation fidelity', () => {
       expect(overlay(b)).toEqual({ codes: [], stripSemantic: false });
     });
 
+    it('accepts null as the empty overlay', () => {
+      // pins the null arm of the normalization; without it null.trim() throws.
+      const b = new BlissSVGBuilder('B313/B1103');
+      b.group(0).applyIndicators(null);
+      expect(overlay(b)).toEqual({ codes: [], stripSemantic: false });
+      expect(b.toString()).toBe('B313/B1103;;');
+    });
+
     it('trims a whitespace-only code argument to the empty overlay', () => {
       const b = new BlissSVGBuilder('B313/B1103');
       b.group(0).applyIndicators('   ');

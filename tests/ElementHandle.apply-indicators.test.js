@@ -22,7 +22,7 @@ import { BlissSVGBuilder } from '../src/index';
  *   replaces an existing semantic; the compound B98 carries semantic
  *   identity and replaces an existing B97; { stripSemantic: true }
  *   suppresses preservation.
- * - Invalid handle or input: a missing/empty code is ALLOWED (rc.4) as the
+ * - Invalid handle or input: a missing/null/empty code is ALLOWED (rc.4) as the
  *   deliberate empty set (same state effect as clearIndicators(), see
  *   `ElementHandle.indicator-mutation-fidelity.test.js`); non-indicator-only
  *   inputs refuse (nothing mutates); apply on a part handle is a no-op that
@@ -213,17 +213,28 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B291']);
     });
 
+    it('accepts null as the empty set instead of throwing', () => {
+      // pins the null arm of the normalization; without it null.trim() throws.
+      const b = new BlissSVGBuilder('B291;B86;B97');
+      b.group(0).glyph(0).applyIndicators(null);
+      expect(partCodes(b)).toEqual(['B291', 'B97']);
+    });
+
     it('accepts the empty string as the empty set instead of throwing', () => {
       const b = new BlissSVGBuilder('B291;B86');
       b.group(0).glyph(0).applyIndicators('');
       expect(partCodes(b)).toEqual(['B291']);
     });
 
-    it('refuses the mutation when all input codes are non-indicators', () => {
+    it('keeps a semantic-only stack unchanged when all input codes are non-indicators', () => {
+      // With only a semantic root present, a refuse and a replace-all that
+      // preserves the root leave the same parts; the per-code validation
+      // warning is what this call observably adds (the distinguishing refuse
+      // pin lives in ElementHandle.indicator-mutation-fidelity.test.js).
       const b = new BlissSVGBuilder('B291;B97');
       b.group(0).glyph(0).applyIndicators('H');
-      // H rejected; the refuse leaves the semantic-only stack untouched
       expect(partCodes(b)).toEqual(['B291', 'B97']);
+      expect(b.warnings.some(w => w.code === 'NON_INDICATOR_AS_CHARACTER_INDICATOR')).toBe(true);
     });
 
     it('attaches onto a lone-indicator glyph, treating the first part as the base', () => {

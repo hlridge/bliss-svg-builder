@@ -19,7 +19,9 @@ import { BlissSVGBuilder } from '../src/index';
  * - apply on a glyph that cannot carry an indicator (a space glyph; a
  *   non-indicator code on an empty glyph). A lone indicator or empty glyph
  *   given a real indicator now attaches it (R15 Task 5), so it is not warned.
- * - apply on an invalid part pattern (a non-indicator part after an indicator).
+ * - apply on an invalid part pattern (a non-indicator part after an indicator),
+ *   including the empty apply's warning source falling back to the target code
+ *   (never the empty string).
  * - clear that finds no indicators to remove, including with the removed
  *   stripSemantic option (ignored on clear since rc.4; clear is the pure undo).
  * - The warning source falls back to a placeholder when the target part has no
@@ -139,6 +141,16 @@ describe('ElementHandle indicator no-op warning', () => {
       const w = noopWarnings(b);
       expect(w).toHaveLength(1);
       expect(w[0].message).toContain('invalid indicator pattern');
+    });
+
+    it('sources an empty apply with the target code, not the empty string', () => {
+      // pins the `code || targetCode` fallback (|| deliberately, not ??): the
+      // empty apply's '' must never become an empty warning source.
+      const b = new BlissSVGBuilder('B291;B86;B303');
+      b.group(0).glyph(0).applyIndicators('');
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B291');
     });
   });
 
