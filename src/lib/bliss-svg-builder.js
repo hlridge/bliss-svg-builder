@@ -542,12 +542,47 @@ class BlissSVGBuilder {
     }
   }
 
+  // Space-invariant normalization (round-3 external review F1): a structural
+  // mutation (replaceGlyph/removeGlyph/replacePart/detach/addGlyph-on-empty)
+  // or hand-authored object input can turn an indicator-bearing word into a
+  // space, leaving state the space serialization ('//') eats — toString would
+  // diverge from toJSON, the reparse loses the state, and the clearIndicators
+  // space guard would refuse to remove the now-hidden overlay. Enforced HERE,
+  // the one chokepoint every mutation route and input surface passes through
+  // (parse and the indicator API already gate their own ingestion, so this is
+  // a no-op for them): a space glyph never carries a designation (deleted
+  // silently, matching the structural `^` drops in splitAt/mergeWithNext); an
+  // all-space word never carries a `;;` overlay (dropped LOUDLY, matching
+  // mergeWithNext's DROPPED_WORD_INDICATOR — data loss must be visible). The
+  // deletion makes the sweep warn once, not per rebuild. An EMPTY group keeps
+  // its overlay (the F3 pure-state-op contract; isRawSpaceGroup is false).
+  #normalizeSpaceInvariant() {
+    for (const group of this.#rawBlissObj.groups ?? []) {
+      for (const glyph of group.glyphs ?? []) {
+        if (glyph.isHeadGlyph === true && BlissSVGBuilder.#isSpaceGlyphNode(glyph)) {
+          delete glyph.isHeadGlyph;
+        }
+      }
+      if (group.wordIndicators && BlissSVGBuilder.#isRawSpaceGroup(group)) {
+        const { codes = [], stripSemantic } = group.wordIndicators;
+        const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+        delete group.wordIndicators;
+        this.#mutationWarnings.push({
+          code: WARNING_CODES.DROPPED_WORD_INDICATOR,
+          message: `A space cannot carry a word indicator: the word became a space, so its word-level indicator overlay (${dropped}) was dropped.`,
+          source: dropped,
+        });
+      }
+    }
+  }
+
   #rebuild() {
     this.#generation++;
     this.#elementsCache = undefined;
     this.#groupsCache = undefined;
     this.#warnings = [];
 
+    this.#normalizeSpaceInvariant();
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
     const blissObj = structuredClone(this.#rawBlissObj);
 
@@ -1288,12 +1323,15 @@ class BlissSVGBuilder {
   // Space codes used in space groups
   static #SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA', 'SP']);
 
+  /** Returns true if a raw glyph node is a space glyph (one space-code part) */
+  static #isSpaceGlyphNode(glyph) {
+    return glyph.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(glyph.parts[0].codeName);
+  }
+
   /** Returns true if a raw group is a space group */
   static #isRawSpaceGroup(group) {
     if (!group.glyphs || group.glyphs.length === 0) return false;
-    return group.glyphs.every(g =>
-      g.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(g.parts[0].codeName)
-    );
+    return group.glyphs.every(g => BlissSVGBuilder.#isSpaceGlyphNode(g));
   }
 
   /** Creates a default space group for insertion between words */
