@@ -796,6 +796,8 @@ const highlight = { left: m.bounds.x, width: m.bounds.width };
 
 All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed). Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
 
+A word that failed to parse (a structurally malformed `;;` — it renders as a single placeholder and `toString()` re-emits the original input) is **terminal**: every content mutation on it, whether through the group handle or a glyph/part handle inside it, is a silent no-op, matching `splitAt` / `mergeWithNext`. Group-level `setOptions` / `removeOptions` still work (options serialize outside the failed content), and you can remove the whole word or replace it with `replaceGroup()` — the recovery path.
+
 ```js
 // Handle methods return the handle, not the builder
 builder.group(0)
@@ -971,7 +973,7 @@ builder.glyph(0).removeOptions('color', 'strokeWidth');
 
 ### Indicator Mutation
 
-`applyIndicators` / `clearIndicators` manage indicators and are **polymorphic by handle level**. Unlike other mutation methods, the `opts` parameter accepts `{ stripSemantic?: boolean, flatten?: boolean }`, not `BlissOptions`.
+`applyIndicators` / `clearIndicators` manage indicators and are **polymorphic by handle level**. Unlike other mutation methods, the `opts` parameter is not `BlissOptions`: `applyIndicators` accepts `{ stripSemantic?: boolean, flatten?: boolean }`, while `clearIndicators` accepts only `{ flatten?: boolean }` — it is the pure undo, and `stripSemantic` lives on apply.
 
 - On a **glyph handle**, they operate character-level: the indicator is baked into the glyph's parts (the `;` channel).
 - On a **group handle**, they operate word-level on the reversible `;;` overlay (`group.wordIndicators`), leaving the base glyphs intact.
@@ -988,7 +990,7 @@ builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 
 An empty `code` (omitted, `''`, or whitespace-only) is now allowed as the deliberate empty set: it has the same state effect as `clearIndicators()`, and `applyIndicators('', { stripSemantic: true })` removes the semantic too. On a bare glyph it is a harmless silent no-op, like a trailing `;` in the DSL.
 
-Every given code must be an indicator: a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR` and an unknown code with `UNKNOWN_CODE`; the valid subset still applies. A call whose codes are *all* invalid is now refused: nothing changes on the glyph (in particular, existing indicators are no longer replaced away, and nothing strips), and the per-code warnings are the only effect. A call that can not change anything for structural reasons (a space glyph, an invalid part pattern) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
+Every given code must be a single indicator: a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR`, an unknown code with `UNKNOWN_CODE`, a code spanning multiple characters (a top-level `/`) with `MISPLACED_CHARACTER_INDICATOR`, and a code whose decoration fails to parse (e.g. `B81:bad`) is rejected with its parse warning; the valid subset still applies. A call whose codes are *all* invalid is now refused: nothing changes on the glyph (in particular, existing indicators are no longer replaced away, and nothing strips), and the per-code warnings are the only effect. A call that can not change anything for structural reasons (a space glyph, an invalid part pattern) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
 
 On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
 
@@ -1004,7 +1006,7 @@ An empty `code` now stores the deliberate empty overlay (`;;`): render-significa
 
 `{ flatten: true }` opts out of the overlay and bakes the indicator onto the head glyph's parts (the pre-overlay shape).
 
-The group-level call validates its codes the same way the DSL `;;` does: a recognized code that is not an indicator is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning, and an unknown code with `UNKNOWN_CODE`. See [Warning Codes](/reference/warning-codes).
+The group-level call validates its codes the same way the DSL `;;` does: a recognized code that is not an indicator is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning, an unknown code with `UNKNOWN_CODE`, and a code carrying a character separator (a top-level `/`, which the `;;` slot cannot hold) with `MALFORMED_WORD_INDICATOR`. A space word cannot carry a word indicator at all: apply and clear on a space group refuse with a `NOOP_INDICATOR_MUTATION` warning. See [Warning Codes](/reference/warning-codes).
 
 #### `.clearIndicators(opts?)`
 
@@ -1019,7 +1021,7 @@ builder.glyph(0).applyIndicators('', { stripSemantic: true }); // removes the se
 
 On a **group handle**, removes the word-level `;;` overlay — the pure undo of a group-level apply: the head glyph's own character-level indicators, hidden while the overlay was active, show again (including a semantic that a `;;!` strip had suppressed). `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
 
-At either level, a clear that finds nothing to remove (a glyph with no indicators; a group with no overlay) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
+At either level, a clear that finds nothing to remove (a glyph with no indicators; a group with no overlay) or that targets a space adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
 
 ### Options
 

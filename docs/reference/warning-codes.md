@@ -66,6 +66,8 @@ B313;;B81/B1103        →  ;; is not at the end of the word
 
 Correct form: `B313/B1103;;B81`.
 
+The `applyIndicators()` overlay channel (group handle or object input) fires it too for a code carrying a character separator (a top-level `/`, e.g. `B81:1,2/B431`): the `;;` slot cannot hold such a code, so it is rejected and the existing overlay stays.
+
 ### `MALFORMED_COORDINATES`
 
 A `:` suffix that is not a valid coordinate pair. The affected character fails to render.
@@ -90,23 +92,34 @@ These fire when a well-formed token is attached to a unit whose granularity does
 
 ### `MISPLACED_HEAD_MARKER`
 
-A head marker (`^`) on a code that expands to multiple characters. `^` designates a single character as the word's head, so it is dropped.
+A head marker (`^`) on a code that expands to multiple characters, or on a space. `^` designates a single character as the word's head — a multi-character expansion has no single character to mark, and a space cannot be a head — so it is dropped.
 
 ```
 MYWORD^                →  renders the word, marker dropped
+TSP^                   →  renders the space, marker dropped
 ```
 
 Mark a single character instead: `B313^/B1103`.
 
 ### `MISPLACED_CHARACTER_INDICATOR`
 
-A `;` indicator on a code that expands to a whole word. `;` composes onto a single character; there is no single character for the indicator to land on.
+A `;` indicator on a code that expands to a whole word. `;` composes onto a single character; there is no single character for the indicator to land on. `applyIndicators()` on a glyph handle fires it too for a code spanning multiple characters (a top-level `/`).
 
 ```
 MYWORD;B81             →  renders the word, indicator dropped
 ```
 
 Use a word-level indicator instead: `MYWORD;;B81`.
+
+### `MISPLACED_WORD_INDICATOR`
+
+A word-level indicator (`;;`) on a space. A space carries no part of speech, so there is nothing for the indicator to modify: the whole overlay (including a `;;!` strip) is dropped and the space still renders.
+
+```
+TSP;;B81               →  renders the space, indicator dropped
+```
+
+Attach it to a word instead: `B313;;B81`.
 
 ### `MISPLACED_PART_OPTION`
 
@@ -207,7 +220,7 @@ More than one `{` in a single input — several `{...}` text blocks, or one bloc
 
 ### `NOOP_INDICATOR_MUTATION`
 
-An `applyIndicators()` / `clearIndicators()` call that could not change anything: a clear with nothing to remove (a glyph with no indicators, or a group with no `;;` overlay), a target that cannot carry an indicator (a space glyph), or a glyph whose parts are not a valid indicator pattern. The warning replaces a silent no-op.
+An `applyIndicators()` / `clearIndicators()` call that could not change anything: a clear with nothing to remove (a glyph with no indicators, or a group with no `;;` overlay), a target that cannot carry an indicator (a space glyph; a space word given a word-level indicator), or a glyph whose parts are not a valid indicator pattern. The warning replaces a silent no-op.
 
 ```js
 new BlissSVGBuilder('B313').glyph(0).clearIndicators();
@@ -217,7 +230,7 @@ new BlissSVGBuilder('B313/B1103').group(0).clearIndicators();
 // no ;; overlay to remove → warning, no change
 ```
 
-Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), and a call whose codes are all invalid is refused without touching the element (one exception: on a group handle, `{ stripSemantic: true }` is itself valid overlay content, so that call still stores the `;;!` strip overlay — matching the DSL `WORD;;!ZZ9`, where the bad code drops and the `!` stays). An *empty* apply (`applyIndicators('')`) is not a no-op case either: it is the deliberate empty indicator set and stays silent.
+Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), and a call whose codes are all invalid is refused without touching the element (one exception: on a group handle, `{ stripSemantic: true }` is itself valid overlay content, so that call still stores the `;;!` strip overlay — matching the DSL `WORD;;!ZZ9`, where the bad code drops and the `!` stays). An *empty* apply (`applyIndicators('')`) is not a no-op case either: it is the deliberate empty indicator set and stays silent on any target that can carry indicators — a space target still warns the structural no-op above.
 
 ## Illegal Operands
 
