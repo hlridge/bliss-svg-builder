@@ -151,6 +151,17 @@ describe('BlissParser strict indicator separation', () => {
       expect(svg(';B97')).toBe(svg('B97'));
       expect(codes(';B97')).toEqual([]);
     });
+
+    it('strips only the trailing ; on a multi-part character, not an inner one', () => {
+      // pins the trailing-; inertness contract on a multi-part character.
+      // Does NOT kill the line-917 /;$/ anchor mutant (2026-07-03 stryker run):
+      // every reachable path (written, def-baked, in-word) pre-normalizes the
+      // trailing ; upstream, so that anchor is defensively equivalent.
+      const b = new BlissSVGBuilder('B431;B81;');
+      expect(b.toString()).toBe('B431;B81');
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toBe(svg('B431;B81'));
+    });
   });
 
   describe('when ! follows a single ;', () => {

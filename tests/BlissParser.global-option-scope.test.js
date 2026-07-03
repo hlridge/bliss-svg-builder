@@ -172,6 +172,14 @@ describe('BlissParser global option scope', () => {
       expect(gated.svgCode).toBe(build('B303;;[color=red]>B81').svgCode);
     });
 
+    it('rejoins multiple kept keys with ; in the rebuilt overlay code', () => {
+      // pins the rebuild's key separator; kills the join(';')->join('')
+      // survivor from the 2026-07-03 stryker run (one kept key cannot)
+      const gated = build('B303;;[margin=2;data-a=x;data-b=y]>B81');
+      expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(gated.toString()).toBe('B303;;[data-a=x;data-b=y]>B81');
+    });
+
     it('stores a clean overlay code verbatim', () => {
       // regression control: SIB-2 option preservation must survive the gate
       const clean = build('B303;;[color=red]>B81');
