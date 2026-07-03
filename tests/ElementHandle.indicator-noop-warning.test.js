@@ -19,6 +19,8 @@ import { BlissSVGBuilder } from '../src/index';
  * - apply on a glyph that cannot carry an indicator (a space glyph; a
  *   non-indicator code on an empty glyph). A lone indicator or empty glyph
  *   given a real indicator now attaches it (R15 Task 5), so it is not warned.
+ * - apply/clear on a SPACE GROUP handle (round-2 review F1): refuses + warns
+ *   instead of storing an overlay the space serialization would eat.
  * - apply on an invalid part pattern (a non-indicator part after an indicator),
  *   including the empty apply's warning source falling back to the target code
  *   (never the empty string).
@@ -151,6 +153,31 @@ describe('ElementHandle indicator no-op warning', () => {
       const w = noopWarnings(b);
       expect(w).toHaveLength(1);
       expect(w[0].source).toBe('B291');
+    });
+  });
+
+  describe('when the word-level channel targets a space group', () => {
+    // regression: round-2 external review F1 — the overlay was stored on the
+    // space group with zero warnings, then the '//' serialization ate it.
+    // Parity with the glyph-level space arm: refuse + warn.
+    it('refuses an apply and warns instead of storing an overlay', () => {
+      const b = new BlissSVGBuilder('TSP');
+      b.element(0).applyIndicators('B81');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B81');
+      expect(w[0].message).toContain('space');
+      expect(b.toString()).toBe('//');
+    });
+
+    it('warns the space no-op on a clear too', () => {
+      const b = new BlissSVGBuilder('TSP');
+      b.element(0).clearIndicators();
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].message).toContain('clearIndicators()');
+      expect(w[0].message).toContain('space');
     });
   });
 

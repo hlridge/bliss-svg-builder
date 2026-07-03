@@ -13,7 +13,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Covers:
  * - Rule 1: `^` on a multi-character alias is dropped with a
  *   MISPLACED_HEAD_MARKER warning; `^` on a single-character alias behaves
- *   exactly as a marker on that character.
+ *   exactly as a marker on that character; `^` on a space (TSP/QSP/ZSA) is
+ *   dropped with the same warning — a space cannot be a word's head (round-2
+ *   review F1).
  * - Rule 2: one head per word-string; a written marker outranks a dormant
  *   embedded designation regardless of order; dropped markers do not count
  *   toward MULTIPLE_HEAD_MARKERS; `//`-words resolve independently.
@@ -235,6 +237,39 @@ describe('BlissParser head-marker contract', () => {
       expect(markedIndexes(r)).toEqual([]);
       expect(markedIndexes(BlissParser.parse('B291/B313;B81^'))).toEqual([1]);
       expect(r._parseWarnings).toEqual([expect.objectContaining({ code: 'MISPLACED_HEAD_MARKER' })]);
+    });
+  });
+
+  describe('when ^ is written on a space (rule 1 target validity)', () => {
+    // regression: round-2 external review F1 — 'TSP^' stored isHeadGlyph on
+    // the space glyph with zero warnings while toString emitted '//', so the
+    // designation silently vanished on reparse. A space cannot be a word's
+    // head: the marker is dropped with a warning at parse.
+    it.each(['TSP^', 'QSP^', 'ZSA^'])('drops the marker on %s with a MISPLACED_HEAD_MARKER warning', (input) => {
+      const b = new BlissSVGBuilder(input);
+      expect(b.warnings.map(w => w.code)).toContain('MISPLACED_HEAD_MARKER');
+      const marked = b.toJSON().groups.flatMap(g => g.glyphs ?? []).filter(g => g.isHeadGlyph === true);
+      expect(marked).toHaveLength(0);
+    });
+
+    it('stores no designation for the space serialization to eat', () => {
+      const b = new BlissSVGBuilder('TSP^');
+      expect(b.toString()).toBe('//');
+      expect(b.toJSON().groups.flatMap(g => g.glyphs ?? []).some(g => g.isHeadGlyph === true)).toBe(false);
+    });
+
+    it('drops a marker on a space inside a mixed word too', () => {
+      // the designation itself is invalid on a space, even where the mixed
+      // word's serialization would have round-tripped it.
+      const b = new BlissSVGBuilder('B291/TSP^');
+      expect(b.warnings.map(w => w.code)).toContain('MISPLACED_HEAD_MARKER');
+      expect(b.toString()).toBe('B291/TSP');
+    });
+
+    it('leaves ordinary space words untouched (no over-reach)', () => {
+      const b = new BlissSVGBuilder('B291//B291');
+      expect(b.toString()).toBe('B291//B291');
+      expect(b.warnings).toEqual([]);
     });
   });
 });

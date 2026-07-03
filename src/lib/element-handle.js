@@ -1021,6 +1021,20 @@ export class ElementHandle {
   #applyOrClearWordIndicators(code, opts) {
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
+    // A space group carries no word indicator: refuse + warn (parity with the
+    // glyph-level space arm), never store an overlay the space's '//'
+    // serialization would eat (round-2 external review F1).
+    if (this.#ctx.isRawSpaceGroup(group)) {
+      const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
+      const targetCode = group.glyphs[0]?.parts?.[0]?.codeName || 'unknown';
+      // `||` deliberately (not `??`): the empty apply's '' falls back to the
+      // target code, never an empty source (parity with the glyph arm).
+      this.#warnIndicatorNoop(
+        `${verb} had no effect: the target word is a space; a space cannot carry a word indicator.`,
+        code || targetCode,
+      );
+      return this;
+    }
     // stripSemantic is an apply-only option: a clear is the pure undo.
     const stripSemantic = code !== null && opts?.stripSemantic === true;
 

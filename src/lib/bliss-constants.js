@@ -235,6 +235,9 @@ export const WARNING_CODES = Object.freeze({
   // misplaced: a well-formed token in the wrong position
   MISPLACED_HEAD_MARKER: 'MISPLACED_HEAD_MARKER',
   MISPLACED_CHARACTER_INDICATOR: 'MISPLACED_CHARACTER_INDICATOR',
+  // a well-formed word-level indicator (`;;`) on a target that cannot carry
+  // one (a space word)
+  MISPLACED_WORD_INDICATOR: 'MISPLACED_WORD_INDICATOR',
   MISPLACED_PART_OPTION: 'MISPLACED_PART_OPTION',
   MISPLACED_CHARACTER_OPTION: 'MISPLACED_CHARACTER_OPTION',
   MISPLACED_GROUP_OPTION: 'MISPLACED_GROUP_OPTION',

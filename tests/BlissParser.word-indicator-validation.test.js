@@ -30,6 +30,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   when every supplied code is a dropped non-indicator.
  * - Granularity boundary: a STRUCTURALLY malformed ;; stays a whole-word
  *   MALFORMED_WORD_INDICATOR failure, NOT a content NON_INDICATOR warning.
+ * - Target validity (round-2 review F1): ;; on an all-space word (TSP/QSP/ZSA)
+ *   warns MISPLACED_WORD_INDICATOR once and drops the whole overlay (strip
+ *   included) — a space carries no word indicator; a word merely containing a
+ *   space keeps its overlay.
  *
  * Does NOT cover:
  * - Structural malformed ;; fail-render, round-trip, and rebuild stickiness,
@@ -142,6 +146,49 @@ describe('BlissParser word-indicator validation', () => {
       const codes = warningCodes('B303;;B81/B431');
       expect(codes).toContain('MALFORMED_WORD_INDICATOR');
       expect(codes).not.toContain('NON_INDICATOR_AS_WORD_INDICATOR');
+    });
+  });
+
+  describe('when ;; targets a space', () => {
+    // regression: round-2 external review F1 — 'TSP;;B81' stored an overlay
+    // with zero warnings; toString emitted '//' and the state vanished on
+    // reparse. A space carries no word indicator: warn + drop at parse, keep
+    // the plain space (a misplaced decoration on valid content).
+    it.each(['TSP;;B81', 'ZSA;;B81'])('warns MISPLACED_WORD_INDICATOR and stores no overlay for %s', (input) => {
+      expect(overlay(input)).toBeUndefined();
+      expect(warningCodes(input)).toContain('MISPLACED_WORD_INDICATOR');
+    });
+
+    it('serializes back to a plain space with state and string in agreement', () => {
+      const b = new BlissSVGBuilder('TSP;;B81');
+      expect(b.toString()).toBe('//');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+    });
+
+    it('drops the strip form too (the target, not the codes, is invalid)', () => {
+      expect(overlay('TSP;;!B81')).toBeUndefined();
+      expect(warningCodes('TSP;;!B81')).toContain('MISPLACED_WORD_INDICATOR');
+    });
+
+    it('warns once for the whole overlay, not per code', () => {
+      const codes = warningCodes('TSP;;B81;ZZ9');
+      expect(codes.filter(c => c === 'MISPLACED_WORD_INDICATOR')).toHaveLength(1);
+      expect(codes).not.toContain('UNKNOWN_CODE');
+      expect(codes).not.toContain('NON_INDICATOR_AS_WORD_INDICATOR');
+    });
+
+    it('drops the marker and the overlay independently on TSP^;;B81', () => {
+      const codes = warningCodes('TSP^;;B81');
+      expect(codes).toContain('MISPLACED_HEAD_MARKER');
+      expect(codes).toContain('MISPLACED_WORD_INDICATOR');
+      expect(overlay('TSP^;;B81')).toBeUndefined();
+    });
+
+    it('keeps the overlay on a word that merely contains a space part', () => {
+      // the gate requires EVERY glyph of the word to be a space: a word with
+      // inked content keeps its overlay (it has a real head to carry it).
+      expect(overlay('B291/TSP;;B81')).toEqual({ codes: ['B81'], stripSemantic: false });
+      expect(warningCodes('B291/TSP;;B81')).not.toContain('MISPLACED_WORD_INDICATOR');
     });
   });
 });

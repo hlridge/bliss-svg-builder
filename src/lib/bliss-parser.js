@@ -425,6 +425,17 @@ export class BlissParser {
           return resolveHeadIndex(parts.map((_, i) => getCode(i)));
         };
 
+        // A space carries neither a designation nor a word indicator: TSP/
+        // QSP/ZSA groups serialize as bare word breaks ('//'), so a `^` or
+        // `;;` stored on one is eaten by toString and lost on reparse
+        // (round-2 external review F1). A DECORATED space token skips the
+        // step-2 space branch (the token is not exactly SP/TSP/QSP) and lands
+        // here; classify by the expanded part's resolved code.
+        const isSpacePart = (p) => {
+          const partCode = p._scanCode ?? (p.part ? p.part.split(';')[0].split(':')[0] : '');
+          return partCode === 'TSP' || partCode === 'QSP' || partCode === 'ZSA';
+        };
+
         // Per-word-string head resolution (head-marker contract):
         // rule 2 -- the leftmost written marker (_marker) in this word-string
         // wins; later ones warn and drop. With no written marker, rule 3
@@ -643,6 +654,21 @@ export class BlissParser {
             return failMultiWordIndicator(expandedParts);
           }
 
+          // A space carries no word indicator (round-2 review F1): the overlay
+          // would be stored, then eaten by the '//' serialization. Warn ONCE
+          // for the whole overlay (strip included) and keep the plain space —
+          // a misplaced decoration on valid content is dropped, not
+          // fail-rendered.
+          if (expandedParts.length > 0 && expandedParts.every(isSpacePart)) {
+            parseWarnings.push({
+              code: WARNING_CODES.MISPLACED_WORD_INDICATOR,
+              message: `Word-level indicator (;;${rawIndicators}) ignored on "${restorePlaceholders(str)}": a space cannot carry a word indicator.`,
+              source: restorePlaceholders(str),
+            });
+            crownWordChunks(expandedParts, wordCode);
+            return expandedParts;
+          }
+
           // Resolve and crown the word so the head is identifiable at decode.
           crownWordChunks(expandedParts, wordCode);
 
@@ -764,9 +790,20 @@ export class BlissParser {
           const parts = expandSegment(str, definitions, isTopLevel, depth);
           if (hasMarker) {
             if (parts.length === 1) {
-              // Rule 1: ^ attaches to a character (one expanded glyph),
-              // including an alias that resolves to a single character.
-              parts[0]._marker = true;
+              if (isSpacePart(parts[0])) {
+                // A space cannot be a word's head (round-2 review F1): warn +
+                // drop, never store a designation the space serialization
+                // ('//') cannot re-emit.
+                parseWarnings.push({
+                  code: WARNING_CODES.MISPLACED_HEAD_MARKER,
+                  message: `Head marker (^) ignored on "${restorePlaceholders(str)}": a space cannot be a word's head.`,
+                  source: restorePlaceholders(str),
+                });
+              } else {
+                // Rule 1: ^ attaches to a character (one expanded glyph),
+                // including an alias that resolves to a single character.
+                parts[0]._marker = true;
+              }
             } else {
               parseWarnings.push({
                 code: WARNING_CODES.MISPLACED_HEAD_MARKER,
