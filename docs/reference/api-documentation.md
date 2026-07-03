@@ -982,7 +982,7 @@ builder.glyph(0).applyIndicators('B81;B86');
 builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 ```
 
-If the call changes nothing (none of the given codes is a recognized indicator *and* the indicator list is left as it was, or the glyph has no base part to carry one), it adds a `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing nothing. Note that applying only non-indicator codes to a glyph that *has* indicators is a real change — the existing grammatical indicators are replaced away — so it does not warn.
+Every given code must be an indicator: a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR` and an unknown code with `UNKNOWN_CODE`; the valid subset still applies. Because the call is replace-all, passing only invalid codes to a glyph that *has* indicators still replaces them away — the warnings make that visible (use `clearIndicators()` to clear deliberately). A call that can not change anything for structural reasons (a space glyph, an invalid part pattern, a clear with nothing to remove) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
 
 On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
 

@@ -423,7 +423,7 @@ builder.group(0).clearIndicators();
 
 Pass `{ stripSemantic: true }` for the `;;!` strip form, or `{ flatten: true }` to bake the indicator onto the head glyph's parts instead of keeping the reversible overlay.
 
-Indicator calls never fail silently. A group-level `applyIndicators()` validates its codes the same way the DSL `;;` does: a recognized non-indicator code is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning (an unknown code with `UNKNOWN_CODE`). A call that cannot apply or remove anything (for example, clearing a glyph that has no indicators) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`.
+Indicator calls never fail silently. `applyIndicators()` validates its codes at both levels: a recognized non-indicator warns `NON_INDICATOR_AS_WORD_INDICATOR` on a group handle and `NON_INDICATOR_AS_CHARACTER_INDICATOR` on a glyph handle (an unknown code warns `UNKNOWN_CODE`), and only real indicators apply. A call that cannot apply or remove anything for structural reasons (for example, clearing a glyph that has no indicators) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`. See [Warning Codes](/reference/warning-codes).
 
 ### Inspecting Indicators
 

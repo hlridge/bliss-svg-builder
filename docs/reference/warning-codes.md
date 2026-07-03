@@ -207,14 +207,14 @@ More than one `{` in a single input — several `{...}` text blocks, or one bloc
 
 ### `NOOP_INDICATOR_MUTATION`
 
-An `applyIndicators()` / `clearIndicators()` call that could not change anything: no recognized indicator was given *and* there was nothing to remove, or there was nothing to clear. The warning replaces a silent no-op.
+An `applyIndicators()` / `clearIndicators()` call that could not change anything: a clear with no indicators to remove, a target that cannot carry an indicator (a space glyph), or a glyph whose parts are not a valid indicator pattern. The warning replaces a silent no-op.
 
 ```js
-new BlissSVGBuilder('B313').glyph(0).applyIndicators('C8');
-// C8 is not an indicator and B313 had none → warning, no change
+new BlissSVGBuilder('B313').glyph(0).clearIndicators();
+// nothing to clear → warning, no change
 ```
 
-The same call on a glyph that has indicators is a real change (the existing grammatical indicators are replaced away), so it does not warn.
+Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), whether or not the rest of the call changes anything.
 
 ## Illegal Operands
 
@@ -243,3 +243,14 @@ builder.group(0).applyIndicators('B291'); // same rule on the API
 ```
 
 An *unrecognized* code in the same slot warns `UNKNOWN_CODE` instead.
+
+### `NON_INDICATOR_AS_CHARACTER_INDICATOR`
+
+The same rule one level down: a glyph-level `applyIndicators()` call received a recognized code that is not an indicator. Each such code warns and cannot be applied.
+
+```js
+new BlissSVGBuilder('B431;B81').glyph(0).applyIndicators('C8');
+// C8 is a shape, not an indicator → warned, not applied
+```
+
+Note that `applyIndicators()` replaces all existing grammatical indicators, so the call may still change the glyph: the valid subset of the given codes (possibly empty) replaces what was there. An unknown code in the same call warns `UNKNOWN_CODE`.
