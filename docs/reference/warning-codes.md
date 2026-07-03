@@ -207,14 +207,17 @@ More than one `{` in a single input — several `{...}` text blocks, or one bloc
 
 ### `NOOP_INDICATOR_MUTATION`
 
-An `applyIndicators()` / `clearIndicators()` call that could not change anything: a clear with no indicators to remove, a target that cannot carry an indicator (a space glyph), or a glyph whose parts are not a valid indicator pattern. The warning replaces a silent no-op.
+An `applyIndicators()` / `clearIndicators()` call that could not change anything: a clear with nothing to remove (a glyph with no indicators, or a group with no `;;` overlay), a target that cannot carry an indicator (a space glyph), or a glyph whose parts are not a valid indicator pattern. The warning replaces a silent no-op.
 
 ```js
 new BlissSVGBuilder('B313').glyph(0).clearIndicators();
 // nothing to clear → warning, no change
+
+new BlissSVGBuilder('B313/B1103').group(0).clearIndicators();
+// no ;; overlay to remove → warning, no change
 ```
 
-Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), whether or not the rest of the call changes anything.
+Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), and a call whose codes are all invalid is refused without touching the element. An *empty* apply (`applyIndicators('')`) is not a no-op case either: it is the deliberate empty indicator set and stays silent.
 
 ## Illegal Operands
 
@@ -253,4 +256,4 @@ new BlissSVGBuilder('B431;B81').glyph(0).applyIndicators('C8');
 // C8 is a shape, not an indicator → warned, not applied
 ```
 
-Note that `applyIndicators()` replaces all existing grammatical indicators, so the call may still change the glyph: the valid subset of the given codes (possibly empty) replaces what was there. An unknown code in the same call warns `UNKNOWN_CODE`.
+A mixed call applies its valid subset (replacing the existing grammatical indicators) and warns per rejected code. A call whose codes are *all* invalid is refused: the glyph keeps its existing indicators unchanged. An unknown code in the same call warns `UNKNOWN_CODE`.

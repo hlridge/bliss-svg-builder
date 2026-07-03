@@ -54,7 +54,7 @@ toString({ flattenIndicators: true }):  B313;B81/B1103         (indicator baked 
 
 Both forms render the same image; the difference is only in the serialized text and the element tree. `flattenIndicators` (word structure) and `preserve` (local names) are independent and compose freely, see the [serialization reference](/reference/api-documentation#serialization).
 
-The head marker (`^`) that explicitly designates the head glyph also survives `toString()`, but is re-emitted only when the automatic head pick would otherwise land on a different glyph (a redundant `^`, or one dropped from a multi-character code, is not re-emitted).
+The head marker (`^`) that explicitly designates the head glyph now always survives `toString()`, even when the automatic head pick would land on the same glyph (a `^` dropped from a multi-character code at parse time is gone and never reappears).
 
 ### The semantic root and `;;!`
 

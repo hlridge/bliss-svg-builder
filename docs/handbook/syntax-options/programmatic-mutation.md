@@ -370,7 +370,9 @@ Multiple indicators use semicolon-separated codes:
 builder.glyph(0).applyIndicators('B81;B86');
 ```
 
-Non-indicator codes in the argument are silently filtered out, matching DSL behavior.
+Non-indicator codes in the argument are filtered out with a per-code warning, matching DSL behavior; a call whose codes are all invalid is refused and changes nothing (see [Validation and no-ops](#validation-and-no-ops) below).
+
+An empty code (omitted, `''`, or whitespace-only) is the deliberate empty set: on a glyph handle it behaves exactly like `clearIndicators()`; on a group handle it stores the empty `;;` overlay (see [Word-Level Indicators](#word-level-indicators)).
 
 ### Semantic Preservation
 
@@ -391,7 +393,7 @@ builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 
 ### Clearing Indicators
 
-Remove all grammatical indicators with `clearIndicators()`. Semantic indicators are preserved by default:
+Remove all grammatical indicators with `clearIndicators()`. It is the pure undo: semantic indicators are always preserved (it takes no `stripSemantic`):
 
 ```js
 const builder = new BlissSVGBuilder('B291;B86;B97');
@@ -399,10 +401,10 @@ builder.glyph(0).clearIndicators();
 // B86 removed, B97 preserved: now 'B291;B97'
 ```
 
-To clear everything including semantic:
+To clear everything including the semantic, use the empty apply with `stripSemantic`:
 
 ```js
-builder.glyph(0).clearIndicators({ stripSemantic: true });
+builder.glyph(0).applyIndicators('', { stripSemantic: true });
 // now 'B291'
 ```
 
@@ -423,9 +425,18 @@ builder.group(0).clearIndicators();
 
 Clearing is the undo of applying: any character-level indicators the head glyph carried before the overlay hid them show again.
 
-Pass `{ stripSemantic: true }` for the `;;!` strip form, or `{ flatten: true }` to bake the indicator onto the head glyph's parts instead of keeping the reversible overlay.
+An empty apply is the third overlay state — the deliberately empty `;;`, which hides the head's own character-level indicators without adding any:
 
-Indicator calls never fail silently. `applyIndicators()` validates its codes at both levels: a recognized non-indicator warns `NON_INDICATOR_AS_WORD_INDICATOR` on a group handle and `NON_INDICATOR_AS_CHARACTER_INDICATOR` on a glyph handle (an unknown code warns `UNKNOWN_CODE`), and only real indicators apply. A call that cannot apply or remove anything for structural reasons (for example, clearing a glyph that has no indicators) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`. See [Warning Codes](/reference/warning-codes).
+```js
+builder.group(0).applyIndicators('');
+// equivalent to the DSL 'B291/B303;;'
+```
+
+On an apply, pass `{ stripSemantic: true }` for the `;;!` strip form (`applyIndicators('', { stripSemantic: true })` is the bare `;;!`), or `{ flatten: true }` to bake the indicator onto the head glyph's parts instead of keeping the reversible overlay.
+
+### Validation and no-ops
+
+Indicator calls never fail silently. `applyIndicators()` validates its codes at both levels: a recognized non-indicator warns `NON_INDICATOR_AS_WORD_INDICATOR` on a group handle and `NON_INDICATOR_AS_CHARACTER_INDICATOR` on a glyph handle (an unknown code warns `UNKNOWN_CODE`), and only real indicators apply. A call whose codes are all invalid is refused: the element keeps its indicators unchanged, and the per-code warnings are the only effect. A call that cannot apply or remove anything for structural reasons (clearing a glyph that has no indicators, clearing a group that has no `;;` overlay, targeting a space glyph) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`. See [Warning Codes](/reference/warning-codes).
 
 ### Inspecting Indicators
 

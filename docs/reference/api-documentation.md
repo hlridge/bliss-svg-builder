@@ -227,16 +227,20 @@ Both forms render an identical image; passing either back into the constructor r
 
 ### Head Marker Resolution
 
-The head marker (`^`) designates which glyph in a word carries word-level indicators. `toString()` and `toJSON()` preserve the resolved head, but `^` is re-emitted only when the bare codes would not re-derive the same head on their own:
+The head marker (`^`) designates which glyph in a word carries word-level indicators. An explicit designation is stored, and `toString()` now always re-emits it — exactly as `toJSON()` keeps `isHeadGlyph` — so a string round-trip never loses it, even when the automatic head pick would land on the same glyph anyway. A word written without `^` stays unmarked (the automatic pick is derived at read time, never stored):
 
 ```js
-// The marked head deviates from the automatic pick, so `^` is re-emitted:
+// The stored designation round-trips verbatim:
 new BlissSVGBuilder('B101/B208^/B303').toString();
 // 'B101/B208^/B303'
 
-// The automatic pick already lands on the same glyph (the leading B486 is
-// skipped), so the redundant `^` is dropped:
+// A redundant designation (the automatic pick lands there anyway) is now
+// kept too:
 new BlissSVGBuilder('B486/B208^').toString();
+// 'B486/B208^'
+
+// No explicit marker was written, so none is emitted:
+new BlissSVGBuilder('B486/B208').toString();
 // 'B486/B208'
 ```
 
@@ -974,7 +978,7 @@ builder.glyph(0).removeOptions('color', 'strokeWidth');
 
 #### `.applyIndicators(code, opts?)`
 
-On a **glyph handle**, replaces all existing indicators with the given code. `code` is required (throws if missing; use `clearIndicators()` to remove). Semantic indicators are preserved unless the new code includes one or `{ stripSemantic: true }` is passed:
+On a **glyph handle**, sets the glyph's indicators to the given code. Semantic indicators are preserved unless the new code includes one or `{ stripSemantic: true }` is passed:
 
 ```js
 builder.glyph(0).applyIndicators('B86');
@@ -982,15 +986,21 @@ builder.glyph(0).applyIndicators('B81;B86');
 builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 ```
 
-Every given code must be an indicator: a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR` and an unknown code with `UNKNOWN_CODE`; the valid subset still applies. Because the call is replace-all, passing only invalid codes to a glyph that *has* indicators still replaces them away — the warnings make that visible (use `clearIndicators()` to clear deliberately). A call that can not change anything for structural reasons (a space glyph, an invalid part pattern, a clear with nothing to remove) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
+An empty `code` (omitted, `''`, or whitespace-only) is now allowed as the deliberate empty set: it has the same state effect as `clearIndicators()`, and `applyIndicators('', { stripSemantic: true })` removes the semantic too. On a bare glyph it is a harmless silent no-op, like a trailing `;` in the DSL.
+
+Every given code must be an indicator: a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR` and an unknown code with `UNKNOWN_CODE`; the valid subset still applies. A call whose codes are *all* invalid is now refused: nothing changes on the glyph (in particular, existing indicators are no longer replaced away, and nothing strips), and the per-code warnings are the only effect. A call that can not change anything for structural reasons (a space glyph, an invalid part pattern) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
 
 On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
 
 ```js
 builder.group(0).applyIndicators('B86');                 // == DSL ;;B86
 builder.group(0).applyIndicators('B86', { stripSemantic: true }); // == ;;!B86
+builder.group(0).applyIndicators('');                    // == bare ;;
+builder.group(0).applyIndicators('', { stripSemantic: true });    // == ;;!
 builder.group(0).applyIndicators('B86', { flatten: true });       // bake onto the head instead
 ```
+
+An empty `code` now stores the deliberate empty overlay (`;;`): render-significant — it hides the head glyph's own character-level indicators and adds none. With `{ stripSemantic: true }` it stores the `;;!` strip overlay.
 
 `{ flatten: true }` opts out of the overlay and bakes the indicator onto the head glyph's parts (the pre-overlay shape).
 
@@ -998,14 +1008,18 @@ The group-level call validates its codes the same way the DSL `;;` does: a recog
 
 #### `.clearIndicators(opts?)`
 
-On a **glyph handle**, removes all grammatical indicators. Semantic indicators are preserved by default; `{ stripSemantic: true }` removes them too:
+`clearIndicators` is the pure undo at both levels, and it no longer takes `stripSemantic` — to remove the semantic too, use `applyIndicators('', { stripSemantic: true })`.
+
+On a **glyph handle**, removes all grammatical indicators. Semantic indicators are always preserved:
 
 ```js
 builder.glyph(0).clearIndicators();
-builder.glyph(0).clearIndicators({ stripSemantic: true });
+builder.glyph(0).applyIndicators('', { stripSemantic: true }); // semantic too
 ```
 
-On a **group handle**, removes the word-level `;;` overlay — the pure undo of a group-level apply: the head glyph's own character-level indicators, hidden while the overlay was active, show again (including a semantic that a `;;!` strip had suppressed). `{ stripSemantic: true }` keeps a reversible empty-codes strip overlay; `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
+On a **group handle**, removes the word-level `;;` overlay — the pure undo of a group-level apply: the head glyph's own character-level indicators, hidden while the overlay was active, show again (including a semantic that a `;;!` strip had suppressed). `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.
+
+At either level, a clear that finds nothing to remove (a glyph with no indicators; a group with no overlay) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
 
 ### Options
 
