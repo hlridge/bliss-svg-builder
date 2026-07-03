@@ -27,6 +27,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   group keeps its overlay (the F3 pure-state-op contract).
  *
  * Does NOT cover:
+ * - Multi-part glyphs LED by a space part (`TSP;B81` shapes): they classify as
+ *   non-space (the single-part boundary of the space test) and keep their
+ *   state, but such compositions have their own preexisting reparse quirks,
+ *   so the boundary is deliberately unpinned here.
  * - The parse-side space gates (`TSP^`, `TSP;;B81`), see
  *   `BlissParser.head-marker-contract.test.js` and
  *   `BlissParser.word-indicator-validation.test.js`.
