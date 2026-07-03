@@ -1,6 +1,6 @@
 # Warning Codes
 
-When the builder encounters a problem it can recover from, it renders everything that is valid and reports the problem in `builder.warnings`. Nothing is dropped or fixed up silently.
+When the builder encounters a problem it can recover from, it renders everything that is valid and reports the problem in `builder.warnings`.
 
 Each warning is an object with three fields:
 
@@ -201,17 +201,20 @@ builder.toString(); // 'B313/B431;;B81' — the ;;B86 overlay was dropped, with 
 
 ### `UNSUPPORTED_TEXT_BLOCKS`
 
-More than one `{...}` text block in a single input. The current parser supports at most one trailing text block per input; with several, the content between them can merge unpredictably.
+More than one `{` in a single input — several `{...}` text blocks, or one block whose text itself contains a `{`. The current parser supports at most one trailing text block per input; beyond that, the content between braces can merge unpredictably.
 
 ## No-op Mutations
 
 ### `NOOP_INDICATOR_MUTATION`
 
-An `applyIndicators()` / `clearIndicators()` call that could not change anything: none of the given codes is a recognized indicator, or there was nothing to clear. The warning replaces a silent no-op.
+An `applyIndicators()` / `clearIndicators()` call that could not change anything: no recognized indicator was given *and* there was nothing to remove, or there was nothing to clear. The warning replaces a silent no-op.
 
 ```js
-builder.glyph(0).applyIndicators('C8'); // C8 is not an indicator → warning, no change
+new BlissSVGBuilder('B313').glyph(0).applyIndicators('C8');
+// C8 is not an indicator and B313 had none → warning, no change
 ```
+
+The same call on a glyph that has indicators is a real change (the existing grammatical indicators are replaced away), so it does not warn.
 
 ## Illegal Operands
 
@@ -225,7 +228,7 @@ B291;MYWORD            →  warns, the character fails to render
 
 ### `COMPOSITE_AS_PART`
 
-A `;`-part references a multi-part composition (a code that itself expands to several parts). Same handling as `WORD_AS_PART`.
+A `;`-part references a plain (typeless) defined code that expands to several parts. Same handling as `WORD_AS_PART`. A code defined as a **glyph** or **shape** is one atomic part and is valid in a `;`-slot even when its definition composes several parts; only the bare alias has no single-part identity to compose.
 
 ### `NON_INDICATOR_AS_WORD_INDICATOR`
 

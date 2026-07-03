@@ -69,6 +69,8 @@ builder.toString();
 // '[data-note="semi;colon"]B313'
 ```
 
+One accepted limit: a value where a backslash sits directly next to a quote (the `a\"b` class, or a trailing backslash) does not survive the round-trip, because only `\"` and `\'` are unescaped on parse.
+
 ## Scope Levels
 
 Options can be applied at four levels, from broadest to most specific:

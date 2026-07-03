@@ -982,7 +982,7 @@ builder.glyph(0).applyIndicators('B81;B86');
 builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 ```
 
-If the call cannot apply any indicator (none of the given codes is a recognized indicator, or the glyph has no base part to carry one), it adds a `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing nothing.
+If the call changes nothing (none of the given codes is a recognized indicator *and* the indicator list is left as it was, or the glyph has no base part to carry one), it adds a `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing nothing. Note that applying only non-indicator codes to a glyph that *has* indicators is a real change — the existing grammatical indicators are replaced away — so it does not warn.
 
 On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
 
@@ -1130,8 +1130,8 @@ parser output (`toJSON()`), rendering (`svgCode`), serialization
 
 Public output surface: the handle/snapshot booleans `.isGlyph`,
 `.isBlissGlyph`, `.isExternalGlyph`, `.isIndicator`, plus `.codeName`,
-`.char`, `indicatorKind`, and `indicatorLevel` (see the [Element
-API](#element-api)). The input field names that begin with `is…` are the
+`.char`, `indicatorKind`, and `indicatorLevel` (see the [ElementHandle
+API](#elementhandle)). The input field names that begin with `is…` are the
 input form; read them back through these accessors, not by reaching into a
 definition object.
 

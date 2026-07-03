@@ -20,7 +20,7 @@ Single separators work within a word (`/` between characters, `;` between the pa
 
 Because `;` targets one glyph, it has no meaning on a code that expands to a whole word (a predefined multi-character code): there is no single character for the indicator to land on, so it is dropped with a `MISPLACED_CHARACTER_INDICATOR` warning and the word still renders. Use `;;` there instead.
 
-A `;`-part must itself be a single part (a primitive or a defined glyph). Composing a whole word or a multi-part composition into a `;`-slot fails that character with a `WORD_AS_PART` / `COMPOSITE_AS_PART` warning. See [Warning Codes](/reference/warning-codes).
+A `;`-part must itself be a single part (a primitive or defined shape, or a defined glyph — a glyph is one atomic part even when its definition composes several). Composing a whole word or a plain multi-part alias into a `;`-slot fails that character with a `WORD_AS_PART` / `COMPOSITE_AS_PART` warning. See [Warning Codes](/reference/warning-codes).
 
 ### `;;` applies word grammar
 
@@ -58,7 +58,7 @@ The head marker (`^`) that explicitly designates the head glyph also survives `t
 
 ### The semantic root and `;;!`
 
-Many Bliss words carry a *semantic root* indicator: `B97` (thing) or `B6436` (abstract). It marks the word's broad category and is preserved by default when a `;;` indicator applies. So `B313/B1103;;B81` keeps an existing thing/abstract root and displays `B81` alongside it.
+Many Bliss words carry a *semantic root* indicator: `B97` (thing) or `B6436` (abstract). It marks the word's broad category and is preserved by default when a `;;` indicator applies. So in `B291;B97/C8;;B86` the head keeps its `B97` root and displays `B86` alongside it.
 
 Use `;;!` to strip the semantic root as well: the word then displays only the indicators you provide.
 
