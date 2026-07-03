@@ -202,12 +202,16 @@ A token that is not even a valid code shape (for example `!B81`) cannot be repre
 
 ### `DROPPED_WORD_INDICATOR`
 
-An operation had to discard a word-level indicator overlay. Currently this fires when `mergeWithNext()` merges two words that both carry a `;;` overlay: the merged word keeps the first word's overlay and drops the absorbed word's.
+An operation had to discard a word-level indicator overlay. It fires when `mergeWithNext()` merges two words that both carry a `;;` overlay (the merged word keeps the first word's overlay and drops the absorbed word's), and when a structural mutation — or object input — leaves an overlay on a word that consists only of spaces (a space cannot carry a word indicator, so the overlay is dropped instead of being stored and silently eaten by the `//` serialization).
 
 ```js
 const builder = new BlissSVGBuilder('B313;;B81//B431;;B86');
 builder.group(0).mergeWithNext();
 builder.toString(); // 'B313/B431;;B81' — the ;;B86 overlay was dropped, with a warning
+
+const spaced = new BlissSVGBuilder('B313;;B81');
+spaced.group(0).replaceGlyph(0, 'TSP');
+spaced.toString(); // '//' — the word became a space; ;;B81 was dropped, with a warning
 ```
 
 ## Unsupported Features

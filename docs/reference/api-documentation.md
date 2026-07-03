@@ -798,6 +798,8 @@ All structural methods trigger a rebuild and return `this` for chaining (except 
 
 A word that failed to parse (a structurally malformed `;;` — it renders as a single placeholder and `toString()` re-emits the original input) is **terminal**: every content mutation on it, whether through the group handle or a glyph/part handle inside it, is a silent no-op, matching `splitAt` / `mergeWithNext`. Group-level `setOptions` / `removeOptions` still work (options serialize outside the failed content), and you can remove the whole word or replace it with `replaceGroup()` — the recovery path.
 
+A structural mutation that turns an indicator-bearing word into a space normalizes the now-invalid state instead of storing it: the word's `;;` overlay is dropped with a `DROPPED_WORD_INDICATOR` warning, and a head designation on a glyph that became a space is deleted (silently, like the structural `^` drops in `splitAt` / `mergeWithNext`) — a space carries neither, and the space serialization (`//`) could not re-emit them.
+
 ```js
 // Handle methods return the handle, not the builder
 builder.group(0)
