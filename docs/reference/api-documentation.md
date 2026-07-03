@@ -800,6 +800,8 @@ A word that failed to parse (a structurally malformed `;;` — it renders as a s
 
 A structural mutation that turns an indicator-bearing word into a space normalizes the now-invalid state instead of storing it: the word's `;;` overlay is dropped with a `DROPPED_WORD_INDICATOR` warning, and a head designation on a glyph that became a space is deleted (silently, like the structural `^` drops in `splitAt` / `mergeWithNext`) — a space carries neither, and the space serialization (`//`) could not re-emit them.
 
+More generally, a bare space glyph never stays *inside* a word: the DSL has no syntax for that state (its serialized token would re-split into separate groups on reparse), so a mutation or alias expansion that leaves one there canonicalizes at rebuild — the word splits at its space runs into real space groups, silently. The first word run keeps the group node, its options, and its `;;` overlay; later word runs receive an options copy (`splitAt` parity) and keep their own head designations. A non-default space keeps its explicit code (`QSP` stays `QSP`), and a space code composed as a *part* of a multi-part glyph (`ZSA;B291`) is not a space glyph and is never touched.
+
 ```js
 // Handle methods return the handle, not the builder
 builder.group(0)
