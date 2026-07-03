@@ -570,7 +570,8 @@ export type WarningCode =
   | 'NOOP_INDICATOR_MUTATION'
   | 'COMPOSITE_AS_PART'
   | 'WORD_AS_PART'
-  | 'NON_INDICATOR_AS_WORD_INDICATOR';
+  | 'NON_INDICATOR_AS_WORD_INDICATOR'
+  | 'NON_INDICATOR_AS_CHARACTER_INDICATOR';
 
 /** A warning generated when the builder encounters a problem it can recover from. */
 export interface Warning {

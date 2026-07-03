@@ -259,6 +259,9 @@ export const WARNING_CODES = Object.freeze({
   // illegal operand in a ;; word-indicator slot: a recognized non-indicator
   // (a real base) supplied where a word-level indicator is required
   NON_INDICATOR_AS_WORD_INDICATOR: 'NON_INDICATOR_AS_WORD_INDICATOR',
+  // same rule one level down: a recognized non-indicator supplied to the
+  // glyph-level applyIndicators() slot (the API's character-indicator channel)
+  NON_INDICATOR_AS_CHARACTER_INDICATOR: 'NON_INDICATOR_AS_CHARACTER_INDICATOR',
 });
 
 /**

@@ -6,7 +6,7 @@
 
 import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
-import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
+import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
@@ -842,24 +842,39 @@ export class ElementHandle {
     // into a proper part node with metadata.
     const requestedCodes = code !== null ? splitTopLevelSemicolons(code) : [];
 
+    // A character-level indicator slot takes indicators only (the same rule,
+    // one level down, as the group `;;` overlay path — shared classifier for
+    // parity). Each rejected code warns individually on the persistent
+    // mutation channel; this REPLACES the old single "applied no indicator"
+    // no-op arm (strictly more informative: it names each offending code even
+    // when the valid subset makes the call a real mutation). The replace-all
+    // semantics are deliberately unchanged: the valid subset (possibly empty)
+    // still replaces the existing grammatical indicators.
+    if (code !== null) {
+      const { rejected } = partitionWordIndicators(requestedCodes, definitions);
+      for (const { code: badCode, reason } of rejected) {
+        this.#ctx.addMutationWarning(reason === 'non-indicator'
+          ? {
+              code: WARNING_CODES.NON_INDICATOR_AS_CHARACTER_INDICATOR,
+              message: `applyIndicators('${code}'): "${badCode}" is not an indicator; it cannot be applied. A character-level indicator code must be an indicator (e.g. B81).`,
+              source: badCode,
+            }
+          : {
+              code: WARNING_CODES.UNKNOWN_CODE,
+              message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it cannot be applied.`,
+              source: badCode,
+            });
+      }
+    }
+
     const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
 
-    // D4: report the no-op cases that still reach this far, gated on the ACTUAL
-    // effect (finalCodes vs the existing list) so a non-indicator code that
-    // legitimately strips existing indicators is NOT mis-reported as a no-op.
-    // An apply whose codes contain no recognized indicator AND leaves the
-    // indicator list unchanged applied nothing the caller asked for; a clear
-    // with no indicator parts had nothing to remove. (A clear that preserves a
-    // semantic root is a documented no-op and is intentionally not warned.)
+    // D4: a clear with no indicator parts had nothing to remove. (A clear that
+    // preserves a semantic root is a documented no-op and is intentionally not
+    // warned. The apply-side "applied no indicator" arm is gone: the per-code
+    // validation warnings above cover every rejected apply code.)
     if (!suppressNoop) {
-      const unchanged = finalCodes.length === existingIndCodes.length
-        && finalCodes.every((c, i) => c === existingIndCodes[i]);
-      if (code !== null && unchanged && filterToIndicators(requestedCodes, definitions).length === 0) {
-        this.#warnIndicatorNoop(
-          `applyIndicators('${code}') applied no indicator: none of the requested codes is a recognized indicator.`,
-          code,
-        );
-      } else if (code === null && indicatorParts.length === 0) {
+      if (code === null && indicatorParts.length === 0) {
         this.#warnIndicatorNoop(
           `clearIndicators() had no effect: the target glyph '${targetCode}' has no indicators to clear.`,
           targetCode,

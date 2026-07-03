@@ -64,10 +64,13 @@ export function filterToIndicators(codes, definitions) {
  * real indicators (kept) and the ones that must be rejected. A word-level
  * indicator must BE an indicator (isIndicator: true); a recognized non-indicator
  * (a real base such as B291) is rejected as `'non-indicator'`, an unrecognized
- * code as `'unknown'`. Shared by the DSL `;;` parser path and the API
- * `applyIndicators` overlay path so the two classify a `;;` code identically
- * (DSL/API parity). The kept-code test mirrors `filterToIndicators`, so a code
- * accepted here always survives the later resolve.
+ * code as `'unknown'`. Shared by the DSL `;;` parser path, the API
+ * `applyIndicators` overlay path, AND the glyph-level `applyIndicators`
+ * character-indicator gate, so all three classify an indicator code
+ * identically (DSL/API parity; the "word" in the name is historical — the
+ * classification itself is level-agnostic). The kept-code test mirrors
+ * `filterToIndicators`, so a code accepted here always survives the later
+ * resolve.
  *
  * @param {string[]} codes - raw `;;` codes (may carry options/coords)
  * @param {Object} definitions

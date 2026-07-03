@@ -8,13 +8,16 @@ import { BlissSVGBuilder } from '../src/index';
  * channel, so it survives later rebuilds and reads through `warnings`.
  *
  * Covers:
- * - apply whose requested codes contain no recognized indicator AND leaves the
- *   indicator list unchanged (a plain character code). The trigger gates on the
- *   actual effect: a non-indicator code that strips an existing indicator
- *   (replace-all / stripSemantic) is a real mutation and is NOT warned.
- * - apply on a glyph that cannot carry an indicator (a space glyph; an
- *   unrecognized code on an empty glyph). A lone indicator or empty glyph given
- *   a real indicator now attaches it (R15 Task 5), so it is not warned.
+ * - apply whose requested codes contain no recognized indicator no longer
+ *   NOOP-warns AT ALL: each rejected code now warns individually
+ *   (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, strictly more
+ *   informative), see `ElementHandle.character-indicator-validation.test.js`.
+ *   This file pins the NOOP absence for those scenarios. Actual-effect
+ *   semantics are unchanged: a non-indicator code that strips an existing
+ *   indicator (replace-all / stripSemantic) is still a real mutation.
+ * - apply on a glyph that cannot carry an indicator (a space glyph; a
+ *   non-indicator code on an empty glyph). A lone indicator or empty glyph
+ *   given a real indicator now attaches it (R15 Task 5), so it is not warned.
  * - apply on an invalid part pattern (a non-indicator part after an indicator).
  * - clear that finds no indicators to remove, including stripSemantic clearing
  *   a glyph that has no semantic.
@@ -26,8 +29,9 @@ import { BlissSVGBuilder } from '../src/index';
  *   warning site (the overlay removal is the effect, so the delegated clear is
  *   suppressed), yet a flatten clear with no overlay and no baked indicators
  *   DOES warn.
- * - N15: a flatten apply of an unrecognized code over a valid `;;` overlay keeps
- *   the overlay and warns about the unrecognized code (the overlay is not lost).
+ * - N15: a flatten apply of a non-indicator code over a valid `;;` overlay keeps
+ *   the overlay and warns about the rejected code (the overlay is not lost);
+ *   the warning is the per-code validation code, not NOOP.
  *
  * Does NOT cover:
  * - The no-op behaviour itself (parts left unchanged), see
@@ -45,14 +49,13 @@ const noopWarnings = (builder) =>
 
 describe('ElementHandle indicator no-op warning', () => {
   describe('when applyIndicators is given no recognized indicator', () => {
-    it('warns naming the requested code that is not an indicator', () => {
+    it('does not NOOP-warn; the per-code validation warning covers it', () => {
+      // retarget: the old single "applied no indicator" NOOP arm is replaced by
+      // per-code NON_INDICATOR_AS_CHARACTER_INDICATOR / UNKNOWN_CODE warnings,
+      // pinned in ElementHandle.character-indicator-validation.test.js.
       const b = new BlissSVGBuilder('B291');
       b.group(0).glyph(0).applyIndicators('B303');
-      const w = noopWarnings(b);
-      expect(w).toHaveLength(1);
-      expect(w[0].code).toBe('NOOP_INDICATOR_MUTATION');
-      expect(w[0].source).toBe('B303');
-      expect(w[0].message).toContain("applyIndicators('B303')");
+      expect(noopWarnings(b)).toHaveLength(0);
     });
 
     it('does not warn when at least one requested code is a valid indicator', () => {
@@ -81,13 +84,14 @@ describe('ElementHandle indicator no-op warning', () => {
       expect(noopWarnings(b)).toHaveLength(0);
     });
 
-    it('warns when a non-indicator code leaves the indicators unchanged', () => {
+    it('does not NOOP-warn when a non-indicator code leaves the indicators unchanged', () => {
       // B97 (semantic) is preserved and there is no grammatical to strip, so the
-      // call is a genuine no-op.
+      // call changes nothing; visibility now comes from the per-code validation
+      // warning (ElementHandle.character-indicator-validation.test.js), not NOOP.
       const b = new BlissSVGBuilder('B291;B97');
       b.group(0).glyph(0).applyIndicators('H');
       expect(b.toString()).toBe('B291;B97');
-      expect(noopWarnings(b)).toHaveLength(1);
+      expect(noopWarnings(b)).toHaveLength(0);
     });
   });
 
@@ -100,15 +104,17 @@ describe('ElementHandle indicator no-op warning', () => {
       expect(w[0].message).toContain('space');
     });
 
-    it('warns when an unrecognized code is applied to an empty glyph', () => {
+    it('warns the validation code when a non-indicator is applied to an empty glyph', () => {
       // regression (R15 Task 5): an empty glyph attaches a real indicator
-      // (matching addPart), but an unrecognized code applies nothing and warns
-      // rather than silently no-opping.
+      // (matching addPart), but a non-indicator code applies nothing and warns
+      // rather than silently no-opping. Retarget: the warning is now the
+      // per-code validation code, not NOOP.
       const b = new BlissSVGBuilder('B291;B86');
       b.group(0).glyph(0).part(1).detach();
       b.group(0).glyph(0).part(0).detach();
       b.group(0).glyph(0).applyIndicators('B303');
-      const w = noopWarnings(b);
+      expect(noopWarnings(b)).toHaveLength(0);
+      const w = b.warnings.filter(x => x.code === 'NON_INDICATOR_AS_CHARACTER_INDICATOR');
       expect(w).toHaveLength(1);
       expect(w[0].source).toBe('B303');
     });
@@ -217,27 +223,29 @@ describe('ElementHandle indicator no-op warning', () => {
     });
   });
 
-  describe('when a flatten apply cannot bake an unrecognized code', () => {
-    it('keeps the overlay and warns about the unrecognized code', () => {
+  describe('when a flatten apply cannot bake a non-indicator code', () => {
+    it('keeps the overlay and warns the validation code for the rejected code', () => {
       // N15 (R15 Task 5): a flatten apply only drops the `;;` overlay when the
       // bake actually lands. A non-indicator code bakes nothing, so the overlay
-      // is preserved; the unrecognized code still warns.
+      // is preserved; the rejected code warns (per-code validation, not NOOP).
       const b = new BlissSVGBuilder('B291;;B86');
       b.group(0).applyIndicators('B303', { flatten: true });
       expect(b.toString()).toBe('B291;;B86');
-      const w = noopWarnings(b);
+      expect(noopWarnings(b)).toHaveLength(0);
+      const w = b.warnings.filter(x => x.code === 'NON_INDICATOR_AS_CHARACTER_INDICATOR');
       expect(w).toHaveLength(1);
       expect(w[0].source).toBe('B303');
     });
 
-    it('does not strip the head when the unrecognized code also requests stripSemantic', () => {
+    it('does not strip the head when the non-indicator code also requests stripSemantic', () => {
       // F2 (R15 Task 5 review): a non-indicator flatten apply is a pure no-op even
       // with stripSemantic — it must not strip the head's baked semantic as a side
       // effect while keeping the overlay. Use clearIndicators({stripSemantic}) to strip.
       const b = new BlissSVGBuilder('B291;B97;;B81');
       b.group(0).applyIndicators('B303', { flatten: true, stripSemantic: true });
       expect(b.toString()).toBe('B291;B97;;B81');
-      const w = noopWarnings(b);
+      expect(noopWarnings(b)).toHaveLength(0);
+      const w = b.warnings.filter(x => x.code === 'NON_INDICATOR_AS_CHARACTER_INDICATOR');
       expect(w).toHaveLength(1);
       expect(w[0].source).toBe('B303');
     });
