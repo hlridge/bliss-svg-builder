@@ -1008,13 +1008,13 @@ The group-level call validates its codes the same way the DSL `;;` does: a recog
 
 #### `.clearIndicators(opts?)`
 
-`clearIndicators` is the pure undo at both levels, and it no longer takes `stripSemantic` — to remove the semantic too, use `applyIndicators('', { stripSemantic: true })`.
+`clearIndicators` is the pure undo at both levels, and it no longer takes `stripSemantic`. That option lives on apply only — and note the level difference: on a glyph handle `applyIndicators('', { stripSemantic: true })` *removes* the baked semantic too, while on a group handle the same call *stores* the reversible `;;!` strip overlay, which hides the head's indicators at render without removing anything.
 
 On a **glyph handle**, removes all grammatical indicators. Semantic indicators are always preserved:
 
 ```js
 builder.glyph(0).clearIndicators();
-builder.glyph(0).applyIndicators('', { stripSemantic: true }); // semantic too
+builder.glyph(0).applyIndicators('', { stripSemantic: true }); // removes the semantic too
 ```
 
 On a **group handle**, removes the word-level `;;` overlay — the pure undo of a group-level apply: the head glyph's own character-level indicators, hidden while the overlay was active, show again (including a semantic that a `;;!` strip had suppressed). `{ flatten: true }` bakes the cleared state onto the head instead of leaving an overlay.

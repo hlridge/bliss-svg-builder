@@ -364,8 +364,10 @@ export declare class ElementHandle {
 
   /**
    * The PURE UNDO: removes indicators, always preserving an existing semantic
-   * indicator (clear takes no `stripSemantic` — the strip-everything spelling
-   * is `applyIndicators('', { stripSemantic: true })`).
+   * indicator. Clear takes no `stripSemantic` — that option lives on apply:
+   * `applyIndicators('', { stripSemantic: true })` REMOVES the baked semantic
+   * on a glyph handle, but on a group handle it STORES the reversible `;;!`
+   * strip overlay (hides the head's indicators at render, removes nothing).
    *
    * Polymorphic by handle level (see `applyIndicators`):
    * - **Glyph handle** — removes the glyph's grammatical indicator parts.
