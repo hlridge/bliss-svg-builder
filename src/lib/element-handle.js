@@ -559,6 +559,12 @@ export class ElementHandle {
       // parsed from; drop its cached identity so an emptied glyph does not
       // re-emit a phantom codeName from toString (mirrors insertPart). N16.
       this.#clearGlyphIdentity(glyph);
+      // An EMPTIED glyph serializes to nothing, so a head designation on it
+      // would live only in toJSON while toString dropped it (round-2 external
+      // review F4): the designation dies visibly with its glyph's content.
+      // detach is the only mutation that leaves an empty glyph in the tree
+      // (remove/removePart cascade the whole glyph away).
+      if (glyph.parts.length === 0) delete glyph.isHeadGlyph;
       this.#ctx.rebuild();
       return undefined;
     }
@@ -1020,7 +1026,11 @@ export class ElementHandle {
   // DSL marker produce byte-identical state (DSL/API parity).
   #applyOrClearWordIndicators(code, opts) {
     const group = this.#nodeRef;
-    if (!group?.glyphs?.length) return this;
+    // Overlay clear/apply are pure state ops on the group node, so they must
+    // keep working when every glyph was detached — a stale overlay on an
+    // emptied word would otherwise be unreachable and resurrect on the next
+    // addGlyph (round-2 external review F3). Only flatten needs glyphs (below).
+    if (!group) return this;
     // A space group carries no word indicator: refuse + warn (parity with the
     // glyph-level space arm), never store an overlay the space's '//'
     // serialization would eat (round-2 external review F1).
@@ -1039,6 +1049,9 @@ export class ElementHandle {
     const stripSemantic = code !== null && opts?.stripSemantic === true;
 
     if (opts?.flatten === true) {
+      // Flatten bakes onto a head, so it still requires glyphs (an empty word
+      // has nothing to bake onto; the overlay stays for a non-flatten op).
+      if (!group.glyphs?.length) return this;
       // Bake onto the head; drop any overlay so the indicator is not applied
       // twice (once baked, once re-merged at render). N15: only drop the overlay
       // when the bake actually lands. A clear always bakes (removal is the
@@ -1079,7 +1092,7 @@ export class ElementHandle {
       const hadOverlay = group.wordIndicators !== undefined;
       delete group.wordIndicators;
       if (!hadOverlay) {
-        const headNode = this.headGlyph()?.#nodeRef ?? group.glyphs[0];
+        const headNode = this.headGlyph()?.#nodeRef ?? group.glyphs?.[0];
         const targetCode = headNode?.codeName || headNode?.parts?.[0]?.codeName || 'unknown';
         this.#warnIndicatorNoop(
           `clearIndicators() had no effect: the word has no word-level (;;) indicator overlay to clear.`,

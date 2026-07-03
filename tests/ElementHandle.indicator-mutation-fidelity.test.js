@@ -25,6 +25,9 @@ import { BlissSVGBuilder } from '../src/index';
  * - Group clear: pure undo (removes the overlay, un-hiding the head's own
  *   character-level indicators); warns NOOP_INDICATOR_MUTATION when there is
  *   no overlay to remove; `stripSemantic` on clear is ignored at both levels.
+ * - Empty word (round-2 review F3): overlay clear/apply still operate when
+ *   every glyph was detached (pure state ops — no stale overlay survives to
+ *   resurrect on addGlyph); only the flatten path still requires a head.
  *
  * Does NOT cover:
  * - Valid-code apply semantics (replacement, semantic ordering), see
@@ -253,6 +256,52 @@ describe('ElementHandle indicator mutation fidelity', () => {
       const b = new BlissSVGBuilder('B291;B86;B97');
       b.group(0).glyph(0).clearIndicators({ stripSemantic: true });
       expect(partCodes(b)).toEqual(['B291', 'B97']);
+    });
+  });
+
+  describe('when the group has no glyphs left', () => {
+    // regression: round-2 external review F3 — after glyph(0).detach() emptied
+    // the word, clear/empty-apply early-returned on the glyphs-length guard,
+    // so a stale overlay survived unreachably and resurrected on the next
+    // addGlyph. Overlay clear/apply are pure state ops; only flatten needs a
+    // head to bake onto.
+    it('clearIndicators removes a stale overlay so addGlyph yields a bare word', () => {
+      const b = new BlissSVGBuilder('B313;;B81');
+      b.glyph(0).detach();
+      b.group(0).clearIndicators();
+      expect(overlay(b)).toBeUndefined();
+      b.group(0).addGlyph('B313');
+      expect(b.toString()).toBe('B313');
+    });
+
+    it('applyIndicators("") replaces a stale overlay with the deliberate empty set', () => {
+      const b = new BlissSVGBuilder('B313;;B81');
+      b.glyph(0).detach();
+      b.group(0).applyIndicators('');
+      expect(overlay(b)).toEqual({ codes: [], stripSemantic: false });
+    });
+
+    it('a code-carrying apply stores the overlay for the next glyph to carry', () => {
+      const b = new BlissSVGBuilder('B313;;B81');
+      b.glyph(0).detach();
+      b.group(0).applyIndicators('B86');
+      expect(overlay(b)).toEqual({ codes: ['B86'], stripSemantic: false });
+      b.group(0).addGlyph('B313');
+      expect(b.toString()).toBe('B313;;B86');
+    });
+
+    it('still warns the clear no-op when there is no overlay to remove', () => {
+      const b = new BlissSVGBuilder('B313');
+      b.glyph(0).detach();
+      b.group(0).clearIndicators();
+      expect(noopWarnings(b)).toHaveLength(1);
+    });
+
+    it('flatten still requires a head: a flatten apply on an empty word is a no-op', () => {
+      const b = new BlissSVGBuilder('B313;;B81');
+      b.glyph(0).detach();
+      b.group(0).applyIndicators('B86', { flatten: true });
+      expect(overlay(b)).toEqual({ codes: ['B81'], stripSemantic: false });
     });
   });
 

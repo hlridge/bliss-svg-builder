@@ -23,12 +23,18 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Dropped word-markers never resurface on export.
  * - Crown stability across parse -> toString -> parse.
  * - toJSON preserving isHeadGlyph on the designated glyph.
+ * - A detach that empties a marked glyph deletes its designation too, keeping
+ *   toString and toJSON in agreement (round-2 review F4); a partial detach
+ *   keeps it.
  * - Per-word emission for multi-word inputs.
  *
  * Does NOT cover:
  * - Resolution semantics themselves (which glyph gets the crown), see
  *   `BlissParser.head-marker-contract.test.js` and
  *   `BlissParser.head-marker-matrix.test.js`.
+ * - The emptied glyph's RENDER advance (an empty glyph still consumes
+ *   charSpace, so live svg differs from the reparse of toString) — an open
+ *   layout-fidelity finding, backlog-tracked, independent of the designation.
  * - General toString flattening of aliases, options, and spaces, see
  *   `BlissSVGBuilder.string-output.test.js` and
  *   `BlissSVGBuilder.round-trip.test.js`.
@@ -160,6 +166,30 @@ describe('BlissSVGBuilder head-marker round-trip', () => {
 
       expect(b.toString()).toBe('B291/B313;B81');
       expect(markedIndexes(BlissParser.parse(b.toString()))).toEqual([]);
+    });
+  });
+
+  describe('when a marked glyph is emptied by part detach', () => {
+    // regression: round-2 external review F4 — toJSON kept isHeadGlyph on the
+    // emptied glyph while toString dropped both glyph and marker, so the
+    // stored designation diverged from its serialization and died on reparse.
+    // The designation dies visibly with its glyph's content.
+    it('deletes the designation with the glyph content', () => {
+      const b = new BlissSVGBuilder('B313^/B1103');
+      b.glyph(0).part(0).detach();
+
+      expect(b.toString()).toBe('B1103');
+      expect(b.toJSON().groups[0].glyphs.some(g => g.isHeadGlyph === true)).toBe(false);
+      const reparsed = new BlissSVGBuilder(b.toString());
+      expect(reparsed.toJSON().groups[0].glyphs.some(g => g.isHeadGlyph === true)).toBe(false);
+    });
+
+    it('keeps the designation while the marked glyph still has parts', () => {
+      const b = new BlissSVGBuilder('B313;B81^/B1103');
+      b.glyph(0).part(1).detach();
+
+      expect(b.toJSON().groups[0].glyphs[0].isHeadGlyph).toBe(true);
+      expect(b.toString()).toBe('B313^/B1103');
     });
   });
 });
