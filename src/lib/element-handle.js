@@ -459,6 +459,23 @@ export class ElementHandle {
 
   // --- Mutation: add/insert ---
 
+  // A fail-flagged word (malformed `;;` sets group.errorCode) is TERMINAL: it
+  // renders as a single placeholder and toString replays its stored
+  // errorSource verbatim, so a content mutation inside it would change the
+  // live tree while the serialized form stays frozen (toJSON/toString
+  // divergence, round-2 external review F5). Every content mutator no-ops on
+  // it — SILENTLY, matching the shipped splitAt/mergeWithNext terminal arms —
+  // whether it targets the group handle or a child glyph/part handle inside.
+  // Recovery: replaceGroup, or removing the whole word (group detach/remove).
+  // Group-level setOptions/removeOptions are exempt: group options serialize
+  // OUTSIDE the error source (`[opts]|errorSource`) and round-trip.
+  #inFailFlaggedGroup() {
+    if (this.#level === 1) return this.#nodeRef?.errorCode !== undefined;
+    if (this.#level === 2) return this.#parentRef?.errorCode !== undefined;
+    if (this.#level === 3) return this.#parentRef?.group?.errorCode !== undefined;
+    return false;
+  }
+
   addGlyph(code, opts) {
     this.#assertReachable();
     if (this.#level !== 1) return this;
@@ -472,6 +489,8 @@ export class ElementHandle {
     if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup.
+    if (group.errorCode) return this;
     const newGlyphs = this.#parseGlyphs(code);
     for (const g of newGlyphs) {
       this.#applyDefaultsOverrides(g, opts);
@@ -526,6 +545,9 @@ export class ElementHandle {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup. Also covers the
+    // group-handle addPart/insertPart forms (they delegate to this arm).
+    if (this.#inFailFlaggedGroup()) return this;
     const newParts = this.#parseParts(code);
     for (const p of newParts) {
       this.#applyDefaultsOverrides(p, opts);
@@ -548,6 +570,10 @@ export class ElementHandle {
    */
   detach() {
     this.#assertReachable();
+    // Terminal fail-flagged word: child content cannot be detached (see
+    // #inFailFlaggedGroup); detaching the WHOLE word (level 1) stays allowed —
+    // removal of the unit is consistent with its frozen serialization.
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return undefined;
 
     if (this.#level === 3) {
       const glyph = this.#parentRef.glyph;
@@ -602,6 +628,9 @@ export class ElementHandle {
    */
   remove() {
     this.#assertReachable();
+    // Terminal fail-flagged word: mirrors detach — child removal no-ops,
+    // whole-word removal (level 1) stays allowed.
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return undefined;
     const raw = this.#ctx.getRaw();
     const groups = raw.groups;
 
@@ -642,6 +671,8 @@ export class ElementHandle {
     if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup.
+    if (group.errorCode) return this;
     if (index < 0) index = group.glyphs.length + index;
     if (index < 0 || index >= group.glyphs.length) return this;
     group.glyphs.splice(index, 1);
@@ -662,6 +693,8 @@ export class ElementHandle {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup.
+    if (this.#inFailFlaggedGroup()) return this;
     if (index < 0) index = glyph.parts.length + index;
     if (index < 0 || index >= glyph.parts.length) return this;
     glyph.parts.splice(index, 1);
@@ -701,6 +734,8 @@ export class ElementHandle {
     if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup.
+    if (group.errorCode) return this;
     if (index < 0) index = group.glyphs.length + index;
     if (index < 0 || index >= group.glyphs.length) return this;
     const newGlyph = this.#parseGlyph(code);
@@ -716,6 +751,8 @@ export class ElementHandle {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph?.parts?.length) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup.
+    if (this.#inFailFlaggedGroup()) return this;
     if (index < 0) index = glyph.parts.length + index;
     if (index < 0 || index >= glyph.parts.length) return this;
     const newPart = this.#parsePart(code);
@@ -731,6 +768,9 @@ export class ElementHandle {
 
   replace(code, opts) {
     this.#assertReachable();
+    // Terminal fail-flagged word: see #inFailFlaggedGroup (levels 2/3 only;
+    // there is no level-1 replace arm — replaceGroup is the recovery).
+    if (this.#inFailFlaggedGroup()) return this;
     if (this.#level === 2) {
       const group = this.#parentRef;
       if (!group?.glyphs) return this;
@@ -806,6 +846,10 @@ export class ElementHandle {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup. (The flatten
+    // delegation cannot reach here for a flagged group — the word-level path
+    // gates first.)
+    if (this.#inFailFlaggedGroup()) return this;
     if (!glyph.parts) glyph.parts = [];
 
     const definitions = this.#ctx.getDefinitions();
@@ -1031,6 +1075,8 @@ export class ElementHandle {
     // emptied word would otherwise be unreachable and resurrect on the next
     // addGlyph (round-2 external review F3). Only flatten needs glyphs (below).
     if (!group) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup.
+    if (group.errorCode) return this;
     // A space group carries no word indicator: refuse + warn (parity with the
     // glyph-level space arm), never store an overlay the space's '//'
     // serialization would eat (round-2 external review F1).
@@ -1284,6 +1330,10 @@ export class ElementHandle {
 
   setOptions(opts) {
     this.#assertReachable();
+    // Terminal fail-flagged word: CHILD options live inside the frozen error
+    // source and no-op; GROUP options are the documented exemption (they
+    // serialize outside it, `[opts]|errorSource`, and round-trip).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
     if (!node) return this;
     this.#applyDefaultsOverrides(node, opts);
@@ -1294,6 +1344,8 @@ export class ElementHandle {
 
   removeOptions(...keys) {
     this.#assertReachable();
+    // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
     if (!node?.options) return this;
     for (const key of keys) {
