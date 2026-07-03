@@ -26,6 +26,12 @@ import { BlissSVGBuilder } from '../src/index';
  * - A fully valid apply warns nothing.
  * - Group-level parity control: the group overlay path still classifies with
  *   `NON_INDICATOR_AS_WORD_INDICATOR` (unchanged by this gate).
+ * - Parse-first validation (round-2 review F2): a code whose decoration fails
+ *   to parse (`B81:bad`) refuses without stripping or appending an error part
+ *   (the forwarded parse warning is the visibility channel); a mixed list
+ *   applies only the parseable subset; a code carrying a top-level `/`
+ *   (`B81:1,2/B86`) warns `MISPLACED_CHARACTER_INDICATOR` and refuses (a
+ *   quoted slash inside an option value is not structure).
  *
  * Does NOT cover:
  * - The surviving NOOP matrix (space target, invalid part pattern, clear with
@@ -134,6 +140,68 @@ describe('ElementHandle character indicator validation', () => {
       expect(word).toHaveLength(1);
       expect(word[0].source).toBe('C8');
       expect(validationWarnings(b)).toHaveLength(0);
+    });
+  });
+
+  describe('when a requested code fails to parse as an indicator part', () => {
+    it('refuses a malformed coordinate decoration, keeping the stack and the semantic', () => {
+      // regression: round-2 external review F2 — the malformed decoration used
+      // to parse into a codeName-less error part that replaced the stack, and
+      // stripSemantic still stripped, so a failed apply destroyed state.
+      const b = new BlissSVGBuilder('B291;B81;B97');
+      b.group(0).glyph(0).applyIndicators('B81:bad', { stripSemantic: true });
+      expect(b.toString()).toBe('B291;B81;B97');
+      expect(b.warnings.map(w => w.code)).toContain('MALFORMED_COORDINATES');
+      expect(noopWarnings(b)).toHaveLength(0);
+    });
+
+    it('applies the parseable subset of a mixed list, dropping the malformed code', () => {
+      const b = new BlissSVGBuilder('B291;B81;B97');
+      b.group(0).glyph(0).applyIndicators('B81:1,2;B81:bad');
+      expect(b.toString()).toBe('B291;B81:1,2;B97');
+      // no codeName-less error part between the applied indicator and the root
+      expect(b.toJSON().groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'B81', 'B97']);
+      expect(b.warnings.map(w => w.code)).toContain('MALFORMED_COORDINATES');
+    });
+  });
+
+  describe('when a requested code contains a character separator', () => {
+    it('warns MISPLACED_CHARACTER_INDICATOR and refuses instead of applying a fragment', () => {
+      // 'B81:1,2/B86' used to apply B81:1,2 and silently DROP B86: the top-level
+      // '/' splits at parse, so the code can never be one indicator part.
+      const b = new BlissSVGBuilder('B291;B81');
+      b.group(0).glyph(0).applyIndicators('B81:1,2/B86');
+      expect(b.toString()).toBe('B291;B81');
+      const w = b.warnings.filter(x => x.code === 'MISPLACED_CHARACTER_INDICATOR');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B81:1,2/B86');
+    });
+
+    it('does not misread a quoted slash inside an option value as structure', () => {
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).glyph(0).applyIndicators('[data-t="a/b"]>B81');
+      expect(b.toJSON().groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'B81']);
+      expect(b.warnings.filter(x => x.code === 'MISPLACED_CHARACTER_INDICATOR')).toHaveLength(0);
+    });
+
+    it('does not misread an unquoted slash inside an option bracket as structure', () => {
+      // pins the depth-0 condition of the top-level-slash scan: a slash inside
+      // a bracket is option-value content whether quoted or not.
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).glyph(0).applyIndicators('[data-t=a/b]>B81');
+      expect(b.toJSON().groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'B81']);
+      expect(b.warnings).toHaveLength(0);
+    });
+  });
+
+  describe('when a requested code carries its own parse warning but still attaches', () => {
+    it('forwards the parse warning exactly once (validation parse is reused)', () => {
+      // pins the part-node reuse in the assembly loop: re-parsing an applied
+      // code would forward its _parseWarnings a second time.
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).glyph(0).applyIndicators('[grid]>B81');
+      expect(b.toJSON().groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'B81']);
+      expect(b.warnings.filter(w => w.code === 'MISPLACED_GLOBAL_OPTION')).toHaveLength(1);
     });
   });
 });

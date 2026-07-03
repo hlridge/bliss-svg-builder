@@ -711,7 +711,10 @@ export class BlissParser {
           // resolveWordIndicatorOverlay is the shared classify + store rule (the
           // DSL, API, and object surfaces all use it, so they agree); it returns
           // null when the codes were all dropped and there is no strip. (Strict
-          // Indicator Separation.)
+          // Indicator Separation.) Its 'word-structure' reject reason cannot
+          // fire on this path: any `/` in the `;;` tail already failed the
+          // whole word at the isMalformed gate above, so this callback maps
+          // only 'non-indicator' and 'unknown'.
           const overlay = resolveWordIndicatorOverlay(gatedCodes, stripSemantic, definitions, ({ code: badCode, reason }) => {
             parseWarnings.push(reason === 'non-indicator'
               ? {

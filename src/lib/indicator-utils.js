@@ -60,28 +60,61 @@ export function filterToIndicators(codes, definitions) {
 }
 
 /**
+ * Detect a TOP-LEVEL character separator (`/`) in an indicator code: outside
+ * option brackets and outside a quoted option value (same scan state as
+ * `splitTopLevelSemicolons`). A `/` hidden behind a coordinate suffix
+ * (`B81:1,2/ZZ9`) escapes `getBareCode` (which reads only up to the `:`), yet
+ * the serialized form re-parses as word structure, so an indicator slot can
+ * never hold such a code (round-2 external review F2).
+ */
+function hasTopLevelSlash(code) {
+  let depth = 0;
+  let quote = null;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (quote !== null) {
+      if (ch === '\\' && i + 1 < code.length) i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if ((ch === '"' || ch === "'") && depth > 0) quote = ch;
+    else if (ch === '[') depth++;
+    else if (ch === ']') { if (depth > 0) depth--; }
+    else if (ch === '/' && depth === 0) return true;
+  }
+  return false;
+}
+
+/**
  * Partition a list of `;;` word-level indicator codes into the ones that are
  * real indicators (kept) and the ones that must be rejected. A word-level
  * indicator must BE an indicator (isIndicator: true); a recognized non-indicator
  * (a real base such as B291) is rejected as `'non-indicator'`, an unrecognized
- * code as `'unknown'`. Shared by the DSL `;;` parser path, the API
- * `applyIndicators` overlay path, AND the glyph-level `applyIndicators`
- * character-indicator gate, so all three classify an indicator code
- * identically (DSL/API parity; the "word" in the name is historical — the
- * classification itself is level-agnostic). The kept-code test mirrors
- * `filterToIndicators`, so a code accepted here always survives the later
- * resolve.
+ * code as `'unknown'`, and a code carrying word structure (a top-level `/`,
+ * which no indicator slot can serialize back out) as `'word-structure'`.
+ * Shared by the DSL `;;` parser path, the API `applyIndicators` overlay path,
+ * AND the glyph-level `applyIndicators` character-indicator gate, so all three
+ * classify an indicator code identically (DSL/API parity; the "word" in the
+ * name is historical — the classification itself is level-agnostic). The
+ * kept-code test mirrors `filterToIndicators`, so a code accepted here always
+ * survives the later resolve.
  *
  * @param {string[]} codes - raw `;;` codes (may carry options/coords)
  * @param {Object} definitions
- * @returns {{ valid: string[], rejected: Array<{ code: string, reason: 'non-indicator'|'unknown' }> }}
+ * @returns {{ valid: string[], rejected: Array<{ code: string, reason: 'non-indicator'|'unknown'|'word-structure' }> }}
  *   `valid` preserves each code verbatim (options/coords intact); each rejected
- *   `code` is the bare offending code (options/coords stripped).
+ *   `code` is the bare offending code (options/coords stripped), except a
+ *   `'word-structure'` reject, which keeps the full code (its bare form would
+ *   hide the offending `/`).
  */
 export function partitionWordIndicators(codes, definitions) {
   const valid = [];
   const rejected = [];
   for (const code of codes) {
+    if (hasTopLevelSlash(code)) {
+      rejected.push({ code, reason: 'word-structure' });
+      continue;
+    }
     const bare = getBareCode(code);
     // Own-property check: a normal definitions object inherits Object.prototype
     // members (toString, constructor, __proto__), so a plain `definitions[bare]`
@@ -129,7 +162,7 @@ export function partitionWordIndicators(codes, definitions) {
  * @param {string[]} rawCodes
  * @param {boolean} stripSemantic
  * @param {Object} definitions
- * @param {(rejected: { code: string, reason: 'non-indicator'|'unknown' }) => void} [onReject]
+ * @param {(rejected: { code: string, reason: 'non-indicator'|'unknown'|'word-structure' }) => void} [onReject]
  * @param {(stripped: { bracket: string, code: string, source: string }) => void} [onCharOptionStrip]
  * @returns {{ codes: string[], stripSemantic: boolean } | null}
  */

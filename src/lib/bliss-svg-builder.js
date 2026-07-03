@@ -421,17 +421,26 @@ class BlissSVGBuilder {
         if (!group.wordIndicators) continue;
         const { codes = [], stripSemantic = false } = group.wordIndicators;
         const overlay = resolveWordIndicatorOverlay(codes, stripSemantic, blissElementDefinitions, ({ code: badCode, reason }) => {
-          (blissObj._parseWarnings ??= []).push(reason === 'non-indicator'
+          (blissObj._parseWarnings ??= []).push(reason === 'word-structure'
             ? {
-                code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
-                message: `Word-level indicator "${badCode}" is not an indicator; it is ignored. A ;; code must be an indicator (e.g. B81).`,
+                // Round-2 external review F2: a `/` hidden behind a coordinate
+                // suffix serialized to a string the DSL re-parses as word
+                // structure; the DSL/API surfaces reject it, so object input must too.
+                code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
+                message: `Word-level indicator "${badCode}" contains a character separator (a top-level /), which a word-level indicator cannot hold; it is ignored.`,
                 source: badCode,
               }
-            : {
-                code: WARNING_CODES.UNKNOWN_CODE,
-                message: `Word-level indicator "${badCode}" is not a known code; it is ignored.`,
-                source: badCode,
-              });
+            : reason === 'non-indicator'
+              ? {
+                  code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
+                  message: `Word-level indicator "${badCode}" is not an indicator; it is ignored. A ;; code must be an indicator (e.g. B81).`,
+                  source: badCode,
+                }
+              : {
+                  code: WARNING_CODES.UNKNOWN_CODE,
+                  message: `Word-level indicator "${badCode}" is not a known code; it is ignored.`,
+                  source: badCode,
+                });
         }, ({ bracket, code: keptCode, source }) => {
           (blissObj._parseWarnings ??= []).push({
             code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,

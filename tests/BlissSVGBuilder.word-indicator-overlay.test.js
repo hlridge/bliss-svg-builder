@@ -14,8 +14,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   render-path readers that index the resolved head cannot silently regress.
  * - Constructor ingestion: default toJSON carries `group.wordIndicators`, and
  *   rebuilding from it renders identically and re-emits `;;` (authoring-faithful
- *   default round-trip). An object overlay carrying a non-indicator or unknown
- *   code is validated + dropped (warn), matching the DSL/API surfaces.
+ *   default round-trip). An object overlay carrying a non-indicator, unknown,
+ *   or word-structure code (a top-level `/`, round-2 review F2) is validated +
+ *   dropped (warn), matching the DSL/API surfaces.
  * - getElementByKey on a `;;` head: base parts stay addressable by key; the
  *   overlay-injected indicator part returns null (lives only in the resolved
  *   tree, no raw node to mutate).
@@ -130,6 +131,20 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
       const b = objectWithOverlay(['B81']);
       expect(b.warnings.filter(x => x.code === 'NON_INDICATOR_AS_WORD_INDICATOR')).toHaveLength(0);
       expect(b.toJSON().groups[0].wordIndicators).toEqual({ codes: ['B81'], stripSemantic: false });
+    });
+
+    it('warns MALFORMED_WORD_INDICATOR and drops a word-structure overlay code', () => {
+      // regression: round-2 external review F2. 'B81:1,2/ZZ9' hides its `/`
+      // behind the coordinate suffix; stored verbatim it serialized to a
+      // string the DSL re-parses as word structure (svg round-trip drift).
+      const b = objectWithOverlay(['B81:1,2/ZZ9']);
+      const w = b.warnings.filter(x => x.code === 'MALFORMED_WORD_INDICATOR');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B81:1,2/ZZ9');
+      expect(b.toJSON().groups[0].wordIndicators).toBeUndefined();
+      expect(b.toString()).toBe('B303');
+      const reparsed = new BlissSVGBuilder(b.toString());
+      expect(reparsed.svgCode).toBe(b.svgCode);
     });
   });
 

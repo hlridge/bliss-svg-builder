@@ -867,30 +867,65 @@ export class ElementHandle {
     // parity). Each rejected code warns individually on the persistent
     // mutation channel; this REPLACES the old single "applied no indicator"
     // no-op arm (strictly more informative: it names each offending code even
-    // when the valid subset makes the call a real mutation). An apply whose
-    // requested codes are ALL rejected REFUSES: explicit failed content is
+    // when the valid subset makes the call a real mutation). A code carrying
+    // word structure (a top-level `/`, hidden from the bare-code classifier
+    // behind a coordinate suffix) can never be a single indicator part, so it
+    // is rejected too. The surviving codes are then PARSED BEFORE the glyph is
+    // touched: a code whose decoration fails to parse (e.g. `B81:bad`) yields
+    // only a codeName-less error part, so it is excluded — the forwarded parse
+    // warnings (MALFORMED_COORDINATES etc.) are its visibility channel. An
+    // apply left with NOTHING attachable REFUSES: explicit failed content is
     // not deliberate emptiness (that spelling is applyIndicators('')), so the
     // existing indicators stay untouched and nothing strips as a side effect
-    // (parity with the group overlay's null-resolver refuse arm).
+    // (parity with the group overlay's null-resolver refuse arm; round-2
+    // external review F2).
+    let attachableEntries = [];
     if (code !== null && requestedCodes.length > 0) {
       const { valid, rejected } = partitionWordIndicators(requestedCodes, definitions);
       for (const { code: badCode, reason } of rejected) {
-        this.#ctx.addMutationWarning(reason === 'non-indicator'
+        this.#ctx.addMutationWarning(reason === 'word-structure'
           ? {
-              code: WARNING_CODES.NON_INDICATOR_AS_CHARACTER_INDICATOR,
-              message: `applyIndicators('${code}'): "${badCode}" is not an indicator; it cannot be applied. A character-level indicator code must be an indicator (e.g. B81).`,
+              code: WARNING_CODES.MISPLACED_CHARACTER_INDICATOR,
+              message: `applyIndicators('${code}'): "${badCode}" spans multiple characters (it contains a top-level /); a character-level indicator code must be a single indicator. It cannot be applied.`,
               source: badCode,
             }
-          : {
-              code: WARNING_CODES.UNKNOWN_CODE,
-              message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it cannot be applied.`,
-              source: badCode,
-            });
+          : reason === 'non-indicator'
+            ? {
+                code: WARNING_CODES.NON_INDICATOR_AS_CHARACTER_INDICATOR,
+                message: `applyIndicators('${code}'): "${badCode}" is not an indicator; it cannot be applied. A character-level indicator code must be an indicator (e.g. B81).`,
+                source: badCode,
+              }
+            : {
+                code: WARNING_CODES.UNKNOWN_CODE,
+                message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it cannot be applied.`,
+                source: badCode,
+              });
       }
-      if (valid.length === 0) return this;
+      for (const validCode of valid) {
+        const parsed = this.#ctx.parse(validCode);
+        this.#forwardParseWarnings(parsed);
+        const glyphs = parsed.groups?.length === 1 ? parsed.groups[0].glyphs : null;
+        const parts = glyphs?.length === 1 ? glyphs[0].parts : null;
+        if (parts?.length > 0 && parts.every(p => p.isIndicator === true)) {
+          attachableEntries.push({ code: validCode, parts });
+        } else {
+          // An error part's warning used to surface at render, AFTER it was
+          // already inserted; the part is now never inserted, so its parse
+          // error (e.g. MALFORMED_COORDINATES) is re-emitted on the mutation
+          // channel as the excluded code's visibility.
+          const errorPart = parts?.find(p => p.errorCode);
+          const detail = errorPart?.error ? ` (${errorPart.error})` : '';
+          this.#ctx.addMutationWarning({
+            code: errorPart?.errorCode ?? WARNING_CODES.UNKNOWN_CODE,
+            message: `applyIndicators('${code}'): "${validCode}" cannot be applied as an indicator part${detail}.`,
+            source: validCode,
+          });
+        }
+      }
+      if (attachableEntries.length === 0) return this;
     }
 
-    const finalCodes = resolveIndicatorCodes(existingIndCodes, requestedCodes, { stripSemantic }, definitions);
+    const finalCodes = resolveIndicatorCodes(existingIndCodes, attachableEntries.map(e => e.code), { stripSemantic }, definitions);
 
     // D4: a clear with no indicator parts had nothing to remove. (A clear that
     // preserves a semantic root is a documented no-op and is intentionally not
@@ -905,8 +940,18 @@ export class ElementHandle {
       }
     }
 
+    // Assemble the new indicator parts. A requested code reuses the part
+    // nodes from its validation parse above (parsing again would forward its
+    // warnings twice); a code the resolver added back (the preserved semantic
+    // root) parses fresh. Entries are consumed in order so a duplicated
+    // requested code yields distinct part nodes.
     const newIndicatorParts = [];
     for (const indCode of finalCodes) {
+      const entryIndex = attachableEntries.findIndex(e => e.code === indCode);
+      if (entryIndex !== -1) {
+        newIndicatorParts.push(...attachableEntries.splice(entryIndex, 1)[0].parts);
+        continue;
+      }
       const parsed = this.#ctx.parse(indCode);
       this.#forwardParseWarnings(parsed);
       const partNode = parsed.groups?.[0]?.glyphs?.[0]?.parts?.[0];
@@ -1035,17 +1080,26 @@ export class ElementHandle {
       // the warning survives the rebuild below.
       const requestedCodes = splitTopLevelSemicolons(code);
       const overlay = resolveWordIndicatorOverlay(requestedCodes, stripSemantic, this.#ctx.getDefinitions(), ({ code: badCode, reason }) => {
-        this.#ctx.addMutationWarning(reason === 'non-indicator'
+        this.#ctx.addMutationWarning(reason === 'word-structure'
           ? {
-              code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
-              message: `applyIndicators('${code}'): "${badCode}" is not an indicator; it is ignored. A word-level indicator code must be an indicator (e.g. B81).`,
+              // Round-2 external review F2: a `/` hidden behind a coordinate
+              // suffix escaped the bare-code classifier, so the stored code
+              // serialized to a string the DSL re-parses as word structure.
+              code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
+              message: `applyIndicators('${code}'): "${badCode}" contains a character separator (a top-level /), which a word-level indicator cannot hold; it is ignored.`,
               source: badCode,
             }
-          : {
-              code: WARNING_CODES.UNKNOWN_CODE,
-              message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it is ignored.`,
-              source: badCode,
-            });
+          : reason === 'non-indicator'
+            ? {
+                code: WARNING_CODES.NON_INDICATOR_AS_WORD_INDICATOR,
+                message: `applyIndicators('${code}'): "${badCode}" is not an indicator; it is ignored. A word-level indicator code must be an indicator (e.g. B81).`,
+                source: badCode,
+              }
+            : {
+                code: WARNING_CODES.UNKNOWN_CODE,
+                message: `applyIndicators('${code}'): unknown indicator code "${badCode}"; it is ignored.`,
+                source: badCode,
+              });
       }, ({ bracket, code: keptCode, source }) => {
         this.#ctx.addMutationWarning({
           code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,

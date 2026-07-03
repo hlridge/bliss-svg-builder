@@ -18,6 +18,11 @@ import { BlissSVGBuilder } from '../src/index';
  *   drops it (a mixed list keeps the valid indicators), mirroring the DSL `;;`
  *   non-indicator rule instead of silently storing an unrenderable overlay; an
  *   unrecognized code warns UNKNOWN_CODE and is dropped (DSL/API parity).
+ * - apply of a code carrying word structure (a top-level `/`, round-2 review
+ *   F2): warns MALFORMED_WORD_INDICATOR and drops it — the `;;` store can only
+ *   hold codes the DSL grammar could author — while a DSL-authorable decorated
+ *   code (`B81:bad`) still stores; the `;;!` strip survives an all-dropped
+ *   apply (the documented asymmetry), including the structural case.
  * - apply { flatten: true }: bakes onto the head, no overlay; drops a
  *   pre-existing overlay before baking, but keeps it when the flattened code
  *   applies no indicator (N15).
@@ -150,6 +155,62 @@ describe('ElementHandle word indicators', () => {
       const rebuilt = new BlissSVGBuilder(dsl.toJSON());
       expect(rebuilt.warnings).toEqual([]);
       expect(rebuilt.toString()).toBe('B303');
+    });
+  });
+
+  describe('when a requested overlay code carries word structure', () => {
+    // regression: round-2 external review F2 — the store validated by bare code
+    // only (read up to ':'), so 'B81:1,2/ZZ9' was stored verbatim and the
+    // serialized `;;B81:1,2/ZZ9` re-parsed as word structure
+    // (MALFORMED_WORD_INDICATOR fail-render, svg round-trip drift).
+    it('warns MALFORMED_WORD_INDICATOR and refuses, keeping the existing overlay', () => {
+      const b = new BlissSVGBuilder('B291;;B86');
+      b.group(0).applyIndicators('B81:1,2/ZZ9');
+      expect(overlay(b)).toEqual({ codes: ['B86'], stripSemantic: false });
+      expect(b.toString()).toBe('B291;;B86');
+      const w = b.warnings.filter((x) => x.code === 'MALFORMED_WORD_INDICATOR');
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('B81:1,2/ZZ9');
+      const reparsed = new BlissSVGBuilder(b.toString());
+      expect(reparsed.svgCode).toBe(b.svgCode);
+    });
+
+    it('stores the valid subset of a mixed list, dropping the structural code', () => {
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).applyIndicators('B81:1,2/ZZ9;B86');
+      expect(overlay(b)).toEqual({ codes: ['B86'], stripSemantic: false });
+      expect(b.warnings.map((x) => x.code)).toContain('MALFORMED_WORD_INDICATOR');
+    });
+
+    it('still stores a DSL-authorable decorated code (no gate over-reach)', () => {
+      // `B291;;B81:bad` is DSL-authorable (stored + warned) and round-trips,
+      // so the API stores it identically; only word STRUCTURE is unstorable.
+      const b = new BlissSVGBuilder('B291;;B86');
+      b.group(0).applyIndicators('B81:bad');
+      expect(overlay(b)).toEqual({ codes: ['B81:bad'], stripSemantic: false });
+      expect(b.toString()).toBe('B291;;B81:bad');
+      const reparsed = new BlissSVGBuilder(b.toString());
+      expect(reparsed.svgCode).toBe(b.svgCode);
+    });
+  });
+
+  describe('when every requested overlay code is dropped but stripSemantic is set', () => {
+    // The deliberate, documented asymmetry: the strip itself is an explicit
+    // DSL-authorable instruction (`;;!`), so it stores even when every code
+    // was dropped; without it the all-dropped apply refuses.
+    it('stores the ;;! strip overlay for an unknown code via the API path', () => {
+      const b = new BlissSVGBuilder('B303;B97');
+      b.group(0).applyIndicators('ZZ9', { stripSemantic: true });
+      expect(overlay(b)).toEqual({ codes: [], stripSemantic: true });
+      expect(b.toString()).toBe('B303;B97;;!');
+      expect(b.warnings.map((w) => w.code)).toContain('UNKNOWN_CODE');
+    });
+
+    it('keeps the strip while dropping a word-structure code', () => {
+      const b = new BlissSVGBuilder('B303;B97');
+      b.group(0).applyIndicators('B81:1,2/ZZ9', { stripSemantic: true });
+      expect(overlay(b)).toEqual({ codes: [], stripSemantic: true });
+      expect(b.warnings.map((w) => w.code)).toContain('MALFORMED_WORD_INDICATOR');
     });
   });
 
