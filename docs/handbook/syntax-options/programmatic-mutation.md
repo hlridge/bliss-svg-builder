@@ -370,7 +370,7 @@ Multiple indicators use semicolon-separated codes:
 builder.glyph(0).applyIndicators('B81;B86');
 ```
 
-Non-indicator codes in the argument are filtered out with a per-code warning, matching DSL behavior; a call whose codes are all invalid is refused and changes nothing (see [Validation and no-ops](#validation-and-no-ops) below).
+Non-indicator codes in the argument are filtered out with a per-code warning, matching DSL behavior; a call whose codes are all invalid is refused and changes nothing on a glyph handle (see [Validation and no-ops](#validation-and-no-ops) below for the one group-level exception).
 
 An empty code (omitted, `''`, or whitespace-only) is the deliberate empty set: on a glyph handle it behaves exactly like `clearIndicators()`; on a group handle it stores the empty `;;` overlay (see [Word-Level Indicators](#word-level-indicators)).
 
@@ -436,7 +436,7 @@ On an apply, pass `{ stripSemantic: true }` for the `;;!` strip form (`applyIndi
 
 ### Validation and no-ops
 
-Indicator calls never fail silently. `applyIndicators()` validates its codes at both levels: a recognized non-indicator warns `NON_INDICATOR_AS_WORD_INDICATOR` on a group handle and `NON_INDICATOR_AS_CHARACTER_INDICATOR` on a glyph handle (an unknown code warns `UNKNOWN_CODE`), and only real indicators apply. A call whose codes are all invalid is refused: the element keeps its indicators unchanged, and the per-code warnings are the only effect. A call that cannot apply or remove anything for structural reasons (clearing a glyph that has no indicators, clearing a group that has no `;;` overlay, targeting a space glyph) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`. See [Warning Codes](/reference/warning-codes).
+Indicator calls never fail silently. `applyIndicators()` validates its codes at both levels: a recognized non-indicator warns `NON_INDICATOR_AS_WORD_INDICATOR` on a group handle and `NON_INDICATOR_AS_CHARACTER_INDICATOR` on a glyph handle (an unknown code warns `UNKNOWN_CODE`), and only real indicators apply. A call whose codes are all invalid is refused: the element keeps its indicators unchanged, and the per-code warnings are the only effect. One deliberate exception: on a group handle, `{ stripSemantic: true }` is itself valid overlay content, so an all-invalid apply with it still stores the `;;!` strip overlay — matching the DSL `WORD;;!ZZ9`, where the bad code drops and the `!` stays. A call that cannot apply or remove anything for structural reasons (clearing a glyph that has no indicators, clearing a group that has no `;;` overlay, targeting a space glyph) records a `NOOP_INDICATOR_MUTATION` warning in `builder.warnings`. See [Warning Codes](/reference/warning-codes).
 
 ### Inspecting Indicators
 

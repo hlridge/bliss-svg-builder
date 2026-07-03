@@ -347,7 +347,11 @@ export declare class ElementHandle {
    * REFUSES: nothing mutates (no clearing, no stripping) and each rejected
    * code warns (`NON_INDICATOR_AS_CHARACTER_INDICATOR` /
    * `NON_INDICATOR_AS_WORD_INDICATOR` / `UNKNOWN_CODE`). A mixed list applies
-   * the valid subset and warns per rejected code.
+   * the valid subset and warns per rejected code. One deliberate exception:
+   * on a group handle, `{ stripSemantic: true }` is itself valid overlay
+   * content, so an all-invalid apply WITH it still stores the `;;!` strip
+   * overlay (DSL parity with `WORD;;!ZZ9` — the bad code drops, the `!`
+   * stays). A non-string code throws a `TypeError`.
    *
    * The per-surface `flatten` asymmetry is deliberate: it applies only to the
    * group/word-level overlay, the only surface with a portable `;;` form to

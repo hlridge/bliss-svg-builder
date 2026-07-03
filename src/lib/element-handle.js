@@ -761,6 +761,12 @@ export class ElementHandle {
 
   applyIndicators(code, opts) {
     this.#assertReachable();
+    // A non-string, non-nullish code is a type error, not DSL content. Without
+    // this guard it would tokenize to zero codes and silently store the
+    // render-significant empty overlay (external review F2).
+    if (code !== undefined && code !== null && typeof code !== 'string') {
+      throw new TypeError('applyIndicators() code must be a string (or omitted for the empty indicator set).');
+    }
     // An empty request (no argument, '', or whitespace-only) is the deliberate
     // spelling of the EMPTY indicator set, not an error: a group handle stores
     // the empty `;;` overlay (hides the head's character-level indicators,
@@ -769,8 +775,7 @@ export class ElementHandle {
     // `;` in the DSL). stripSemantic lives on apply only, so
     // applyIndicators('', { stripSemantic: true }) is the strip spelling
     // (formerly clearIndicators({ stripSemantic: true })).
-    const normalized = (code === undefined || code === null
-      || (typeof code === 'string' && code.trim() === '')) ? '' : code;
+    const normalized = (code === undefined || code === null || code.trim() === '') ? '' : code;
     // Group handle (level 1): word-level overlay channel. Glyph handle
     // (level 2): character-level parts. Other levels: no-op via the level-2 path.
     if (this.#level === 1) return this.#applyOrClearWordIndicators(normalized, opts);
@@ -809,9 +814,11 @@ export class ElementHandle {
     if (this.#ctx.isRawSpaceGroup(this.#parentRef)) {
       if (!suppressNoop) {
         const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
+        // `||` deliberately (not `??`): the empty apply's '' must fall back to
+        // the target code, never become an empty source (external review F4).
         this.#warnIndicatorNoop(
           `${verb} had no effect: the target glyph '${targetCode}' is a space.`,
-          code ?? targetCode,
+          code || targetCode,
         );
       }
       return this;
@@ -838,9 +845,10 @@ export class ElementHandle {
     if (!isValidPattern) {
       if (!suppressNoop) {
         const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
+        // `||` deliberately (not `??`): see the space-glyph arm above (F4).
         this.#warnIndicatorNoop(
           `${verb} had no effect: the target glyph '${targetCode}' has a non-indicator part after an indicator part (an invalid indicator pattern).`,
-          code ?? targetCode,
+          code || targetCode,
         );
       }
       return this;

@@ -106,6 +106,16 @@ describe('ElementHandle indicator no-op warning', () => {
       expect(w[0].message).toContain('space');
     });
 
+    it('falls the warning source back to the target code on an empty apply', () => {
+      // external review F4: '' is a legal code since rc.4; the source must
+      // name the space glyph, not become an empty string.
+      const b = new BlissSVGBuilder('B291//B291');
+      b.element(1).glyph(0).applyIndicators('');
+      const w = noopWarnings(b);
+      expect(w).toHaveLength(1);
+      expect(w[0].source).toBe('TSP');
+    });
+
     it('warns the validation code when a non-indicator is applied to an empty glyph', () => {
       // regression (R15 Task 5): an empty glyph attaches a real indicator
       // (matching addPart), but a non-indicator code applies nothing and warns

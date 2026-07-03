@@ -217,7 +217,7 @@ new BlissSVGBuilder('B313/B1103').group(0).clearIndicators();
 // no ;; overlay to remove → warning, no change
 ```
 
-Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), and a call whose codes are all invalid is refused without touching the element. An *empty* apply (`applyIndicators('')`) is not a no-op case either: it is the deliberate empty indicator set and stays silent.
+Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), and a call whose codes are all invalid is refused without touching the element (one exception: on a group handle, `{ stripSemantic: true }` is itself valid overlay content, so that call still stores the `;;!` strip overlay — matching the DSL `WORD;;!ZZ9`, where the bad code drops and the `!` stays). An *empty* apply (`applyIndicators('')`) is not a no-op case either: it is the deliberate empty indicator set and stays silent.
 
 ## Illegal Operands
 

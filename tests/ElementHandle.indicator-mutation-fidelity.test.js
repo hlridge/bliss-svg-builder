@@ -247,4 +247,21 @@ describe('ElementHandle indicator mutation fidelity', () => {
       expect(partCodes(b)).toEqual(['B291', 'B97']);
     });
   });
+
+  describe('when applyIndicators is given a non-string code', () => {
+    // external review F2: a number tokenized to zero codes and silently stored
+    // the render-significant empty `;;` overlay; a type-violating argument is
+    // an error, not the deliberate empty spelling.
+    it('throws a TypeError on a group handle instead of storing the empty overlay', () => {
+      const b = new BlissSVGBuilder('B313/B1103');
+      expect(() => b.group(0).applyIndicators(5)).toThrow(TypeError);
+      expect(overlay(b)).toBeUndefined();
+    });
+
+    it('throws a TypeError on a glyph handle instead of clearing', () => {
+      const b = new BlissSVGBuilder('B291;B86');
+      expect(() => b.group(0).glyph(0).applyIndicators(5)).toThrow(TypeError);
+      expect(partCodes(b)).toEqual(['B291', 'B86']);
+    });
+  });
 });
