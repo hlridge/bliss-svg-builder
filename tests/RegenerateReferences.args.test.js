@@ -9,6 +9,9 @@
  * - No args (and an explicit `status`) select no write-mode.
  * - Each write flag sets exactly its own mode.
  * - --accept collects names from both `--accept a,b` and `--accept=a,b` forms.
+ * - --accept keeps commas INSIDE a filename (derived names carry `#x,y` /
+ *   `@ax,ay` coordinate commas): the list separator is a comma following the
+ *   `.svg` extension only.
  * - --accept with no names throws.
  * - An unknown flag throws rather than being ignored.
  * - runWriteModes dispatch: a flag runs only its mode; --delete-orphans is a dry
@@ -77,6 +80,19 @@ describe('parseArgs', () => {
 
     it('collects names from the inline = form', () => {
       expect(parseArgs(['--accept=B83.svg,B84.svg']).accept).toEqual(['B83.svg', 'B84.svg']);
+    });
+
+    it('keeps a comma-bearing filename intact as one name', () => {
+      // regression: 2026-07-08 — the indicator-centering accept named a ref
+      // whose derived filename carries coordinate/anchor commas; splitting on
+      // every comma shredded it into un-acceptable fragments
+      expect(parseArgs(['--accept', 'B291+B97+{B86+SDOT#3,4@-0.5,0}.svg']).accept)
+        .toEqual(['B291+B97+{B86+SDOT#3,4@-0.5,0}.svg']);
+    });
+
+    it('splits a mixed list only at .svg boundaries', () => {
+      expect(parseArgs(['--accept=B291+B98#5,0.svg,B83.svg']).accept)
+        .toEqual(['B291+B98#5,0.svg', 'B83.svg']);
     });
 
     it('throws when no names follow', () => {

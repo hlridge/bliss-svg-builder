@@ -48,7 +48,8 @@ const USAGE = `reference-SVG regeneration engine
 Modes (none = read-only status):
   --add-new          write the first reference for every New case (never overwrites)
   --refresh-safe     refresh stale markup on Unchanged refs (cannot change a render)
-  --accept <list>    write only the named Changed refs (comma-separated filenames)
+  --accept <list>    write only the named Changed refs (filenames separated by
+                     commas after the .svg extension; in-name commas are kept)
   --delete-orphans   list orphan refs (dry run); add --confirm to actually remove
   --confirm          authorize the irreversible --delete-orphans removal
   --json             print machine-readable status instead of the table
@@ -78,7 +79,9 @@ export function parseArgs(argv) {
     else if (arg === '-h' || arg === '--help') opts.help = true;
     else if (arg === '--accept' || arg.startsWith('--accept=')) {
       const inline = arg.startsWith('--accept=') ? arg.slice('--accept='.length) : argv[++i];
-      const names = (inline ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+      // split only on commas FOLLOWING the .svg extension: derived reference
+      // names legitimately contain commas (`#x,y` coordinates, `@ax,ay` anchors)
+      const names = (inline ?? '').split(/(?<=\.svg)\s*,\s*/i).map((s) => s.trim()).filter(Boolean);
       if (names.length === 0) throw new Error('--accept requires a comma-separated list of reference filenames');
       opts.accept.push(...names);
     } else {
