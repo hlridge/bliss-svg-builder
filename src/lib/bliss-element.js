@@ -313,37 +313,42 @@ export class BlissElement {
     const totalIndicatorWidth = indicatorParts.reduce((sum, ind) => sum + ind.width, 0)
       + (indicatorParts.length - 1) * INDICATOR_GAP;
 
-    // Calculate shift to center ANCHORS (not visual edges) over glyph anchor.
+    // Center the group's CONTENT span over the glyph anchor.
     //
-    // Each indicator has an anchor point at: position + width/2 + anchorOffsetX
-    // We want the midpoint of first and last anchors to align with glyphAnchorX.
+    // An indicator's anchorOffsetX marks the center of its CONTENT (B84: the
+    // description arrow with an annotation dot trailing right, a = -0.5; B85
+    // mirrored, a = +0.5): the content center sits at width/2 + a, and the
+    // dot occupies the remaining 2|a| on the opposite side. Alone over a
+    // character, the arrow centers on the anchor and the dot hangs outside
+    // the measurement (the single-indicator rule below). In a group, the
+    // reader centers the same thing: the row of content from the FIRST
+    // member's content-left edge to the LAST member's content-right edge
+    // ("spaced apart and centered as a group", docs handbook/writing/
+    // characters-bcodes). An edge dot facing OUTWARD hangs off the row and
+    // is excluded — its member's content edge pulls in by 2|a| — while a dot
+    // facing INTO the row and any middle member's dot sit inside it and move
+    // nothing:
+    //   span   = [P + max(0, 2*a1), P + totalWidth + min(0, 2*aN)]
+    //   center = P + totalWidth/2 + max(0, a1) + min(0, aN) = glyphAnchorX
+    //   =>  shift = -max(0, a1) - min(0, aN)
     //
-    // SINGLE INDICATOR:
-    //   anchor = x + width/2 + anchorOffsetX
-    //   We want: anchor = glyphAnchorX
-    //   So: x = glyphAnchorX - width/2 - anchorOffsetX
-    //   Without shift: x = glyphAnchorX - width/2
-    //   Therefore: shift = -anchorOffsetX
+    // A single indicator is the n = 1 degenerate case (first == last, one of
+    // the two terms is a, the other 0):
+    //   x = glyphAnchorX - width/2 - anchorOffsetX
+    // sitting its content center exactly on the glyph anchor.
     //
-    // MULTIPLE INDICATORS (derivation for first/last anchor midpoint):
-    //   Let P = starting position (first indicator's x)
-    //   First anchor:  P + w1/2 + a1
-    //   Last anchor:   P + totalWidth - w2/2 + a2  (where totalWidth includes gaps)
-    //   Midpoint = (firstAnchor + lastAnchor) / 2
-    //            = P + (w1/2 + a1 + totalWidth - w2/2 + a2) / 2
-    //   We want midpoint = glyphAnchorX, so:
-    //   P = glyphAnchorX - (w1/2 + a1 + totalWidth - w2/2 + a2) / 2
-    //     = glyphAnchorX - totalWidth/2 - (w1 - w2)/4 - (a1 + a2)/2
-    //   Without shift: P = glyphAnchorX - totalWidth/2
-    //   Therefore: shift = -(w1 - w2)/4 - (a1 + a2)/2
-    //                    = (w2 - w1)/4 - (a1 + a2)/2
-    //
+    // (The pre-2026-07-08 rule centered the MIDPOINT of the first/last
+    // anchor points instead. Its (wN - w1)/4 width term sat any group whose
+    // edge members differ in CONTENT width (width minus the outer 2|a| dot
+    // allowance) off the anchor, order-dependently: B391;B81;B90 vs
+    // B391;B90;B81, ±0.875. Where edge content widths are equal — B84/B85
+    // beside a w=2 partner (3 - 1 = 2) — the old width term coincidentally
+    // equaled this dot exclusion, which is why those pairs render exactly as
+    // before. Width never skews the group; only outward edge dots move it,
+    // by half their 2|a| allowance.)
     const firstAnchorOffsetX = indicatorParts[0].anchorOffset?.x || 0;
     const lastAnchorOffsetX = indicatorParts[indicatorParts.length - 1].anchorOffset?.x || 0;
-    const anchorShift = indicatorParts.length > 1
-      ? (indicatorParts[indicatorParts.length - 1].width - indicatorParts[0].width) / 4
-        - firstAnchorOffsetX / 2 - lastAnchorOffsetX / 2
-      : -firstAnchorOffsetX;
+    const anchorShift = -Math.max(0, firstAnchorOffsetX) - Math.min(0, lastAnchorOffsetX);
 
     // Position indicators. A baseless stack (no base part) has nothing to
     // center over, so it lays its parts out left-to-right from the origin; a
@@ -356,7 +361,8 @@ export class BlissElement {
     for (const indicator of indicatorParts) {
       // X positioning: only override if no explicit x was provided
       // Position by left edge to maintain visual 1-unit gaps between indicators
-      // (indicator's anchorOffsetX is NOT used here - it's for single indicator centering only)
+      // (a member's own anchorOffsetX never repositions it INSIDE the group;
+      // outward edge dots act once, via anchorShift above)
       if (indicator.#blissObj.x === undefined) {
         indicator.#relativeToParentX = currentX;
       } else {

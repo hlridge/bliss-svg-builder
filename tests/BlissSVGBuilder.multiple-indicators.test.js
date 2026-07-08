@@ -7,7 +7,9 @@
  * - Backwards-compatible single-indicator centering (B291;B99 -> x=3).
  * - Width getters: baseGlyphWidth excludes indicators; rightExtendedGlyphWidth
  *   includes overhang when indicators extend right of the glyph.
- * - anchorOffsetX shifting (B84/B85) for both single and grouped indicators.
+ * - anchorOffsetX attachment for single indicators (B84/B85); a group
+ *   centers its CONTENT span (outward edge annotation dots excluded,
+ *   member widths never skew).
  * - Left overhang at sequence start (B428;B99;B97 with zero-width base).
  * - Irregular patterns: bare base (B291), empty slot (B291;), all-indicator
  *   composite (B98), composite base with indicator (B291;H:0,4;B99), and
@@ -17,6 +19,9 @@
  * - Indicator overhang across word boundaries (B428;B99//B428;B97).
  *
  * Does NOT cover:
+ * - The full width × anchorOffsetX × count centering matrix (both orders,
+ *   offset bases, surface parity), see
+ *   `BlissSVGBuilder.indicator-group-centering.test.js`.
  * - SVG output of positioned indicators, see
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
  * - isIndicator detection contract, see
@@ -28,9 +33,16 @@
  *
  * Positioning algorithm pinned by these tests:
  *   totalIndicatorWidth = sum(widths) + (n - 1) * 1
- *   anchorX            = glyphCenter + anchorOffsetX
+ *   anchorX            = glyphCenter + anchorOffsetX   (of the base)
  *   firstIndicator.x   = anchorX - totalIndicatorWidth / 2
+ *                        - max(0, a1) - min(0, aN)
  *   nextIndicator.x    = prevIndicator.x + prevIndicator.width + 1
+ *   (a1/aN = first/last member anchorOffsetX. The group's CONTENT span is
+ *   centered: an edge member's annotation dot facing outward — what its
+ *   anchorOffsetX records — hangs off the row and is excluded, like on a
+ *   lone indicator; n = 1 degenerates to x = anchorX - width/2 - a. Member
+ *   WIDTHS never skew the group — 2026-07-08 fix, was first/last
+ *   anchor-midpoint.)
  */
 
 import { describe, it, expect } from 'vitest';
@@ -230,19 +242,14 @@ describe('BlissSVGBuilder multiple indicators', () => {
       expect(indicator.x).toBe(2);
     });
 
-    it('shifts the group right when the last indicator has negative anchorOffsetX (B291;B97;B84)', () => {
+    it('pulls the group right when the last indicator has an outward trailing dot (B291;B97;B84)', () => {
+      // the CONTENT span (B97's left ink to B84's arrow-right) is centered;
+      // B84's dot trails outward right and is excluded, so the group shifts
+      // right by the full dot extent: -min(0, -0.5) = +0.5
       // B291: width 8, center 4
-      // B97: width 2, anchorOffsetX 0
-      // B84: width 3, anchorOffsetX -0.5
-      //
-      // Without anchor shift:
-      //   totalWidth        = 2 + 1 + 3 = 6
-      //   firstIndicator.x  = 4 - 6/2 = 1
-      //   secondIndicator.x = 1 + 2 + 1 = 4
-      //
-      // With anchor shift = -(first.anchorOffsetX + last.anchorOffsetX) = -(0 + -0.5) = +0.5
-      //   firstIndicator.x  = 1 + 0.5 = 1.5
-      //   secondIndicator.x = 4 + 0.5 = 4.5
+      // totalWidth        = 2 + 1 + 3 = 6
+      // firstIndicator.x  = 4 - 6/2 + 0.5 = 1.5
+      // secondIndicator.x = 1.5 + 2 + 1 = 4.5
       const character = getCharacter("B291;B97;B84");
 
       const firstIndicator = character.children[1];
@@ -255,19 +262,12 @@ describe('BlissSVGBuilder multiple indicators', () => {
       expect(secondIndicator.x - firstRightEdge).toBe(1);
     });
 
-    it('shifts the group left when the first indicator has positive anchorOffsetX (B291;B85;B97)', () => {
+    it('pulls the group left when the first indicator has an outward leading dot (B291;B85;B97)', () => {
+      // B85's dot leads outward left, excluded: shift = -max(0, 0.5) = -0.5
       // B291: width 8, center 4
-      // B85: width 3, anchorOffsetX +0.5
-      // B97: width 2, anchorOffsetX 0
-      //
-      // Without anchor shift:
-      //   totalWidth        = 3 + 1 + 2 = 6
-      //   firstIndicator.x  = 4 - 6/2 = 1
-      //   secondIndicator.x = 1 + 3 + 1 = 5
-      //
-      // With anchor shift = -(0.5 + 0) = -0.5
-      //   firstIndicator.x  = 1 - 0.5 = 0.5
-      //   secondIndicator.x = 5 - 0.5 = 4.5
+      // totalWidth        = 3 + 1 + 2 = 6
+      // firstIndicator.x  = 4 - 6/2 - 0.5 = 0.5
+      // secondIndicator.x = 0.5 + 3 + 1 = 4.5
       const character = getCharacter("B291;B85;B97");
 
       const firstIndicator = character.children[1];
@@ -381,12 +381,14 @@ describe('BlissSVGBuilder multiple indicators', () => {
   });
 
   describe('when indicators in the group have different widths', () => {
-    it('shifts the group to keep the anchor centered (B291;B99;B84)', () => {
+    it('excludes an outward trailing dot but never the width difference (B291;B99;B84)', () => {
+      // regression: 2026-07-08 group-centering fix — the width difference
+      // contributes nothing; B84 last trails its dot outward, so the content
+      // span excludes it: shift = -min(0, -0.5) = +0.5
       // B291: width 8, center 4
-      // B99: w=2, anchorOffsetX 0; B84: w=3, anchorOffsetX -0.5
+      // B99: w=2; B84: w=3, a=-0.5
       // total = 2 + 1 + 3 = 6
-      // shift = (w2 - w1)/4 - (a1 + a2)/2 = (3-2)/4 - (0 + -0.5)/2 = 0.25 + 0.25 = 0.5
-      // firstIndicator.x  = (4 - 6/2) + 0.5 = 1.5
+      // firstIndicator.x  = 4 - 6/2 + 0.5 = 1.5
       // secondIndicator.x = 1.5 + 2 + 1 = 4.5
       const character = getCharacter("B291;B99;B84");
 
@@ -399,11 +401,13 @@ describe('BlissSVGBuilder multiple indicators', () => {
       expect(secondIndicator.x - (firstIndicator.x + firstIndicator.width)).toBe(1);
     });
 
-    it('keeps the group centered without shift when reversed widths cancel anchor offsets (B291;B84;B99)', () => {
+    it('keeps an inward dot inside the centered span (B291;B84;B99)', () => {
+      // B84 first points its dot INTO the row (part of the internal gap), so
+      // nothing is excluded: shift = -max(0, -0.5) - min(0, 0) = 0; the
+      // width swap versus the reversed order changes nothing
       // B291: width 8, center 4
-      // B84: w=3, anchorOffsetX -0.5; B99: w=2, anchorOffsetX 0
+      // B84: w=3, a=-0.5; B99: w=2
       // total = 3 + 1 + 2 = 6
-      // shift = (2-3)/4 - (-0.5 + 0)/2 = -0.25 + 0.25 = 0
       // firstIndicator.x  = 4 - 6/2 = 1
       // secondIndicator.x = 1 + 3 + 1 = 5
       const character = getCharacter("B291;B84;B99");
