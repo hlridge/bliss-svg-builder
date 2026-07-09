@@ -2,6 +2,8 @@
 
 When the builder encounters a problem it can recover from, it renders everything that is valid and reports the problem in `builder.warnings`.
 
+For the workflow of checking errors and warnings in code, including which calls throw versus warn, see [Error Handling](/reference/api-documentation#error-handling).
+
 Each warning is an object with three fields:
 
 ```js

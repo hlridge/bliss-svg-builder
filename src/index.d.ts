@@ -160,6 +160,9 @@ export interface ElementSnapshot {
  * A live handle referencing a node in the raw composition object.
  * Returned by `getElementByKey()`, `group()`, `glyph()`, and `part()`.
  * Mutations through a handle trigger a rebuild of the composition.
+ *
+ * A handle whose element has been removed is stale; most operations on a stale
+ * handle throw (see Handle Lifetime in the docs).
  */
 export declare class ElementHandle {
   /** Structural depth: 1 = group, 2 = glyph, 3+ = part. */
@@ -363,6 +366,7 @@ export declare class ElementHandle {
    * (a space glyph, or an invalid part pattern) adds an
    * `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing
    * nothing.
+   * @throws {TypeError} If `code` is provided and is not a string.
    */
   applyIndicators(code?: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
@@ -394,6 +398,9 @@ export declare class ElementHandle {
    * is a word property: the first (left) part always keeps it. A `^` head
    * marker is kept only if its glyph lands in the first part; otherwise the
    * second part re-derives its head.
+   * @throws {Error} On a group handle, if `glyphIndex` is out of range (must be
+   *   1 to glyphs.length-1 inclusive). Returns `this` with no effect on non-group
+   *   handles (no throw).
    */
   splitAt(glyphIndex: number): this;
 
@@ -619,6 +626,9 @@ export declare class BlissSVGBuilder {
    * Creates an instance of BlissSVGBuilder.
    * @param input - A DSL string, a plain object from `toJSON()`, or omitted for an empty builder
    * @param options - Defaults/overrides to merge, or flat options treated as overrides
+   * @throws {Error} If `input` is neither a DSL string nor a plain `toJSON()` object
+   *   (for example a number, `null`, or an array). Recoverable DSL problems (unknown codes,
+   *   invalid syntax) do NOT throw; they are reported in `warnings`.
    */
   constructor(input?: string | BlissJSON, options?: BlissOptions | OptionLayers);
 
@@ -644,7 +654,12 @@ export declare class BlissSVGBuilder {
 
   // --- Warnings ---
 
-  /** Warnings generated during parsing/rendering (unknown codes, invalid syntax, etc.). */
+  /**
+   * Warnings generated during parsing/rendering (unknown codes, invalid syntax, etc.).
+   * Populated at construction and re-derived on each rebuild. NOT exhaustive: some
+   * mutation operations drop data silently (see the Error Handling docs), so an empty
+   * array is not a guarantee of zero data loss across every mutation path.
+   */
   readonly warnings: readonly Warning[];
 
   // --- Element tree (getters) ---
@@ -707,10 +722,19 @@ export declare class BlissSVGBuilder {
   /** Replaces the group at the given index with new content. Negative indices count from the end. */
   replaceGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Merges another builder's content into this one. Appends the other builder's groups with a space between. The other builder's global options are discarded. */
+  /**
+   * Merges another builder's content into this one. Appends the other builder's groups
+   * with a space between. The other builder's global options are discarded.
+   * @throws {Error} If `other` is not a `BlissSVGBuilder` instance.
+   */
   merge(other: BlissSVGBuilder): this;
 
-  /** Splits this builder at the given group index. This builder keeps the left half; a new builder with the right half is returned. Both share the same global options. */
+  /**
+   * Splits this builder at the given group index. This builder keeps the left half;
+   * a new builder with the right half is returned. Both share the same global options.
+   * @throws {Error} If the builder has fewer than 2 groups, or `groupIndex` is out of
+   *   range (must be 1 to groupCount-1 inclusive).
+   */
   splitAt(groupIndex: number): BlissSVGBuilder;
 
   /** Appends a raw group with no automatic space management. SP auto-resolves to TSP/QSP. */
@@ -762,6 +786,10 @@ export declare class BlissSVGBuilder {
    * Defines one or more custom codes (glyphs, shapes, external glyphs, or bare aliases).
    * @param definitions - Map of code names to their definitions
    * @param options - Pass `{ overwrite: true }` to replace existing custom definitions
+   *
+   * Does NOT throw: each entry is validated independently, and any rejection is reported
+   * in `result.errors` (other entries in the same call still register). Always inspect
+   * the returned `{ defined, skipped, errors }`.
    */
   static define(
     definitions: Record<string, CodeDefinition>,
@@ -777,13 +805,23 @@ export declare class BlissSVGBuilder {
   /** Lists all defined codes, optionally filtered by type. */
   static listDefinitions(filter?: { type?: DefinitionType }): string[];
 
-  /** Removes a custom definition. Throws if the code is built-in. */
+  /**
+   * Removes a custom definition. Returns `false` (no throw) if the code does not exist.
+   * @throws {Error} If `code` is a built-in definition (built-ins cannot be removed).
+   */
   static removeDefinition(code: string): boolean;
 
   /**
    * Patches properties on an existing custom definition.
    * Only keys valid for the definition's type are accepted.
    * Built-in definitions cannot be patched.
+   * @throws {Error} If `code` is not defined or is built-in, `changes` is not an object,
+   *   or a change violates the definition rules: an unknown property or internal/type
+   *   flag (e.g. `type`, `isBuiltIn`) for the definition;
+   *   `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`;
+   *   a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular
+   *   reference; a `;`-part that is itself a composition; or a global-only
+   *   `defaultOptions` key.
    */
   static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true };
 }

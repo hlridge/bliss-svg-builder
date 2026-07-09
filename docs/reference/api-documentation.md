@@ -476,6 +476,8 @@ textA.merge(textB);
 
 Returns `this` for chaining.
 
+**Throws** if `other` is not a `BlissSVGBuilder` instance.
+
 ### `.splitAt(groupIndex)`
 
 Splits this builder into two at the given group boundary. This builder
@@ -496,7 +498,8 @@ right.toJSON().options;    // { color: 'red' }
 | `groupIndex` | `number` | Split point: 1 to groupCount-1 |
 
 Returns a new `BlissSVGBuilder` with the right-half groups.
-Throws if `groupIndex` is out of range.
+
+**Throws** if the builder has fewer than 2 groups, or `groupIndex` is out of range (must be 1 to groupCount-1 inclusive).
 
 ### `clear()`
 
@@ -1063,8 +1066,8 @@ const result = BlissSVGBuilder.define({
 });
 
 result.defined;  // codes that were registered
-result.skipped;  // codes that already existed
-result.errors;   // codes that failed validation
+result.skipped;  // codes that already existed (informational, not an error)
+result.errors;   // codes that failed validation (define() does not throw; check this)
 ```
 
 The `type` field controls what kind of definition is created: `'glyph'`, `'shape'`, or `'externalGlyph'`. When omitted, `codeString` definitions create bare codes (words, aliases), while `getPath` definitions are auto-detected as shapes or external glyphs. Note: `'bare'` and `'space'` are read-only types reported by `getDefinition()` and `listDefinitions()`, not valid inputs to `define()`.
@@ -1238,6 +1241,8 @@ Allowed properties by type:
 
 Patching `defaultOptions` replaces the entire sub-object (not a deep merge). Patching `codeString` validates references and checks for circular dependencies.
 
+**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; or a global-only `defaultOptions` key. A rejected patch leaves the definition untouched (validation runs before any change is applied).
+
 ### `listDefinitions(filter?)`
 
 List all defined codes, optionally filtered by type:
@@ -1323,11 +1328,26 @@ new BlissSVGBuilder('B313').warnings; // []
 
 Warnings are recalculated on each rebuild, so fixing an issue via a handle mutation clears the corresponding warning.
 
+**Not exhaustive.** `warnings` surfaces recoverable parse and render problems, but a few mutation operations drop data without emitting one. For example, `mergeWithNext()` discards the absorbed word's options and `^` head marker silently (only its `;;` overlay warns `DROPPED_WORD_INDICATOR`). So treat `warnings` as a "something went wrong" signal, not a guarantee that an empty array means zero data loss across every mutation path.
+
 Every code the builder can emit, with its trigger and an example, is listed in the [Warning Codes reference](/reference/warning-codes). In TypeScript, `code` is typed as the `WarningCode` union.
 
 ## Error Handling
 
-The builder throws for structural problems that prevent any rendering:
+The library distinguishes two kinds of failure: **throws** (structural problems that prevent rendering, or invalid API arguments) and **warnings** (recoverable problems; the valid parts still render). Neither kind surfaces through a callback or event; you inspect it directly after the call.
+
+### What throws
+
+The builder constructor, the definition API, and the split operations throw under specific conditions. Each is annotated with `@throws` in `index.d.ts` (visible in editor hover):
+
+| Call | Throws when |
+|------|-------------|
+| `new BlissSVGBuilder(input)` | `input` is neither a DSL string nor a plain `toJSON()` object (number, `null`, array, ...) |
+| `builder.merge(other)` | `other` is not a `BlissSVGBuilder` instance |
+| `builder.splitAt(groupIndex)` | fewer than 2 groups, or `groupIndex` out of range (1..groupCount-1) |
+| `groupHandle.splitAt(glyphIndex)` | `glyphIndex` out of range (1..glyphs.length-1); no-op (no throw) on non-group handles |
+| `removeDefinition(code)` | `code` is a built-in |
+| `patchDefinition(code, changes)` | not defined / built-in / non-object `changes` / a rule violation (see its section) |
 
 ```js
 // Non-string, non-object input
@@ -1335,7 +1355,37 @@ new BlissSVGBuilder(42);
 // Error: Input must be a DSL string or a plain object from toJSON()
 ```
 
-Unknown codes do **not** throw. They appear in `warnings` (see above).
+Unknown codes and invalid DSL do **not** throw. They appear in `warnings` (see above).
+
+ElementHandle mutation methods throw in two more misuse cases (documented at each method and in [Handle Lifetime](#handle-lifetime)): using a handle after its element has been removed (a stale handle), and passing a non-string `code` to `applyIndicators` (a `TypeError`). By contrast, the constructor does not throw on content — `new BlissSVGBuilder('H//C8')` renders the two words; its only throw is for a wrong input type (above).
+
+### What does NOT throw: `define()` and content errors
+
+`define()` never throws for a bad definition. Each entry is validated independently and rejections land in `result.errors` (the other entries still register), so you must inspect the return value:
+
+```js
+const result = BlissSVGBuilder.define({ 'BAD': { type: 'glyph', codeString: 'B313/B1103' } });
+result.defined;  // []
+result.errors;   // ['"BAD": ... a glyph definition cannot be a multi-character word ...']
+```
+
+### The check-after-each-call discipline
+
+```js
+// 1. define(): inspect the return value (it does not throw)
+const res = BlissSVGBuilder.define(defs);
+if (res.errors.length) { /* rejected entries */ }
+
+// 2. construction: try/catch only for the input-type throw; warnings for content
+try {
+  const builder = new BlissSVGBuilder(input);
+  if (builder.warnings.length) { /* unknown codes, misplaced options, ... */ }
+} catch (err) {
+  // only a wrong input type (not a string / plain object) lands here
+}
+```
+
+`builder.warnings` is populated at construction (no need to render first) and re-derived on each rebuild.
 
 ### Safety Limits
 
