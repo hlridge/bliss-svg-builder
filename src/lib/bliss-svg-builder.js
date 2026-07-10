@@ -8,7 +8,7 @@ import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitio
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
-import { ElementHandle } from "./element-handle.js";
+import { ElementHandle, assertCodeArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
@@ -989,11 +989,12 @@ class BlissSVGBuilder {
 
   /**
    * Appends a new glyph group with automatic space management.
-   * @param {string} code - DSL code string
+   * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted appends an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   addGroup(code, opts) {
+    assertCodeArg('addGroup', code);
     const nonSpaceCount = this.#getNonSpaceGroupIndices().length;
     return this.insertGroup(nonSpaceCount, code, opts);
   }
@@ -1002,13 +1003,13 @@ class BlissSVGBuilder {
    * Inserts a new glyph group at the given semantic (non-space) index
    * with automatic space management.
    * @param {number} index - Semantic non-space group index
-   * @param {string} code - DSL code string
+   * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted inserts an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   insertGroup(index, code, opts) {
+    assertCodeArg('insertGroup', code);
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
-    if (!newGroup) return this;
     const groups = this.#rawBlissObj.groups;
     const indices = this.#getNonSpaceGroupIndices();
 
@@ -1087,16 +1088,16 @@ class BlissSVGBuilder {
   /**
    * Replaces the non-space group at the given semantic index.
    * @param {number} index - Semantic index (supports negative)
-   * @param {string} code - DSL code string
+   * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted swaps in an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   replaceGroup(index, code, opts) {
+    assertCodeArg('replaceGroup', code);
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
     if (index < 0 || index >= indices.length) return this;
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
-    if (!newGroup) return this;
     const rawIndex = indices[index];
     this.#rawBlissObj.groups[rawIndex] = newGroup;
     this.#rebuild();
@@ -1206,15 +1207,26 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Parses a code string and applies option layers to the first parsed group.
-   * @param {string} code
+   * Parses a code string into exactly one group and applies option layers.
+   * An omitted, empty, or whitespace-only code yields an empty group.
+   * @param {string} [code]
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
-   * @returns {object|null} parsed group or null
+   * @returns {object} parsed group
    */
   static #parseGroupWithOpts(code, opts) {
-    const parsed = BlissParser.parse(code);
-    const newGroup = parsed.groups?.[0];
-    if (!newGroup) return null;
+    let newGroup;
+    if (code === undefined || code.trim() === '') {
+      // "Add a group with nothing in it" is meaningful: '' is the DSL
+      // counterpart of the already-valid {glyphs: []} object state.
+      newGroup = { glyphs: [] };
+    } else {
+      const parsed = BlissParser.parse(code);
+      const groupCount = parsed.groups?.length ?? 0;
+      if (groupCount !== 1) {
+        throw new Error(`Expected a single group, but code "${code}" produced ${groupCount} groups`);
+      }
+      newGroup = parsed.groups[0];
+    }
     if (opts) {
       const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
       if (defaults || overrides) {
@@ -1230,13 +1242,13 @@ class BlissSVGBuilder {
 
   /**
    * Appends a raw group with no automatic space management.
-   * @param {string} code - DSL code string
+   * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted appends an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   addElement(code, opts) {
+    assertCodeArg('addElement', code);
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
-    if (!newGroup) return this;
     this.#rawBlissObj.groups.push(newGroup);
     this.#rebuild();
     return this;
@@ -1245,13 +1257,13 @@ class BlissSVGBuilder {
   /**
    * Inserts a raw group at the given index with no automatic space management.
    * @param {number} index - Raw index (supports negative: -1 = before last)
-   * @param {string} code - DSL code string
+   * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted inserts an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   insertElement(index, code, opts) {
+    assertCodeArg('insertElement', code);
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
-    if (!newGroup) return this;
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
     if (index < 0) index = 0;
@@ -1281,16 +1293,16 @@ class BlissSVGBuilder {
   /**
    * Replaces the raw group at the given index with new content.
    * @param {number} index - Raw index (supports negative: -1 = last)
-   * @param {string} code - DSL code string
+   * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted swaps in an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   replaceElement(index, code, opts) {
+    assertCodeArg('replaceElement', code);
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
     if (index < 0 || index >= groups.length) return this;
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
-    if (!newGroup) return this;
     groups[index] = newGroup;
     this.#rebuild();
     return this;

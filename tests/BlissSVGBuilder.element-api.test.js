@@ -603,10 +603,11 @@ describe('raw element CRUD: edge cases', () => {
     expect(b.element(1).glyph(0).part(0).codeName).toBe('H');
   });
 
-  it('addElement is a no-op for empty/unparseable code', () => {
+  it('addElement creates an empty group for empty code', () => {
     const b = new BlissSVGBuilder('H');
     b.addElement('');
-    expect(b.elementCount).toBe(1);
+    expect(b.elementCount).toBe(2);
+    expect(b.toJSON().groups[1]).toEqual({ glyphs: [] });
   });
 });
 

@@ -8,6 +8,13 @@ import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
+// Shared arg guard for the mutation families: a code arg is a string or omitted.
+export function assertCodeArg(method, code) {
+  if (code !== undefined && typeof code !== 'string') {
+    throw new TypeError(`${method}() requires a DSL code string`);
+  }
+}
+
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
  * Survives `#rebuild()` because it holds a direct reference to the raw node,

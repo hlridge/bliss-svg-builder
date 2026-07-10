@@ -711,8 +711,13 @@ export declare class BlissSVGBuilder {
 
   // --- Building and manipulation ---
 
-  /** Appends a new glyph group with automatic space management. */
-  addGroup(code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Appends a new glyph group with automatic space management. An omitted,
+   * empty, or whitespace-only `code` appends an empty group.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` does not parse to exactly one group.
+   */
+  addGroup(code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Appends a glyph to the last non-space group (creates one if empty). */
   addGlyph(code: string, opts?: BlissOptions | OptionLayers): this;
@@ -720,14 +725,26 @@ export declare class BlissSVGBuilder {
   /** Appends a part to the last glyph of the last group. */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Inserts a group at the given index. Negative indices count from the end. */
-  insertGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Inserts a group at the given index. Negative indices count from the end.
+   * An omitted, empty, or whitespace-only `code` inserts an empty group.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` does not parse to exactly one group.
+   */
+  insertGroup(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Removes the group at the given index. Negative indices count from the end. */
   removeGroup(index: number): this;
 
-  /** Replaces the group at the given index with new content. Negative indices count from the end. */
-  replaceGroup(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Replaces the group at the given index with new content. Negative indices
+   * count from the end. An omitted, empty, or whitespace-only `code` swaps the target for an
+   * empty group. Out-of-range indices remain a silent no-op (checked before
+   * the code is parsed).
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` does not parse to exactly one group.
+   */
+  replaceGroup(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /**
    * Merges another builder's content into this one. Appends the other builder's groups
@@ -744,17 +761,34 @@ export declare class BlissSVGBuilder {
    */
   splitAt(groupIndex: number): BlissSVGBuilder;
 
-  /** Appends a raw group with no automatic space management. SP auto-resolves to TSP/QSP. */
-  addElement(code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Appends a raw group with no automatic space management. SP auto-resolves
+   * to TSP/QSP. An omitted, empty, or whitespace-only `code` appends an empty group.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` does not parse to exactly one group.
+   */
+  addElement(code?: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Inserts a raw group at the given index with no automatic space management. SP auto-resolves. */
-  insertElement(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Inserts a raw group at the given index with no automatic space management.
+   * SP auto-resolves. An omitted, empty, or whitespace-only `code` inserts an empty group.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` does not parse to exactly one group.
+   */
+  insertElement(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Removes the raw group at the given index (plain splice, no space cleanup). */
   removeElement(index: number): this;
 
-  /** Replaces the raw group at the given index with new content. */
-  replaceElement(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Replaces the raw group at the given index with new content. An omitted,
+   * empty, or whitespace-only `code` swaps the target for an empty group.
+   * Out-of-range indices
+   * remain a silent no-op (checked before the code is parsed).
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` does not parse to exactly one group.
+   */
+  replaceElement(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Removes all content from the builder. */
   clear(): this;
