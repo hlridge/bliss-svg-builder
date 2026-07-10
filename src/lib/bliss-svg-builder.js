@@ -1697,6 +1697,23 @@ class BlissSVGBuilder {
     }
 
     const segments = [];
+    // Space groups and bare content-empty groups coalesce into maximal runs so
+    // serialized spacing always matches rendered spacing: N default space
+    // glyphs emit N+1 slashes once per run; a run holding any non-default
+    // space code emits the explicit code list instead; bare empty groups
+    // contribute no units and never split a run.
+    let spaceRun = null;
+    const flushSpaceRun = () => {
+      if (!spaceRun) return;
+      // Defensive: only space groups open a run, and a space group always
+      // holds a glyph. Empties never open one (they only skip the flush).
+      if (spaceRun.glyphCount > 0) {
+        segments.push(spaceRun.hasNonDefault
+          ? spaceRun.codes.join('/')
+          : '/'.repeat(spaceRun.glyphCount + 1));
+      }
+      spaceRun = null;
+    };
     for (const group of obj.groups || []) {
       if (!group.glyphs) continue;
       // A group the parser flagged as a malformed word (errorCode) re-emits its
@@ -1705,22 +1722,17 @@ class BlissSVGBuilder {
       // advances like a normal one) are NOT serialized: they would collapse to a
       // valid word and silently lose the malformation.
       if (group.errorCode && group.errorSource !== undefined) {
+        flushSpaceRun();
         const optPrefix = serializeOptions(group.options);
         segments.push(optPrefix ? `${optPrefix}|${group.errorSource}` : group.errorSource);
         continue;
       }
       if (isSpaceGroup(group)) {
-        const hasNonDefaultSpace = group.glyphs.some(g =>
-          g.parts?.some(p => p._differsFromDefault)
-        );
-        if (hasNonDefaultSpace) {
-          // Explicit space codes that differ from default — keep them
-          const codes = group.glyphs.map(g => g.parts[0].codeName);
-          segments.push(codes.join('/'));
-        } else {
-          // Default spaces — use // shorthand, N spaces = N+1 slashes
-          const slashes = '/'.repeat(group.glyphs.length + 1);
-          segments.push(slashes);
+        spaceRun ??= { glyphCount: 0, codes: [], hasNonDefault: false };
+        spaceRun.glyphCount += group.glyphs.length;
+        spaceRun.codes.push(...group.glyphs.map(g => g.parts[0].codeName));
+        if (group.glyphs.some(g => g.parts?.some(p => p._differsFromDefault))) {
+          spaceRun.hasNonDefault = true;
         }
         continue;
       }
@@ -1749,8 +1761,11 @@ class BlissSVGBuilder {
       // Prefix group-level options with [opts]| syntax
       const groupOptPrefix = serializeOptions(group.options);
       if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
+      if (groupStr === '') continue; // bare content-empty: no segment, run stays open
+      flushSpaceRun();
       segments.push(groupStr);
     }
+    flushSpaceRun();
     // Join: slash-only segments already include separators, others need /
     let result = segments.reduce((acc, seg) => {
       if (acc === '') return seg;
