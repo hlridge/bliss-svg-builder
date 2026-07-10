@@ -514,11 +514,13 @@ export class BlissElement {
       }
 
 
-      // Check if this is a space group (all glyphs are space glyphs: TSP or QSP)
-      this.#isSpaceGroup = this.#blissObj.glyphs?.every(g => {
+      // Check if this is a space group (all glyphs are space glyphs: TSP or QSP).
+      // A group with zero glyphs has no space semantics: content-empty groups
+      // stay visible to navigation and are never classified as space groups.
+      this.#isSpaceGroup = (this.#blissObj.glyphs?.length > 0) && this.#blissObj.glyphs.every(g => {
         const code = g.parts?.[0]?.codeName;
         return code && isSpaceGlyph(code);
-      }) ?? false;
+      });
       const isSpaceGroup = this.#isSpaceGroup;
 
       if (this.#previousElement) {

@@ -148,6 +148,10 @@ export interface ElementSnapshot {
   readonly isBlissGlyph: boolean;
   readonly isExternalGlyph: boolean;
   readonly isHeadGlyph: boolean;
+  /**
+   * Whether this group is a space separator (TSP/QSP). A content-empty group
+   * (`{ glyphs: [] }`) is never a space group.
+   */
   readonly isSpaceGroup: boolean;
   readonly index: number;
   readonly parentKey: string | null;
@@ -230,7 +234,10 @@ export declare class ElementHandle {
   /** Whether this glyph is the head of its word group. */
   readonly isHeadGlyph: boolean;
 
-  /** Whether this group is a space separator (TSP/QSP). */
+  /**
+   * Whether this group is a space separator (TSP/QSP). A content-empty group
+   * (`{ glyphs: [] }`) is never a space group.
+   */
   readonly isSpaceGroup: boolean;
 
   // --- Dimensions (read-only, from snapshot) ---
