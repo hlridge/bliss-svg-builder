@@ -41,6 +41,7 @@ export class BlissElement {
   #externalGlyphSpacing
   #isSpaceGroup
   #isEmptyGlyph
+  #isEmptyGroup
   //#endregion
   #childStartOffset
   #parentElement;
@@ -216,6 +217,10 @@ export class BlissElement {
    * @returns {BlissElement|null}
    */
   #getFirstCharacterElement() {
+    // KNOWN GAP (backlog "empty-content extent" row): a leading content-empty
+    // group should be skipped here the way empty glyphs are below, else it
+    // wins the [0] slot and defeats the indicator-overhang offset (live 5 vs
+    // reparse 6.5 for {groups: [{glyphs: []}, B12;B98-word]}).
     const firstGroup = this.#children?.[0];
     if (!firstGroup) return null;
 
@@ -511,6 +516,12 @@ export class BlissElement {
           this.#children.push(child);
           if (!child.#isEmptyGlyph) previousLayoutGlyph = child;
         }
+
+        // Content-empty groups (zero glyphs, or only empty-parts glyphs)
+        // render nothing and contribute no document extent, mirroring
+        // #isEmptyGlyph one level up. Fail-flagged groups never reach this
+        // branch: the flag stays unset there, so fail-render keeps its extent.
+        this.#isEmptyGroup = this.#children.every(child => child.#isEmptyGlyph);
       }
 
 
@@ -558,6 +569,8 @@ export class BlissElement {
       } else if (this.#children.every(child => child.#isEmptyGlyph)) {
         // A group whose every glyph is empty has no layout content: it
         // advances nothing, matching its serialized form, which omits it.
+        // Deliberately not #isEmptyGroup: this branch also covers
+        // fail-flagged groups (vacuously, with error-placeholder off).
         this.#advanceX = 0;
       } else {
         this.#advanceX = this.baseGroupWidth + this.#sharedOptions.charSpace;
@@ -859,11 +872,13 @@ export class BlissElement {
     if (this.#leafWidth !== undefined) return this.#leafWidth;
     if (!this.#children || this.#children.length === 0) return 0;
 
-    // Empty-parts glyphs contribute no extent (they render nothing and
-    // serialization omits them).
-    const layoutChildren = this.#level === 1
-      ? this.#children.filter(child => !child.#isEmptyGlyph)
-      : this.#children;
+    // Empty-parts glyphs and content-empty groups contribute no extent
+    // (they render nothing and serialization omits them).
+    const layoutChildren = this.#level === 0
+      ? this.#children.filter(child => !child.#isEmptyGroup)
+      : this.#level === 1
+        ? this.#children.filter(child => !child.#isEmptyGlyph)
+        : this.#children;
     if (layoutChildren.length === 0) return 0;
 
     const minRelativeX = Math.min(...layoutChildren.map(child => child.#relativeToParentX));
@@ -950,7 +965,11 @@ export class BlissElement {
 
   get baseWidth() {
     if (this.#level === 0) {
-      const groups = this.#children;
+      // Content-empty groups contribute no extent here either: centering
+      // reads baseWidth, so a leaked trailing-empty position term would
+      // shift the viewBox and clip ink (mirrors baseGroupWidth's
+      // empty-glyph exclusion one level down).
+      const groups = this.#children.filter(group => !group.#isEmptyGroup);
       if (groups.length === 0) return 0;
 
       const firstGroup = groups[0];
@@ -1201,7 +1220,27 @@ export class BlissElement {
       };
     }
 
-    const childBounds = this.#children.map(child =>
+    // Content-empty groups and empty-parts glyphs are excluded from bounds
+    // like they are from the width getter; an element left with no layout
+    // children collapses to a point at its origin instead of Math.min/max
+    // over nothing (Infinity).
+    const layoutChildren = this.#level === 0
+      ? this.#children.filter(child => !child.#isEmptyGroup)
+      : this.#level === 1
+        ? this.#children.filter(child => !child.#isEmptyGlyph)
+        : this.#children;
+    if (layoutChildren.length === 0) {
+      return {
+        minX: absX,
+        maxX: absX,
+        minY: absY,
+        maxY: absY,
+        width: 0,
+        height: 0
+      };
+    }
+
+    const childBounds = layoutChildren.map(child =>
       child.#calculateBounds(absX, absY)
     );
 
