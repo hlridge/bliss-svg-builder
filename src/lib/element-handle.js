@@ -349,44 +349,42 @@ export class ElementHandle {
     return glyphs[0];
   }
 
-  // Parse a DSL code string in part context.
-  // For single-glyph codes: embeds in helper glyph for proper part-level expansion.
-  // For multi-glyph codes (words): returns an error part (words cannot be parts).
-  #parseParts(code) {
-    // Check if the code parses to multiple glyphs (word) vs single glyph (part)
+  // Parse a mutation arg in part context: exactly one part. A word
+  // (multi-glyph code) keeps the existing WORD_AS_PART error-part contract.
+  // Empty/omitted throws: a part references a shape and has no empty form
+  // (unlike group/glyph containers). Warnings forward only when the arg is
+  // accepted.
+  #parsePartArg(code) {
+    if (code === undefined || code.trim() === '') {
+      throw new Error('Expected a single part, but code "" produced none. '
+        + 'A part is a reference to a shape and cannot be empty; '
+        + 'to reserve an empty slot, use addGlyph("") for an empty glyph.');
+    }
     const rawParsed = this.#ctx.parse(code);
-    if (!rawParsed.groups || rawParsed.groups.length !== 1) {
-      throw new Error(`Expected parts within a single group, but code "${code}" produced ${rawParsed.groups?.length ?? 0} groups`);
+    const groupCount = rawParsed.groups?.length ?? 0;
+    if (groupCount !== 1) {
+      throw new Error(`Expected parts within a single group, but code "${code}" produced ${groupCount} groups`);
     }
     const rawGroup = rawParsed.groups[0];
     if (!rawGroup.glyphs || rawGroup.glyphs.length === 0) {
       throw new Error(`Code "${code}" produced no glyphs`);
     }
-
-    if (rawGroup.glyphs.length === 1) {
-      // Single glyph — use helper approach for proper part-level expansion.
-      // Forward only THIS parse's warnings: the probe parse above ran the
-      // same gates on the same code, so forwarding both would double-warn.
-      const parsed = this.#ctx.parse(`H;${code}`);
-      this.#forwardParseWarnings(parsed);
-      const glyph = parsed.groups?.[0]?.glyphs?.[0];
-      if (glyph?.parts?.length >= 2) {
-        return glyph.parts.slice(1);
-      }
-      // Fallback: return the single glyph's parts directly
-      return rawGroup.glyphs[0].parts || [];
+    if (rawGroup.glyphs.length > 1) {
+      // Multi-glyph code is a word: words cannot be composed with ;
+      return { codeName: code, error: `"${code}" is a word and cannot be composed with ;`, errorCode: 'WORD_AS_PART' };
     }
-
-    // Multi-glyph code is a word — words cannot be composed with ;
-    return [{ codeName: code, error: `"${code}" is a word and cannot be composed with ;`, errorCode: 'WORD_AS_PART' }];
-  }
-
-  // Parse a single part (strict). Used by replace() which must swap exactly one part.
-  #parsePart(code) {
-    const parts = this.#parseParts(code);
+    // Single glyph: helper-glyph embedding for proper part-level expansion.
+    // Forward only THIS parse's warnings (the raw parse above ran the same
+    // gates; forwarding both would double-warn).
+    const parsed = this.#ctx.parse(`H;${code}`);
+    const glyph = parsed.groups?.[0]?.glyphs?.[0];
+    const parts = glyph?.parts?.length >= 2
+      ? glyph.parts.slice(1)
+      : (rawGroup.glyphs[0].parts || []);
     if (parts.length !== 1) {
       throw new Error(`Expected a single part, but code "${code}" produced ${parts.length} parts`);
     }
+    this.#forwardParseWarnings(parsed);
     return parts[0];
   }
 
@@ -526,12 +524,31 @@ export class ElementHandle {
     delete glyph.glyphCode;
   }
 
+  // Level-1 addPart/insertPart on a group with zero glyphs: create a carrier
+  // glyph so the part is not silently dropped (mirrors the empty-builder
+  // routing one level down). Parses BEFORE any state change so a rejected
+  // arg leaves the group untouched.
+  #fillEmptyGroupWithPart(group, method, code, opts) {
+    assertCodeArg(method, code);
+    const newPart = this.#parsePartArg(code);
+    this.#applyDefaultsOverrides(newPart, opts);
+    group.glyphs = [{ parts: [newPart] }];
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
   addPart(code, opts) {
     this.#assertReachable();
     // Group level: delegate to last glyph
     if (this.#level === 1) {
       const group = this.#nodeRef;
-      if (!group?.glyphs?.length) return this;
+      if (!group) return this;
+      // Terminal fail-flagged word: see #inFailFlaggedGroup.
+      if (group.errorCode) return this;
+      if (!group.glyphs?.length) {
+        return this.#fillEmptyGroupWithPart(group, 'addPart', code, opts);
+      }
       const lastGlyph = group.glyphs[group.glyphs.length - 1];
       const glyphHandle = new ElementHandle(this.#ctx, 2, lastGlyph, group);
       glyphHandle.addPart(code, opts);
@@ -541,6 +558,11 @@ export class ElementHandle {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
+    // Terminal fail-flagged word: gated here too (not only in the insertPart
+    // delegate) so the silent no-op wins over the argument guard below, per
+    // the validation ordering rule.
+    if (this.#inFailFlaggedGroup()) return this;
+    assertCodeArg('addPart', code);
     return this.insertPart(glyph.parts?.length ?? 0, code, opts);
   }
 
@@ -549,7 +571,13 @@ export class ElementHandle {
     // Group level: delegate to last glyph
     if (this.#level === 1) {
       const group = this.#nodeRef;
-      if (!group?.glyphs?.length) return this;
+      if (!group) return this;
+      // Terminal fail-flagged word: see #inFailFlaggedGroup.
+      if (group.errorCode) return this;
+      if (!group.glyphs?.length) {
+        // The index is irrelevant for a first part.
+        return this.#fillEmptyGroupWithPart(group, 'insertPart', code, opts);
+      }
       const lastGlyph = group.glyphs[group.glyphs.length - 1];
       const glyphHandle = new ElementHandle(this.#ctx, 2, lastGlyph, group);
       glyphHandle.insertPart(index, code, opts);
@@ -559,15 +587,14 @@ export class ElementHandle {
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
     if (!glyph) return this;
-    // Terminal fail-flagged word: see #inFailFlaggedGroup. Also covers the
-    // group-handle addPart/insertPart forms (they delegate to this arm).
+    // Terminal fail-flagged word: see #inFailFlaggedGroup. Defense-in-depth
+    // for the group-handle delegation forms, which gate at level 1 already.
     if (this.#inFailFlaggedGroup()) return this;
-    const newParts = this.#parseParts(code);
-    for (const p of newParts) {
-      this.#applyDefaultsOverrides(p, opts);
-    }
+    assertCodeArg('insertPart', code);
+    const newPart = this.#parsePartArg(code);
+    this.#applyDefaultsOverrides(newPart, opts);
     if (!glyph.parts) glyph.parts = [];
-    glyph.parts.splice(index, 0, ...newParts);
+    glyph.parts.splice(index, 0, newPart);
     this.#clearGlyphIdentity(glyph);
     this.#ctx.rebuild();
     this.#syncGeneration();
@@ -766,12 +793,14 @@ export class ElementHandle {
     this.#assertReachable();
     if (this.#level !== 2) return this;
     const glyph = this.#nodeRef;
-    if (!glyph?.parts?.length) return this;
+    if (!glyph) return this;
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (this.#inFailFlaggedGroup()) return this;
+    assertCodeArg('replacePart', code);
+    if (!glyph.parts?.length) return this;
     if (index < 0) index = glyph.parts.length + index;
     if (index < 0 || index >= glyph.parts.length) return this;
-    const newPart = this.#parsePart(code);
+    const newPart = this.#parsePartArg(code);
     this.#applyDefaultsOverrides(newPart, opts);
     glyph.parts[index] = newPart;
     this.#clearGlyphIdentity(glyph);
@@ -803,11 +832,12 @@ export class ElementHandle {
     }
 
     if (this.#level === 3) {
+      assertCodeArg('replace', code);
       const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return this;
       const partIndex = glyph.parts.indexOf(this.#nodeRef);
       if (partIndex < 0) return this;
-      const newPart = this.#parsePart(code);
+      const newPart = this.#parsePartArg(code);
       this.#applyDefaultsOverrides(newPart, opts);
       glyph.parts[partIndex] = newPart;
       this.#clearGlyphIdentity(glyph);

@@ -1056,15 +1056,27 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Appends a part to the last non-space group's last glyph (creates group if empty).
-   * @param {string} code - DSL code string
+   * Appends a part to the last non-space group's last glyph (on an empty
+   * document, creates the group and a glyph around the part).
+   * A part references a shape, so an omitted or empty code throws;
+   * use addGlyph('') to reserve an empty slot instead.
+   * @param {string} code - DSL code string resolving to exactly one part
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   addPart(code, opts) {
+    assertCodeArg('addPart', code);
     const indices = this.#getNonSpaceGroupIndices();
     if (indices.length === 0) {
-      return this.addGroup(code, opts);
+      // Empty builder: validate at part level FIRST. The scaffold group is
+      // attached only after the handle call succeeds, so a rejected arg
+      // leaves the builder untouched, and opts land at part level exactly
+      // as they do on a non-empty builder.
+      const newGroup = { glyphs: [] };
+      new ElementHandle(this.#mutationCtx, 1, newGroup).addPart(code, opts);
+      this.#rawBlissObj.groups.push(newGroup);
+      this.#rebuild();
+      return this;
     }
     const lastGi = indices[indices.length - 1];
     const rawGroup = this.#rawBlissObj.groups[lastGi];

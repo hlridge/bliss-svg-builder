@@ -314,10 +314,28 @@ export declare class ElementHandle {
    */
   insertGlyph(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Appends a part to this glyph. On group handles, delegates to the last glyph. */
+  /**
+   * Appends a part to this glyph. On group handles, delegates to the last
+   * glyph; if the group has no glyphs, the part is wrapped in a new glyph
+   * instead of being dropped. A part references a shape, so `code` is
+   * required: to reserve an empty slot, use `addGlyph('')`.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` is empty or whitespace-only (a part cannot be
+   *   empty), or parses to anything but exactly one part (a multi-part
+   *   composition takes one call per part; a word is kept as a failed part
+   *   with a `WORD_AS_PART` warning instead of throwing).
+   */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Inserts a part at the given index in this glyph. Only valid on glyph handles. */
+  /**
+   * Inserts a part at the given index in this glyph. On group handles,
+   * delegates to the last glyph; if the group has no glyphs, the part is
+   * wrapped in a new glyph. A part references a shape, so `code` is
+   * required.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` is empty or parses to anything but exactly one
+   *   part (see `addPart`).
+   */
   insertPart(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
   // --- Mutation: remove/replace (self) ---
@@ -333,11 +351,13 @@ export declare class ElementHandle {
    * On a glyph handle an omitted, empty, or whitespace-only `code` swaps this
    * glyph for an empty glyph (`{parts: []}`), destructively discarding the
    * old content (a head designation dies with it).
-   * @throws {TypeError} On a glyph handle, if `code` is provided and is not
-   *   a string.
+   * @throws {TypeError} On glyph and part handles, if `code` is provided and
+   *   is not a string.
    * @throws {Error} On a glyph handle, if `code` parses to anything but
    *   exactly one glyph (see `addGlyph`). On a part handle, if `code` is
-   *   empty or parses to anything but a single part.
+   *   omitted or empty (a part references a shape and cannot be empty; swap
+   *   in an empty slot with the glyph handle's `replace('')` instead) or
+   *   parses to anything but a single part.
    */
   replace(code?: string, opts?: BlissOptions | OptionLayers): this;
 
@@ -361,7 +381,14 @@ export declare class ElementHandle {
   /** Removes the part at the given index in this glyph. Only valid on glyph handles. */
   removePart(index: number): this;
 
-  /** Replaces the part at the given index in this glyph. Only valid on glyph handles. */
+  /**
+   * Replaces the part at the given index in this glyph. Only valid on glyph
+   * handles. Out-of-range indices remain a silent no-op (checked before the
+   * code is parsed). A part references a shape, so `code` is required.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` is empty or parses to anything but exactly one
+   *   part (see `addPart`).
+   */
   replacePart(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
 
   // --- Mutation: indicators ---
@@ -770,7 +797,19 @@ export declare class BlissSVGBuilder {
    */
   addGlyph(code?: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Appends a part to the last glyph of the last group. */
+  /**
+   * Appends a part to the last non-space group's last glyph. If that group
+   * has no glyphs, the part is wrapped in a new glyph; on an empty builder
+   * the part is validated first, then wrapped in a new group and glyph, so
+   * a rejected code leaves the builder untouched and `opts` land on the
+   * part itself. A part references a shape, so `code` is required: to
+   * reserve an empty slot, use `addGlyph('')`.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` is empty or whitespace-only (a part cannot be
+   *   empty), or parses to anything but exactly one part (a multi-part
+   *   composition takes one call per part; a word is kept as a failed part
+   *   with a `WORD_AS_PART` warning instead of throwing).
+   */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;
 
   /**
