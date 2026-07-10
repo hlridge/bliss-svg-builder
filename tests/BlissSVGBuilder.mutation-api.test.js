@@ -23,10 +23,10 @@ import { BlissSVGBuilder } from '../src/index';
  * - DRY equivalence: addGlyph(code) is identical to insertGlyph(length,
  *   code); addPart(code) is identical to insertPart(length, code);
  *   addGroup(code) is identical to insertGroup(count, code).
- * - Multi-glyph addGlyph / insertGlyph: a slash-separated code or a
- *   defined word code expands to multiple glyphs in the receiver group;
- *   insertGlyph(0, ...) inserts at the start; multi-group codes (//)
- *   throw; group-level options propagate to each expanded glyph.
+ * - Singular addGlyph / insertGlyph: a slash-separated code or a defined
+ *   word code throws and leaves the receiver group untouched; multi-group
+ *   codes (//) throw; a rejected code applies options to no glyph. The
+ *   full argument matrix lives in ElementHandle.glyph-mutation-args.test.js.
  * - builder.insertGroup: positions 0, end, and middle; defaults/overrides
  *   propagate to the new group's options; chainable; works on an empty
  *   builder.
@@ -42,7 +42,7 @@ import { BlissSVGBuilder } from '../src/index';
  *   glyph-level identity (codeName, isBlissGlyph, glyphCode) so live
  *   handle, snapshot, and toJSON stay coherent.
  * - Cross-variant regressions: chained addGroup → addGlyph → addPart;
- *   multi-glyph add then part add on the last expanded glyph; handle
+ *   a rejected multi-glyph add leaving the group usable for addPart; handle
  *   survival across unrelated builder mutations; insertGroup followed by
  *   navigation to the inserted group; insertGroup middle producing
  *   correct toString round-trip; addPart and glyph.insertPart clearing
@@ -204,25 +204,27 @@ describe('BlissSVGBuilder mutation API', () => {
   });
 
   describe('when addGlyph or insertGlyph is given a multi-glyph code', () => {
-    it('expands a slash-separated code into multiple glyphs in the receiver group', () => {
+    it('throws for a slash-separated code and leaves the receiver group untouched', () => {
       const b = new BlissSVGBuilder('B291');
-      b.group(0).addGlyph('H/C8');
-      expect(glyphCount(b, 0)).toBe(3);
+      expect(() => b.group(0).addGlyph('H/C8'))
+        .toThrow('Expected a single glyph, but code "H/C8" produced 2 glyphs');
+      expect(glyphCount(b, 0)).toBe(1);
     });
 
-    it('expands a defined word code into multiple glyphs in the receiver group', () => {
+    it('throws for a defined word code and leaves the receiver group untouched', () => {
       const b = new BlissSVGBuilder('H');
-      b.group(0).addGlyph('TW');
-      expect(glyphCount(b, 0)).toBe(3); // H + B291 + B291
+      expect(() => b.group(0).addGlyph('TW'))
+        .toThrow('Expected a single glyph, but code "TW" produced 2 glyphs');
+      expect(glyphCount(b, 0)).toBe(1);
     });
 
-    it('inserts an expanded word code at the start when index is 0', () => {
+    it('throws for insertGlyph(0, word) and inserts nothing', () => {
       const b = new BlissSVGBuilder('H');
-      b.group(0).insertGlyph(0, 'TW');
+      expect(() => b.group(0).insertGlyph(0, 'TW'))
+        .toThrow('Expected a single glyph, but code "TW" produced 2 glyphs');
       const glyphs = b.toJSON().groups[0].glyphs;
-      expect(glyphs).toHaveLength(3);
-      // First two should be from TW expansion, last is H
-      expect(glyphs[2].parts[0].codeName).toBe('H');
+      expect(glyphs).toHaveLength(1);
+      expect(glyphs[0].parts[0].codeName).toBe('H');
     });
 
     it('throws when the input code spans multiple groups (//)', () => {
@@ -232,13 +234,13 @@ describe('BlissSVGBuilder mutation API', () => {
       }).toThrow(/groups/);
     });
 
-    it('propagates options to every expanded glyph', () => {
+    it('applies options to no glyph when the multi-glyph code is rejected', () => {
       const b = new BlissSVGBuilder('H');
-      b.group(0).addGlyph('H/C8', { overrides: { color: 'red' } });
+      expect(() => b.group(0).addGlyph('H/C8', { overrides: { color: 'red' } }))
+        .toThrow('Expected a single glyph, but code "H/C8" produced 2 glyphs');
       const glyphs = b.toJSON().groups[0].glyphs;
-      // Both new glyphs should have the color option
-      expect(glyphs[1].options?.color).toBe('red');
-      expect(glyphs[2].options?.color).toBe('red');
+      expect(glyphs).toHaveLength(1);
+      expect(glyphs[0].options).toBeUndefined();
     });
   });
 
@@ -496,14 +498,14 @@ describe('BlissSVGBuilder mutation API', () => {
       expect(glyphCount(b, 0)).toBe(2);
     });
 
-    it('combines a multi-glyph addGlyph with a subsequent group.addPart on the last expanded glyph', () => {
+    it('leaves the group usable for group.addPart after a rejected multi-glyph addGlyph', () => {
       const b = new BlissSVGBuilder('H');
-      b.group(0).addGlyph('TW'); // adds 2 glyphs (B291, B291)
-      b.group(0).addPart('B291'); // adds to last glyph
+      expect(() => b.group(0).addGlyph('TW')) // adding 2 glyphs (B291, B291) is rejected
+        .toThrow('Expected a single glyph, but code "TW" produced 2 glyphs');
+      b.group(0).addPart('B291'); // adds to the original last glyph
       const glyphs = b.toJSON().groups[0].glyphs;
-      expect(glyphs).toHaveLength(3); // H + B291 + B291
-      // Last glyph should have extra part
-      expect(glyphs[2].parts.length).toBeGreaterThan(1);
+      expect(glyphs).toHaveLength(1);
+      expect(glyphs[0].parts.length).toBeGreaterThan(1);
     });
 
     it('keeps a previously captured handle valid across an unrelated builder mutation', () => {

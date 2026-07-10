@@ -291,11 +291,28 @@ export declare class ElementHandle {
 
   // --- Mutation: add/insert ---
 
-  /** Appends a glyph to this group. Only valid on group handles. */
-  addGlyph(code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Appends a glyph to this group. Only valid on group handles. An omitted,
+   * empty, or whitespace-only `code` appends an empty glyph (`{parts: []}`);
+   * it renders nothing and round-trips through `toJSON()`.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` parses to anything but exactly one glyph:
+   *   multi-glyph codes (including defined word names) and multi-group codes
+   *   throw, as do word-level artifacts (word options `[opts]|`, a word
+   *   indicator list `;;`, or a code that fails to parse as a word). Use the
+   *   group family for word content.
+   */
+  addGlyph(code?: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Inserts a glyph at the given index in this group. Only valid on group handles. */
-  insertGlyph(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Inserts a glyph at the given index in this group. Only valid on group
+   * handles. An omitted, empty, or whitespace-only `code` inserts an empty
+   * glyph (`{parts: []}`).
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` parses to anything but exactly one glyph (see
+   *   `addGlyph`).
+   */
+  insertGlyph(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Appends a part to this glyph. On group handles, delegates to the last glyph. */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;
@@ -311,16 +328,35 @@ export declare class ElementHandle {
   /** Disconnects this element from its parent without cascade cleanup. May leave empty containers. */
   detach(): undefined;
 
-  /** Replaces this element with a new one. Valid on glyph and part handles. */
-  replace(code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Replaces this element with a new one. Valid on glyph and part handles.
+   * On a glyph handle an omitted, empty, or whitespace-only `code` swaps this
+   * glyph for an empty glyph (`{parts: []}`), destructively discarding the
+   * old content (a head designation dies with it).
+   * @throws {TypeError} On a glyph handle, if `code` is provided and is not
+   *   a string.
+   * @throws {Error} On a glyph handle, if `code` parses to anything but
+   *   exactly one glyph (see `addGlyph`). On a part handle, if `code` is
+   *   empty or parses to anything but a single part.
+   */
+  replace(code?: string, opts?: BlissOptions | OptionLayers): this;
 
   // --- Mutation: remove/replace (parent-centric, by index) ---
 
   /** Removes the glyph at the given index in this group. Only valid on group handles. */
   removeGlyph(index: number): this;
 
-  /** Replaces the glyph at the given index in this group. Only valid on group handles. */
-  replaceGlyph(index: number, code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Replaces the glyph at the given index in this group. Only valid on group
+   * handles. An omitted, empty, or whitespace-only `code` swaps the target
+   * for an empty glyph (`{parts: []}`), destructively discarding the old
+   * content (a head designation dies with it). Out-of-range indices remain a
+   * silent no-op (checked before the code is parsed).
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` parses to anything but exactly one glyph (see
+   *   `addGlyph`).
+   */
+  replaceGlyph(index: number, code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Removes the part at the given index in this glyph. Only valid on glyph handles. */
   removePart(index: number): this;
@@ -719,8 +755,20 @@ export declare class BlissSVGBuilder {
    */
   addGroup(code?: string, opts?: BlissOptions | OptionLayers): this;
 
-  /** Appends a glyph to the last non-space group (creates one if empty). */
-  addGlyph(code: string, opts?: BlissOptions | OptionLayers): this;
+  /**
+   * Appends a glyph to the last non-space group (creates one if empty). An
+   * omitted, empty, or whitespace-only `code` appends an empty glyph
+   * (`{parts: []}`). On an empty builder the glyph is validated first, then
+   * wrapped in a new group, so a rejected code leaves the builder untouched
+   * and `opts` land on the glyph itself.
+   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {Error} If `code` parses to anything but exactly one glyph:
+   *   multi-glyph codes (including defined word names) and multi-group codes
+   *   throw, as do word-level artifacts (word options `[opts]|`, a word
+   *   indicator list `;;`, or a code that fails to parse as a word). Use the
+   *   group family for word content.
+   */
+  addGlyph(code?: string, opts?: BlissOptions | OptionLayers): this;
 
   /** Appends a part to the last glyph of the last group. */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;

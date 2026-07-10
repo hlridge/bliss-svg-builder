@@ -507,12 +507,6 @@ class BlissSVGBuilder {
       getGeneration: () => this.#generation,
       getDefinitions: () => blissElementDefinitions,
       addMutationWarning: (warning) => this.#mutationWarnings.push(warning),
-      // Build a temporary element tree for layout computation (e.g. addGlyph word expansion)
-      computeLayout: (code) => {
-        const parsed = BlissParser.parse(code);
-        const tempElement = new BlissElement(parsed, { sharedOptions: this.#sharedOptions });
-        return tempElement.snapshot();
-      },
     };
   }
 
@@ -1035,15 +1029,24 @@ class BlissSVGBuilder {
 
   /**
    * Appends a glyph to the last non-space group (creates one if empty).
-   * @param {string} code - DSL code string
+   * An omitted, empty, or whitespace-only code appends an empty glyph.
+   * @param {string} [code] - DSL code string
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
    */
   addGlyph(code, opts) {
+    assertCodeArg('addGlyph', code);
     const indices = this.#getNonSpaceGroupIndices();
     if (indices.length === 0) {
-      // Empty builder — create a new group with this glyph
-      return this.addGroup(code, opts);
+      // Empty builder: validate at glyph level FIRST. The scaffold group is
+      // attached only after the handle call succeeds, so a rejected arg
+      // leaves the builder untouched, and opts land at glyph level exactly
+      // as they do on a non-empty builder.
+      const newGroup = { glyphs: [] };
+      new ElementHandle(this.#mutationCtx, 1, newGroup).addGlyph(code, opts);
+      this.#rawBlissObj.groups.push(newGroup);
+      this.#rebuild();
+      return this;
     }
     const lastGi = indices[indices.length - 1];
     const rawGroup = this.#rawBlissObj.groups[lastGi];

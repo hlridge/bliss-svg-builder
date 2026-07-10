@@ -320,29 +320,32 @@ export class ElementHandle {
     }
   }
 
-  // Parse a DSL code string and extract glyphs from a single group.
-  // Accepts multi-glyph codes (e.g. "H/C8" or word definitions).
-  // Rejects multi-group input (e.g. "H//C8").
-  #parseGlyphs(code) {
+  // Parse a mutation arg in glyph context: exactly one glyph, no word-level
+  // artifacts (a fail flag, word options, or a word indicator list belong to
+  // the group family). Empty/omitted means a deliberate empty glyph
+  // ({parts: []}). Warnings forward only when the arg is accepted.
+  #parseGlyphArg(code) {
+    if (code === undefined || code.trim() === '') return { parts: [] };
     const parsed = this.#ctx.parse(code);
-    if (!parsed.groups || parsed.groups.length !== 1) {
-      throw new Error(`Expected glyphs within a single group, but code "${code}" produced ${parsed.groups?.length ?? 0} groups`);
+    const groupCount = parsed.groups?.length ?? 0;
+    if (groupCount !== 1) {
+      throw new Error(`Expected a single group, but code "${code}" produced ${groupCount} groups`);
     }
     const group = parsed.groups[0];
-    if (!group.glyphs || group.glyphs.length === 0) {
-      throw new Error(`Code "${code}" produced no glyphs`);
+    if (group.errorCode !== undefined) {
+      throw new Error(`Code "${code}" is not a single valid glyph (it fails as a word: ${group.errorCode}). Fix the code, or use the group family to work with whole words`);
     }
-    this.#forwardParseWarnings(parsed);
-    return group.glyphs;
-  }
-
-  // Parse a DSL code string and extract exactly one glyph.
-  // Used by replace() which must swap a single glyph.
-  #parseGlyph(code) {
-    const glyphs = this.#parseGlyphs(code);
+    if (group.options) {
+      throw new Error(`Code "${code}" carries word-level options ("[opts]|"). Style the glyph itself ("[opts]CODE" or the opts parameter), or use addGroup() for word content`);
+    }
+    if (group.wordIndicators) {
+      throw new Error(`Code "${code}" carries a word-level indicator list (";;"). Use applyIndicators() on the word, or addGroup() for word content`);
+    }
+    const glyphs = group.glyphs ?? [];
     if (glyphs.length !== 1) {
       throw new Error(`Expected a single glyph, but code "${code}" produced ${glyphs.length} glyphs`);
     }
+    this.#forwardParseWarnings(parsed);
     return glyphs[0];
   }
 
@@ -488,6 +491,11 @@ export class ElementHandle {
     if (this.#level !== 1) return this;
     const group = this.#nodeRef;
     if (!group) return this;
+    // Terminal fail-flagged word: see #inFailFlaggedGroup. Gated here too
+    // (not only in the insertGlyph delegate) so the silent no-op wins over
+    // the argument guard below, per the validation ordering rule.
+    if (group.errorCode) return this;
+    assertCodeArg('addGlyph', code);
     return this.insertGlyph(group.glyphs?.length ?? 0, code, opts);
   }
 
@@ -498,12 +506,11 @@ export class ElementHandle {
     if (!group) return this;
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (group.errorCode) return this;
-    const newGlyphs = this.#parseGlyphs(code);
-    for (const g of newGlyphs) {
-      this.#applyDefaultsOverrides(g, opts);
-    }
+    assertCodeArg('insertGlyph', code);
+    const newGlyph = this.#parseGlyphArg(code);
+    this.#applyDefaultsOverrides(newGlyph, opts);
     if (!group.glyphs) group.glyphs = [];
-    group.glyphs.splice(index, 0, ...newGlyphs);
+    group.glyphs.splice(index, 0, newGlyph);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
@@ -740,12 +747,14 @@ export class ElementHandle {
     this.#assertReachable();
     if (this.#level !== 1) return this;
     const group = this.#nodeRef;
-    if (!group?.glyphs?.length) return this;
+    if (!group) return this;
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (group.errorCode) return this;
+    assertCodeArg('replaceGlyph', code);
+    if (!group.glyphs?.length) return this;
     if (index < 0) index = group.glyphs.length + index;
     if (index < 0 || index >= group.glyphs.length) return this;
-    const newGlyph = this.#parseGlyph(code);
+    const newGlyph = this.#parseGlyphArg(code);
     this.#applyDefaultsOverrides(newGlyph, opts);
     group.glyphs[index] = newGlyph;
     this.#ctx.rebuild();
@@ -779,11 +788,12 @@ export class ElementHandle {
     // there is no level-1 replace arm — replaceGroup is the recovery).
     if (this.#inFailFlaggedGroup()) return this;
     if (this.#level === 2) {
+      assertCodeArg('replace', code);
       const group = this.#parentRef;
       if (!group?.glyphs) return this;
       const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
       if (glyphIndex < 0) return this;
-      const newGlyph = this.#parseGlyph(code);
+      const newGlyph = this.#parseGlyphArg(code);
       this.#applyDefaultsOverrides(newGlyph, opts);
       group.glyphs[glyphIndex] = newGlyph;
       this.#nodeRef = newGlyph;
