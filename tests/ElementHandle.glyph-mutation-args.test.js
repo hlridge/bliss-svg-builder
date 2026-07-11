@@ -29,9 +29,9 @@
  * - group-family singular rules, see
  *   BlissSVGBuilder.group-mutation-args.test.js
  * - part-family rules (addPart/insertPart/replacePart, part replace), see
- *   ElementHandle.part-mutation-args (planned alongside this file)
+ *   ElementHandle.part-mutation-args.test.js
  * - full DSL/API/object parity for empty content, see
- *   BlissSVGBuilder.empty-content-parity.test.js (planned)
+ *   BlissSVGBuilder.empty-content-parity.test.js
  * - fail-flagged TARGET no-ops across all mutators, see
  *   ElementHandle.failed-word-mutation.test.js
  *

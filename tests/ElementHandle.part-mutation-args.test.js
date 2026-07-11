@@ -35,7 +35,7 @@
  * - fail-flagged TARGET no-ops across all mutators, see
  *   ElementHandle.failed-word-mutation.test.js
  * - cross-surface empty-content parity, see
- *   BlissSVGBuilder.empty-content-parity.test.js (planned)
+ *   BlissSVGBuilder.empty-content-parity.test.js
  *
  * @issue: #33
  */

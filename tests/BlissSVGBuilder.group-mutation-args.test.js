@@ -20,10 +20,10 @@
  * - '//' parses to a single space group and stays accepted
  *
  * Does NOT cover:
- * - glyph/part-family singular rules, see ElementHandle.glyph-mutation-args
- *   and ElementHandle.part-mutation-args (planned alongside this file)
+ * - glyph/part-family singular rules, see ElementHandle.glyph-mutation-args.test.js
+ *   and ElementHandle.part-mutation-args.test.js
  * - full DSL/API/object parity for empty content, see
- *   BlissSVGBuilder.empty-content-parity.test.js (planned)
+ *   BlissSVGBuilder.empty-content-parity.test.js
  * - serialization runs and document extent of empty groups, see
  *   BlissSVGBuilder.empty-content-serialization.test.js and
  *   BlissSVGBuilder.empty-content-extent.test.js
