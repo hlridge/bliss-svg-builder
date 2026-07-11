@@ -477,6 +477,15 @@ describe('ElementHandle part mutation args', () => {
       expect(stateOf(b)).toBe(before);
     });
 
+    it('stays a clean no-op for a fractional index', () => {
+      // a fractional in-range index passes a bare bounds check and used to
+      // write a stray non-index property onto the raw parts array
+      const b = new BlissSVGBuilder('B291;B97');
+      b.group(0).glyph(0).replacePart(0.5, 'B81');
+      expect(Object.keys(b.toJSON().groups[0].glyphs[0].parts)).toEqual(['0', '1']);
+      expect(b.toString()).toBe('B291;B97');
+    });
+
     it('stays a silent no-op even for a multi-part code', () => {
       // index no-op checks precede content validation in the replace family
       const b = new BlissSVGBuilder('B291');

@@ -286,6 +286,15 @@ describe('ElementHandle glyph mutation args', () => {
       expect(stateOf(b)).toBe(before);
     });
 
+    it('stays a clean no-op for a fractional index', () => {
+      // a fractional in-range index passes a bare bounds check and used to
+      // write a stray non-index property onto the raw glyphs array
+      const b = new BlissSVGBuilder('B291/B92');
+      b.group(0).replaceGlyph(0.5, 'B208');
+      expect(Object.keys(b.toJSON().groups[0].glyphs)).toEqual(['0', '1']);
+      expect(b.toString()).toBe('B291/B92');
+    });
+
     it('stays a silent no-op even for a multi-glyph code', () => {
       // index no-op checks precede content validation in the replace family
       const b = new BlissSVGBuilder('B291');

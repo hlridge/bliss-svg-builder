@@ -805,7 +805,7 @@ export class ElementHandle {
     assertCodeArg('replaceGlyph', code);
     if (!group.glyphs?.length) return this;
     if (index < 0) index = group.glyphs.length + index;
-    if (index < 0 || index >= group.glyphs.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= group.glyphs.length) return this;
     const newGlyph = this.#parseGlyphArg(code);
     this.#applyDefaultsOverrides(newGlyph, opts);
     group.glyphs[index] = newGlyph;
@@ -824,7 +824,7 @@ export class ElementHandle {
     assertCodeArg('replacePart', code);
     if (!glyph.parts?.length) return this;
     if (index < 0) index = glyph.parts.length + index;
-    if (index < 0 || index >= glyph.parts.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= glyph.parts.length) return this;
     const newPart = this.#parsePartArg(code);
     this.#applyDefaultsOverrides(newPart, opts);
     glyph.parts[index] = newPart;

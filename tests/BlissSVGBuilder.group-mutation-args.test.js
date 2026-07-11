@@ -233,6 +233,18 @@ describe('BlissSVGBuilder group mutation args', () => {
       expect(() => b.replaceGroup(99, 42)).toThrow(TypeError);
       expect(() => b.replaceElement(99, 42)).toThrow(TypeError);
     });
+
+    it('stays a clean no-op for a fractional or NaN index', () => {
+      // a fractional in-range index passes a bare bounds check and used to
+      // write a stray non-index property onto the raw groups array (visible
+      // in the keys of toJSON's groups, invisible to JSON.stringify)
+      const b = new BlissSVGBuilder('B291//B208');
+      b.replaceGroup(0.5, 'B92');
+      b.replaceGroup(NaN, 'B92');
+      b.replaceElement(0.5, '');
+      expect(Object.keys(b.toJSON().groups)).toEqual(['0', '1', '2']);
+      expect(b.toString()).toBe('B291//B208');
+    });
   });
 
   describe('when an empty code carries options', () => {

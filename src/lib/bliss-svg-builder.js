@@ -1111,7 +1111,7 @@ class BlissSVGBuilder {
     assertCodeArg('replaceGroup', code);
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
-    if (index < 0 || index >= indices.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= indices.length) return this;
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
     const rawIndex = indices[index];
     this.#rawBlissObj.groups[rawIndex] = newGroup;
@@ -1323,7 +1323,7 @@ class BlissSVGBuilder {
     assertCodeArg('replaceElement', code);
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
-    if (index < 0 || index >= groups.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= groups.length) return this;
     const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
     groups[index] = newGroup;
     this.#rebuild();
