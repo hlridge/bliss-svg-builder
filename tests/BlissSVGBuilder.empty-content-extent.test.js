@@ -15,6 +15,8 @@
  * - snapshot bounds.maxX ends at the last content glyph
  * - [center] with min-width positions a trailing-empty document exactly
  *   like its serialized twin (baseWidth exclusion)
+ * - a leading empty group no longer defeats the first-character
+ *   indicator-overhang offset (live width matches the reparse)
  *
  * Does NOT cover:
  * - navigation/classification of empty groups, see
@@ -98,6 +100,43 @@ describe('BlissSVGBuilder empty-content extent', () => {
     it('keeps an interior empty group width-neutral', () => {
       const b = new BlissSVGBuilder({ groups: [word('B291'), space(), empty(), space(), word('B208')] });
       expect(viewBoxWidth(b)).toBe(31.5);
+    });
+  });
+
+  describe('when a leading empty group precedes an indicator-overhang word', () => {
+    // B12;B98 is an overhang word: its indicator part starts left of the
+    // glyph ink, so the document shifts content right by the overhang.
+    const overhangWord = () => ({ glyphs: [{ parts: [{ codeName: 'B12' }, { codeName: 'B98' }] }] });
+
+    it('applies the overhang offset past a leading empty group', () => {
+      const b = new BlissSVGBuilder({ groups: [empty(), overhangWord()] });
+      expect(viewBoxWidth(b)).toBe(6.5);
+      expect(viewBoxWidth(b)).toBe(viewBoxWidth(new BlissSVGBuilder({ groups: [overhangWord()] })));
+    });
+
+    it('renders as wide as the reparse of its own serialization', () => {
+      const b = new BlissSVGBuilder({ groups: [empty(), overhangWord()] });
+      expect(viewBoxWidth(b)).toBe(viewBoxWidth(new BlissSVGBuilder(b.toString())));
+    });
+
+    it('applies the overhang offset past a run of leading empty groups', () => {
+      const b = new BlissSVGBuilder({ groups: [empty(), empty(), overhangWord()] });
+      expect(viewBoxWidth(b)).toBe(6.5);
+    });
+
+    it('applies the overhang offset when insertElement adds the leading empty', () => {
+      const b = new BlissSVGBuilder('B12;B98');
+      b.insertElement(0, '');
+      expect(viewBoxWidth(b)).toBe(6.5);
+      expect(viewBoxWidth(b)).toBe(viewBoxWidth(new BlissSVGBuilder(b.toString())));
+    });
+
+    it('keeps a space-led overhang word unchanged (spaces are not skipped)', () => {
+      // regression pin: only content-empty groups are skipped when locating
+      // the first character; a leading space group still wins the slot.
+      const b = new BlissSVGBuilder({ groups: [empty(), space(), overhangWord()] });
+      expect(viewBoxWidth(b)).toBe(11);
+      expect(viewBoxWidth(b)).toBe(viewBoxWidth(new BlissSVGBuilder('//B12;B98')));
     });
   });
 

@@ -217,11 +217,10 @@ export class BlissElement {
    * @returns {BlissElement|null}
    */
   #getFirstCharacterElement() {
-    // KNOWN GAP (backlog "empty-content extent" row): a leading content-empty
-    // group should be skipped here the way empty glyphs are below, else it
-    // wins the [0] slot and defeats the indicator-overhang offset (live 5 vs
-    // reparse 6.5 for {groups: [{glyphs: []}, B12;B98-word]}).
-    const firstGroup = this.#children?.[0];
+    // Content-empty groups are invisible to layout: the reparse of toString()
+    // (which omits them) computes indicator overhang from the first
+    // content-bearing group, so the live render must skip empties too.
+    const firstGroup = this.#children?.find(g => !g.#isEmptyGroup);
     if (!firstGroup) return null;
 
     // Empty-parts glyphs are invisible to layout: the reparse of toString()
