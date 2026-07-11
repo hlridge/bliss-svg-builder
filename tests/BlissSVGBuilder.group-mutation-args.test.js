@@ -18,6 +18,8 @@
  * - accepted args keep surfacing their kept-node warnings (UNKNOWN_CODE);
  *   rejected args leak no warnings
  * - '//' parses to a single space group and stays accepted
+ * - document-level options ("[opts]||CODE") throw on every method; a bare
+ *   empty "||" prefix stays plain accepted content
  *
  * Does NOT cover:
  * - glyph/part-family singular rules, see ElementHandle.glyph-mutation-args.test.js
@@ -70,6 +72,18 @@ describe('BlissSVGBuilder group mutation args', () => {
         expect(stateOf(b)).toBe(before);
       });
     });
+
+    describe('when the code carries document-level options', () => {
+      it('throws the document-options error and leaves the builder untouched', () => {
+        // the constructor applies "[opts]||" document options; a group arg has
+        // no document to attach them to, so silently stripping them was loss
+        const b = new BlissSVGBuilder('B291');
+        const before = stateOf(b);
+        expect(() => invoke(b, '[color=red]||B208'))
+          .toThrow('Code "[color=red]||B208" carries document-level options ("[opts]||")');
+        expect(stateOf(b)).toBe(before);
+      });
+    });
   });
 
   describe('when the code parses to no group at all', () => {
@@ -79,6 +93,23 @@ describe('BlissSVGBuilder group mutation args', () => {
       expect(() => b.addGroup('[color=red]||'))
         .toThrow('Expected a single group, but code "[color=red]||" produced 0 groups');
       expect(stateOf(b)).toBe(before);
+    });
+  });
+
+  describe('when the code carries a bare empty global-options prefix', () => {
+    it('accepts ||CODE as its single parsed group and points the throw message home', () => {
+      // "||" with nothing before it sets no document options (parser pin), so
+      // the document-options gate must key on option CONTENT, not the token
+      const b = new BlissSVGBuilder('B291');
+      b.addGroup('||B208');
+      expect(b.toString()).toBe('B291//B208');
+      expect(b.warnings).toHaveLength(0);
+    });
+
+    it('names the builder input and the word spelling in the document-options error', () => {
+      const b = new BlissSVGBuilder('B291');
+      expect(() => b.addGroup('[color=red]||B208')).toThrow('builder input');
+      expect(() => b.addGroup('[color=red]||B208')).toThrow('opts parameter');
     });
   });
 

@@ -12,6 +12,8 @@
  *   mergeWithNext migration reproduces the retired word-fusion result
  * - word-level artifact args throw: word options ([opts]|CODE), word
  *   indicator lists (;;), and fail-flagged words (malformed ;;)
+ * - document-level options ([opts]||CODE) throw on every surface; a bare
+ *   empty "||" prefix stays plain accepted content
  * - '' / whitespace / omitted code creates {parts:[]}; on an empty builder
  *   the scaffold group holds the empty glyph; replaceGlyph/replace swap in
  *   the empty glyph destructively and the head designation dies with the
@@ -179,7 +181,34 @@ describe('ElementHandle glyph mutation args', () => {
       const before = stateOf(b);
       expect(() => b.group(0).addGlyph('B291;;B81;;B86')).toThrow('not a single valid glyph');
       expect(() => b.group(0).addGlyph('B291;;B81;;B86')).toThrow('MALFORMED_WORD_INDICATOR');
+      expect(() => b.group(0).addGlyph('B291;;B81;;B86')).toThrow('addGroup()');
       expect(stateOf(b)).toBe(before);
+    });
+  });
+
+  describe('when the code carries document-level options', () => {
+    it.each(EACH_SURFACE)('%s rejects document-level options and leaves the builder untouched', (label, { invoke }) => {
+      // the constructor applies "[opts]||" document options; a glyph arg has
+      // no document to attach them to, so silently stripping them was loss
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, '[color=red]||B100')).toThrow('document-level options');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it('points the document-options rejection to the builder input and the glyph spelling', () => {
+      const b = new BlissSVGBuilder('B291');
+      expect(() => b.group(0).addGlyph('[color=red]||B100')).toThrow('builder input');
+      expect(() => b.group(0).addGlyph('[color=red]||B100')).toThrow('[opts]CODE');
+    });
+
+    it('accepts a bare empty global-options prefix as plain glyph content', () => {
+      // "||" with nothing before it sets no document options (parser pin), so
+      // the gate must key on option CONTENT, not the token
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).addGlyph('||B208');
+      expect(b.toString()).toBe('B291/B208');
+      expect(b.warnings).toHaveLength(0);
     });
   });
 

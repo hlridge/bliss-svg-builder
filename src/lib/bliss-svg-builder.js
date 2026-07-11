@@ -1240,6 +1240,13 @@ class BlissSVGBuilder {
       if (groupCount !== 1) {
         throw new Error(`Expected a single group, but code "${code}" produced ${groupCount} groups`);
       }
+      // Document-level options have no home on a single group: the same
+      // string given to the constructor would style the whole document, so
+      // stripping them here would be silent loss. An empty "||" prefix sets
+      // no options and stays plain content.
+      if (Object.keys(parsed.options ?? {}).length > 0) {
+        throw new Error(`Code "${code}" carries document-level options ("[opts]||"). Set document options on the builder input, or style the group itself ("[opts]|" in the code or the opts parameter)`);
+      }
       newGroup = parsed.groups[0];
     }
     if (opts) {

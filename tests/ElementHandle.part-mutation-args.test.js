@@ -18,6 +18,10 @@
  *   empty builders (uniform routing)
  * - single-part decorations pass through ([opts]>CODE, :x,y, opts param)
  *   and the char-scope spelling keeps failing like its DSL twin
+ * - artifacts above part level throw on every surface: document-level
+ *   options ([opts]||), word-level options ([opts]|), word indicator lists
+ *   (;;), head markers (^), and fail-flagged args; a word arg with an
+ *   overlay suffix stays on the WORD_AS_PART path (the word row wins)
  * - degenerate parses keep their messages (no glyphs, multiple groups)
  * - designed TypeErrors name the called method on every surface; gated
  *   targets (fail-flagged word, wrong level) stay silent no-ops, while
@@ -192,12 +196,91 @@ describe('ElementHandle part mutation args', () => {
     });
   });
 
+  describe('when the code carries an artifact above part level', () => {
+    it.each(EACH_SURFACE)('%s rejects document-level options and leaves the builder untouched', (label, { invoke }) => {
+      // the constructor applies "[opts]||" document options; a part arg has
+      // no document to attach them to, so silently stripping them was loss
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, '[color=red]||B97')).toThrow('document-level options');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it.each(EACH_SURFACE)('%s rejects word-level options and leaves the builder untouched', (label, { invoke }) => {
+      // formerly stripped behind a MALFORMED_GROUP_OPTIONS warning from the
+      // helper embedding; now rejected whole like the glyph family
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, '[color=red]|B97')).toThrow('word-level options');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it.each(EACH_SURFACE)('%s rejects a word indicator list and leaves the builder untouched', (label, { invoke }) => {
+      // formerly the helper embedding silently dropped the ;; overlay while
+      // attaching the base part
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, 'B97;;B81')).toThrow('word-level indicator list');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it('rejects a bare word indicator marker the same way', () => {
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => b.group(0).glyph(0).addPart('B97;;')).toThrow('word-level indicator list');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it.each(EACH_SURFACE)('%s rejects a head marker and leaves the builder untouched', (label, { invoke }) => {
+      // formerly the helper embedding silently dropped the ^ designation
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, 'B97^')).toThrow('head marker');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it.each(EACH_SURFACE)('%s rejects a fail-flagged arg and leaves the builder untouched', (label, { invoke }) => {
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, 'B291;;B81;;B86')).toThrow('not a single valid part');
+      expect(() => invoke(b, 'B291;;B81;;B86')).toThrow('MALFORMED_WORD_INDICATOR');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it('points each rejection to its part-level alternative', () => {
+      const b = new BlissSVGBuilder('B291');
+      const addPart = (code) => () => b.group(0).glyph(0).addPart(code);
+      expect(addPart('[color=red]||B97')).toThrow('builder input');
+      expect(addPart('[color=red]|B97')).toThrow('[opts]>CODE');
+      expect(addPart('B97;;B81')).toThrow('applyIndicators()');
+      expect(addPart('B97^')).toThrow('CODE^');
+      expect(addPart('B291;;B81;;B86')).toThrow('addGroup()');
+    });
+
+    it('keeps a word arg with an overlay suffix on the WORD_AS_PART path', () => {
+      // the word row wins: multi-glyph args stay the kept error part even
+      // when they also carry a word-level artifact
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).glyph(0).addPart('B313/B1103;;B81');
+      const parts = b.toJSON().groups[0].glyphs[0].parts;
+      expect(parts[1].errorCode).toBe('WORD_AS_PART');
+      expect(b.warnings.some((w) => w.code === 'WORD_AS_PART')).toBe(true);
+    });
+
+    it('rejects artifacts identically on an empty builder and leaves it empty', () => {
+      const b = new BlissSVGBuilder('');
+      expect(() => b.addPart('B97;;B81')).toThrow('word-level indicator list');
+      expect(b.toJSON().groups).toEqual([]);
+      expect(b.stats.groupCount).toBe(0);
+    });
+  });
+
   describe('when the code parses to no glyphs or multiple groups', () => {
     it('throws the no-glyphs message for a bare word-boundary token', () => {
       const b = new BlissSVGBuilder('B291');
       const before = stateOf(b);
       expect(() => b.group(0).glyph(0).addPart('|'))
-        .toThrow('Code "|" produced no glyphs');
+        .toThrow('Expected a single part, but code "|" produced no glyphs');
       expect(stateOf(b)).toBe(before);
     });
 

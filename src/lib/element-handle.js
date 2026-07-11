@@ -320,10 +320,11 @@ export class ElementHandle {
     }
   }
 
-  // Parse a mutation arg in glyph context: exactly one glyph, no word-level
-  // artifacts (a fail flag, word options, or a word indicator list belong to
-  // the group family). Empty/omitted means a deliberate empty glyph
-  // ({parts: []}). Warnings forward only when the arg is accepted.
+  // Parse a mutation arg in glyph context: exactly one glyph, no document or
+  // word-level artifacts (document options, a fail flag, word options, or a
+  // word indicator list belong above the glyph). Empty/omitted means a
+  // deliberate empty glyph ({parts: []}). Warnings forward only when the arg
+  // is accepted.
   #parseGlyphArg(code) {
     if (code === undefined || code.trim() === '') return { parts: [] };
     const parsed = this.#ctx.parse(code);
@@ -331,9 +332,13 @@ export class ElementHandle {
     if (groupCount !== 1) {
       throw new Error(`Expected a single group, but code "${code}" produced ${groupCount} groups`);
     }
+    // An empty "||" prefix sets no options and stays plain content.
+    if (Object.keys(parsed.options ?? {}).length > 0) {
+      throw new Error(`Code "${code}" carries document-level options ("[opts]||"). Set document options on the builder input, or style the glyph itself ("[opts]CODE" or the opts parameter)`);
+    }
     const group = parsed.groups[0];
     if (group.errorCode !== undefined) {
-      throw new Error(`Code "${code}" is not a single valid glyph (it fails as a word: ${group.errorCode}). Fix the code, or use the group family to work with whole words`);
+      throw new Error(`Code "${code}" is not a single valid glyph (it fails as a word: ${group.errorCode}). Fix the code, or use addGroup() to work with whole words`);
     }
     if (group.options) {
       throw new Error(`Code "${code}" carries word-level options ("[opts]|"). Style the glyph itself ("[opts]CODE" or the opts parameter), or use addGroup() for word content`);
@@ -367,11 +372,31 @@ export class ElementHandle {
     }
     const rawGroup = rawParsed.groups[0];
     if (!rawGroup.glyphs || rawGroup.glyphs.length === 0) {
-      throw new Error(`Code "${code}" produced no glyphs`);
+      throw new Error(`Expected a single part, but code "${code}" produced no glyphs`);
     }
     if (rawGroup.glyphs.length > 1) {
       // Multi-glyph code is a word: words cannot be composed with ;
       return { codeName: code, error: `"${code}" is a word and cannot be composed with ;`, errorCode: 'WORD_AS_PART' };
+    }
+    // A single-glyph arg must not smuggle artifacts from above the part
+    // level: the helper embedding below would silently launder them away
+    // (document/word options, a word indicator list, a fail flag, or a head
+    // marker all describe something a part cannot carry). Words take the
+    // WORD_AS_PART route above instead, artifacts and all.
+    if (Object.keys(rawParsed.options ?? {}).length > 0) {
+      throw new Error(`Code "${code}" carries document-level options ("[opts]||"). Set document options on the builder input, or style the part itself ("[opts]>CODE" or the opts parameter)`);
+    }
+    if (rawGroup.options) {
+      throw new Error(`Code "${code}" carries word-level options ("[opts]|"). Style the part itself ("[opts]>CODE" or the opts parameter), or use addGroup() for word content`);
+    }
+    if (rawGroup.wordIndicators) {
+      throw new Error(`Code "${code}" carries a word-level indicator list (";;"). Use applyIndicators() on the word, or addGroup() for word content`);
+    }
+    if (rawGroup.errorCode !== undefined) {
+      throw new Error(`Code "${code}" is not a single valid part (it fails as a word: ${rawGroup.errorCode}). Fix the code, or use addGroup() to work with whole words`);
+    }
+    if (rawGroup.glyphs[0].isHeadGlyph) {
+      throw new Error(`Code "${code}" carries a head marker ("^"). A head marker belongs on a character: pass it to the glyph methods ("CODE^"), or use addGroup() for word content`);
     }
     // Single glyph: helper-glyph embedding for proper part-level expansion.
     // Forward only THIS parse's warnings (the raw parse above ran the same
