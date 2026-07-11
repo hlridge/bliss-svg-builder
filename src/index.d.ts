@@ -726,9 +726,10 @@ export declare class BlissSVGBuilder {
 
   /**
    * Warnings generated during parsing/rendering (unknown codes, invalid syntax, etc.).
-   * Populated at construction and re-derived on each rebuild. NOT exhaustive: some
-   * mutation operations drop data silently (see the Error Handling docs), so an empty
-   * array is not a guarantee of zero data loss across every mutation path.
+   * Populated at construction and re-derived on each rebuild. NOT exhaustive: a few
+   * structural operations discard data without a warning (e.g. `mergeWithNext()` drops
+   * the absorbed word's options and `^` head marker), so an empty array is not a
+   * guarantee of zero data loss across every mutation path.
    */
   readonly warnings: readonly Warning[];
 

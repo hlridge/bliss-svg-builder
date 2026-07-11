@@ -144,6 +144,60 @@ Insert at a specific position:
 builder.glyph(0).insertPart(0, 'B81'); // prepend
 ```
 
+## One Unit per Call
+
+Every add, insert, and replace method takes exactly one unit of its own level: one word group, one character, or one part. A code that spans more than one unit throws instead of keeping part of it, so a mistake never silently drops content:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+
+builder.addGroup('B431//B291');
+// Error: Expected a single group, but code "B431//B291" produced 3 groups
+
+builder.addGroup('B431');  // one call per word
+builder.addGroup('B291');
+```
+
+The character-level methods (`addGlyph`, `insertGlyph`, `replaceGlyph`, `replace` on a glyph handle) reject word-level content of every kind: multi-character codes, defined word names, word options (`[color=red]|B313`), and word indicator lists (`B291;;B81`). The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, or use `addGroup()` for word content (the word-options and indicator-list errors say so directly).
+
+To build from a defined word name and fuse it into a neighboring word, go through the group level:
+
+```js
+BlissSVGBuilder.define({ MYWORD: { codeString: 'B313/B1103' } });
+
+const text = new BlissSVGBuilder('B291');
+text.addGlyph('MYWORD');       // Error: 'MYWORD' produces 2 glyphs
+text.addGroup('MYWORD');       // the word becomes its own group
+text.group(0).mergeWithNext(); // then fuse it into the previous word
+```
+
+A non-string code throws a `TypeError` naming the method. A rejected call leaves the builder unchanged. Out-of-range indices are still silently ignored, and calling a method on the wrong handle level is still a no-op; see the [API reference](/reference/api-documentation#one-unit-per-mutation-call) for the full contract.
+
+## Empty Slots
+
+Sometimes you want structure before content: a placeholder word to fill in later, or a cleared character position. An omitted or empty code creates exactly that at group and character level:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+
+builder.addGroup('');               // an empty word group
+builder.group(1).addGlyph('B431');  // fill it later
+```
+
+Empty slots are first-class: they render nothing, add no width, appear in `.groups` and `group(i)`, and round-trip through `toJSON()`. Adding a part to an empty word wraps the part in a new character automatically:
+
+```js
+const builder = new BlissSVGBuilder();
+builder.addGroup('');
+builder.group(0).addPart('B431'); // the group now holds one character with one part
+```
+
+Replacing with an empty code is destructive on purpose: `replaceGroup(0, '')` and `replaceGlyph(0, '')` swap the target for an empty slot rather than doing nothing. Use it to clear a position while keeping it.
+
+Parts are the one level with no empty state: a part is a reference to a shape, not a container that can stand empty. `addPart('')` throws, and the error points you to `addGlyph('')` when you want to reserve an empty slot.
+
+One thing to know when serializing: `toJSON()` keeps every empty slot, but a bare empty group or glyph has no DSL token, so it does not survive a `toString()` round-trip. An options-carrying empty does: an empty group serializes as `[color=red]|`, an empty glyph as `[color=red]`. Prefer `toJSON()` for saving documents that use empty slots.
+
 ## Modifying Content
 
 ### Replacing Elements
@@ -155,6 +209,8 @@ const builder = new BlissSVGBuilder('B313/B1103');
 builder.glyph(0).replace('B431');
 // now equivalent to 'B431/B1103'
 ```
+
+An empty code swaps in an empty slot instead of doing nothing (see [Empty Slots](#empty-slots)).
 
 ### Setting Options
 
@@ -218,7 +274,7 @@ builder.group(0).glyph(1).detach();  // plain-splice a glyph from a group
 builder.glyph(0).part(2).detach();   // plain-splice a part from a glyph
 ```
 
-Like `remove()`, `detach()` returns `undefined` and cannot be chained. It can produce empty containers that render as zero-width elements. This is intentional for fine-grained structural control.
+Like `remove()`, `detach()` returns `undefined` and cannot be chained. It can leave empty containers behind; an empty group or glyph is a first-class state that renders nothing and stays visible to navigation (see [Empty Slots](#empty-slots)). This is intentional for fine-grained structural control.
 
 ### Parent-Centric Remove and Replace
 
@@ -346,7 +402,7 @@ builder.group(0).mergeWithNext();
 // now equivalent to 'B313/B431'
 ```
 
-The merged word keeps the first word's options. The absorbed word's options are discarded. If there is no next word group, `mergeWithNext()` is a no-op.
+The merged word keeps the first word's options. The absorbed word's options are discarded. If there is no next word group, or the next word group is [empty](#empty-slots), `mergeWithNext()` is a no-op (an empty group itself absorbs its next word normally).
 
 Likewise, the merged word keeps the first word's word-level (`;;`) indicator overlay. A `;;` overlay on the absorbed word is dropped, and a `DROPPED_WORD_INDICATOR` entry is added to `builder.warnings` so the loss is visible.
 

@@ -182,6 +182,8 @@ builder.toString();
 // 'B313/B1103//B431;B81'
 ```
 
+Serialized spacing always matches rendered spacing: adjacent space groups serialize as one coalesced run (a run of N space glyphs emits N+1 slashes; an explicit space code that differs from its position's default, like `QSP` between words, keeps its name), and [empty slots](#empty-slots-are-deliberate) contribute nothing. A bare empty group or glyph has no DSL token of its own, so it is omitted from the string (an options-carrying empty does have one: `[color=red]|` for a group, `[color=red]` for a glyph); use `toJSON()` when empty slots must survive a round-trip.
+
 Custom code behavior:
 - **Typeless aliases** (word-level codes) are always expanded, never preserved.
 - **Custom glyphs and shapes** are decomposed to built-in codes by default.
@@ -389,6 +391,8 @@ const glyphs = builder.query(el => el.isGlyph);
 
 Methods on the builder instance for modifying content. All return `this` for chaining. Out-of-range indices are silently ignored (no error thrown, no mutation performed).
 
+Every add/insert/replace method takes exactly one unit of its own level (one word group, one character, or one part) and throws when the code spans more, so content is never silently dropped. An omitted or empty `code` creates an empty slot at group and glyph level; parts always name a shape. See [One unit per mutation call](#one-unit-per-mutation-call) and [Empty slots are deliberate](#empty-slots-are-deliberate) for the full contract.
+
 ```js
 // Builder methods return the builder, so you can chain into properties
 const svg = new BlissSVGBuilder()
@@ -398,7 +402,7 @@ const svg = new BlissSVGBuilder()
   .svgCode;
 ```
 
-### `addGroup(code, opts?)`
+### `addGroup(code?, opts?)`
 
 Appends a new glyph group with automatic space management:
 
@@ -408,7 +412,16 @@ builder.addGroup('B431');
 // equivalent to new BlissSVGBuilder('B313//B431')
 ```
 
-### `addGlyph(code, opts?)`
+The code must be exactly one word group (one call per word). An omitted, empty, or whitespace-only `code` appends an [empty group](#empty-slots-are-deliberate):
+
+```js
+builder.addGroup('');                   // an empty word slot, renders nothing
+builder.addGroup('', { color: 'red' }); // empty slot with options, serializes as '[color=red]|'
+```
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+
+### `addGlyph(code?, opts?)`
 
 Appends a glyph to the last glyph group. Creates a group if the builder is empty:
 
@@ -417,6 +430,10 @@ const builder = new BlissSVGBuilder('B313');
 builder.addGlyph('B1103');
 // equivalent to new BlissSVGBuilder('B313/B1103')
 ```
+
+The code must be exactly one character. An omitted or empty `code` appends an [empty glyph](#empty-slots-are-deliberate). On an empty builder the code is validated first and only then wrapped in a new group, so a rejected code leaves the builder untouched, and `opts` land on the glyph itself.
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character: multi-character codes and defined word names throw, as do word options (`[color=red]|B313`), a word indicator list (`B291;;B81`), and codes that fail to parse. Use the group methods for word content (see [One unit per mutation call](#one-unit-per-mutation-call)).
 
 ### `addPart(code, opts?)`
 
@@ -428,7 +445,11 @@ builder.addPart('B81');
 // appends B81 to B313, equivalent to 'B313;B81'
 ```
 
-### `insertGroup(index, code, opts?)`
+The code must be exactly one part (one call per part). If the last group has no glyphs, the part is wrapped in a new glyph; on an empty builder the group is created too, with `opts` landing on the part itself. A part references a shape, so `code` is required: to reserve an empty slot, use `addGlyph('')`.
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty or parses to more than one part. A word code (`B313/B1103`) does not throw: it is kept as a failed part with a `WORD_AS_PART` warning, exactly like the DSL.
+
+### `insertGroup(index, code?, opts?)`
 
 Inserts a group at the given position. Negative indices count from the end:
 
@@ -438,6 +459,10 @@ builder.insertGroup(1, 'B291');
 // now equivalent to 'B313//B291//B431'
 ```
 
+An omitted or empty `code` inserts an [empty group](#empty-slots-are-deliberate).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+
 ### `removeGroup(index)`
 
 Removes the group at the given index. Negative indices count from the end:
@@ -446,13 +471,17 @@ Removes the group at the given index. Negative indices count from the end:
 builder.removeGroup(-1); // remove last group
 ```
 
-### `replaceGroup(index, code, opts?)`
+### `replaceGroup(index, code?, opts?)`
 
 Replaces the group at the given index with new content:
 
 ```js
 builder.replaceGroup(0, 'B431', { color: 'red' });
 ```
+
+An omitted or empty `code` deliberately clears the slot: the target group is swapped for an [empty group](#empty-slots-are-deliberate), discarding its content. Out-of-range indices remain a silent no-op (checked before the code is parsed).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
 
 ### `.merge(other)`
 
@@ -516,30 +545,38 @@ These operate on the raw groups array with no automatic space management. Use th
 
 The managed methods (`addGroup`, `insertGroup`, `removeGroup`) auto-insert and clean up space groups. The raw element methods do not.
 
-#### `addElement(code, opts?)`
+#### `addElement(code?, opts?)`
 
 Appends a raw group. No space group is inserted:
 
 ```js
 const builder = new BlissSVGBuilder('B313');
 builder.addElement('B431');
-// [B313, B431] — no space between
+// [B313, B431], no space between
 ```
 
-#### `insertElement(index, code, opts?)`
+An omitted or empty `code` appends an [empty group](#empty-slots-are-deliberate) (here without the auto-space `addGroup` would add).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+
+#### `insertElement(index, code?, opts?)`
 
 Inserts a raw group at the given index. Negative indices count from the end:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B431');
 builder.insertElement(0, 'SP');
-// [SP, B313/B431] — leading space
+// [SP, B313/B431], leading space
 
 builder.insertElement(1, 'SP');
 // inserts space at raw index 1
 ```
 
 `SP` auto-resolves to `TSP` (standard spacing) or `QSP` (reduced spacing before punctuation). Use `TSP` or `QSP` explicitly to bypass resolution.
+
+An omitted or empty `code` inserts an [empty group](#empty-slots-are-deliberate).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
 
 #### `removeElement(index)`
 
@@ -551,7 +588,7 @@ builder.removeElement(1); // remove space group
 // [B313, B431] — adjacent, no space
 ```
 
-#### `replaceElement(index, code, opts?)`
+#### `replaceElement(index, code?, opts?)`
 
 Replaces the raw group at the given index. Negative indices count from the end:
 
@@ -559,6 +596,10 @@ Replaces the raw group at the given index. Negative indices count from the end:
 const builder = new BlissSVGBuilder('B313//B431');
 builder.replaceElement(1, 'QSP'); // swap TSP for QSP
 ```
+
+An omitted or empty `code` deliberately clears the slot: the target is swapped for an [empty group](#empty-slots-are-deliberate). Out-of-range indices remain a silent no-op (checked before the code is parsed).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
 
 ## ElementHandle
 
@@ -799,6 +840,8 @@ const highlight = { left: m.bounds.x, width: m.bounds.width };
 
 All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed). Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
 
+Content arguments follow the same contract as the builder methods: exactly one glyph or part per call, an omitted or empty `code` creates an empty glyph (parts always name a shape), and a non-string `code` throws a `TypeError`. See [One unit per mutation call](#one-unit-per-mutation-call).
+
 A word that failed to parse (a structurally malformed `;;` — it renders as a single placeholder and `toString()` re-emits the original input) is **terminal**: every content mutation on it, whether through the group handle or a glyph/part handle inside it, is a silent no-op, matching `splitAt` / `mergeWithNext`. Group-level `setOptions` / `removeOptions` still work (options serialize outside the failed content), and you can remove the whole word or replace it with `replaceGroup()` — the recovery path.
 
 A structural mutation that turns an indicator-bearing word into a space normalizes the now-invalid state instead of storing it: the word's `;;` overlay is dropped with a `DROPPED_WORD_INDICATOR` warning, and a head designation on a glyph that became a space is deleted (silently, like the structural `^` drops in `splitAt` / `mergeWithNext`) — a space carries neither, and the space serialization (`//`) could not re-emit them.
@@ -817,7 +860,7 @@ builder.group(0).addGlyph('B291');
 builder.svgCode; // back on the builder
 ```
 
-#### `.addGlyph(code, opts?)`
+#### `.addGlyph(code?, opts?)`
 
 Appends a glyph to this group:
 
@@ -825,7 +868,11 @@ Appends a glyph to this group:
 builder.group(0).addGlyph('B1103');
 ```
 
-#### `.insertGlyph(index, code, opts?)`
+The code must be exactly one character; an omitted or empty `code` appends an [empty glyph](#empty-slots-are-deliberate).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character (multi-character codes, defined word names, word options `[opts]|`, a word indicator list `;;`, or a code that fails to parse).
+
+#### `.insertGlyph(index, code?, opts?)`
 
 Inserts a glyph at a specific position within this group:
 
@@ -833,14 +880,20 @@ Inserts a glyph at a specific position within this group:
 builder.group(0).insertGlyph(0, 'B431'); // prepend
 ```
 
+Same content contract as `.addGlyph()`: one character per call, empty `code` inserts an empty glyph, same **Throws**.
+
 #### `.addPart(code, opts?)`
 
-On a glyph handle, appends a part to that glyph. On a group handle, delegates to the last glyph in the group:
+On a glyph handle, appends a part to that glyph. On a group handle, delegates to the last glyph in the group; if the group has no glyphs, the part is wrapped in a new glyph instead of being dropped:
 
 ```js
 builder.glyph(0).addPart('B81');
 builder.group(0).addPart('B81'); // appends to last glyph in group
 ```
+
+The code must be exactly one part. A part references a shape, so `code` is required: to reserve an empty slot, use `addGlyph('')`.
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty or parses to more than one part. A word code is kept as a failed part with a `WORD_AS_PART` warning instead of throwing.
 
 #### `.insertPart(index, code, opts?)`
 
@@ -849,6 +902,8 @@ Inserts a part at a specific position within this glyph:
 ```js
 builder.glyph(0).insertPart(0, 'B81'); // prepend
 ```
+
+Same content contract as `.addPart()`: one part per call, `code` required, same **Throws**.
 
 #### `.remove()`
 
@@ -878,13 +933,17 @@ builder.group(0).glyph(1).detach();  // plain-splice a glyph from a group
 builder.glyph(0).part(2).detach();   // plain-splice a part from a glyph
 ```
 
-#### `.replace(code, opts?)`
+#### `.replace(code?, opts?)`
 
-Replaces the element with new content:
+Replaces the element with new content. Valid on glyph and part handles:
 
 ```js
 builder.glyph(0).replace('B431');
 ```
+
+On a glyph handle, an omitted or empty `code` deliberately swaps the glyph for an [empty glyph](#empty-slots-are-deliberate), discarding the old content (a head designation dies with it). On a part handle, `code` is required.
+
+**Throws** a `TypeError` if `code` is provided and is not a string. On a glyph handle, throws an `Error` if `code` parses to anything but exactly one character (see `.addGlyph()`); on a part handle, if `code` is empty (swap in an empty slot with the glyph handle's `replace('')` instead) or parses to more than one part.
 
 #### `.removeGlyph(index)`
 
@@ -894,13 +953,17 @@ On a group handle, removes the glyph at the given index. Negative indices count 
 builder.group(0).removeGlyph(-1); // remove last glyph
 ```
 
-#### `.replaceGlyph(index, code, opts?)`
+#### `.replaceGlyph(index, code?, opts?)`
 
 On a group handle, replaces the glyph at the given index:
 
 ```js
 builder.group(0).replaceGlyph(0, 'B431');
 ```
+
+An omitted or empty `code` deliberately swaps the target for an [empty glyph](#empty-slots-are-deliberate), discarding the old content (a head designation dies with it). Out-of-range indices remain a silent no-op (checked before the code is parsed).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character (see `.addGlyph()`).
 
 #### `.removePart(index)`
 
@@ -917,6 +980,10 @@ On a glyph handle, replaces the part at the given index:
 ```js
 builder.glyph(0).replacePart(0, 'B81');
 ```
+
+A part references a shape, so `code` is required. Out-of-range indices remain a silent no-op (checked before the code is parsed).
+
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty or parses to more than one part (see `.addPart()`).
 
 ### Space Manipulation
 
@@ -951,7 +1018,7 @@ builder.group(0).mergeWithNext();
 
 The merged word keeps the first group's options. The absorbed group's options are discarded. Glyph-level options on absorbed glyphs are preserved.
 
-No-op when there is no next word group, or when called on a space group or non-group handle.
+No-op when there is no next word group, when the next word group is [empty](#empty-slots-are-deliberate) (empties are never absorbed, though an empty group absorbs its next word normally), or when called on a space group or non-group handle.
 
 ### Options Mutation
 
@@ -1338,7 +1405,7 @@ The library distinguishes two kinds of failure: **throws** (structural problems 
 
 ### What throws
 
-The builder constructor, the definition API, and the split operations throw under specific conditions. Each is annotated with `@throws` in `index.d.ts` (visible in editor hover):
+The builder constructor, the definition API, the split operations, and the content mutation methods throw under specific conditions. Each is annotated with `@throws` in `index.d.ts` (visible in editor hover):
 
 | Call | Throws when |
 |------|-------------|
@@ -1346,6 +1413,7 @@ The builder constructor, the definition API, and the split operations throw unde
 | `builder.merge(other)` | `other` is not a `BlissSVGBuilder` instance |
 | `builder.splitAt(groupIndex)` | fewer than 2 groups, or `groupIndex` out of range (1..groupCount-1) |
 | `groupHandle.splitAt(glyphIndex)` | `glyphIndex` out of range (1..glyphs.length-1); no-op (no throw) on non-group handles |
+| add/insert/replace mutation methods | `code` spans more than one unit of the method's level, is empty at part level, or is a non-string (see [One unit per mutation call](#one-unit-per-mutation-call)) |
 | `removeDefinition(code)` | `code` is a built-in |
 | `patchDefinition(code, changes)` | not defined / built-in / non-object `changes` / a rule violation (see its section) |
 
@@ -1357,7 +1425,54 @@ new BlissSVGBuilder(42);
 
 Unknown codes and invalid DSL do **not** throw. They appear in `warnings` (see above).
 
-ElementHandle mutation methods throw in two more misuse cases (documented at each method and in [Handle Lifetime](#handle-lifetime)): using a handle after its element has been removed (a stale handle), and passing a non-string `code` to `applyIndicators` (a `TypeError`). By contrast, the constructor does not throw on content — `new BlissSVGBuilder('H//C8')` renders the two words; its only throw is for a wrong input type (above).
+ElementHandle mutation methods throw in two more misuse cases (documented at each method and in [Handle Lifetime](#handle-lifetime)): using a handle after its element has been removed (a stale handle), and passing a non-string `code` to a content mutation method (a `TypeError`; `applyIndicators` throws it too, though it accepts `null` as its deliberate empty indicator set). By contrast, the constructor does not throw on content: `new BlissSVGBuilder('H//C8')` renders the two words; its only throw is for a wrong input type (above). The mutation methods are deliberately stricter than the constructor, holding each call to one unit of content (next section).
+
+### One unit per mutation call
+
+Every content mutation method takes exactly one unit of its own level: one word group (`addGroup`, `insertGroup`, `replaceGroup`, and the raw element methods), one character (`addGlyph`, `insertGlyph`, `replaceGlyph`, `replace()` on a glyph handle), or one part (`addPart`, `insertPart`, `replacePart`, `replace()` on a part handle). A code that parses to more than one unit throws instead of keeping part of it, so content is never silently dropped:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+
+builder.addGroup('B431//B291');
+// Error: Expected a single group, but code "B431//B291" produced 3 groups
+
+builder.addGroup('B431').addGroup('B291'); // one call per word
+```
+
+The character-level methods also reject word-level content of every kind: multi-character codes, defined word names, word options, and word indicator lists:
+
+```js
+builder.addGlyph('B313/B1103');       // Error: produced 2 glyphs
+builder.addGlyph('[color=red]|B313'); // Error: carries word-level options
+builder.addGlyph('B291;;B81');        // Error: carries a word-level indicator list
+```
+
+The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, or use `addGroup()` for word content (the word-options and indicator-list errors say so directly).
+
+Defined word names count as words. To fuse one into an existing word, go through the group level:
+
+```js
+BlissSVGBuilder.define({ MYWORD: { codeString: 'B313/B1103' } });
+
+const text = new BlissSVGBuilder('B291');
+text.addGlyph('MYWORD');          // Error: 'MYWORD' produces 2 glyphs
+text.addGroup('MYWORD');          // the word becomes its own group
+text.group(0).mergeWithNext();    // then fuse it into the previous word
+```
+
+A non-string `code` (a number, `null`, an object) is a malformed call and throws a `TypeError` naming the method. On handles, the silent no-ops for wrong-level calls and for words that failed to parse win over the argument checks (those calls never read the argument); the builder methods check the argument first. Rejected calls leave the builder unchanged, and no warnings from the rejected parse leak into `warnings`.
+
+### Empty slots are deliberate
+
+An omitted, empty, or whitespace-only `code` is not an error at group and glyph level: it creates an empty slot on purpose.
+
+- `addGroup('')` / `insertGroup(i, '')` (and the raw element forms) add an empty word group; `addGlyph('')` / `insertGlyph(i, '')` add an empty character slot.
+- The replace forms are destructive: `replaceGroup(i, '')`, `replaceGlyph(i, '')`, and `replace('')` on a glyph handle swap the target for an empty slot instead of doing nothing (a head designation on the replaced glyph dies with it).
+- Empty slots render nothing, add no width, stay visible to navigation (`.groups`, `group(i)`, `stats.groupCount`), and round-trip through `toJSON()`. Fill them later: `group(i).addGlyph('B313')` fills an empty group, adding a part to an empty group wraps the part in a new character, and adding a part to an empty glyph fills that glyph.
+- Parts are the exception: a part is a reference to a shape, not a container, so an empty part cannot exist. `addPart('')` throws, and the message points to `addGlyph('')` for reserving an empty slot.
+
+One serialization asymmetry to know about: `toJSON()` always keeps empty slots, but a bare empty group or glyph has no DSL token, so it survives `toJSON()` round-trips and not `toString()` round-trips. An options-carrying empty serializes and round-trips on both surfaces: `[color=red]|` for an empty group, `[color=red]` for an empty glyph. Either way, serialized spacing matches rendered spacing.
 
 ### What does NOT throw: `define()` and content errors
 
