@@ -158,7 +158,9 @@ builder.addGroup('B431');  // one call per word
 builder.addGroup('B291');
 ```
 
-The character-level methods (`addGlyph`, `insertGlyph`, `replaceGlyph`, `replace` on a glyph handle) reject word-level content of every kind: multi-character codes, defined word names, word options (`[color=red]|B313`), and word indicator lists (`B291;;B81`). The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, or use `addGroup()` for word content (the word-options and indicator-list errors say so directly).
+The character-level methods (`addGlyph`, `insertGlyph`, `replaceGlyph`, `replace` on a glyph handle) reject content that belongs above the character: multi-character codes, defined word names, word options (`[color=red]|B313`), word indicator lists (`B291;;B81`), and document options (`[color=red]||B313`). The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, set document options on the builder input, or use `addGroup()` for word content (each error names its own alternative).
+
+The part-level methods (`addPart`, `insertPart`, `replacePart`, `replace` on a part handle) go further: a part references a single shape, so alongside multi-part codes they reject every artifact from above the part, a head marker (`^`), a word indicator list (`;;`), word options, and document options. Passing a whole word to `addPart` is the lone exception, kept as a failed part with a `WORD_AS_PART` warning rather than thrown.
 
 To build from a defined word name and fuse it into a neighboring word, go through the group level:
 

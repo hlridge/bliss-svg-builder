@@ -419,7 +419,7 @@ builder.addGroup('');                   // an empty word slot, renders nothing
 builder.addGroup('', { color: 'red' }); // empty slot with options, serializes as '[color=red]|'
 ```
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group or carries document options (`[opts]||`).
 
 ### `addGlyph(code?, opts?)`
 
@@ -433,7 +433,7 @@ builder.addGlyph('B1103');
 
 The code must be exactly one character. An omitted or empty `code` appends an [empty glyph](#empty-slots-are-deliberate). On an empty builder the code is validated first and only then wrapped in a new group, so a rejected code leaves the builder untouched, and `opts` land on the glyph itself.
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character: multi-character codes and defined word names throw, as do word options (`[color=red]|B313`), a word indicator list (`B291;;B81`), and codes that fail to parse. Use the group methods for word content (see [One unit per mutation call](#one-unit-per-mutation-call)).
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character: multi-character codes and defined word names throw, as do word options (`[color=red]|B313`), a word indicator list (`B291;;B81`), document options (`[color=red]||B313`), and codes that fail to parse. Use the group methods for word content (see [One unit per mutation call](#one-unit-per-mutation-call)).
 
 ### `addPart(code, opts?)`
 
@@ -447,7 +447,7 @@ builder.addPart('B81');
 
 The code must be exactly one part (one call per part). If the last group has no glyphs, the part is wrapped in a new glyph; on an empty builder the group is created too, with `opts` landing on the part itself. A part references a shape, so `code` is required: to reserve an empty slot, use `addGlyph('')`.
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty or parses to more than one part. A word code (`B313/B1103`) does not throw: it is kept as a failed part with a `WORD_AS_PART` warning, exactly like the DSL.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty, parses to more than one part, or carries an artifact from above the part (a head marker `^`, a word indicator list `;;`, word options `[opts]|`, or document options `[opts]||`). A word code (`B313/B1103`) does not throw: it is kept as a failed part with a `WORD_AS_PART` warning, exactly like the DSL.
 
 ### `insertGroup(index, code?, opts?)`
 
@@ -461,7 +461,7 @@ builder.insertGroup(1, 'B291');
 
 An omitted or empty `code` inserts an [empty group](#empty-slots-are-deliberate).
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group or carries document options (`[opts]||`).
 
 ### `removeGroup(index)`
 
@@ -481,7 +481,7 @@ builder.replaceGroup(0, 'B431', { color: 'red' });
 
 An omitted or empty `code` deliberately clears the slot: the target group is swapped for an [empty group](#empty-slots-are-deliberate), discarding its content. Out-of-range indices remain a silent no-op (checked before the code is parsed).
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group or carries document options (`[opts]||`).
 
 ### `.merge(other)`
 
@@ -557,7 +557,7 @@ builder.addElement('B431');
 
 An omitted or empty `code` appends an [empty group](#empty-slots-are-deliberate) (here without the auto-space `addGroup` would add).
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group or carries document options (`[opts]||`).
 
 #### `insertElement(index, code?, opts?)`
 
@@ -576,7 +576,7 @@ builder.insertElement(1, 'SP');
 
 An omitted or empty `code` inserts an [empty group](#empty-slots-are-deliberate).
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group or carries document options (`[opts]||`).
 
 #### `removeElement(index)`
 
@@ -599,7 +599,7 @@ builder.replaceElement(1, 'QSP'); // swap TSP for QSP
 
 An omitted or empty `code` deliberately clears the slot: the target is swapped for an [empty group](#empty-slots-are-deliberate). Out-of-range indices remain a silent no-op (checked before the code is parsed).
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to more than one group or carries document options (`[opts]||`).
 
 ## ElementHandle
 
@@ -870,7 +870,7 @@ builder.group(0).addGlyph('B1103');
 
 The code must be exactly one character; an omitted or empty `code` appends an [empty glyph](#empty-slots-are-deliberate).
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character (multi-character codes, defined word names, word options `[opts]|`, a word indicator list `;;`, or a code that fails to parse).
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` parses to anything but exactly one character (multi-character codes, defined word names, word options `[opts]|`, a word indicator list `;;`, document options `[opts]||`, or a code that fails to parse).
 
 #### `.insertGlyph(index, code?, opts?)`
 
@@ -893,7 +893,7 @@ builder.group(0).addPart('B81'); // appends to last glyph in group
 
 The code must be exactly one part. A part references a shape, so `code` is required: to reserve an empty slot, use `addGlyph('')`.
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty or parses to more than one part. A word code is kept as a failed part with a `WORD_AS_PART` warning instead of throwing.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty, parses to more than one part, or carries an artifact from above the part (`^`, `;;`, `[opts]|`, `[opts]||`; see [`addPart`](#addpart-code-opts)). A word code is kept as a failed part with a `WORD_AS_PART` warning instead of throwing.
 
 #### `.insertPart(index, code, opts?)`
 
@@ -1440,15 +1440,18 @@ builder.addGroup('B431//B291');
 builder.addGroup('B431').addGroup('B291'); // one call per word
 ```
 
-The character-level methods also reject word-level content of every kind: multi-character codes, defined word names, word options, and word indicator lists:
+The character-level methods also reject content that belongs above the character: multi-character codes, defined word names, word options, word indicator lists, and document-level options:
 
 ```js
-builder.addGlyph('B313/B1103');       // Error: produced 2 glyphs
-builder.addGlyph('[color=red]|B313'); // Error: carries word-level options
-builder.addGlyph('B291;;B81');        // Error: carries a word-level indicator list
+builder.addGlyph('B313/B1103');        // Error: produced 2 glyphs
+builder.addGlyph('[color=red]|B313');  // Error: carries word-level options
+builder.addGlyph('B291;;B81');         // Error: carries a word-level indicator list
+builder.addGlyph('[color=red]||B313'); // Error: carries document-level options
 ```
 
-The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, or use `addGroup()` for word content (the word-options and indicator-list errors say so directly).
+The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, set document options on the builder input, or use `addGroup()` for word content (each error names its own alternative).
+
+The part-level methods (`addPart`, `insertPart`, `replacePart`, `replace()` on a part handle) are stricter still: a part references a single shape, so besides multi-part codes they reject every artifact from above the part, including a head marker (`^`), a word indicator list (`;;`), word options, and document options. A whole word passed to `addPart` is the one exception: it is kept as a failed part with a `WORD_AS_PART` warning (visible, not silently dropped) rather than throwing.
 
 Defined word names count as words. To fuse one into an existing word, go through the group level:
 
