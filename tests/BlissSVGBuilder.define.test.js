@@ -15,8 +15,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   char resolves to 'externalGlyph'.
  * - Validation: unknown type, undetectable input (no type, no getPath, no
  *   codeString), missing shape dimensions, missing externalGlyph char,
- *   empty codeString, empty code key, null input, duplicate codes
- *   (skipped without overwrite, replaced with overwrite: true).
+ *   empty or whitespace-only codeString, empty or whitespace-only code
+ *   key, null input, duplicate codes (skipped without overwrite, replaced
+ *   with overwrite: true).
  * - Content guards: a glyph definition cannot bake in an indicator part (D-S1a);
  *   a definition cannot use a composed unflagged alias as a ; part (part-merge
  *   operand rule) - a word-member via / or a flagged glyph part is fine; no
@@ -39,6 +40,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   regression suite.
  * - defaultOptions' downstream interaction with the parser and renderer;
  *   see `BlissSVGBuilder.defaultOptions.test.js`.
+ * - A whitespace-only externalGlyph `char` is NOT rejected: an external glyph's
+ *   visual is its getPath, so a blank char is a benign label, not empty content.
  */
 describe('BlissSVGBuilder.define', () => {
 
@@ -516,6 +519,37 @@ describe('BlissSVGBuilder.define', () => {
     it('reports an error for an empty code key', () => {
       const result = BlissSVGBuilder.define({ '': { codeString: 'H' } });
       expect(result.errors).toHaveLength(1);
+    });
+  });
+
+  describe('when called with a whitespace-only key or value', () => {
+    it('reports an error for a whitespace-only code key', () => {
+      trackCode('   ');
+      const result = BlissSVGBuilder.define({ '   ': { codeString: 'H' } });
+      expect(result.errors).toHaveLength(1);
+      expect(result.defined).toHaveLength(0);
+      expect(BlissSVGBuilder.isDefined('   ')).toBe(false);
+    });
+
+    it('reports an error for a whitespace-only bare codeString', () => {
+      const code = trackCode('QZWSBARE');
+      const result = BlissSVGBuilder.define({ [code]: { codeString: '   ' } });
+      expect(result.errors).toHaveLength(1);
+      expect(BlissSVGBuilder.isDefined(code)).toBe(false);
+    });
+
+    it('reports an error for a whitespace-only glyph codeString', () => {
+      const code = trackCode('QZWSGLYPH');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: '   ' } });
+      expect(result.errors).toHaveLength(1);
+      expect(BlissSVGBuilder.isDefined(code)).toBe(false);
+    });
+
+    it('reports an error for a whitespace-only shape codeString', () => {
+      const code = trackCode('QZWSSHAPE');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: '   ' } });
+      expect(result.errors).toHaveLength(1);
+      expect(BlissSVGBuilder.isDefined(code)).toBe(false);
     });
   });
 

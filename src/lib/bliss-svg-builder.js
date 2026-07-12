@@ -2002,8 +2002,8 @@ class BlissSVGBuilder {
 
   // Validates a definition code string
   static #validateCode(code) {
-    if (typeof code !== 'string' || code.length === 0) {
-      throw new Error('Definition code must be a non-empty string.');
+    if (typeof code !== 'string' || code.trim().length === 0) {
+      throw new Error('Definition code must be a non-empty, non-whitespace string.');
     }
   }
 
@@ -2114,10 +2114,10 @@ class BlissSVGBuilder {
     BlissSVGBuilder.#validateCode(code);
 
     const hasGetPath = typeof definition?.getPath === 'function';
-    const hasCodeString = typeof definition?.codeString === 'string' && definition.codeString.length > 0;
+    const hasCodeString = typeof definition?.codeString === 'string' && definition.codeString.trim().length > 0;
 
     if (!hasGetPath && !hasCodeString) {
-      throw new Error(`define("${code}"): shape requires either "getPath" (function) or "codeString" (non-empty string).`);
+      throw new Error(`define("${code}"): shape requires either "getPath" (function) or "codeString" (non-empty, non-whitespace string).`);
     }
 
     if (hasGetPath) {
@@ -2213,8 +2213,8 @@ class BlissSVGBuilder {
   static #defineGlyph(code, definition, options = {}) {
     BlissSVGBuilder.#validateCode(code);
 
-    if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
-      throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
+    if (typeof definition?.codeString !== 'string' || definition.codeString.trim().length === 0) {
+      throw new Error(`define("${code}"): "codeString" must be a non-empty, non-whitespace string.`);
     }
 
     // A glyph is a single character; `/` and `//` are word separators, so a
@@ -2385,8 +2385,8 @@ class BlissSVGBuilder {
   static #defineBare(code, definition, options = {}) {
     BlissSVGBuilder.#validateCode(code);
 
-    if (typeof definition?.codeString !== 'string' || definition.codeString.length === 0) {
-      throw new Error(`define("${code}"): "codeString" must be a non-empty string.`);
+    if (typeof definition?.codeString !== 'string' || definition.codeString.trim().length === 0) {
+      throw new Error(`define("${code}"): "codeString" must be a non-empty, non-whitespace string.`);
     }
 
     // `;;` is a word-level indicator applied at the USE SITE (WORD;;INDICATOR),
