@@ -1449,7 +1449,7 @@ builder.addGlyph('B291;;B81');         // Error: carries a word-level indicator 
 builder.addGlyph('[color=red]||B313'); // Error: carries document-level options
 ```
 
-The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, set document options on the builder input, or use `addGroup()` for word content (each error names its own alternative).
+The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, set document options on the builder input, or use `addGroup()` for word content (the artifact errors each name their own alternative; the multi-character and word-name errors report only the count).
 
 The part-level methods (`addPart`, `insertPart`, `replacePart`, `replace()` on a part handle) are stricter still: a part references a single shape, so besides multi-part codes they reject every artifact from above the part, including a head marker (`^`), a word indicator list (`;;`), word options, and document options. A whole word passed to `addPart` is the one exception: it is kept as a failed part with a `WORD_AS_PART` warning (visible, not silently dropped) rather than throwing.
 

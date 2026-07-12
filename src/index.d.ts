@@ -427,7 +427,8 @@ export declare class ElementHandle {
    * on a group handle, `{ stripSemantic: true }` is itself valid overlay
    * content, so an all-invalid apply WITH it still stores the `;;!` strip
    * overlay (DSL parity with `WORD;;!ZZ9` — the bad code drops, the `!`
-   * stays). A non-string code throws a `TypeError`.
+   * stays). A non-string code (other than `null`, accepted as the deliberate
+   * empty set) throws a `TypeError`.
    *
    * The per-surface `flatten` asymmetry is deliberate: it applies only to the
    * group/word-level overlay, the only surface with a portable `;;` form to
@@ -439,7 +440,7 @@ export declare class ElementHandle {
    * (a space glyph, or an invalid part pattern) adds an
    * `NOOP_INDICATOR_MUTATION` warning to `warnings` instead of silently doing
    * nothing.
-   * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `code` is provided, is not a string, and is not `null`.
    */
   applyIndicators(code?: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
