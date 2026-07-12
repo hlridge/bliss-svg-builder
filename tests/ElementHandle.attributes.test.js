@@ -24,6 +24,16 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Collision precedence: when the same attribute name is set via both
  *   `setAttributes` and `setOptions`, the options value wins (test 10 — pins
  *   the merge order in `#separateAnchorAndGroupOptions`).
+ * - Object-input constructor with raw `attributes` on a part: `#processAttributes`
+ *   escapes values exactly once on the rebuild clone, independent of
+ *   `setAttributes` (test 11 — pins the escape point for the constructor path;
+ *   catches the "escape moved to setAttributes, #processAttributes deleted"
+ *   mutant that test 9 misses because it re-applies the same raw value).
+ * - Object-input constructor with an unsafe attribute name (`on*`): the
+ *   render-path `isSafeAttributeName` check in `#separateAnchorAndGroupOptions`
+ *   rejects it (test 12 — pins the defense-in-depth check that `setAttributes`
+ *   alone cannot exercise, since `setAttributes` rejects unsafe names before
+ *   they reach the node).
  *
  * Does NOT cover:
  * - General `setOptions`/`removeOptions` behavior, see
@@ -164,6 +174,57 @@ describe('ElementHandle render-only attributes', () => {
       // pins: options are semantic and win on collision; attributes are additive
       expect(svg).toContain('stroke="blue"');
       expect(svg).not.toContain('stroke="red"');
+    });
+  });
+
+  describe('when the constructor receives object input with raw attributes', () => {
+    it('escapes attribute values exactly once via #processAttributes', () => {
+      // Object input bypasses setAttributes — the constructor does
+      // structuredClone(raw) then #processAllOptions, which calls
+      // #processAttributes on the rebuild clone. If #processAttributes were
+      // deleted (the "escape moved to setAttributes" mutant), these raw
+      // values would render UNESCAPED. Test 9 misses this because it
+      // re-applies the same raw value via setAttributes, masking the gap.
+      const b = new BlissSVGBuilder({
+        groups: [{
+          glyphs: [{
+            parts: [{
+              codeName: 'B313',
+              attributes: { 'data-x': 'a&b' },
+            }],
+          }],
+        }],
+      });
+
+      // pins: #processAttributes is the escape point for the constructor path
+      expect(b.svgCode).toContain('data-x="a&amp;b"');
+      expect(b.svgCode).not.toContain('a&amp;amp;b');
+      // pins: attributes are still render-only — toString is clean
+      expect(b.toString()).not.toContain('data-x');
+    });
+  });
+
+  describe('when the constructor receives object input with an unsafe attribute name', () => {
+    it('rejects the unsafe name via the render-path isSafeAttributeName check', () => {
+      // setAttributes rejects unsafe names before they reach the node, so the
+      // render-path `isSafeAttributeName` check in #separateAnchorAndGroupOptions
+      // is a no-op for the public API. Object input with hand-authored
+      // attributes is the only path that exercises this defense-in-depth.
+      const b = new BlissSVGBuilder({
+        groups: [{
+          glyphs: [{
+            parts: [{
+              codeName: 'B313',
+              attributes: { 'on-click': 'x', 'data-safe': 'ok' },
+            }],
+          }],
+        }],
+      });
+
+      // pins: on* event handler names never reach the SVG
+      expect(b.svgCode).not.toContain('on-click');
+      // pins: safe attribute names still render
+      expect(b.svgCode).toContain('data-safe="ok"');
     });
   });
 });
