@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
+import { camelToKebab, isSafeAttributeName, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
@@ -1428,6 +1428,59 @@ export class ElementHandle {
     // Clean up empty options object
     if (Object.keys(node.options).length === 0) {
       delete node.options;
+    }
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  // --- Mutation: render-only attributes ---
+
+  // Stores RAW attribute values on node.attributes (no escaping here — escaping
+  // happens once in #processAttributes on the rebuild clone, mirroring how
+  // setOptions stores raw via #applyDefaultsOverrides and #processOptions
+  // escapes on the clone). See bliss-svg-builder.js #processAllOptions.
+  setAttributes(attrs) {
+    this.#assertReachable();
+    // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
+    const node = this.#nodeRef;
+    if (!node) return this;
+    const validated = {};
+    for (const [key, value] of Object.entries(attrs)) {
+      if (!isSafeAttributeName(key)) {
+        this.#ctx.addMutationWarning({
+          code: WARNING_CODES.UNSAFE_ATTRIBUTE,
+          message: `setAttributes() rejected unsafe attribute name "${key}" (event handlers and invalid characters are not allowed).`,
+          source: key,
+        });
+        continue;
+      }
+      validated[key] = value;
+    }
+    if (Object.keys(validated).length > 0) {
+      node.attributes = { ...(node.attributes ?? {}), ...validated };
+    }
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  // Attributes are stored VERBATIM (no kebab-conversion, unlike options), so
+  // a single delete per key suffices — do NOT mirror the kebab+camel
+  // double-delete in removeOptions.
+  removeAttributes(...keys) {
+    this.#assertReachable();
+    // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
+    const node = this.#nodeRef;
+    if (!node?.attributes) return this;
+    for (const key of keys) {
+      delete node.attributes[key];
+    }
+    // Clean up empty attributes object
+    if (Object.keys(node.attributes).length === 0) {
+      delete node.attributes;
     }
     this.#ctx.rebuild();
     this.#syncGeneration();

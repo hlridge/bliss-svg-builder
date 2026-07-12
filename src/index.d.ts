@@ -494,6 +494,17 @@ export declare class ElementHandle {
 
   /** Removes specific option keys from this element. */
   removeOptions(...keys: string[]): this;
+
+  /**
+   * Set render-only DOM attributes on this element. The attributes render to
+   * the SVG output but are NOT included in `toString()` or `toJSON()` — they
+   * are transient and re-applied by the consumer on each render. Unsafe names
+   * (`on*` event handlers, invalid characters) are dropped with a warning.
+   */
+  setAttributes(attrs: Record<string, string>): this;
+
+  /** Removes specific render-only attribute keys from this element. */
+  removeAttributes(...keys: string[]): this;
 }
 
 // --- Definition types ---
@@ -670,6 +681,7 @@ export type WarningCode =
   | 'DROPPED_WORD_INDICATOR'
   | 'UNSUPPORTED_TEXT_BLOCKS'
   | 'NOOP_INDICATOR_MUTATION'
+  | 'UNSAFE_ATTRIBUTE'
   | 'COMPOSITE_AS_PART'
   | 'WORD_AS_PART'
   | 'NON_INDICATOR_AS_WORD_INDICATOR'

@@ -256,6 +256,9 @@ export const WARNING_CODES = Object.freeze({
   UNSUPPORTED_TEXT_BLOCKS: 'UNSUPPORTED_TEXT_BLOCKS',
   // no-op mutation
   NOOP_INDICATOR_MUTATION: 'NOOP_INDICATOR_MUTATION',
+  // a render-only attribute name rejected by isSafeAttributeName (on* or
+  // invalid chars) — dropped from the attributes bag with a warning
+  UNSAFE_ATTRIBUTE: 'UNSAFE_ATTRIBUTE',
   // illegal operand in a ;-part slot (also used as an internal part.errorCode)
   COMPOSITE_AS_PART: 'COMPOSITE_AS_PART',
   WORD_AS_PART: 'WORD_AS_PART',
