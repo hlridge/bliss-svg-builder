@@ -378,6 +378,19 @@ class BlissSVGBuilder {
     return options;
   }
 
+  // Escapes render-only attribute string values ONCE, on the rebuild clone
+  // (the same object #processOptions escapes options on). Mirrors the L372-376
+  // pass-through: string values are escaped via escapeHtml, non-strings pass
+  // through. This is the SINGLE escape point — setAttributes stores raw, so
+  // repeated rebuilds never compound escapes (escapeHtml is not idempotent).
+  #processAttributes(rawAttributes = {}) {
+    const escaped = {};
+    for (const [key, value] of Object.entries(rawAttributes)) {
+      escaped[key] = typeof value === 'string' ? escapeHtml(value) : value;
+    }
+    return escaped;
+  }
+
   // Recursively process options at all levels (groups, glyphs, parts)
   #processAllOptions(obj, isTopLevel = false) {
     if (obj.options) {
@@ -387,6 +400,9 @@ class BlissSVGBuilder {
         delete obj.options.key;
       }
       obj.options = this.#processOptions(obj.options, isTopLevel);
+    }
+    if (obj.attributes) {
+      obj.attributes = this.#processAttributes(obj.attributes);
     }
     if (obj.groups) {
       for (const group of obj.groups) {
@@ -1790,6 +1806,9 @@ class BlissSVGBuilder {
     // Strip keys from all levels (keys are runtime identity, not composition data)
     delete obj.key;
     if (obj.options) delete obj.options.key;
+    // Strip render-only attributes from all levels (attributes render to SVG
+    // but are never serialized — the core invariant of the attributes bag).
+    delete obj.attributes;
 
     if (obj.groups) {
       // Strip keys from parts. Unless deep: true, also strip nested sub-parts
@@ -1798,6 +1817,7 @@ class BlissSVGBuilder {
       const stripParts = (parts) => {
         for (const part of parts) {
           delete part.key;
+          delete part.attributes;
           // Internal origin tag from the word-indicator merge (flatten path):
           // not composition data, never surfaced in serialized output.
           delete part._indicatorOrigin;
@@ -1823,6 +1843,7 @@ class BlissSVGBuilder {
 
       for (const group of obj.groups) {
         delete group.key;
+        delete group.attributes;
         if (group.options) delete group.options.key;
 
         // R14: flattenIndicators bakes the word-level overlay onto the head as
@@ -1855,6 +1876,7 @@ class BlissSVGBuilder {
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
             delete glyph.key;
+            delete glyph.attributes;
             if (glyph.options) delete glyph.options.key;
             if (glyph.parts) stripParts(glyph.parts);
 

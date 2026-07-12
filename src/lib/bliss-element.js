@@ -74,8 +74,8 @@ export class BlissElement {
    * @param {Object} options - The options containing anchor and group attributes
    * @returns {string} The wrapped content
    */
-  static #wrapWithAnchorAndGroup(content, options) {
-    const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(options);
+  static #wrapWithAnchorAndGroup(content, options, attributes) {
+    const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(options, attributes);
 
     // Content that starts with '<' is already wrapped in proper tags
     // Raw path data or fragments need wrapping
@@ -104,8 +104,8 @@ export class BlissElement {
     return content;
   }
 
-  static #separateAnchorAndGroupOptions(options) {
-    if (!options || typeof options !== 'object') {
+  static #separateAnchorAndGroupOptions(options, attributes) {
+    if ((!options || typeof options !== 'object') && !attributes) {
       return { anchorAttrs: '', groupAttrs: '', hasHref: false };
     }
 
@@ -138,8 +138,21 @@ export class BlissElement {
       return /^(https?:|mailto:|tel:|\/|#)/i.test(cleaned);
     };
 
+    // Render-only attributes are stamped FIRST so options win on collision
+    // (options are semantic; attributes are additive annotation). Values are
+    // already escaped by #processAttributes on the rebuild clone.
+    if (attributes) {
+      for (const [key, value] of Object.entries(attributes)) {
+        if (!isSafeAttributeName(key)) continue;
+        // vector-effect is non-inherited; capture it for relocation onto paths
+        if (key === 'vector-effect') { vectorEffect = value; continue; }
+        if (key === 'pointer-events') hasPointerEvents = true;
+        groupAttrs.set(key, value);
+      }
+    }
+
     // Values are already escaped by #processOptions at the input boundary
-    for (const [key, value] of Object.entries(options)) {
+    for (const [key, value] of Object.entries(options ?? {})) {
       if (INTERNAL_OPTIONS.has(key) || !isSafeAttributeName(key)) continue;
 
       if (anchorAttrNames.has(key)) {
@@ -567,7 +580,7 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
-        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.attributes);
       };
 
       if (this.#blissObj.errorCode && !this.#sharedOptions?.errorPlaceholder) {
@@ -735,7 +748,7 @@ export class BlissElement {
               ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
               : childContents.join('');
 
-            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.attributes);
           };
         }
       } else {
@@ -1317,7 +1330,7 @@ export class BlissElement {
         pathOptions
       );
 
-      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options);
+      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.attributes);
     };
   }
 
@@ -1401,7 +1414,7 @@ export class BlissElement {
         ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
         : childContents.join('');
 
-      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.attributes);
     };
   }
 }
