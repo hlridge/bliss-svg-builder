@@ -6,7 +6,7 @@ Any option that Bliss SVG Builder doesn't recognize as a built-in option is pass
 
 The builder maintains a set of known option keys (`color`, `stroke-width`, `margin`, `grid`, etc.). When you set an option that isn't in this set, it passes through to the SVG output as-is.
 
-At the **global level**, pass-through attributes are added to the `<g class="bliss-content">` wrapper. At the **element level**, they are added to a wrapping `<g>` element around that character.
+Where a pass-through attribute lands depends on the level you set it at. A **global** option is merged onto the `<g class="bliss-content">` wrapper; a **word**, **character**, or **part** option is placed on a `<g>` that wraps just that word, character, or part. Every one of these targets sits inside the SVG `viewBox`, never on the root `<svg>` element.
 
 ```
 [opacity=0.5]||B313
@@ -30,13 +30,31 @@ Bliss SVG Builder sets `stroke-linejoin` and `stroke-linecap` to `round` by defa
 
 ## Style Attribute
 
-The `style` attribute passes through like any other, allowing inline CSS on the SVG element:
+The `style` attribute passes through like any other, so you can apply inline CSS to the wrapper element for whichever level you target (global, word, character, or part):
 
 ```
 [style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313
 ```
 
 <Demo code="[style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313" title="CSS filter via style pass-through" />
+
+### Using CSS `filter`
+
+The `filter` property is worth a note because, like every pass-through, it applies to a `<g>` inside the SVG coordinate system rather than to the root `<svg>`. A filter therefore behaves as part of the artwork, which is intentional and matches how SVG works: the effect stays locked to the symbol and scales with it.
+
+- **Filter lengths are in grid units, not screen pixels.** Inside the SVG a CSS length is read in the symbol's own coordinate system, the same units as the strokes, so `drop-shadow(2px 2px 2px ...)` really means `drop-shadow(2 2 2 ...)` in grid units. At this scale that is a lot: a stroke is only 0.5 units wide, and most symbols span just 4 to 8 units (some as little as 2), so a 2-unit offset and blur is several times the line width and about the size of a small symbol, nothing like the 2 pixels the `px` suffix suggests. Grid units are also what let the shadow scale with the symbol rather than stay a fixed screen size, so its size in pixels depends on how large the SVG is displayed. Think in grid units, where even `1px` (one grid unit) is already a prominent shadow.
+- **Multiple `drop-shadow()`s chain,** exactly as they do in any CSS filter list: each one is applied to the result of the previous.
+- **A tight viewBox clips an outward shadow.** Add margin to give it room.
+
+Browsers render CSS filters on SVG groups inconsistently. This is a browser limitation, not specific to Bliss SVG Builder:
+
+- **Firefox** renders them faithfully.
+- **Chromium and Edge** drop offsets and blur radii below about 1 grid unit, so keep filter lengths at 1 grid unit or more (go a little above 1 for effects that must stay visible in these engines).
+- **Safari (WebKit)** does not apply a CSS `filter` to an SVG group at all, at any size.
+
+Because of that, a CSS `filter` set this way is not dependable in every browser today. For an effect that must look identical everywhere, prefer the pass-through properties that render consistently: `stroke-width`, `stroke-dasharray`, `transform`, `fill`, `opacity`, and `mix-blend-mode`.
+
+Reliable cross-browser filters are planned through a native SVG `<filter>`; follow [#34](https://github.com/hlridge/bliss-svg-builder/issues/34) for progress.
 
 ## ID Attribute
 
@@ -95,7 +113,7 @@ Pass-through attributes are sanitized:
 
 ## SVG Structure
 
-The SVG root element is purely structural (`xmlns`, `width`, `height`, `viewBox`) and includes a `data-generator` attribute identifying the library version. All styling and pass-through attributes live on the `<g class="bliss-content">` wrapper inside it:
+The SVG root element is purely structural (`xmlns`, `width`, `height`, `viewBox`) and includes a `data-generator` attribute identifying the library version. Global styling and pass-through attributes live on the `<g class="bliss-content">` wrapper inside it; word-, character-, and part-level attributes go on nested `<g>` elements within it:
 
 ```html
 <svg xmlns="..." data-generator="bliss-svg-builder/..." width="..." height="..." viewBox="...">
@@ -115,4 +133,4 @@ The SVG root element is purely structural (`xmlns`, `width`, `height`, `viewBox`
 | `transform` | `rotate(15)` | SVG transform |
 | `class` | `my-class` | CSS class |
 | `id` | `my-symbol` | Element ID |
-| `style` | `filter:blur(1px)` | Inline CSS |
+| `style` | `filter:blur(1px)` | Inline CSS (`filter` scales with the symbol and is not applied by Safari, see [Style Attribute](#style-attribute)) |
