@@ -15,8 +15,9 @@
  * - validation ordering: TypeError guard before index checks, index no-op
  *   checks before content validation (replace family)
  * - options-carrying empty group serializing as the [opts]| token (round-trip)
- * - accepted args keep surfacing their kept-node warnings (UNKNOWN_CODE);
- *   rejected args leak no warnings
+ * - accepted args forward their parse-time warnings (MISPLACED_GLOBAL_OPTION,
+ *   MISPLACED_HEAD_MARKER, NON_INDICATOR_AS_WORD_INDICATOR) and keep surfacing
+ *   their kept-node warnings (UNKNOWN_CODE); rejected args leak no warnings
  * - '//' parses to a single space group and stays accepted
  * - document-level options ("[opts]||CODE") throw on every method; a bare
  *   empty "||" prefix stays plain accepted content
@@ -259,10 +260,11 @@ describe('BlissSVGBuilder group mutation args', () => {
     });
   });
 
-  describe('when an accepted code carries a warning', () => {
+  describe('when an accepted code carries a kept-node warning', () => {
     it('keeps surfacing the unknown-code warning on builder.warnings', () => {
-      // the kept node carries the unknown code, so its warning survives the
-      // mutation; parse-time-only warnings are a separate, pre-existing gap
+      // the kept node carries the unknown code, so its warning re-derives at
+      // every rebuild; parse-time-only warnings forward via a separate path
+      // (see 'when an accepted code carries a parse-time warning')
       const b = new BlissSVGBuilder('B208');
       b.addGroup('B291;ZZ9');
       expect(b.warnings.some(w => w.code === 'UNKNOWN_CODE')).toBe(true);
@@ -274,6 +276,43 @@ describe('BlissSVGBuilder group mutation args', () => {
       const b = new BlissSVGBuilder('B208');
       expect(() => b.addGroup('B291;ZZ9//B208')).toThrow('produced 3 groups');
       expect(b.warnings.some(w => w.code === 'UNKNOWN_CODE')).toBe(false);
+    });
+  });
+
+  describe('when an accepted code carries a parse-time warning', () => {
+    // parse-time warnings (a misplaced option, head marker, or word indicator)
+    // live on no node, so unlike UNKNOWN_CODE they never re-derive at rebuild;
+    // every group method forwards them through the persistent mutation channel,
+    // matching the handle family's #forwardParseWarnings
+    describe.each(METHODS.map((m) => [m.name, m]))('%s', (name, { invoke }) => {
+      it.each([
+        ['[margin=2]B291', 'MISPLACED_GLOBAL_OPTION'],
+        ['B291^;B81', 'MISPLACED_HEAD_MARKER'],
+        ['B291;;B291', 'NON_INDICATOR_AS_WORD_INDICATOR'],
+      ])('forwards the parse warning of %s as %s', (code, expected) => {
+        const b = new BlissSVGBuilder('B208');
+        invoke(b, code);
+        expect(b.warnings.some((w) => w.code === expected)).toBe(true);
+      });
+    });
+
+    it('does not forward the parse warning from a rejected multi-group arg', () => {
+      // accept-only: the throw for the extra groups precedes the forward, so
+      // the misplaced-option warning dies with the rejected arg
+      const b = new BlissSVGBuilder('B208');
+      expect(() => b.addGroup('[margin=2]B291//B208')).toThrow('produced 3 groups');
+      expect(b.warnings).toHaveLength(0);
+    });
+
+    it('keeps the forwarded warning after a later unrelated rebuild, without duplicating', () => {
+      // the mutation channel is append-only: a later rebuild resets the parse
+      // warnings but the forwarded one must persist exactly once, not vanish
+      // (a per-rebuild channel would) or double (re-deriving at rebuild would)
+      const b = new BlissSVGBuilder('B208');
+      b.addGroup('[margin=2]B291');
+      b.addGroup('B92');
+      const misplaced = b.warnings.filter((w) => w.code === 'MISPLACED_GLOBAL_OPTION');
+      expect(misplaced).toHaveLength(1);
     });
   });
 

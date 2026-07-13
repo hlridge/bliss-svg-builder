@@ -1003,7 +1003,7 @@ class BlissSVGBuilder {
    */
   insertGroup(index, code, opts) {
     assertCodeArg('insertGroup', code);
-    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     const indices = this.#getNonSpaceGroupIndices();
 
@@ -1112,7 +1112,7 @@ class BlissSVGBuilder {
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= indices.length) return this;
-    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    const newGroup = this.#parseGroupWithOpts(code, opts);
     const rawIndex = indices[index];
     this.#rawBlissObj.groups[rawIndex] = newGroup;
     this.#rebuild();
@@ -1224,12 +1224,20 @@ class BlissSVGBuilder {
   /**
    * Parses a code string into exactly one group and applies option layers.
    * An omitted, empty, or whitespace-only code yields an empty group.
+   *
+   * An accepted arg's parse-time warnings (a misplaced option, head marker, or
+   * word indicator) forward to the persistent mutation channel: they live on
+   * no node, so unlike a kept UNKNOWN_CODE they never re-derive at rebuild and
+   * would otherwise vanish. Forwarded last (after the opts resolve), so a
+   * rejected code or bad opts leaks nothing, matching the handle family's
+   * #forwardParseWarnings accept-only rule.
    * @param {string} [code]
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {object} parsed group
    */
-  static #parseGroupWithOpts(code, opts) {
+  #parseGroupWithOpts(code, opts) {
     let newGroup;
+    let parseWarnings;
     if (code === undefined || code.trim() === '') {
       // "Add a group with nothing in it" is meaningful: '' is the DSL
       // counterpart of the already-valid {glyphs: []} object state.
@@ -1248,6 +1256,7 @@ class BlissSVGBuilder {
         throw new Error(`Code "${code}" carries document-level options ("[opts]||"). Set document options on the builder input, or style the group itself ("[opts]|" in the code or the opts parameter)`);
       }
       newGroup = parsed.groups[0];
+      parseWarnings = parsed._parseWarnings;
     }
     if (opts) {
       const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
@@ -1257,6 +1266,7 @@ class BlissSVGBuilder {
         newGroup.options = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
       }
     }
+    if (parseWarnings?.length) this.#mutationWarnings.push(...parseWarnings);
     return newGroup;
   }
 
@@ -1270,7 +1280,7 @@ class BlissSVGBuilder {
    */
   addElement(code, opts) {
     assertCodeArg('addElement', code);
-    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    const newGroup = this.#parseGroupWithOpts(code, opts);
     this.#rawBlissObj.groups.push(newGroup);
     this.#rebuild();
     return this;
@@ -1285,7 +1295,7 @@ class BlissSVGBuilder {
    */
   insertElement(index, code, opts) {
     assertCodeArg('insertElement', code);
-    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
     if (index < 0) index = 0;
@@ -1324,7 +1334,7 @@ class BlissSVGBuilder {
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= groups.length) return this;
-    const newGroup = BlissSVGBuilder.#parseGroupWithOpts(code, opts);
+    const newGroup = this.#parseGroupWithOpts(code, opts);
     groups[index] = newGroup;
     this.#rebuild();
     return this;
