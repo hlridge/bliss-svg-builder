@@ -304,6 +304,20 @@ describe('BlissSVGBuilder group mutation args', () => {
       expect(b.warnings).toHaveLength(0);
     });
 
+    it.each([
+      ['addGroup', (b) => b.addGroup('[margin=2]B291', 'red')],
+      ['replaceGroup', (b) => b.replaceGroup(0, '[margin=2]B291', 'red')],
+      ['addElement', (b) => b.addElement('[margin=2]B291', 'red')],
+    ])('leaks nothing when %s parses the code but the opts arg throws', (name, act) => {
+      // the forward sits AFTER the opts resolve: a non-object opts throws in
+      // #resolveOpts, so the whole call rejects and the captured parse warning
+      // dies with it. Guards the accept-only placement against a forward moved
+      // ahead of the opts block (the three shapes cover delegate/index/raw)
+      const b = new BlissSVGBuilder('B208');
+      expect(() => act(b)).toThrow();
+      expect(b.warnings).toHaveLength(0);
+    });
+
     it('keeps the forwarded warning after a later unrelated rebuild, without duplicating', () => {
       // the mutation channel is append-only: a later rebuild resets the parse
       // warnings but the forwarded one must persist exactly once, not vanish
