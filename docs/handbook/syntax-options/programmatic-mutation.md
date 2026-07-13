@@ -173,7 +173,7 @@ text.addGroup('MYWORD');       // the word becomes its own group
 text.group(0).mergeWithNext(); // then fuse it into the previous word
 ```
 
-A non-string code throws a `TypeError` naming the method. A rejected call leaves the builder unchanged. Out-of-range indices are still silently ignored, and calling a method on the wrong handle level is still a no-op; see the [API reference](/reference/api-documentation#one-unit-per-mutation-call) for the full contract.
+A non-string code throws a `TypeError` naming the method, and so does a non-object `opts` (a string, number, boolean, or array; `null`/`undefined` mean "no options"). A rejected call leaves the builder unchanged. Out-of-range indices are still silently ignored, and calling a method on the wrong handle level is still a no-op; see the [API reference](/reference/api-documentation#one-unit-per-mutation-call) for the full contract.
 
 ## Empty Slots
 

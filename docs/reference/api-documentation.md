@@ -1037,6 +1037,8 @@ builder.glyph(0).setOptions({
 });
 ```
 
+A non-object `opts` throws a `TypeError`; an empty `{}` is a no-op (see [error handling](#error-handling)).
+
 #### `.removeOptions(...keys)`
 
 Removes specific option keys:
@@ -1464,7 +1466,7 @@ text.addGroup('MYWORD');          // the word becomes its own group
 text.group(0).mergeWithNext();    // then fuse it into the previous word
 ```
 
-A non-string `code` (a number, `null`, an object) is a malformed call and throws a `TypeError` naming the method. On handles, the silent no-ops for wrong-level calls and for words that failed to parse win over the argument checks (those calls never read the argument); the builder methods check the argument first. Rejected calls leave the builder unchanged, and no warnings from the rejected parse leak into `warnings`.
+A non-string `code` (a number, `null`, an object) is a malformed call and throws a `TypeError` naming the method. A non-object `opts` (a string, number, boolean, or array) does the same, on every method that takes an options argument (including `setOptions`); `null` and `undefined` mean "no options" and are accepted. On handles, the silent no-ops for wrong-level calls and for words that failed to parse win over the argument checks (those calls never read the argument); the builder methods check the argument first. Rejected calls leave the builder unchanged, and no warnings from the rejected parse leak into `warnings` (the option check runs before the code is parsed).
 
 ### Empty slots are deliberate
 

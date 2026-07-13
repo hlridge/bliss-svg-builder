@@ -15,6 +15,18 @@ export function assertCodeArg(method, code) {
   }
 }
 
+// Shared arg guard for the mutation families: an opts arg is a plain options
+// object or omitted. Nullish (undefined/null) means "no options"; a string,
+// number, boolean, or array is a designed error. Thrown beside assertCodeArg,
+// before any parse or warning-forward, so a rejected opts never leaks the
+// code's parse-time warnings and never leaves the builder half-mutated.
+export function assertOptsArg(method, opts) {
+  if (opts == null) return;
+  if (typeof opts !== 'object' || Array.isArray(opts)) {
+    throw new TypeError(`${method}() options must be an object`);
+  }
+}
+
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
  * Survives `#rebuild()` because it holds a direct reference to the raw node,
@@ -426,7 +438,10 @@ export class ElementHandle {
     if (!defaults && !overrides) return;
     const rawDefaults = defaults ? this.#ctx.toRaw(defaults) : {};
     const rawOverrides = overrides ? this.#ctx.toRaw(overrides) : {};
-    node.options = { ...rawDefaults, ...(node.options ?? {}), ...rawOverrides };
+    const merged = { ...rawDefaults, ...(node.options ?? {}), ...rawOverrides };
+    // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
+    // options:{} onto the node, which would be toJSON noise.
+    if (Object.keys(merged).length > 0) node.options = merged;
   }
 
   // --- Navigation ---
@@ -519,6 +534,7 @@ export class ElementHandle {
     // the argument guard below, per the validation ordering rule.
     if (group.errorCode) return this;
     assertCodeArg('addGlyph', code);
+    assertOptsArg('addGlyph', opts);
     return this.insertGlyph(group.glyphs?.length ?? 0, code, opts);
   }
 
@@ -530,6 +546,7 @@ export class ElementHandle {
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (group.errorCode) return this;
     assertCodeArg('insertGlyph', code);
+    assertOptsArg('insertGlyph', opts);
     const newGlyph = this.#parseGlyphArg(code);
     this.#applyDefaultsOverrides(newGlyph, opts);
     if (!group.glyphs) group.glyphs = [];
@@ -555,6 +572,7 @@ export class ElementHandle {
   // arg leaves the group untouched.
   #fillEmptyGroupWithPart(group, method, code, opts) {
     assertCodeArg(method, code);
+    assertOptsArg(method, opts);
     const newPart = this.#parsePartArg(code);
     this.#applyDefaultsOverrides(newPart, opts);
     group.glyphs = [{ parts: [newPart] }];
@@ -588,6 +606,7 @@ export class ElementHandle {
     // the validation ordering rule.
     if (this.#inFailFlaggedGroup()) return this;
     assertCodeArg('addPart', code);
+    assertOptsArg('addPart', opts);
     return this.insertPart(glyph.parts?.length ?? 0, code, opts);
   }
 
@@ -616,6 +635,7 @@ export class ElementHandle {
     // for the group-handle delegation forms, which gate at level 1 already.
     if (this.#inFailFlaggedGroup()) return this;
     assertCodeArg('insertPart', code);
+    assertOptsArg('insertPart', opts);
     const newPart = this.#parsePartArg(code);
     this.#applyDefaultsOverrides(newPart, opts);
     if (!glyph.parts) glyph.parts = [];
@@ -803,6 +823,7 @@ export class ElementHandle {
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (group.errorCode) return this;
     assertCodeArg('replaceGlyph', code);
+    assertOptsArg('replaceGlyph', opts);
     if (!group.glyphs?.length) return this;
     if (index < 0) index = group.glyphs.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= group.glyphs.length) return this;
@@ -822,6 +843,7 @@ export class ElementHandle {
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (this.#inFailFlaggedGroup()) return this;
     assertCodeArg('replacePart', code);
+    assertOptsArg('replacePart', opts);
     if (!glyph.parts?.length) return this;
     if (index < 0) index = glyph.parts.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= glyph.parts.length) return this;
@@ -843,6 +865,7 @@ export class ElementHandle {
     if (this.#inFailFlaggedGroup()) return this;
     if (this.#level === 2) {
       assertCodeArg('replace', code);
+      assertOptsArg('replace', opts);
       const group = this.#parentRef;
       if (!group?.glyphs) return this;
       const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
@@ -858,6 +881,7 @@ export class ElementHandle {
 
     if (this.#level === 3) {
       assertCodeArg('replace', code);
+      assertOptsArg('replace', opts);
       const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return this;
       const partIndex = glyph.parts.indexOf(this.#nodeRef);
@@ -1408,6 +1432,7 @@ export class ElementHandle {
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
     if (!node) return this;
+    assertOptsArg('setOptions', opts);
     this.#applyDefaultsOverrides(node, opts);
     this.#ctx.rebuild();
     this.#syncGeneration();

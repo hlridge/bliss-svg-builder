@@ -8,7 +8,7 @@ import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitio
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
-import { ElementHandle, assertCodeArg } from "./element-handle.js";
+import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
@@ -989,6 +989,7 @@ class BlissSVGBuilder {
    */
   addGroup(code, opts) {
     assertCodeArg('addGroup', code);
+    assertOptsArg('addGroup', opts);
     const nonSpaceCount = this.#getNonSpaceGroupIndices().length;
     return this.insertGroup(nonSpaceCount, code, opts);
   }
@@ -1003,6 +1004,7 @@ class BlissSVGBuilder {
    */
   insertGroup(index, code, opts) {
     assertCodeArg('insertGroup', code);
+    assertOptsArg('insertGroup', opts);
     const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     const indices = this.#getNonSpaceGroupIndices();
@@ -1036,6 +1038,7 @@ class BlissSVGBuilder {
    */
   addGlyph(code, opts) {
     assertCodeArg('addGlyph', code);
+    assertOptsArg('addGlyph', opts);
     const indices = this.#getNonSpaceGroupIndices();
     if (indices.length === 0) {
       // Empty builder: validate at glyph level FIRST. The scaffold group is
@@ -1066,6 +1069,7 @@ class BlissSVGBuilder {
    */
   addPart(code, opts) {
     assertCodeArg('addPart', code);
+    assertOptsArg('addPart', opts);
     const indices = this.#getNonSpaceGroupIndices();
     if (indices.length === 0) {
       // Empty builder: validate at part level FIRST. The scaffold group is
@@ -1109,6 +1113,7 @@ class BlissSVGBuilder {
    */
   replaceGroup(index, code, opts) {
     assertCodeArg('replaceGroup', code);
+    assertOptsArg('replaceGroup', opts);
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= indices.length) return this;
@@ -1263,7 +1268,10 @@ class BlissSVGBuilder {
       if (defaults || overrides) {
         const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
         const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
-        newGroup.options = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
+        const merged = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
+        // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
+        // options:{} onto the group, which would be toJSON noise.
+        if (Object.keys(merged).length > 0) newGroup.options = merged;
       }
     }
     if (parseWarnings?.length) this.#mutationWarnings.push(...parseWarnings);
@@ -1280,6 +1288,7 @@ class BlissSVGBuilder {
    */
   addElement(code, opts) {
     assertCodeArg('addElement', code);
+    assertOptsArg('addElement', opts);
     const newGroup = this.#parseGroupWithOpts(code, opts);
     this.#rawBlissObj.groups.push(newGroup);
     this.#rebuild();
@@ -1295,6 +1304,7 @@ class BlissSVGBuilder {
    */
   insertElement(index, code, opts) {
     assertCodeArg('insertElement', code);
+    assertOptsArg('insertElement', opts);
     const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
@@ -1331,6 +1341,7 @@ class BlissSVGBuilder {
    */
   replaceElement(index, code, opts) {
     assertCodeArg('replaceElement', code);
+    assertOptsArg('replaceElement', opts);
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= groups.length) return this;

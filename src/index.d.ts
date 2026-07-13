@@ -296,6 +296,7 @@ export declare class ElementHandle {
    * empty, or whitespace-only `code` appends an empty glyph (`{parts: []}`);
    * it renders nothing and round-trips through `toJSON()`.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` parses to anything but exactly one glyph:
    *   multi-glyph codes (including defined word names) and multi-group codes
    *   throw, as do artifacts from above the glyph (document options
@@ -309,6 +310,7 @@ export declare class ElementHandle {
    * handles. An omitted, empty, or whitespace-only `code` inserts an empty
    * glyph (`{parts: []}`).
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` parses to anything but exactly one glyph (see
    *   `addGlyph`).
    */
@@ -320,6 +322,7 @@ export declare class ElementHandle {
    * instead of being dropped. A part references a shape, so `code` is
    * required: to reserve an empty slot, use `addGlyph('')`.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` is empty or whitespace-only (a part cannot be
    *   empty), parses to anything but exactly one part (a multi-part
    *   composition takes one call per part; a word is kept as a failed part
@@ -336,6 +339,7 @@ export declare class ElementHandle {
    * wrapped in a new glyph. A part references a shape, so `code` is
    * required.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` is empty or parses to anything but exactly one
    *   part (see `addPart`).
    */
@@ -356,6 +360,7 @@ export declare class ElementHandle {
    * old content (a head designation dies with it).
    * @throws {TypeError} On glyph and part handles, if `code` is provided and
    *   is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} On a glyph handle, if `code` parses to anything but
    *   exactly one glyph (see `addGlyph`). On a part handle, if `code` is
    *   omitted or empty (a part references a shape and cannot be empty; swap
@@ -376,6 +381,7 @@ export declare class ElementHandle {
    * content (a head designation dies with it). Out-of-range indices remain a
    * silent no-op (checked before the code is parsed).
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` parses to anything but exactly one glyph (see
    *   `addGlyph`).
    */
@@ -389,6 +395,7 @@ export declare class ElementHandle {
    * handles. Out-of-range indices remain a silent no-op (checked before the
    * code is parsed). A part references a shape, so `code` is required.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` is empty or parses to anything but exactly one
    *   part (see `addPart`).
    */
@@ -490,7 +497,11 @@ export declare class ElementHandle {
 
   // --- Mutation: options ---
 
-  /** Sets or merges options on this element. Accepts flat options (treated as overrides) or { defaults, overrides }. */
+  /**
+   * Sets or merges options on this element. Accepts flat options (treated as
+   * overrides) or { defaults, overrides }.
+   * @throws {TypeError} If `opts` is provided and is not an object.
+   */
   setOptions(opts: BlissOptions | OptionLayers): this;
 
   /** Removes specific option keys from this element. */
@@ -783,6 +794,7 @@ export declare class BlissSVGBuilder {
    * Appends a new glyph group with automatic space management. An omitted,
    * empty, or whitespace-only `code` appends an empty group.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
    *   carries document-level options (`[opts]||`).
    */
@@ -795,6 +807,7 @@ export declare class BlissSVGBuilder {
    * wrapped in a new group, so a rejected code leaves the builder untouched
    * and `opts` land on the glyph itself.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` parses to anything but exactly one glyph:
    *   multi-glyph codes (including defined word names) and multi-group codes
    *   throw, as do artifacts from above the glyph (document options
@@ -811,6 +824,7 @@ export declare class BlissSVGBuilder {
    * part itself. A part references a shape, so `code` is required: to
    * reserve an empty slot, use `addGlyph('')`.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` is empty or whitespace-only (a part cannot be
    *   empty), parses to anything but exactly one part (a multi-part
    *   composition takes one call per part; a word is kept as a failed part
@@ -825,6 +839,7 @@ export declare class BlissSVGBuilder {
    * Inserts a group at the given index. Negative indices count from the end.
    * An omitted, empty, or whitespace-only `code` inserts an empty group.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
    *   carries document-level options (`[opts]||`).
    */
@@ -839,6 +854,7 @@ export declare class BlissSVGBuilder {
    * empty group. Out-of-range indices remain a silent no-op (checked before
    * the code is parsed).
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
    *   carries document-level options (`[opts]||`).
    */
@@ -863,6 +879,7 @@ export declare class BlissSVGBuilder {
    * Appends a raw group with no automatic space management. SP auto-resolves
    * to TSP/QSP. An omitted, empty, or whitespace-only `code` appends an empty group.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
    *   carries document-level options (`[opts]||`).
    */
@@ -872,6 +889,7 @@ export declare class BlissSVGBuilder {
    * Inserts a raw group at the given index with no automatic space management.
    * SP auto-resolves. An omitted, empty, or whitespace-only `code` inserts an empty group.
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
    *   carries document-level options (`[opts]||`).
    */
@@ -886,6 +904,7 @@ export declare class BlissSVGBuilder {
    * Out-of-range indices
    * remain a silent no-op (checked before the code is parsed).
    * @throws {TypeError} If `code` is provided and is not a string.
+   * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
    *   carries document-level options (`[opts]||`).
    */
