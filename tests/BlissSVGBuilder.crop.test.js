@@ -35,6 +35,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   for that side; bounds-based, not metadata-based (anchorOffsetY ignored).
  *
  * Does NOT cover:
+ * - Degenerate / over-crop dimension clamping (crop insets past the box, e.g.
+ *   an empty document or a crop larger than the content, where the raw viewBox
+ *   dimension would go negative), see
+ *   `BlissSVGBuilder.crop-dimension-clamp.test.js`.
  * - Element-level bounds and height invariants without crop options, see
  *   `BlissSVGBuilder.element-bounds.test.js`.
  * - The `effectiveBounds` getter independent of crop, see

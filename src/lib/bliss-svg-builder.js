@@ -2810,16 +2810,21 @@ class BlissSVGBuilder {
       gridOffsetX = viewBoxX + marginLeft;
     }
     const content = this.svgContent;
-    const viewBoxWidth = width + marginLeft + marginRight - cropLeft - cropRight;
-    const viewBoxHeight = height + marginTop + marginBottom - cropTop - cropBottom;
+    // Clamp to >= 0: when crop insets past the available box (an empty
+    // document, or a crop larger than the content), the raw difference goes
+    // negative, which is invalid SVG. Flooring at 0 keeps the crop monotonic
+    // (a wider crop shrinks the box toward 0 and stays there) and valid.
+    const viewBoxWidth = Math.max(0, width + marginLeft + marginRight - cropLeft - cropRight);
+    const viewBoxHeight = Math.max(0, height + marginTop + marginBottom - cropTop - cropBottom);
     const svgAttributeMultiplier = 6;
 
     // Calculate SVG element dimensions (maintaining aspect ratio)
     let svgWidth, svgHeight;
     if (this.#processedOptions.svgHeight !== undefined) {
-      // Height specified: calculate width to maintain aspect ratio
+      // Height specified: calculate width to maintain aspect ratio.
+      // Guard the clamped viewBoxHeight === 0 case so it never divides to NaN.
       svgHeight = this.#processedOptions.svgHeight;
-      svgWidth = (viewBoxWidth / viewBoxHeight) * svgHeight;
+      svgWidth = viewBoxHeight > 0 ? (viewBoxWidth / viewBoxHeight) * svgHeight : 0;
     } else {
       // Auto-calculate both dimensions
       svgWidth = svgAttributeMultiplier * viewBoxWidth;
