@@ -38,7 +38,7 @@ const styled = new BlissSVGBuilder('B313', {
 });
 ```
 
-Options use camelCase keys and native JS types. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules.
+Options use camelCase keys and native JS types. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules. A non-object `options` argument (a string, number, boolean, or array) throws a `TypeError`; `null` and `undefined` mean "no options" (see [error handling](#error-handling)).
 
 ### Round-trip from toJSON()
 
@@ -1466,7 +1466,7 @@ text.addGroup('MYWORD');          // the word becomes its own group
 text.group(0).mergeWithNext();    // then fuse it into the previous word
 ```
 
-A non-string `code` (a number, `null`, an object) is a malformed call and throws a `TypeError` naming the method. A non-object `opts` (a string, number, boolean, or array) does the same, on every method that takes an options argument (including `setOptions`); `null` and `undefined` mean "no options" and are accepted. On handles, the silent no-ops for wrong-level calls and for words that failed to parse win over the argument checks (those calls never read the argument); the builder methods check the argument first. Rejected calls leave the builder unchanged, and no warnings from the rejected parse leak into `warnings` (the option check runs before the code is parsed).
+A non-string `code` (a number, `null`, an object) is a malformed call and throws a `TypeError` naming the method. A non-object `opts` (a string, number, boolean, or array) does the same, on every method that takes an options argument (including `setOptions` and the constructor); `null` and `undefined` mean "no options" and are accepted. On handles, the silent no-ops for wrong-level calls and for words that failed to parse win over the argument checks (those calls never read the argument); the builder methods check the argument first. Rejected calls leave the builder unchanged, and no warnings from the rejected parse leak into `warnings` (the option check runs before the code is parsed).
 
 ### Empty slots are deliberate
 

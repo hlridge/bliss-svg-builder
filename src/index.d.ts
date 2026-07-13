@@ -714,6 +714,7 @@ export declare class BlissSVGBuilder {
    * @throws {Error} If `input` is neither a DSL string nor a plain `toJSON()` object
    *   (for example a number, `null`, or an array). Recoverable DSL problems (unknown codes,
    *   invalid syntax) do NOT throw; they are reported in `warnings`.
+   * @throws {TypeError} If `options` is provided and is not an object.
    */
   constructor(input?: string | BlissJSON, options?: BlissOptions | OptionLayers);
 

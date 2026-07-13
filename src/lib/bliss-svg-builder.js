@@ -408,6 +408,7 @@ class BlissSVGBuilder {
   #rawBlissObj; // Stored for toJSON() round-trip
 
   constructor(input, options = {}) {
+    assertOptsArg('BlissSVGBuilder', options);
     const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(options);
 
     // Allow empty constructor for building from scratch

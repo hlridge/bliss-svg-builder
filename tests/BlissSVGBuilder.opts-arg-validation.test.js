@@ -1,14 +1,16 @@
 /**
- * Pins the opts-arg shape guard (assertOptsArg) shared by every mutation method
- * that takes an options argument: a non-object opts (string, number, boolean,
- * array) throws a designed TypeError BEFORE any parse or warning forward, so a
- * rejected call neither mutates state nor leaks the code's parse-time warnings.
- * Nullish opts (undefined/null) means "no options"; an empty object no longer
- * stamps options:{} into toJSON.
+ * Pins the opts-arg shape guard (assertOptsArg) shared by the constructor and
+ * every mutation method that takes an options argument: a non-object opts
+ * (string, number, boolean, array) throws a designed TypeError BEFORE any parse
+ * or warning forward, so a rejected call neither mutates state nor leaks the
+ * code's parse-time warnings. Nullish opts (undefined/null) means "no options";
+ * an empty object no longer stamps options:{} into toJSON.
  *
  * Covers:
  * - the assertOptsArg predicate: string/number/boolean/array rejected, the
  *   designed message names the method
+ * - the constructor's options argument (new BlissSVGBuilder(input, opts)) rejects
+ *   a non-object with the same designed TypeError
  * - every opts-taking mutator wires the guard: builder group family
  *   (addGroup/insertGroup/replaceGroup/addElement/insertElement/replaceElement),
  *   builder addGlyph/addPart (via the handle delegate), handle glyph/part/replace
@@ -22,9 +24,6 @@
  * - an empty-object opts no longer stamps options:{} onto the node (family-wide)
  *
  * Does NOT cover:
- * - the constructor's document-options arg (new BlissSVGBuilder(input, opts)),
- *   which still throws a raw TypeError on a non-object; adjacent, out of scope,
- *   tracked as a Standalone backlog row
  * - singular code-arg validation, see BlissSVGBuilder.group-mutation-args.test.js,
  *   ElementHandle.glyph-mutation-args.test.js, ElementHandle.part-mutation-args.test.js
  * - accept-only forwarding of a valid code's parse warnings, see
@@ -184,6 +183,30 @@ describe('BlissSVGBuilder opts-arg validation', () => {
       const b = new BlissSVGBuilder('B208');
       b.addGlyph('B291', { defaults: { color: 'blue' }, overrides: { color: 'red' } });
       expect(b.toJSON().groups[0].glyphs[1].options).toEqual({ color: 'red' });
+    });
+  });
+
+  describe('when the constructor receives a non-object options argument', () => {
+    it.each([
+      ['a string', 'red'],
+      ['a number', 5],
+      ['an array', ['red']],
+      ['an empty string', ''],
+    ])('rejects %s with a designed TypeError', (_label, badOpts) => {
+      expect(() => new BlissSVGBuilder('B291', badOpts)).toThrow(TypeError);
+      expect(() => new BlissSVGBuilder('B291', badOpts)).toThrow(
+        'BlissSVGBuilder() options must be an object'
+      );
+    });
+
+    it('accepts a valid options object and applies it to the document', () => {
+      const b = new BlissSVGBuilder('B291', { color: 'red' });
+      expect(b.toJSON().options).toEqual({ color: 'red' });
+    });
+
+    it('treats omitted and null options as no options', () => {
+      expect(() => new BlissSVGBuilder('B291')).not.toThrow();
+      expect(() => new BlissSVGBuilder('B291', null)).not.toThrow();
     });
   });
 });
