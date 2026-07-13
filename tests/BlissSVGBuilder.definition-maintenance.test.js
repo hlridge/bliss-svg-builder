@@ -21,9 +21,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - patchDefinition: patches glyph / shape / externalGlyph / bare properties
  *   selectively; replaces sub-objects (defaultOptions) wholesale rather than
  *   merging; rejects non-existent codes, built-in codes, type changes,
- *   internal flags, non-function getPath on a shape, and self-referencing
- *   codeString; resolves bare aliases when patching the codeString of a
- *   bare definition.
+ *   internal flags, non-function getPath on a shape, a self-referencing
+ *   codeString, and an empty or whitespace-only codeString; resolves bare
+ *   aliases when patching the codeString of a bare definition.
  *
  * Does NOT cover:
  * - Registration of new definitions via `define()`; see
@@ -334,6 +334,15 @@ describe('BlissSVGBuilder definition maintenance', () => {
       BlissSVGBuilder.define({ [code]: { type: 'shape', codeString: 'HL4' } });
       expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: 'HL4/VL4' }))
         .toThrow(/multi-character word/i);
+    });
+
+    it('rejects patching a codeString to whitespace-only', () => {
+      // mirrors define()'s blank-value rejection so patch is not a backdoor to a
+      // definition holding an unusable whitespace codeString
+      const code = trackCode('PATCHWS1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B291' } });
+      expect(() => BlissSVGBuilder.patchDefinition(code, { codeString: '   ' }))
+        .toThrow(/non-whitespace/i);
     });
 
     it('rejects patching a shape codeString to contain a word-level indicator', () => {

@@ -553,6 +553,24 @@ describe('BlissSVGBuilder.define', () => {
     });
   });
 
+  describe('when incidental whitespace accompanies real content', () => {
+    it('accepts and stores verbatim a codeString with surrounding whitespace', () => {
+      const code = trackCode('QZPAD1');
+      const result = BlissSVGBuilder.define({ [code]: { codeString: ' B100' } });
+      expect(result.defined).toContain(code);
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe(' B100');
+    });
+
+    it('defines a getPath shape even when its optional codeString is whitespace-only', () => {
+      const code = trackCode('QZSHAPEGP');
+      const result = BlissSVGBuilder.define({
+        [code]: { type: 'shape', getPath: () => 'M0 0 L10 0', width: 10, height: 10, codeString: '   ' }
+      });
+      expect(result.defined).toContain(code);
+      expect(BlissSVGBuilder.isDefined(code)).toBe(true);
+    });
+  });
+
   describe(`when called with a 'shape' definition missing dimensions`, () => {
     it('reports an error when width is missing', () => {
       const result = BlissSVGBuilder.define({

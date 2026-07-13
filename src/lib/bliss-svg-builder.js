@@ -2641,8 +2641,8 @@ class BlissSVGBuilder {
     // If codeString is being patched, validate references and circular refs
     if ('codeString' in changes) {
       const newCodeString = changes.codeString;
-      if (typeof newCodeString !== 'string' || newCodeString.length === 0) {
-        throw new Error(`patchDefinition("${code}"): "codeString" must be a non-empty string.`);
+      if (typeof newCodeString !== 'string' || newCodeString.trim().length === 0) {
+        throw new Error(`patchDefinition("${code}"): "codeString" must be a non-empty, non-whitespace string.`);
       }
       // A `;;` word-level indicator is a use-site construct (WORD;;INDICATOR);
       // NO definition of any type may bake one in, so this guard is universal.

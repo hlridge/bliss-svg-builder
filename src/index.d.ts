@@ -960,7 +960,7 @@ export declare class BlissSVGBuilder {
    * @throws {Error} If `code` is not defined or is built-in, `changes` is not an object,
    *   or a change violates the definition rules: an unknown property or internal/type
    *   flag (e.g. `type`, `isBuiltIn`) for the definition;
-   *   `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`;
+   *   `getPath` not a function; empty, whitespace-only, or non-string `codeString`; a `;;` in `codeString`;
    *   a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular
    *   reference; a `;`-part that is itself a composition; or a global-only
    *   `defaultOptions` key.
