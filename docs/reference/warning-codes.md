@@ -166,14 +166,14 @@ The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid
 
 ### `MISPLACED_SPACE_DECORATION`
 
-A coordinate (`:x,y`) or an option (`[opts]` at any scope) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
+A coordinate (`:x,y`) or a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
 
 ```
 QSP:1,2                →  renders a plain quarter-space, coordinate dropped
 [color=red]|TSP        →  renders a plain space, option dropped
 ```
 
-For a positionable or styleable blank, use `ZSA` instead: it is inkless content, so it keeps its coordinate and options.
+A global-only option key on a space (`[grid]|QSP`) is reported by `MISPLACED_GLOBAL_OPTION` instead: its scope, not the space, is the mismatch. The space still keeps its identity either way. For a positionable or styleable blank, use `ZSA` instead: it is inkless content, so it keeps its coordinate and options.
 
 ## Duplicates
 

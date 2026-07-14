@@ -15,6 +15,9 @@ import { BlissSVGBuilder } from '../src/index';
  *   the svg round-trip becomes true (the reported `QSP:1,2` -> `//` loss).
  * - An option on a space at every scope (word `[o]|`, character `[o]`, part
  *   `[o]>`): dropped + warned; no empty styled `<g>` is emitted.
+ * - A global-only option key (`[grid]|QSP`) keeps the space's identity too, but
+ *   is reported by its own MISPLACED_GLOBAL_OPTION (the parser's scope gate),
+ *   NOT a second MISPLACED_SPACE_DECORATION.
  * - Coordinate and option together: two warnings, both dropped.
  * - Multiple decorated spaces, and an inline decorated space (the rule applies
  *   to every space, not only a standalone one).
@@ -51,12 +54,17 @@ describe('BlissSVGBuilder space decoration', () => {
     it('drops the coordinate from a TSP and keeps the default space', () => {
       const b = new BlissSVGBuilder('TSP:1,2');
       expect(b.toString()).toBe('//');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }]);
     });
 
-    it('renders a coordinate-bearing space identically to the bare space', () => {
-      // pins the coordinate no longer stretches the bounding box at an edge.
-      expect(new BlissSVGBuilder('QSP:5,0').svgCode).toBe(new BlissSVGBuilder('QSP').svgCode);
+    it('renders a coordinate-bearing space identically to the bare space and warns', () => {
+      // pins the coordinate no longer stretches the bounding box at an edge, AND
+      // that a non-zero coordinate still warns (distinct from the :0,0 no-op).
+      const b = new BlissSVGBuilder('QSP:5,0');
+      expect(b.svgCode).toBe(new BlissSVGBuilder('QSP').svgCode);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':5,0' }]);
     });
 
     it('makes a coordinate-bearing space round-trip its svg', () => {
@@ -85,19 +93,47 @@ describe('BlissSVGBuilder space decoration', () => {
     it('drops a character-scope option from a QSP and warns', () => {
       const b = new BlissSVGBuilder('[color=red]QSP');
       expect(b.toString()).toBe('QSP');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: '[color=red]' }]);
     });
 
     it('drops a part-scope option from a QSP and warns', () => {
       const b = new BlissSVGBuilder('[color=red]>QSP');
       expect(b.toString()).toBe('QSP');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: '[color=red]' }]);
     });
 
     it('drops a word-scope option from a TSP and warns', () => {
       const b = new BlissSVGBuilder('[color=red]|TSP');
       expect(b.toString()).toBe('//');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: '[color=red]' }]);
+    });
+  });
+
+  describe('when a space carries a global-only option', () => {
+    // A global-only key (grid/center/margin/svg-title/...) at word/char/part scope
+    // is a SCOPE mismatch the parser catches first as MISPLACED_GLOBAL_OPTION, so it
+    // does NOT also warn MISPLACED_SPACE_DECORATION (no double warning). The space
+    // still keeps its identity, exactly like a non-global option: a QSP stays a
+    // quarter-space, a TSP stays the default //.
+    it('keeps the QSP identity and warns MISPLACED_GLOBAL_OPTION, not space-decoration', () => {
+      const b = new BlissSVGBuilder('[grid]|QSP');
+      expect(b.toString()).toBe('QSP');
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(roundTripsSvg('[grid]|QSP')).toBe(true);
+    });
+
+    it('keeps the default TSP space and warns MISPLACED_GLOBAL_OPTION', () => {
+      const b = new BlissSVGBuilder('[margin=2]|TSP');
+      expect(b.toString()).toBe('//');
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+    });
+
+    it('keeps the QSP identity for a global key at character and part scope', () => {
+      expect(new BlissSVGBuilder('[grid]QSP').toString()).toBe('QSP');
+      expect(new BlissSVGBuilder('[grid]>QSP').toString()).toBe('QSP');
     });
 
     it('emits no styled group for an option-bearing space', () => {
@@ -121,14 +157,16 @@ describe('BlissSVGBuilder space decoration', () => {
     it('drops the coordinate from every space in a run', () => {
       const b = new BlissSVGBuilder('QSP:1,2/QSP:3,4');
       expect(b.toString()).toBe('QSP/QSP');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION, SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }, { code: SPACE_DECORATION, source: ':3,4' }]);
       expect(roundTripsSvg('QSP:1,2/QSP:3,4')).toBe(true);
     });
 
     it('drops the coordinate from an inline space between two words', () => {
       const b = new BlissSVGBuilder('B291/QSP:1,2/C8');
       expect(b.toString()).toBe('B291/QSP/C8');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }]);
       expect(roundTripsSvg('B291/QSP:1,2/C8')).toBe(true);
     });
   });
@@ -137,7 +175,8 @@ describe('BlissSVGBuilder space decoration', () => {
     it('drops a coordinate supplied through object input', () => {
       const b = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'QSP', x: 1, y: 2 }] }] }] });
       expect(b.toString()).toBe('QSP');
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }]);
     });
 
     it('drops a coordinate supplied through addGroup', () => {
@@ -196,7 +235,8 @@ describe('BlissSVGBuilder space decoration', () => {
       const glyph = b.toJSON().groups[0].glyphs[0];
       expect(glyph.options?.relativeKerning).toBe(0.5);
       expect(glyph.parts[0].x).toBeUndefined();
-      expect(b.warnings.map(w => w.code)).toEqual([SPACE_DECORATION]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }]);
     });
   });
 });

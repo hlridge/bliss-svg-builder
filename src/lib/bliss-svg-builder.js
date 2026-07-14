@@ -666,7 +666,14 @@ class BlissSVGBuilder {
           if (meaningful) warnSpaceDrop('coordinate', source);
           touched = true;
         }
-        if (touched) movedSpaceGlyphs.push(glyph);
+        // Re-flag for identity even when nothing survived to strip: a space that
+        // arrived carrying a global-only option key (`[grid]|QSP`) is stripped by
+        // the parser first (as MISPLACED_GLOBAL_OPTION), which leaves the QSP bared
+        // but UNflagged, so it would serialize to the default `//` and lose its
+        // quarter-space identity. Re-flag only a currently-UNflagged pure-space
+        // glyph (set-only via the loop below): an already-flagged space is left
+        // untouched, so a correctly parsed space never gets its flag cleared.
+        if (touched || (pureSpace && !part._differsFromDefault)) movedSpaceGlyphs.push(glyph);
       }
     }
     // Pass 3: split mixed words at their space runs.
