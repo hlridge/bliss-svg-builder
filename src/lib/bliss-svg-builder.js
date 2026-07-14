@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
@@ -569,17 +569,18 @@ class BlissSVGBuilder {
   // renders differently, silently). Enforced HERE, the one chokepoint every
   // mutation route and input surface passes through (parse and the indicator
   // API already gate their own ingestion):
-  //  1. A space glyph never carries a designation (deleted silently, matching
-  //     the structural `^` drops in splitAt/mergeWithNext). Likewise a glyph
-  //     serialization omits entirely (empty parts, no codeName, no options
-  //     that would re-emit it as an options-only token): its designation has
-  //     no serialized form, so it dies with the glyph's content (the
-  //     round-2 F4 contract, enforced here for hand-authored object input).
-  //  2. An all-space word never carries a `;;` overlay (dropped LOUDLY,
-  //     matching mergeWithNext's DROPPED_WORD_INDICATOR — data loss must be
-  //     visible). The deletion makes the sweep warn once, not per rebuild.
-  //     An EMPTY group keeps its overlay (the F3 pure-state-op contract;
-  //     isRawSpaceGroup is false).
+  //  1. A non-head marker (a space glyph or the ZSA anchor) never carries a
+  //     designation (deleted silently, matching the structural `^` drops in
+  //     splitAt/mergeWithNext). Likewise a glyph serialization omits entirely
+  //     (empty parts, no codeName, no options that would re-emit it as an
+  //     options-only token): its designation has no serialized form, so it
+  //     dies with the glyph's content (the round-2 F4 contract, enforced here
+  //     for hand-authored object input).
+  //  2. An all-non-head-marker word never carries a `;;` overlay (dropped
+  //     LOUDLY, matching mergeWithNext's DROPPED_WORD_INDICATOR, since data
+  //     loss must be visible). The deletion makes the sweep warn once, not per
+  //     rebuild. An EMPTY group keeps its overlay (the F3 pure-state-op
+  //     contract; isNonHeadMarkerGroup is false).
   //  3. A bare space glyph never lives inside a word: the word is split at
   //     its space runs into real space groups — canonicalization, SILENT
   //     (nothing is lost: glyph nodes move; the first word run keeps the
@@ -595,7 +596,7 @@ class BlissSVGBuilder {
     const groups = this.#rawBlissObj.groups ?? [];
     for (const group of groups) {
       for (const glyph of group.glyphs ?? []) {
-        if (glyph.isHeadGlyph === true && BlissSVGBuilder.#isSpaceGlyphNode(glyph)) {
+        if (glyph.isHeadGlyph === true && BlissSVGBuilder.#isNonHeadMarkerNode(glyph)) {
           delete glyph.isHeadGlyph;
         }
         if (glyph.isHeadGlyph === true && !glyph.parts?.length
@@ -603,7 +604,7 @@ class BlissSVGBuilder {
           delete glyph.isHeadGlyph;
         }
       }
-      if (group.wordIndicators && !group.errorCode && BlissSVGBuilder.#isRawSpaceGroup(group)) {
+      if (group.wordIndicators && !group.errorCode && BlissSVGBuilder.#isNonHeadMarkerGroup(group)) {
         const { codes = [], stripSemantic } = group.wordIndicators;
         const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
         delete group.wordIndicators;
@@ -1505,18 +1506,37 @@ class BlissSVGBuilder {
     return result;
   }
 
-  // Space codes used in space groups
-  static #SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA', 'SP']);
-
+  // Content-vs-whitespace classification: only TSP/QSP are spaces (the canonical
+  // set, shared with the element snapshot and toString via isSpaceGlyph). ZSA is
+  // an inkless positionable shape that counts, navigates, and serializes as
+  // content; SP is a parser-internal placeholder that never reaches a real tree.
+  // Drives group counting, navigation, word-splitting, and adjacent-space merges.
   /** Returns true if a raw glyph node is a space glyph (one space-code part) */
   static #isSpaceGlyphNode(glyph) {
-    return glyph.parts?.length === 1 && BlissSVGBuilder.#SPACE_CODES.has(glyph.parts[0].codeName);
+    return glyph.parts?.length === 1 && isSpaceGlyph(glyph.parts[0].codeName);
   }
 
   /** Returns true if a raw group is a space group */
   static #isRawSpaceGroup(group) {
     if (!group.glyphs || group.glyphs.length === 0) return false;
     return group.glyphs.every(g => BlissSVGBuilder.#isSpaceGlyphNode(g));
+  }
+
+  // Head / word-indicator eligibility is BROADER than space classification: a
+  // ZSA counts as content but, like a space, can never be a word's head or carry
+  // a ;; overlay (the frozen parser's isSpacePart = {TSP,QSP,ZSA} rejects both).
+  // The rebuild normalizer strips a head/overlay a mutation or object input left
+  // on one so the tree stays reparse-valid.
+  static #NON_HEAD_MARKER_CODES = new Set(['TSP', 'QSP', 'ZSA']);
+
+  /** Returns true if a raw glyph node cannot be a word head (space or anchor). */
+  static #isNonHeadMarkerNode(glyph) {
+    return glyph.parts?.length === 1 && BlissSVGBuilder.#NON_HEAD_MARKER_CODES.has(glyph.parts[0].codeName);
+  }
+
+  /** Returns true if every glyph in a group is a non-head marker. */
+  static #isNonHeadMarkerGroup(group) {
+    return group.glyphs?.length > 0 && group.glyphs.every(g => BlissSVGBuilder.#isNonHeadMarkerNode(g));
   }
 
   /** Creates a default space group for insertion between words */
@@ -1743,12 +1763,12 @@ class BlissSVGBuilder {
       return result;
     }
 
-    // Check if a group is a space (TSP, QSP, etc.)
-    const SPACE_CODES = new Set(['TSP', 'QSP', 'ZSA']);
+    // Check if a group is a space (TSP or QSP). ZSA is content: it serializes as
+    // its own code, not a slash, so a standalone ZSA round-trips faithfully.
     function isSpaceGroup(group) {
       if (!group.glyphs || group.glyphs.length === 0) return false;
       return group.glyphs.every(g =>
-        g.parts?.length === 1 && SPACE_CODES.has(g.parts[0].codeName)
+        g.parts?.length === 1 && isSpaceGlyph(g.parts[0].codeName)
       );
     }
 
