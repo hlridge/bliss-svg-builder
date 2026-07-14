@@ -610,7 +610,7 @@ class BlissSVGBuilder {
         delete group.wordIndicators;
         this.#mutationWarnings.push({
           code: WARNING_CODES.DROPPED_WORD_INDICATOR,
-          message: `A space cannot carry a word indicator: the word became a space, so its word-level indicator overlay (${dropped}) was dropped.`,
+          message: `A space or anchor cannot carry a word indicator, so the word-level indicator overlay (${dropped}) was dropped.`,
           source: dropped,
         });
       }
@@ -676,8 +676,9 @@ class BlissSVGBuilder {
     }
     // Flag the moved space parts against their position's default space code
     // (mirrors the parser's step-4 SP/QSP resolution): the serializer emits
-    // '//' only for the default, so an explicit QSP/ZSA must carry
-    // _differsFromDefault or its identity (and width) would be lost.
+    // '//' only for the default, so an explicit QSP must carry
+    // _differsFromDefault or its identity (and width) would be lost. ZSA is
+    // content and is never a moved space glyph, so it never reaches this path.
     if (movedSpaceGlyphs.length > 0) {
       const moved = new Set(movedSpaceGlyphs);
       for (let i = 0; i < groups.length; i++) {

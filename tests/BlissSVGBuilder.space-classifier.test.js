@@ -22,6 +22,8 @@ import { BlissSVGBuilder } from '../src/index';
  *   content).
  * - A mutation turning a marked word into a ZSA drops the head (parser parity)
  *   while the ZSA is still counted and serialized as content.
+ * - applyIndicators on a now-reachable ZSA group drops the overlay and warns
+ *   (a ZSA cannot be a word head), leaving the render untouched.
  *
  * Does NOT cover:
  * - ZSA as a composed part (`B291;ZSA:10`, `ZSA;B291:2`), a multi-part glyph
@@ -129,6 +131,21 @@ describe('BlissSVGBuilder space classifier', () => {
       expect(marked).toBe(false);
       expect(b.toString()).toBe('ZSA');
       expect(b.groups.length).toBe(1);
+    });
+  });
+
+  describe('when applyIndicators targets a now-reachable ZSA group', () => {
+    it('drops the overlay and warns instead of storing it', () => {
+      // group(i) reaches a ZSA group now that ZSA counts as content, so
+      // applyIndicators on it is newly reachable. A ZSA still cannot be a word
+      // head, so the overlay never survives and the render is untouched.
+      const b = new BlissSVGBuilder('B291//ZSA');
+      const before = b.svgCode;
+      b.group(1).applyIndicators('B81');
+      expect(b.toJSON().groups.every(g => !g.wordIndicators)).toBe(true);
+      expect(b.toString()).toBe('B291//ZSA');
+      expect(b.svgCode).toBe(before);
+      expect(b.warnings.some(w => w.code === 'DROPPED_WORD_INDICATOR')).toBe(true);
     });
   });
 });
