@@ -164,6 +164,17 @@ A canvas-wide option key placed at word, character, or part scope. These keys co
 
 The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background`/`background-*`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
 
+### `MISPLACED_SPACE_DECORATION`
+
+A coordinate (`:x,y`) or an option (`[opts]` at any scope) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
+
+```
+QSP:1,2                →  renders a plain quarter-space, coordinate dropped
+[color=red]|TSP        →  renders a plain space, option dropped
+```
+
+For a positionable or styleable blank, use `ZSA` instead: it is inkless content, so it keeps its coordinate and options.
+
 ## Duplicates
 
 ### `MULTIPLE_HEAD_MARKERS`

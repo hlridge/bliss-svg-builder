@@ -244,6 +244,11 @@ export const WARNING_CODES = Object.freeze({
   // a global-only (builder-canvas) option KEY inside a group/character/part
   // bracket: the key is well-formed but its scope is the whole SVG
   MISPLACED_GLOBAL_OPTION: 'MISPLACED_GLOBAL_OPTION',
+  // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
+  // space: a space is a pure word-separator with no ink to position or style,
+  // so the decoration is dropped and the space keeps its identity (ZSA is
+  // content and is exempt; use it for a positionable/styleable blank)
+  MISPLACED_SPACE_DECORATION: 'MISPLACED_SPACE_DECORATION',
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',

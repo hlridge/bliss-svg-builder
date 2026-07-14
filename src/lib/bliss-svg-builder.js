@@ -615,9 +615,61 @@ class BlissSVGBuilder {
         });
       }
     }
-    // Pass 3: split mixed words at their space runs.
     const createdSpaceGroups = [];
     const movedSpaceGlyphs = [];
+    // A TSP/QSP space is a pure word-separator: a coordinate (`:x,y`) or an
+    // option (`[opts]` at any scope) on one cannot position or style whitespace,
+    // so it is dropped with a MISPLACED_SPACE_DECORATION warning and the space
+    // keeps its identity. ZSA is content (a positionable inkless shape) and is
+    // exempt: the strip targets only #isSpaceGlyphNode (= {TSP, QSP}). A stripped
+    // glyph joins movedSpaceGlyphs so the _differsFromDefault re-flag below keeps
+    // a bared QSP serializing as `QSP`, not the default `//`. Kerning
+    // (GLYPH_INTERNAL_KEYS) and the runtime key are spared.
+    const warnSpaceDrop = (kind, source) => this.#mutationWarnings.push({
+      code: WARNING_CODES.MISPLACED_SPACE_DECORATION,
+      message: `A space cannot carry ${kind === 'coordinate' ? 'a coordinate' : 'an option'}, so "${source}" was dropped.`,
+      source,
+    });
+    for (const group of groups) {
+      if (group.errorCode || !group.glyphs?.length) continue;
+      const pureSpace = BlissSVGBuilder.#isRawSpaceGroup(group);
+      let groupStripped = false;
+      if (pureSpace) {
+        const repr = BlissSVGBuilder.#dropSpaceOptions(group.options);
+        if (repr) {
+          if (Object.keys(group.options).length === 0) delete group.options;
+          warnSpaceDrop('option', repr);
+          groupStripped = true;
+        }
+      }
+      for (const glyph of group.glyphs) {
+        if (!BlissSVGBuilder.#isSpaceGlyphNode(glyph)) continue;
+        let touched = groupStripped;
+        const glyphRepr = BlissSVGBuilder.#dropSpaceOptions(glyph.options);
+        if (glyphRepr) {
+          if (Object.keys(glyph.options).length === 0) delete glyph.options;
+          warnSpaceDrop('option', glyphRepr);
+          touched = true;
+        }
+        const part = glyph.parts[0];
+        const partRepr = BlissSVGBuilder.#dropSpaceOptions(part.options);
+        if (partRepr) {
+          if (Object.keys(part.options).length === 0) delete part.options;
+          warnSpaceDrop('option', partRepr);
+          touched = true;
+        }
+        if (part.x !== undefined || part.y !== undefined) {
+          const source = `:${part.x ?? 0},${part.y ?? 0}`;
+          const meaningful = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0;
+          delete part.x;
+          delete part.y;
+          if (meaningful) warnSpaceDrop('coordinate', source);
+          touched = true;
+        }
+        if (touched) movedSpaceGlyphs.push(glyph);
+      }
+    }
+    // Pass 3: split mixed words at their space runs.
     for (let i = 0; i < groups.length; i++) {
       const group = groups[i];
       if (group.errorCode || !group.glyphs?.length) continue;
@@ -677,8 +729,10 @@ class BlissSVGBuilder {
     // Flag the moved space parts against their position's default space code
     // (mirrors the parser's step-4 SP/QSP resolution): the serializer emits
     // '//' only for the default, so an explicit QSP must carry
-    // _differsFromDefault or its identity (and width) would be lost. ZSA is
-    // content and is never a moved space glyph, so it never reaches this path.
+    // _differsFromDefault or its identity (and width) would be lost. Both a
+    // Pass-3 split and the decoration strip above feed movedSpaceGlyphs; a bared
+    // QSP whose coordinate suppressed its parse-time flag is re-flagged here.
+    // ZSA is content and never a moved space glyph, so it never reaches this path.
     if (movedSpaceGlyphs.length > 0) {
       const moved = new Set(movedSpaceGlyphs);
       for (let i = 0; i < groups.length; i++) {
@@ -1538,6 +1592,26 @@ class BlissSVGBuilder {
   /** Returns true if every glyph in a group is a non-head marker. */
   static #isNonHeadMarkerGroup(group) {
     return group.glyphs?.length > 0 && group.glyphs.every(g => BlissSVGBuilder.#isNonHeadMarkerNode(g));
+  }
+
+  // Option keys a space glyph keeps when its decorations are stripped: the
+  // runtime key (identity, re-assigned each rebuild) and kerning (RK/AK, which
+  // adjusts spacing between glyphs, a separate backlogged space-sizing concern).
+  static #SPACE_KEPT_OPTION_KEYS = new Set(['key', 'relativeKerning', 'absoluteKerning']);
+
+  /**
+   * Removes every non-internal option (a styling decoration) from a space's
+   * options object and returns a `[k=v;…]` representation of what was dropped,
+   * or null if there was nothing to drop. Kerning and the runtime key are
+   * spared. Mutates `options` in place.
+   */
+  static #dropSpaceOptions(options) {
+    if (!options) return null;
+    const keys = Object.keys(options).filter(k => !BlissSVGBuilder.#SPACE_KEPT_OPTION_KEYS.has(k));
+    if (keys.length === 0) return null;
+    const repr = '[' + keys.map(k => (options[k] === true ? k : `${k}=${options[k]}`)).join(';') + ']';
+    for (const k of keys) delete options[k];
+    return repr;
   }
 
   /** Creates a default space group for insertion between words */
