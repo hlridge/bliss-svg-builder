@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { BlissParser } from '../src/lib/bliss-parser.js';
+import { BlissSVGBuilder } from '../src/index.js';
 
 /**
- * Pins the interim contract of the `{text}` placeholder pre-pass: a
- * single trailing `{...}` block per group is captured verbatim;
- * multiple `{...}` blocks (whether in one group or spread across `//`)
- * produce a `UNSUPPORTED_TEXT_BLOCKS` warning with documented-undefined
- * parse behavior. The pre-pass uses a regex, so any nested `{` inside
- * a single block raises the same warning even though the content is
- * still preserved.
+ * Pins the interim contract of the `{text}` placeholder pre-pass: EVERY
+ * `{...}` block warns `UNSUPPORTED_TEXT_BLOCKS` (run-to-stable Phase 2.2 —
+ * the text parses onto `group.text` but renders nothing and is dropped from
+ * `toString()`, so a silent single block violated visible-not-silent); a
+ * single trailing block per group is still captured verbatim; multiple
+ * blocks keep documented-undefined parse behavior. The block count is taken
+ * AFTER bracket tokenization, so a literal `{` inside a quoted option value
+ * never counts and a whole `{...}` block counts once regardless of nested
+ * braces in its content.
  *
  * Background (2026-05-03 parser audit): the previous behavior silently
  * merged two `{...}` blocks into one text label and dropped the glyphs
@@ -18,19 +21,17 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * blocks; see the project's text-overlay backlog.
  *
  * Covers:
- * - Single trailing `{text}`: clean capture, preserved glyphs, no warning.
- * - Verbatim content including whitespace, punctuation, and empty `{}`.
- * - Placeholder-ID-shaped content (e.g. `{PLACEHOLDER_0}`) does not
- *   collide with internal pre-pass markers, including when the text
- *   content is `[PLACEHOLDER_0]` and a real bracket-option block is
- *   also present in the same input.
- * - Verbatim preservation of `[`, `]`, `{`, `}`, and other delimiter
- *   characters inside `{...}` blocks, across multi-group inputs that
- *   interleave implicit space groups (e.g. `H//C8{...}`).
- * - Nested braces in a single block: content preserved, warning fires.
- * - Multiple blocks across groups (`{a}//{b}`): warning fires.
- * - Multiple blocks in one group (`{a}/{b}`): warning fires with
- *   "not supported" message.
+ * - Single trailing `{text}`: clean capture, preserved glyphs, and the
+ *   UNSUPPORTED_TEXT_BLOCKS warning (the visibility witness).
+ * - Builder-level swallow visibility: the warning surfaces on
+ *   `builder.warnings`, the base still renders, `toString()` drops the block.
+ * - Verbatim content including whitespace, punctuation, empty `{}`, and
+ *   placeholder-ID-shaped content.
+ * - Nested braces in a single block count as ONE block (content preserved).
+ * - A `{` inside a quoted option value never triggers the warning.
+ * - A mid-string (non-trailing) block warns instead of garbling silently.
+ * - Multiple blocks (same group, across groups, adjacent) keep the warning
+ *   and the documented-undefined merged capture.
  *
  * Does NOT cover:
  * - The rendered SVG output of `{text}` overlays (feature not yet
@@ -39,24 +40,31 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   regex pre-pass when the tokenizer lands.
  */
 describe('BlissParser text-label placeholder pre-pass', () => {
+  const textWarnings = (r) =>
+    (r._parseWarnings ?? []).filter((w) => w.code === 'UNSUPPORTED_TEXT_BLOCKS');
+
   describe('when the input has a single trailing {text} block', () => {
-    it('captures the text and preserves all glyphs', () => {
+    it('captures the text, preserves all glyphs, and warns UNSUPPORTED_TEXT_BLOCKS', () => {
       const r = BlissParser.parse('H/B313{a}');
       expect(r.groups[0].glyphs).toHaveLength(2);
       expect(r.groups[0].text).toBe('a');
-      expect(r._parseWarnings).toBeUndefined();
+      // regression (Phase 2.2): a single block used to parse with zero
+      // warnings while rendering and toString() dropped it silently
+      expect(textWarnings(r)).toHaveLength(1);
+      // the source names the ORIGINAL input, not the tokenized form
+      expect(textWarnings(r)[0].source).toBe('H/B313{a}');
     });
 
     it('preserves arbitrary content verbatim including spaces and punctuation', () => {
       const r = BlissParser.parse('B313{hello world!}');
       expect(r.groups[0].text).toBe('hello world!');
-      expect(r._parseWarnings).toBeUndefined();
+      expect(textWarnings(r)).toHaveLength(1);
     });
 
     it('captures empty content as the empty string', () => {
       const r = BlissParser.parse('B313{}');
       expect(r.groups[0].text).toBe('');
-      expect(r._parseWarnings).toBeUndefined();
+      expect(textWarnings(r)).toHaveLength(1);
     });
 
     it('accepts placeholder-ID-shaped content without colliding with internal markers', () => {
@@ -75,64 +83,82 @@ describe('BlissParser text-label placeholder pre-pass', () => {
     });
   });
 
+  describe('when the swallow is observed on the builder surface', () => {
+    it('warns, renders the base, and drops the block from toString()', () => {
+      const b = new BlissSVGBuilder('B291{hej}');
+      expect(b.warnings.map((w) => w.code)).toContain('UNSUPPORTED_TEXT_BLOCKS');
+      expect(b.svgCode).toContain('<path');
+      expect(b.toString()).toBe('B291');
+    });
+  });
+
   describe('when {text} content contains brackets, braces, or other delimiters', () => {
     it.each([
-      ['square brackets', 'H//C8{hello [world]}', 'hello [world]', false],
-      ['curly brackets', 'H//C8{hello {world}}', 'hello {world}', true],
-      ['mixed brackets', 'H//C8{hello [world] and {stuff}}', 'hello [world] and {stuff}', true],
-      ['delimiters', 'H//C8{text with []{}():;,/}', 'text with []{}():;,/', true]
-    ])('preserves %s verbatim in {text} content', (description, input, expectedText, expectsWarning) => {
+      ['square brackets', 'H//C8{hello [world]}', 'hello [world]'],
+      ['curly brackets', 'H//C8{hello {world}}', 'hello {world}'],
+      ['mixed brackets', 'H//C8{hello [world] and {stuff}}', 'hello [world] and {stuff}'],
+      ['delimiters', 'H//C8{text with []{}():;,/}', 'text with []{}():;,/']
+    ])('preserves %s verbatim in {text} content', (description, input, expectedText) => {
       const result = BlissParser.parse(input);
 
       // With implicit space groups interleaved as [H, TSP, C8], C8 is at index 2.
       expect(result.groups[2].text).toBe(expectedText);
-
-      // A nested `{` bumps the brace count, so the interim contract fires
-      // UNSUPPORTED_TEXT_BLOCKS (visible, not silent); the square-bracket row
-      // has no nested brace and parses without a warning.
-      if (expectsWarning) {
-        expect(result._parseWarnings?.[0]?.code).toBe('UNSUPPORTED_TEXT_BLOCKS');
-      } else {
-        expect(result._parseWarnings).toBeUndefined();
-      }
+      expect(textWarnings(result)).toHaveLength(1);
     });
   });
 
   describe('when the {text} content contains nested braces', () => {
-    it('preserves the nested characters and emits a UNSUPPORTED_TEXT_BLOCKS warning', () => {
+    it('counts the block once and preserves the nested characters', () => {
       const r = BlissParser.parse('B313{hello {world} and [stuff]}');
       expect(r.groups[0].text).toBe('hello {world} and [stuff]');
-      // Nested `{}` bumps the `{` count, so the warning fires too. That is
-      // the documented trade-off of the interim contract: visible, not silent.
-      expect(r._parseWarnings?.[0]?.code).toBe('UNSUPPORTED_TEXT_BLOCKS');
+      // the greedy pre-pass captures the whole span as ONE tokenized block,
+      // so the post-tokenization count sees one block, not two braces
+      expect(textWarnings(r)).toHaveLength(1);
+    });
+  });
+
+  describe('when a literal { sits inside a quoted option value', () => {
+    // regression (Phase 2.2): the pre-move check counted raw `{` characters
+    // BEFORE tokenization, so two quoted braces spuriously warned
+    it.each([
+      ['one quoted brace', '[data-t="a{b"]||B291'],
+      ['two quoted braces', '[data-t="a{b{c"]||B291']
+    ])('does not warn for %s', (description, input) => {
+      const r = BlissParser.parse(input);
+      expect(textWarnings(r)).toHaveLength(0);
+    });
+  });
+
+  describe('when a single block sits mid-string instead of trailing', () => {
+    it('warns instead of garbling silently', () => {
+      // the block lands inside a glyph token (undefined interim parse);
+      // the warning is the visibility witness
+      const r = BlissParser.parse('B291{hej}/B313');
+      expect(textWarnings(r)).toHaveLength(1);
     });
   });
 
   describe('when the input has multiple {...} blocks (interim limitation)', () => {
     it('emits a UNSUPPORTED_TEXT_BLOCKS warning when blocks live in different groups', () => {
-      // Two `{` characters anywhere in the input, even split across groups,
-      // currently means the greedy regex eats from the first `{` to the last
-      // `}` and merges across the `//`. We flag this with a warning; the
-      // actual parse output is documented-as-undefined until the tokenizer
-      // ships. When that lands, this test should flip to asserting per-group
-      // text capture.
+      // The greedy regex eats from the first `{` to the last `}` and merges
+      // across the `//`. The actual parse output is documented-as-undefined
+      // until the tokenizer ships. When that lands, this test should flip
+      // to asserting per-group text capture.
       const r = BlissParser.parse('B313{first}//B431{second}');
-      expect(r._parseWarnings?.[0]?.code).toBe('UNSUPPORTED_TEXT_BLOCKS');
+      expect(textWarnings(r)).toHaveLength(1);
     });
 
     it('emits a UNSUPPORTED_TEXT_BLOCKS warning when multiple blocks live in the same group', () => {
       const r = BlissParser.parse('H/B313{a}/B313{b}');
-      const warning = r._parseWarnings?.find(w => w.code === 'UNSUPPORTED_TEXT_BLOCKS');
+      const [warning] = textWarnings(r);
       expect(warning).toBeDefined();
       expect(warning.message).toMatch(/not supported/i);
     });
 
     it('captures the merged span between the first `{` and the last `}` when two blocks sit adjacent on one part', () => {
-      // `B313{a}{b}` has two `{` characters → the greedy regex captures
-      // from the first `{` to the last `}`, producing `a}{b` as the
-      // text content. Pinning the interim contract: content is preserved
-      // (the inner `}{` survives), and the multi-block limitation
-      // surfaces via the same warning mechanism as the cross-glyph case.
+      // `B313{a}{b}` → the greedy regex captures from the first `{` to the
+      // last `}`, producing `a}{b` as the text content. Pinning the interim
+      // contract: content is preserved (the inner `}{` survives).
       const r = BlissParser.parse('B313{a}{b}');
       expect(r.groups[0].text).toBe('a}{b');
     });

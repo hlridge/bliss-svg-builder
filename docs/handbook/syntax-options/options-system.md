@@ -129,6 +129,7 @@ A custom glyph is a single part while you use it by name, so `[opts]>` works on 
 Each bracket binds to a single unit of its scope, and the builder verifies that the unit matches. When it does not, the option is **dropped with a warning and the content still renders**; the dropped option is not re-emitted by `toString()`.
 
 - A character option on a code that expands to a whole word warns [`MISPLACED_CHARACTER_OPTION`](/reference/warning-codes#misplaced-character-option); a part option (`[opts]>`) on one warns [`MISPLACED_PART_OPTION`](/reference/warning-codes#misplaced-part-option). A character option is valid only on a single character, a part option only on a single part.
+- A bracket without `>` inside a `;`-part slot (`B291;[color=red]B81`) is a character option by syntax where only a part option fits, so it warns `MISPLACED_CHARACTER_OPTION` and the part renders bare. To style the part, write `B291;[color=red]>B81`.
 - A word option (`[opts]|`) on a predefined code that expands to multiple words warns [`MISPLACED_GROUP_OPTION`](/reference/warning-codes#misplaced-group-option). Written multi-word content is different: in `[color=red]|B313//B431` the bracket binds the first word by syntax, which is valid.
 - Only one bracket is allowed per scope: `[grid][grid-color=red]||B313` applies just the first bracket and warns [`MULTIPLE_OPTION_BRACKETS`](/reference/warning-codes#multiple-option-brackets). Combine the options instead: `[grid;grid-color=red]||B313`.
 

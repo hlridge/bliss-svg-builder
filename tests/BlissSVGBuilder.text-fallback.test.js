@@ -29,10 +29,15 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   silently dropped.
  * - Round-trip of partial-fallback inputs through `toJSON` preserves
  *   the rendered SVG byte-identically.
- * - The option-bracket/fallback asymmetry: bare Xλ renders via <text>
- *   while [color=green]Xλ fails as UNKNOWN_CODE (current behavior; the
- *   desired contract is an it.todo, fix scheduled with the char-option
- *   regex work, run-to-stable Phase 2.2).
+ * - Option-bracket routing (run-to-stable Phase 2.2): a character-level
+ *   `[opts]` or part-level `[opts]>` prefix no longer hides an X-run from
+ *   fallback routing. [color=green]Xλ renders the green fallback letter
+ *   with zero warnings; a prefixed multi-letter run behaves exactly like
+ *   its written `/`-expansion (option rides the first expanded glyph;
+ *   an all-fallback run stays one <text> glyph); an option-prefixed
+ *   member of an X-sequence stands alone instead of merging into the
+ *   whole-run fallback. X-codes in a `;`-part slot stay out of fallback
+ *   routing (unchanged).
  * - XTXT_ singleton isolation: rendering a text-fallback input does not
  *   leak `XTXT_` keys into the global definitions registry, and two
  *   builders with different XTXT_ inputs render independently.
@@ -277,22 +282,87 @@ describe('BlissSVGBuilder text fallback', () => {
     it.todo('renders Xhello//Xpiǎ as paths for the hardcoded word and a single text element for the fallback word');
   });
 
-  // A character-level option bracket hides an X-run from XTXT_ routing
-  // (processXCodes only recognizes X-runs at a glyph boundary), so a
-  // fallback letter that renders bare fails with UNKNOWN_CODE once
-  // bracketed. Fix scheduled with the char-option regex work (run-to-stable
-  // Phase 2.2); the it.todo pins the acceptance criterion.
-  describe('when a character-level option bracket precedes a fallback letter', () => {
-    it('renders bare Xλ via text fallback but reports [color=green]Xλ as UNKNOWN_CODE', () => {
-      expect(renderSvg('Xλ')).toContain('<text');
+  // Phase 2.2 acceptance criterion (1.4 review MAJOR-1): an option bracket
+  // must not hide an X-run from XTXT_ routing. processXCodes now looks
+  // through a leading `[opts]` / `[opts]>` prefix at a glyph boundary.
+  describe('when an option bracket precedes a fallback letter', () => {
+    it('renders [color=green]Xλ as a green text-fallback element with zero warnings', () => {
       const bracketed = new BlissSVGBuilder('[color=green]Xλ');
-      expect(bracketed.svgCode).not.toContain('<text');
-      expect(bracketed.warnings).toContainEqual(expect.objectContaining({
-        code: 'UNKNOWN_CODE',
-      }));
+      expect(bracketed.svgCode).toContain('<text');
+      expect(bracketed.svgCode).toContain('green');
+      expect(bracketed.warnings).toEqual([]);
+      // regression: the bracket used to defeat XTXT_ routing entirely —
+      // UNKNOWN_CODE and no render while bare Xλ rendered
+      expect(renderSvg('Xλ')).toContain('<text');
     });
 
-    it.todo('renders [color=green]Xλ as a green text-fallback element with zero warnings');
+    it('round-trips the bracketed fallback letter byte-stably', () => {
+      const b = new BlissSVGBuilder('[color=green]Xλ');
+      expect(b.toString()).toBe('[color=green]Xλ');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('renders a part-option-prefixed fallback letter with zero warnings', () => {
+      const b = new BlissSVGBuilder('[color=red]>Xλ');
+      expect(b.svgCode).toContain('<text');
+      expect(b.warnings).toEqual([]);
+    });
+
+    // pins the outlined-letter pass-through: only a FALLBACK letter is
+    // rewritten to XTXT_; a hardcoded letter behind a bracket keeps its
+    // path-outline route
+    it('keeps an outlined letter behind a bracket on the path route', () => {
+      const b = new BlissSVGBuilder('[color=green]XA');
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toContain('<path');
+      expect(b.svgCode).not.toContain('<text');
+    });
+  });
+
+  describe('when an option bracket precedes a multi-letter X-run', () => {
+    it('behaves exactly like the written /-expansion for outlined letters', () => {
+      // X-runs are string-level sugar (toString of Xab IS Xa/Xb), so the
+      // prefixed form must equal its expansion: option on the first glyph
+      const sugar = new BlissSVGBuilder('[color=green]Xab');
+      const written = new BlissSVGBuilder('[color=green]Xa/Xb');
+      expect(sugar.warnings).toEqual([]);
+      expect(sugar.svgCode).toBe(written.svgCode);
+      expect(sugar.toString()).toBe('[color=green]Xa/Xb');
+    });
+
+    it('keeps an all-fallback run as one styled text glyph', () => {
+      const b = new BlissSVGBuilder('[color=green]Xλμ');
+      expect(b.warnings).toEqual([]);
+      expect((b.svgCode.match(/<text/g) ?? []).length).toBe(1);
+      expect(b.svgCode).toContain('green');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('routes a part-option prefix on a multi-letter run like its written expansion', () => {
+      const sugar = new BlissSVGBuilder('[color=red]>Xab');
+      const written = new BlissSVGBuilder('[color=red]>Xa/Xb');
+      expect(sugar.warnings).toEqual([]);
+      expect(sugar.svgCode).toBe(written.svgCode);
+    });
+  });
+
+  describe('when an option-prefixed member sits inside an X-sequence', () => {
+    it('stands alone instead of merging into the whole-run fallback', () => {
+      const b = new BlissSVGBuilder('Xa/[color=green]Xλ/Xb');
+      expect(b.warnings).toEqual([]);
+      // a and b stay outlined paths; only the styled λ falls back to text
+      expect((b.svgCode.match(/<text/g) ?? []).length).toBe(1);
+      expect(externalGlyphPaths(b.svgCode).length).toBeGreaterThanOrEqual(2);
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+  });
+
+  describe('when an X-code sits in a ;-part slot', () => {
+    it('stays out of fallback routing (unchanged contract)', () => {
+      const b = new BlissSVGBuilder('B291;Xλ');
+      expect(b.warnings.map((w) => w.code)).toContain('UNKNOWN_CODE');
+      expect(b.svgCode).not.toContain('<text');
+    });
   });
 
   describe('when XTXT_ inputs are isolated from global state', () => {

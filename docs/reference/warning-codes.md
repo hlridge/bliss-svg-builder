@@ -135,13 +135,14 @@ Use the scope that matches what you mean, e.g. `[color=red]||MYWORD`.
 
 ### `MISPLACED_CHARACTER_OPTION`
 
-A character option on a code that expands to a whole word.
+A character option where no single character can take it: on a code that expands to a whole word, or a bracket without `>` inside a `;`-part slot (a bracket without `>` is a character option by syntax; a part takes `[opts]>`).
 
 ```
 [color=red]MYWORD      →  renders the word, option dropped
+B291;[color=red]B81    →  renders both parts, option dropped
 ```
 
-A character option is valid only on a single character (a B-code, a composed character, or a code resolving to one).
+A character option is valid only on a single character (a B-code, a composed character, or a code resolving to one). To style a single part, use the part scope: `B291;[color=red]>B81`.
 
 ### `MISPLACED_GROUP_OPTION`
 
@@ -253,7 +254,7 @@ spaced.toString(); // '//' — the word became a space; ;;B81 was dropped, with 
 
 ### `UNSUPPORTED_TEXT_BLOCKS`
 
-More than one `{` in a single input — several `{...}` text blocks, or one block whose text itself contains a `{`. The current parser supports at most one trailing text block per input; beyond that, the content between braces can merge unpredictably.
+A `{...}` text block in the input. Text blocks parse but do not render yet and are dropped from `toString()` output, so every block warns until text rendering ships. Several blocks in one input additionally have undefined parse behavior (the content between braces can merge across blocks). A `{` inside a quoted option value is plain text and never counts.
 
 ## No-op Mutations
 

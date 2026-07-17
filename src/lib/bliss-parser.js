@@ -25,6 +25,15 @@ const COORD_SUFFIX_PATTERN = /:(?:-?(?:\d+(?:\.\d*)?|\.\d+))?(?:,(?:-?(?:\d+(?:\
 // a toJSON() round-trip reconstructs what the string parser accepted.
 const PART_OPTION_CODESTRING = /^\[.*?\]>/;
 
+// A `>`-less bracket is a CHARACTER option by syntax; inside a `;`-part slot
+// only part options ([opts]>) apply, so the bracket is misplaced on an
+// otherwise-valid code: peel + warn + drop, then parse the remainder normally.
+// The [^\[\]] class keeps the match to ONE bracket token — a `.*?` class
+// would backtrack across `]…[` and capture a bracket pair as one blob. The
+// non-empty remainder (.+) keeps a dangling bracket with no code on the
+// whole-character fail path.
+const PART_SLOT_CHAR_OPTION_PATTERN = /^(\[[^\[\]]*\])(?!>)(.+)$/;
+
 // Quote-aware bracket matchers built from the shared grammar (see
 // OPTION_BRACKET_CONTENT in bliss-constants.js for the rationale and the
 // linear-time guarantee; probe: probe-chunk11-option-value-quoting.mjs).
@@ -190,13 +199,7 @@ export class BlissParser {
     // tokenizer and ships with the {text} rendering feature
     // (see .claude/backlog/text-overlay.md).
     // [...] uses non-greedy match since it can appear multiple times.
-    if ((inputString.match(/\{/g) || []).length > 1) {
-      parseWarnings.push({
-        code: WARNING_CODES.UNSUPPORTED_TEXT_BLOCKS,
-        message: 'Multiple `{...}` blocks in one input are not supported by the current parser. Behavior is undefined until proper text-block tokenization ships. Use a single trailing `{text}` per group.',
-        source: inputString,
-      });
-    }
+    const originalInput = inputString;
     inputString = inputString.replace(BRACKET_TOKEN_PATTERN, (match, textContent, optionContent) => {
       let placeholder = `PLACEHOLDER_${placeholderCount++}`;
       if (textContent !== undefined) {
@@ -207,6 +210,20 @@ export class BlissParser {
         return '[' + placeholder + ']';
       }
     });
+
+    // {text} blocks parse onto group.text but do not render yet and are
+    // dropped from toString(), so EVERY block warns — a silent single block
+    // violated visible-not-silent. Counting `{` AFTER tokenization means a
+    // quoted `{` inside an option value never counts, a whole block counts
+    // once regardless of nested braces in its content, and a stray unmatched
+    // `{` still counts as a failed block attempt.
+    if ((inputString.match(/\{/g) || []).length > 0) {
+      parseWarnings.push({
+        code: WARNING_CODES.UNSUPPORTED_TEXT_BLOCKS,
+        message: 'Text blocks ({...}) are not supported yet: the text does not render and is dropped from toString() output. Multiple {...} blocks in one input have undefined parse behavior until text-block tokenization ships. Use a single trailing {text} per group.',
+        source: originalInput,
+      });
+    }
 
     // Remove all spaces in input string (but not in preserved content)
     inputString = inputString.replace(/\s/g, '');
@@ -354,7 +371,13 @@ export class BlissParser {
         // Anchor to a glyph boundary (start of string or after /) so an X+letters
         // sequence embedded in a longer code name (e.g. a custom code EXTRA) is not
         // rewritten mid-token. Match Latin, Latin Extended, and Cyrillic letters.
-        let expanded = codeString.replace(/(?<=^|\/)X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, chars, offset) => {
+        // An option bracket ([opts] or [opts]>) at the boundary must not hide
+        // the X-run from routing (run-to-stable 2.2): the prefix rides the
+        // FIRST expanded glyph, matching the written /-expansion \u2014 X-runs are
+        // string-level sugar, so [opts]Xab must equal [opts]Xa/Xb in every
+        // observable. An all-fallback run stays ONE XTXT_ glyph, so its
+        // prefix scopes the whole run.
+        let expanded = codeString.replace(/(?<=^|\/)(\[[^\[\]]*\]>?)?X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, optionPrefix = '', chars, offset) => {
           // Skip expansion when followed by ; (word expansion would break composition).
           // A past-the-end index reads as undefined, which is never ';', so no bounds guard.
           const after = codeString[offset + match.length] === ';';
@@ -362,9 +385,9 @@ export class BlissParser {
 
           const allHavePath = [...chars].every(char => hasPathData(char));
           if (allHavePath) {
-            return [...chars].map(char => `X${char}`).join('/');
+            return optionPrefix + [...chars].map(char => `X${char}`).join('/');
           } else {
-            return `XTXT_${chars}`;
+            return `${optionPrefix}XTXT_${chars}`;
           }
         });
 
@@ -400,8 +423,18 @@ export class BlissParser {
           // Match single-char X-codes: Latin, Latin Extended, and Cyrillic letters
           if (/^X[a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]$/.test(part)) {
             currentXSequence.push(part);
+            continue;
+          }
+          flushXSequence();
+          // An option-prefixed single-char X-code stands alone: the option
+          // scopes to that one character, so it never merges into a
+          // whole-run fallback. An outlined letter passes through unchanged
+          // (it resolves via its definition downstream); only a fallback
+          // letter is rewritten so the XTXT_ route can see it.
+          const prefixed = part.match(/^(\[[^\[\]]*\]>?)X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF])$/);
+          if (prefixed && !hasPathData(prefixed[2])) {
+            result.push(`${prefixed[1]}XTXT_${prefixed[2]}`);
           } else {
-            flushXSequence();
             result.push(part);
           }
         }
@@ -1285,7 +1318,11 @@ export class BlissParser {
         }
 
         let glyphCodeString = part;
-        const glyphMatch = part.match(/^(\[.*?\])(?!>)(.*)/);
+        // The [^\[\]] class keeps the char-option match to ONE bracket token.
+        // The old `.*?` class backtracked across `]>…;[` when the lookahead
+        // failed, capturing `[a]>CODE;[b]` as one character-option blob —
+        // every part before the second bracket was silently eaten.
+        const glyphMatch = part.match(/^(\[[^\[\]]*\])(?!>)(.*)/);
         if (glyphMatch) {
           const parsedOptions = dropMisplacedGlobalKeys(
             this.#parseOptions(restorePlaceholders(glyphMatch[1])), 'character');
@@ -1307,7 +1344,23 @@ export class BlissParser {
           // yields an indicator-only glyph instead of a failed empty part.
           // Word-level ';;' is resolved upstream and never reaches here.
           const twoPartPartStrings = partsString.split(';').filter(s => s !== '');
-          for (const [partIndex, twoPartPartString] of twoPartPartStrings.entries()) {
+          for (const [partIndex, rawPartString] of twoPartPartStrings.entries()) {
+            let twoPartPartString = rawPartString;
+            // Slot 0 is the character's own option position (its bracket was
+            // already stripped at the glyph level); a `>`-less bracket in a
+            // LATER slot is a misplaced character option: peel one warning
+            // per bracket, drop it, and parse the remaining code normally.
+            if (partIndex > 0) {
+              let peeled;
+              while ((peeled = twoPartPartString.match(PART_SLOT_CHAR_OPTION_PATTERN)) !== null) {
+                parseWarnings.push({
+                  code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+                  message: `Character option (${restorePlaceholders(peeled[1])}) ignored on "${restorePlaceholders(peeled[2])}": a ; part slot takes part options. Use ${restorePlaceholders(peeled[1])}>${restorePlaceholders(peeled[2])} to style the part.`,
+                  source: restorePlaceholders(rawPartString),
+                });
+                twoPartPartString = peeled[2];
+              }
+            }
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
             if (part.options) {
               part.options = dropMisplacedGlobalKeys(part.options, 'part');

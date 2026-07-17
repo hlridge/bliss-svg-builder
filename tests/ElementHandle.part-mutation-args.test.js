@@ -185,14 +185,17 @@ describe('ElementHandle part mutation args', () => {
       expect(b.toString()).toBe('B291;[color=red]>B97');
     });
 
-    it('fails the char-scope options spelling exactly like its DSL twin', () => {
+    it('peels the char-scope options spelling exactly like its DSL twin', () => {
       // note: '[color=red]B97' is the CHARACTER-scope spelling; in a part slot
-      // it is invalid on both surfaces (G1) and surfaces UNKNOWN_CODE
+      // it is a misplaced character option on both surfaces (run-to-stable
+      // Phase 2.2): warn + drop the bracket + keep the part
       const b = new BlissSVGBuilder('B291');
       b.group(0).glyph(0).addPart('[color=red]B97');
-      expect(b.warnings.some((w) => w.code === 'UNKNOWN_CODE')).toBe(true);
+      expect(b.warnings.some((w) => w.code === 'MISPLACED_CHARACTER_OPTION')).toBe(true);
       const twin = new BlissSVGBuilder('B291;[color=red]B97');
-      expect(twin.warnings.some((w) => w.code === 'UNKNOWN_CODE')).toBe(true);
+      expect(twin.warnings.some((w) => w.code === 'MISPLACED_CHARACTER_OPTION')).toBe(true);
+      expect(b.toString()).toBe(twin.toString());
+      expect(b.svgCode).toBe(twin.svgCode);
     });
   });
 

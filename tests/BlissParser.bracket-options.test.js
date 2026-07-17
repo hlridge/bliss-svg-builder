@@ -328,9 +328,12 @@ describe('BlissParser bracket options', () => {
     it('restores text placeholders inside invalid group option warnings', () => {
       const r = BlissParser.parse('bad{with space}|H');
 
-      expect(r._parseWarnings).toEqual([
-        invalidGroupOptionsWarning('bad{with space}')
-      ]);
+      // the {…} block also fires the every-block UNSUPPORTED_TEXT_BLOCKS
+      // witness (run-to-stable 2.2); the restored-placeholder pin is the
+      // MALFORMED_GROUP_OPTIONS entry
+      expect(r._parseWarnings).toContainEqual(invalidGroupOptionsWarning('bad{with space}'));
+      expect(r._parseWarnings.map((w) => w.code))
+        .toEqual(['UNSUPPORTED_TEXT_BLOCKS', 'MALFORMED_GROUP_OPTIONS']);
       expect(r.groups[0].glyphs[0].parts[0].codeName).toBe('H');
     });
 
@@ -387,9 +390,11 @@ describe('BlissParser bracket options', () => {
     it('restores text placeholders inside invalid global option warnings', () => {
       const r = BlissParser.parse('bad{with space}||B313');
 
-      expect(r._parseWarnings).toEqual([
-        invalidGlobalOptionsWarning('bad{with space}')
-      ]);
+      // the {…} block also fires the every-block UNSUPPORTED_TEXT_BLOCKS
+      // witness (run-to-stable 2.2)
+      expect(r._parseWarnings).toContainEqual(invalidGlobalOptionsWarning('bad{with space}'));
+      expect(r._parseWarnings.map((w) => w.code))
+        .toEqual(['UNSUPPORTED_TEXT_BLOCKS', 'MALFORMED_GLOBAL_OPTIONS']);
       expect(r.groups[0].glyphs[0].glyphCode).toBe('B313');
     });
 
