@@ -78,4 +78,4 @@ Text rendering covers the Latin, Greek, and Cyrillic letter ranges. `X` followed
 
 ## Compatibility
 
-X-code input keeps its meaning permanently: a string that parses today keeps parsing and keeps meaning the same text in every future version. The X notation is the library's current mechanism for spelled text, not necessarily its final one: the serialized form and the rendering mechanism may evolve in future releases, always release-noted. The letter B-codes (`B29`-`B80`) are stable like every B-code. Details in [Compatibility](/reference/compatibility#external-glyphs-x-codes).
+X-code input keeps its meaning permanently: a string that parses today keeps parsing and keeps meaning the same text in every future version. The X notation is the library's current mechanism for spelled text, not necessarily its final one: the serialized form and the rendering mechanism may evolve in future releases, always release-noted, and a future mechanism may depend on a font being available where the SVG is generated. The letter B-codes (`B29`-`B80`) are stable like every B-code. Details in [Compatibility](/reference/compatibility#external-glyphs-x-codes).
