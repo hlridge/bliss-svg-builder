@@ -131,6 +131,14 @@ describe('BlissParser part-slot character options', () => {
       expect(build('S8;[fill=green]').svgCode).not.toContain('<path');
     });
 
+    // regression: the Invalid-format message surfaced the internal token
+    // literally ([PLACEHOLDER_0]) instead of the written bracket
+    it('names the written bracket in the failure message, not the internal token', () => {
+      const warning = build('S8;[fill=green]').warnings.find((w) => w.code === 'UNKNOWN_CODE');
+      expect(warning.message).toContain('[fill=green]');
+      expect(warning.message).not.toContain('PLACEHOLDER');
+    });
+
     // pins the one-bracket-token peel class: a `.*?` body would backtrack
     // across `]>…[` and peel `[a]>[b]` as one blob instead of leaving the
     // part-option-then-bracket stack on the whole-character fail path

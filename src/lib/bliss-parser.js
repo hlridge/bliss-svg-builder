@@ -160,7 +160,10 @@ export class BlissParser {
         x !== undefined && (part.x = Number(x));
         y !== undefined && (part.y = Number(y));
       } else {
-        part.error = `Invalid format: ${codeString}`;
+        // Restore placeholders in the MESSAGE only (a tokenized bracket
+        // otherwise leaks as a literal [PLACEHOLDER_n], round-2 review
+        // NOTE-2); the format checks below stay on the tokenized string.
+        part.error = `Invalid format: ${restoreFunction(codeString)}`;
         // A recognizable code followed by a malformed coordinate suffix
         // (B291:abc, B291:., B291:5,6,7) is a coordinate FORMAT error, not an
         // unknown code: the code lexes fine, only the `:x,y` failed to parse.
