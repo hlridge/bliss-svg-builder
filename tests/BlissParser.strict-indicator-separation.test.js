@@ -213,15 +213,16 @@ describe('BlissParser strict indicator separation', () => {
   });
 
   describe('when a malformed ;; is applied to a multi-word (//) alias', () => {
-    it('fail-renders without growing the toString round-trip', () => {
+    it('drops the failed word without growing the toString round-trip', () => {
       // regression (M1): the malformed-;; fallback expanded the // alias into
       // separate word-groups, so toString re-emitted the whole expansion and the
-      // round-trip grew by "//B313/B291" on every pass. Collapsing the multi-word
-      // expansion to one fail-placeholder restores the verbatim fixpoint.
+      // round-trip grew by "//B313/B291" on every pass. The failed word now drops
+      // entirely (retention family, rows 31/80), so the round-trip is the empty
+      // fixpoint, never unbounded.
       const b = new BlissSVGBuilder('MWORD;;B81/B291');
       const t1 = b.toString();
       const t2 = new BlissSVGBuilder(t1).toString();
-      expect(t1).toBe('MWORD;;B81/B291');
+      expect(t1).toBe('');
       expect(t2).toBe(t1);
     });
 

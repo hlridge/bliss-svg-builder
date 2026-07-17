@@ -886,12 +886,87 @@ class BlissSVGBuilder {
     }
   }
 
+  // Retention family (row 31): malformed SYNTAX is a parse-time warning, never
+  // persisted. A malformed part token is a pure error node (an `{error}` node
+  // with no codeName and no nested parts): `!` (Invalid format) or a code with
+  // an unparseable `:x,y` suffix (MALFORMED_COORDINATES). Dropping only the bad
+  // part would let a valid sibling collapse into a DIFFERENT valid character
+  // (the E->F hazard: `B291;!;B97` -> `B291;B97`), so the WHOLE character is
+  // dropped from render and BOTH serializations, keeping the parse-time warning
+  // as the only trace (no persisted `{error}` node). Exempt: an UNKNOWN code
+  // (`ZZ9`, a codeName that cannot yet resolve) is CONTENT, kept + warned
+  // (define it later and it renders); a word/composite misused as a part
+  // (WORD_AS_PART / COMPOSITE_AS_PART) carries a codeName or nested parts and
+  // re-emits visibly; a compound-indicator glyph (glyph-level isIndicator) is
+  // atomic. A fail-flagged word (group.errorCode) is dropped whole by
+  // #normalizeFailedWordInvariant, so its glyphs are skipped. Runs FIRST among
+  // the rebuild normalizers so a doomed glyph raises exactly one drop warning,
+  // not also a space-part or indicator warning.
+  #normalizeMalformedPartInvariant() {
+    for (const group of this.#rawBlissObj.groups ?? []) {
+      if (group.errorCode) continue;
+      const glyphs = group.glyphs;
+      if (!Array.isArray(glyphs)) continue;
+      const doomed = [];
+      for (let gi = 0; gi < glyphs.length; gi++) {
+        const glyph = glyphs[gi];
+        if (glyph.isIndicator === true) continue;
+        const parts = glyph.parts;
+        if (!Array.isArray(parts)) continue;
+        const errorParts = parts.filter(p => p.error && !p.codeName && !(p.parts?.length > 0));
+        if (errorParts.length === 0) continue;
+        for (const p of errorParts) {
+          // Mirror BlissElement's leaf-fail warning so the visibility survives
+          // the drop: a code with a bad `:x,y` suffix names the coordinate
+          // error, any other malformed token is UNKNOWN_CODE.
+          if (p.errorCode === WARNING_CODES.MALFORMED_COORDINATES) {
+            this.#mutationWarnings.push({ code: WARNING_CODES.MALFORMED_COORDINATES, message: p.error, source: p.error });
+          } else {
+            this.#mutationWarnings.push({ code: WARNING_CODES.UNKNOWN_CODE, message: `Unknown or invalid code: "${p.error}"`, source: p.error });
+          }
+        }
+        doomed.push(gi);
+      }
+      for (let k = doomed.length - 1; k >= 0; k--) glyphs.splice(doomed[k], 1);
+    }
+  }
+
+  // Retention family (row 80): a malformed word-level indicator (a doubled `;;`,
+  // or a `;;` bound to a multi-word alias) fails the WHOLE word at parse
+  // (group.errorCode = MALFORMED_WORD_INDICATOR, group.errorSource = the raw
+  // text). The failed word is not content: it is dropped from render and BOTH
+  // serializations, reserving no extent, and neither errorCode nor errorSource
+  // is persisted. The parse-time warning (formerly surfaced by the element's L1
+  // fail-render, gone with the group) is re-emitted here before the drop so it
+  // survives; the drop makes the sweep warn once, not per rebuild. Runs before
+  // #normalizeSpaceInvariant so its adjacent-space merge sees the post-drop
+  // layout (a dropped middle word can leave two neighbor spaces).
+  #normalizeFailedWordInvariant() {
+    const groups = this.#rawBlissObj.groups;
+    if (!Array.isArray(groups)) return;
+    const survivors = [];
+    for (const group of groups) {
+      if (group.errorCode) {
+        this.#mutationWarnings.push({
+          code: group.errorCode,
+          message: group.error,
+          source: group.errorSource,
+        });
+        continue;
+      }
+      survivors.push(group);
+    }
+    if (survivors.length !== groups.length) this.#rawBlissObj.groups = survivors;
+  }
+
   #rebuild() {
     this.#generation++;
     this.#elementsCache = undefined;
     this.#groupsCache = undefined;
     this.#warnings = [];
 
+    this.#normalizeMalformedPartInvariant();
+    this.#normalizeFailedWordInvariant();
     this.#normalizeSpacePartInvariant();
     this.#normalizeSpaceInvariant();
     this.#normalizeIndicatorInvariant();
@@ -2002,17 +2077,9 @@ class BlissSVGBuilder {
     };
     for (const group of obj.groups || []) {
       if (!group.glyphs) continue;
-      // A group the parser flagged as a malformed word (errorCode) re-emits its
-      // original offending string verbatim, so parse(toString(x)) re-detects the
-      // same fault and re-flags. Its base glyphs (kept only so the failed word
-      // advances like a normal one) are NOT serialized: they would collapse to a
-      // valid word and silently lose the malformation.
-      if (group.errorCode && group.errorSource !== undefined) {
-        flushSpaceRun();
-        const optPrefix = serializeOptions(group.options);
-        segments.push(optPrefix ? `${optPrefix}|${group.errorSource}` : group.errorSource);
-        continue;
-      }
+      // A malformed word (parser group.errorCode) never reaches serialization:
+      // #normalizeFailedWordInvariant drops it from #rawBlissObj at rebuild
+      // (retention family, rows 31/80), so no errorSource replay survives here.
       if (isSpaceGroup(group)) {
         spaceRun ??= { glyphCount: 0, codes: [], hasNonDefault: false };
         spaceRun.glyphCount += group.glyphs.length;

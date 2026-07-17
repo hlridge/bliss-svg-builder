@@ -60,7 +60,7 @@ Correct form: `[color=red]|B313`.
 
 ### `MALFORMED_WORD_INDICATOR`
 
-A structurally invalid `;;`: it must be the trailing part of a word. The affected word fails to render (this is a structure error, not a droppable decoration).
+A structurally invalid `;;`: it must be the trailing part of a word. The whole word is dropped from render and from both `toString()` and `toJSON()` (malformed syntax is not content; the warning is its only trace).
 
 ```
 B313;;B81/B1103        →  ;; is not at the end of the word
@@ -72,7 +72,7 @@ The `applyIndicators()` overlay channel (group handle or object input) fires it 
 
 ### `MALFORMED_COORDINATES`
 
-A `:` suffix that is not a valid coordinate pair. The affected character fails to render.
+A `:` suffix that is not a valid coordinate pair. The whole character is dropped from render and from both `toString()` and `toJSON()`: a malformed part fails the entire character, since keeping the rest could silently form a different valid character.
 
 ```
 B313:abc               →  not numbers
@@ -231,7 +231,7 @@ A code that is not a built-in and not defined. The affected character fails to r
 B291;ZZ9               →  warns, toString() still returns 'B291;ZZ9'
 ```
 
-A token that is not even a valid code shape (for example `!B81`) cannot be represented and is dropped instead, also with `UNKNOWN_CODE`.
+A token that is not even a valid code shape (for example `!B81`) cannot be represented. It is malformed syntax rather than content, so the **whole character** is dropped from render and from both `toString()` and `toJSON()`, also with `UNKNOWN_CODE`. (Only the *bad* part is not dropped in isolation: keeping the rest, `B291;!B81` -> `B291`, could silently form a different valid character.)
 
 ## Dropped Content
 

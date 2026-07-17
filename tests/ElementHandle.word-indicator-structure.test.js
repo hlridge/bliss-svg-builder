@@ -25,10 +25,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   group-boundary mutations: mergeWithNext and removeGlyph re-derive which
  *   glyph heads the word, independent of the overlay.
  * - A fail-flagged word (malformed-`;;` OR a `;;` indicator bound to a multi-word
- *   alias) is the terminal sibling of the overlay: splitAt and mergeWithNext
- *   NO-OP when a flagged group is involved (a failed word's hidden base glyphs
- *   must not escape across a group boundary and render as valid), via one
- *   generic group.errorCode guard; only replacing the whole group recovers it.
+ *   alias) is DROPPED at rebuild (retention family, rows 31/80), so it never
+ *   persists for splitAt/mergeWithNext to reach: a lone fail-flagged input is
+ *   empty, and a fail-flagged word beside valid content leaves only the valid
+ *   neighbor. This retired the pre-2.1 terminal-word no-op guard.
  *
  * Does NOT cover:
  * - The applyIndicators / clearIndicators overlay API itself, see
@@ -317,61 +317,36 @@ describe('ElementHandle word indicators under structural mutation', () => {
     });
   });
 
-  describe('when restructuring a fail-flagged (malformed-;; or multi-word-alias) word', () => {
+  describe('when a fail-flagged (malformed-;; or multi-word-alias) word is dropped', () => {
     // A malformed `;;` (non-trailing or repeated) OR a `;;` indicator bound to a
-    // multi-word alias flags the WHOLE word (group.errorCode) for a single-icon
-    // fail-render. Like the overlay it is a word-level property, but unlike the
-    // overlay it is TERMINAL: splitAt and mergeWithNext move glyphs across a
-    // group boundary, which would let the failed word's hidden base glyphs
-    // escape and render as valid (a silent un-fail, or silent loss of the
-    // absorbed word). So both NO-OP when a flagged group is involved, via a
-    // single generic guard keyed on group.errorCode (not on how the flag was
-    // set); only replacing the whole group recovers it.
+    // multi-word alias flags the WHOLE word at parse, and the builder DROPS it at
+    // rebuild (retention family, rows 31/80). So there is no persisted flagged
+    // group for splitAt/mergeWithNext to reach: a dropped word cannot be split
+    // back into the glyphs it never kept, or absorb a neighbor. This retired the
+    // terminal-word guard (a fail-flagged word used to persist and no-op every
+    // structural mutation until replaceGroup recovered it).
     const malformedWarnings = (builder) =>
       builder.warnings.filter(w => w.code === 'MALFORMED_WORD_INDICATOR');
 
-    it('does not split a fail-flagged word', () => {
+    it('drops the failed word so a lone fail-flagged input is empty', () => {
       const b = new BlissSVGBuilder('B313;;B81/B431');
-      b.group(0).splitAt(1);
-      expect(b.toString()).toBe('B313;;B81/B431');
-      expect(b.stats.groupCount).toBe(1);
+      expect(b.toString()).toBe('');
+      expect(b.stats.groupCount).toBe(0);
       expect(malformedWarnings(b)).toHaveLength(1);
     });
 
-    it('does not merge a valid word into a following fail-flagged word', () => {
+    it('drops the failed word, leaving only the valid neighbor to restructure', () => {
       const b = new BlissSVGBuilder('B291//B313;;B84;;B97');
-      b.group(0).mergeWithNext();
-      expect(b.toString()).toBe('B291//B313;;B84;;B97');
+      expect(b.toString()).toBe('B291//');
       expect(malformedWarnings(b)).toHaveLength(1);
     });
 
-    it('does not merge a fail-flagged word with its valid neighbor', () => {
-      const b = new BlissSVGBuilder('B313;;B84;;B97//B291');
-      b.group(0).mergeWithNext();
-      expect(b.toString()).toBe('B313;;B84;;B97//B291');
-      expect(malformedWarnings(b)).toHaveLength(1);
-    });
-
-    it('recovers the word when the whole group is replaced', () => {
-      const b = new BlissSVGBuilder('B313;;B81/B431');
-      b.replaceGroup(0, 'B291');
-      expect(b.toString()).toBe('B291');
-      expect(malformedWarnings(b)).toHaveLength(0);
-    });
-
-    it('no-ops splitAt and mergeWithNext on a multi-word-alias ;; fail (same guard)', () => {
-      // A `;;` indicator bound to a multi-word alias sets the SAME group.errorCode
-      // as a malformed `;;`, so the generic guard protects it identically: the
-      // collapsed unit cannot be split back into the words it would have rendered.
-      // (A char-level `;` on a multi-word alias is now MISPLACED + render, not a
-      // fail - see BlissParser.strict-indicator-separation.test.js.)
+    it('drops a multi-word-alias ;; fail the same way (same parse flag)', () => {
       BlissSVGBuilder.define({ _MW_FAIL: { codeString: 'B291//B313' } });
       try {
         const b = new BlissSVGBuilder('_MW_FAIL;;B81');
-        b.group(0).splitAt(1);
-        b.group(0).mergeWithNext();
-        expect(b.toString()).toBe('_MW_FAIL;;B81');
-        expect(b.stats.groupCount).toBe(1);
+        expect(b.toString()).toBe('');
+        expect(b.stats.groupCount).toBe(0);
         expect(malformedWarnings(b)).toHaveLength(1);
       } finally {
         BlissSVGBuilder.removeDefinition('_MW_FAIL');

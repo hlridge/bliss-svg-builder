@@ -257,17 +257,17 @@ describe('BlissSVGBuilder space invariant', () => {
   });
 
   describe('when a fail-flagged word contains a bare space glyph', () => {
-    it('never splits the terminal word (its errorSource replays verbatim)', () => {
-      // reachable via an alias expanding an in-word space under a malformed
-      // ;;. Splitting the flagged group would duplicate its errorSource
-      // replay, so the canonicalization pass exempts errorCode groups.
+    it('drops the whole word, so the space-split pass never reaches it', () => {
+      // reachable via an alias expanding an in-word space under a malformed ;;.
+      // The word is fail-flagged at parse and dropped at rebuild (retention
+      // family, rows 31/80), so the bare in-word space never surfaces for the
+      // space-split canonicalization: there is nothing left to split.
       BlissSVGBuilder.define({ _SIT_X: { codeString: 'B291/TSP/B313' } });
       try {
         const b = new BlissSVGBuilder('_SIT_X;;B81;;B86');
-        expect(b.toJSON().groups).toHaveLength(1);
-        expect(b.toJSON().groups[0].errorCode).toBe('MALFORMED_WORD_INDICATOR');
-        expect(b.toString()).toBe('_SIT_X;;B81;;B86');
-        expect(new BlissSVGBuilder(b.toString()).toString()).toBe(b.toString());
+        expect(b.toJSON().groups).toEqual([]);
+        expect(b.toString()).toBe('');
+        expect(b.warnings.map(w => w.code)).toEqual(['MALFORMED_WORD_INDICATOR']);
       } finally {
         BlissSVGBuilder.removeDefinition('_SIT_X');
       }

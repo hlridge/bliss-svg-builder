@@ -20,7 +20,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Navigation repair: a space-led part list no longer miscounts `.groups`.
  * - Untouched forms: genuine space words, ZSA parts (content, exempt),
  *   the parser-transient SP (unknown-code path, not a space classifier
- *   member), fail-flagged words.
+ *   member). A fail-flagged word is dropped whole before the space-part pass
+ *   (retention family, rows 31/80), so it never needs a separate exemption.
  * - The define() reference-type gate: a glyph definition cannot reference a
  *   space, so no definition anatomy legitimately contains a space part.
  * - Normalizer ordering: a space part is no indicator witness, so the
@@ -203,11 +204,12 @@ describe('BlissSVGBuilder space as a part', () => {
   });
 
   describe('when the word is fail-flagged', () => {
-    it('leaves the word untouched, space part included', () => {
-      // pins the group.errorCode skip (replay fidelity): a fail-flagged word
-      // re-emits verbatim, so its space part must survive normalize
+    it('drops the whole word, so the space-part pass never reaches it', () => {
+      // A fail-flagged word (doubled ;;) is dropped at rebuild (retention family,
+      // rows 31/80) before the space-part normalizer runs, so its space part
+      // never needs a separate exemption: the whole word is gone.
       const b = new BlissSVGBuilder('B313;QSP;;X;;Y');
-      expect(b.toString()).toBe('B313;QSP;;X;;Y');
+      expect(b.toString()).toBe('');
       expect(spaceWarnings(b)).toHaveLength(0);
       expect(b.warnings.map((w) => w.code)).toContain('MALFORMED_WORD_INDICATOR');
     });

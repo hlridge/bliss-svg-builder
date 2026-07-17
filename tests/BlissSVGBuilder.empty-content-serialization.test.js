@@ -148,12 +148,14 @@ describe('BlissSVGBuilder empty-content serialization', () => {
   });
 
   describe('when a space run meets a fail-flagged word', () => {
-    it('re-emits the failed word in place between separate space runs', () => {
-      // The malformed ;; chain flags the word (MALFORMED_WORD_INDICATOR) and
-      // toString re-emits its errorSource verbatim; the surrounding space
-      // runs must flush around it, never coalesce across it or trail it.
+    it('drops the failed word so the surrounding spaces coalesce and round-trip', () => {
+      // The malformed ;; chain flags the word (MALFORMED_WORD_INDICATOR) and the
+      // builder drops it (retention family, rows 31/80). Its two separating
+      // spaces are now adjacent and merge into one run, staying round-trip
+      // stable in both serialization and rendered width.
       const b = new BlissSVGBuilder('B291//B313;;B81;;B86//B208');
-      expect(b.toString()).toBe('B291//B313;;B81;;B86//B208');
+      expect(b.toString()).toBe('B291///B208');
+      expect(b.warnings.map(w => w.code)).toEqual(['MALFORMED_WORD_INDICATOR']);
       expect(reparsedWidth(b)).toBe(viewBoxWidth(b));
     });
   });

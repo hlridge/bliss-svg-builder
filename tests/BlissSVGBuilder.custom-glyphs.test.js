@@ -225,14 +225,14 @@ describe('BlissSVGBuilder custom glyphs', () => {
   });
 
   describe('when a ;!-part is applied to a baseless compound-indicator glyph', () => {
-    it('dumb-appends the invalid !-code and warns UNKNOWN_CODE (no special strip parse)', () => {
-      // Strict Indicator Separation: `;` is dumb part-composition, so `;!B81` on
-      // a glyph appends the invalid code `!B81` (UNKNOWN_CODE); there is no
-      // character-level strip-semantic surface (that is API-only). The base
-      // compound indicator is unchanged.
+    it('drops the whole character on the invalid !-code, warning UNKNOWN_CODE', () => {
+      // Strict Indicator Separation: `;` is dumb part-composition, so `;!B81`
+      // appends the invalid code `!B81` (UNKNOWN_CODE at parse). A malformed part
+      // now fails the WHOLE character (retention family, rows 31/80): keeping the
+      // base COMBO_IND (B86;B97) would be a DIFFERENT valid character.
       defineAndTrack({ COMBO_IND: { type: 'glyph', codeString: 'B86;B97', isIndicator: true } });
       const b = new BlissSVGBuilder('COMBO_IND;!B81');
-      expect(b.toString()).toBe('B86;B97');
+      expect(b.toString()).toBe('');
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
     });
   });

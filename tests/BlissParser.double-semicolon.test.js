@@ -38,9 +38,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Single ; on a pre-defined multi-glyph word is misplaced (warn + drop, no
  *   overlay), not baked onto the head.
  * - Malformed ;; (a glyph follows the indicators, or ;; repeats) flagging the
- *   whole word (group.errorCode = MALFORMED_WORD_INDICATOR) for a single-icon
- *   fail-render, emitting exactly one warning, and round-tripping the offending
- *   string (toString re-emit, toJSON flag fields, rebuild stickiness).
+ *   whole word at the PARSER (group.errorCode = MALFORMED_WORD_INDICATOR); the
+ *   BUILDER then DROPS the failed word from render and both serializations,
+ *   emitting exactly one warning and persisting no errorCode/errorSource
+ *   (retention family, rows 31/80; retired the pre-2.1 errorSource round-trip).
  * - A ;; bound to a MULTI-WORD ALIAS (one token expanding past a word break)
  *   failing the whole unit (group.errorCode) instead of overlaying only the
  *   first word; uniform with the char-level `;` multi-word-alias fail in
@@ -298,13 +299,13 @@ describe('BlissParser ;; syntax', () => {
   describe('when ;; is malformed (a glyph follows the indicators, or ;; repeats)', () => {
     // A word-level indicator must be the TRAILING part of a word. When a
     // `/`-separated glyph follows the indicators (B313;;B81/B431), or a second
-    // ;; appears (B313;;B84;;B97), the word is invalid: the parser flags the
-    // whole GROUP (group.errorCode = MALFORMED_WORD_INDICATOR) and the element
-    // fails the entire word to one error placeholder (error-placeholder on) or
-    // nothing (off), emitting exactly ONE warning. This revises the earlier
-    // char-level (;) degrade: a malformed word-level indicator is a WORD
-    // property, so it invalidates the word, not one character (user decision,
-    // corpus-expansion-and-indicator-contract plan, Decision 6).
+    // ;; appears (B313;;B84;;B97), the word is invalid: the PARSER flags the
+    // whole GROUP (group.errorCode = MALFORMED_WORD_INDICATOR). The builder then
+    // DROPS the failed word from render and both serializations (retention
+    // family, rows 31/80), emitting exactly ONE MALFORMED_WORD_INDICATOR
+    // warning. The drop supersedes the earlier fail-render-to-placeholder
+    // behavior: a malformed word is not content, so error-placeholder shows
+    // nothing for it (only retained unknown codes still get a placeholder).
     const warningCodes = (dsl) => new BlissSVGBuilder(dsl).warnings.map((w) => w.code);
     const flaggedGroup = (dsl) => BlissParser.parse(dsl).groups[0];
 
@@ -312,27 +313,27 @@ describe('BlissParser ;; syntax', () => {
       'B313;;B81/B431',       // a glyph follows the indicators
       'B313;;B84;;B97',       // a second ;; repeats
       'B313;;B81/B431;;B86',  // non-trailing AND repeated
-    ])('flags the whole word with group.errorCode for %s', (dsl) => {
+    ])('flags the whole word with group.errorCode at the parser for %s', (dsl) => {
       expect(flaggedGroup(dsl).errorCode).toBe('MALFORMED_WORD_INDICATOR');
       expect(flaggedGroup(dsl).errorSource).toBe(dsl);
     });
 
-    it('emits exactly one MALFORMED_WORD_INDICATOR warning for the word', () => {
-      // The warning is recorded once by the L1 fail-render mechanism, not twice
-      // (the parser no longer also pushes a parse warning for the same fault).
+    it('emits exactly one MALFORMED_WORD_INDICATOR warning for the dropped word', () => {
+      // The warning is re-emitted once by the drop normalizer as the only trace.
       const malformed = new BlissSVGBuilder('B313;;B84;;B97').warnings
         .filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
       expect(malformed).toHaveLength(1);
     });
 
-    it('collapses the whole word to a single placeholder when error-placeholder is on', () => {
-      const group = new BlissSVGBuilder('[error-placeholder]||B313;;B81/B431').snapshot().children[0];
-      expect(group.children).toHaveLength(1);
+    it('drops the failed word entirely even when error-placeholder is on', () => {
+      // A malformed word is not content; error-placeholder shows nothing for it.
+      const snap = new BlissSVGBuilder('[error-placeholder]||B313;;B81/B431').snapshot();
+      expect(snap.children).toEqual([]);
     });
 
-    it('renders the word invisible with no children when error-placeholder is off', () => {
-      const group = new BlissSVGBuilder('B313;;B81/B431').snapshot().children[0];
-      expect(group.children).toEqual([]);
+    it('drops the failed word with no children when error-placeholder is off', () => {
+      const snap = new BlissSVGBuilder('B313;;B81/B431').snapshot();
+      expect(snap.children).toEqual([]);
     });
 
     it('does not flag or warn for a well-formed trailing ;; (B313/B1103;;B81)', () => {
@@ -341,51 +342,47 @@ describe('BlissParser ;; syntax', () => {
     });
   });
 
-  describe('when a malformed-;; word round-trips or rebuilds', () => {
-    // Task-2 self-review acceptance gates: the flag must survive serialization
-    // and rebuild. toString re-emits the offending string so parse(toString(x))
-    // re-flags; toJSON keeps the flag fields; a rebuild re-honors the flag
-    // exactly once. The flag is STATIC (the malformed ;; grammar is resolved
-    // away at parse, leaving no structure to re-derive from), so it is never
-    // re-derived and a mutation cannot silently un-fail the word.
-    it('re-emits the malformed string from toString and re-flags on re-parse', () => {
+  describe('when a malformed-;; word is dropped through the builder', () => {
+    // Retention family (rows 31/80): the builder drops a fail-flagged word from
+    // BOTH serializations and persists no errorCode/errorSource. The parser
+    // still produces the flag (asserted above); the builder never carries it
+    // into toString/toJSON. This retired the pre-2.1 errorSource round-trip
+    // pins (verbatim re-emit + toJSON flag fields), where the serializer
+    // replayed non-valid DSL that re-flagged on reparse.
+    it('drops the failed word from toString instead of replaying errorSource', () => {
       const builder = new BlissSVGBuilder('B313;;B81/B431');
-      expect(builder.toString()).toBe('B313;;B81/B431');
-      expect(BlissParser.parse(builder.toString()).groups[0].errorCode)
-        .toBe('MALFORMED_WORD_INDICATOR');
+      expect(builder.toString()).toBe('');
+      // parse(toString(x)) is now clean: nothing to re-flag.
+      expect(new BlissSVGBuilder(builder.toString()).warnings).toEqual([]);
     });
 
-    it('preserves the flag fields through toJSON', () => {
+    it('persists no errorCode or errorSource in toJSON', () => {
       const json = new BlissSVGBuilder('B313;;B84;;B97').toJSON();
-      expect(json.groups[0].errorCode).toBe('MALFORMED_WORD_INDICATOR');
-      expect(json.groups[0].errorSource).toBe('B313;;B84;;B97');
+      expect(json.groups).toEqual([]);
+      expect(JSON.stringify(json)).not.toContain('errorCode');
+      expect(JSON.stringify(json)).not.toContain('errorSource');
     });
 
-    it('keeps the flag and one warning after a sibling-word mutation rebuilds', () => {
-      const builder = new BlissSVGBuilder('B313;;B81/B431');
-      builder.addGroup('B291'); // mutates a sibling word, triggering a rebuild
+    it('keeps one warning and the drop after a sibling-word mutation rebuilds', () => {
+      const builder = new BlissSVGBuilder('B291//B313;;B81/B431');
+      builder.addGroup('B208'); // mutates a sibling word, triggering a rebuild
       const malformed = builder.warnings.filter((w) => w.code === 'MALFORMED_WORD_INDICATOR');
-      expect(malformed).toHaveLength(1);
-      expect(builder.snapshot().children[0].children).toEqual([]);
+      expect(malformed).toHaveLength(1); // not re-emitted per rebuild
+      const str = builder.toString();
+      expect(str).not.toContain('B313');
+      expect(str).not.toContain('B431');
+      expect(str).toContain('B208');
     });
 
     // regression: chunk-5a external review 2026-07-02 F4 (pre-existing) — the
-    // malformed handler stored the PLACEHOLDERIZED string in its warning and
-    // errorSource, so an option bracket round-tripped as a literal
-    // [PLACEHOLDER_0] token, silently corrupting the option.
-    it('restores option text in the malformed re-emit instead of a placeholder token', () => {
-      const builder = new BlissSVGBuilder('B313/[color=red]C8;;B81/B291');
-      const emitted = builder.toString();
-      expect(emitted).toBe('B313/[color=red]C8;;B81/B291');
-      const reparsed = new BlissSVGBuilder(emitted);
-      expect(reparsed.toString()).toBe(emitted);
-      expect(reparsed.warnings.map((w) => w.code)).toEqual(['MALFORMED_WORD_INDICATOR']);
-    });
-
-    it('restores option text in a multi-word-alias ;; fail source', () => {
+    // malformed handler stored the PLACEHOLDERIZED string in its warning
+    // source, so an option bracket surfaced as a literal [PLACEHOLDER_0] token.
+    // The word now drops, but the warning source (from errorSource) must still
+    // restore the option text, not leak a placeholder token.
+    it('restores option text in the drop warning source, not a placeholder token', () => {
       blissElementDefinitions['PHWORDS'] = { codeString: 'B291//C8' };
       const builder = new BlissSVGBuilder('PHWORDS;;[color=red]>B81');
-      expect(builder.toString()).toBe('PHWORDS;;[color=red]>B81');
+      expect(builder.toString()).toBe('');
       expect(builder.warnings[0].source).not.toContain('PLACEHOLDER');
       expect(builder.warnings[0].message).not.toContain('PLACEHOLDER');
     });
@@ -422,11 +419,10 @@ describe('BlissParser ;; syntax', () => {
       expect(flaggedGroup('_MWSEMI_DIRECT;;B81').wordIndicators).toBeUndefined();
     });
 
-    it('collapses the unit to one placeholder when error-placeholder is on', () => {
+    it('drops the failed unit entirely even when error-placeholder is on', () => {
       const children = new BlissSVGBuilder('[error-placeholder]||_MWSEMI_DIRECT;;B81')
         .snapshot().children;
-      expect(children).toHaveLength(1);
-      expect(children[0].children).toHaveLength(1);
+      expect(children).toEqual([]);
     });
 
     it('still overlays ;; on a single-word alias without failing', () => {

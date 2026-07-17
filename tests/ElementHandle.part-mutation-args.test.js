@@ -23,9 +23,9 @@
  *   (;;), head markers (^), and fail-flagged args; a word arg with an
  *   overlay suffix stays on the WORD_AS_PART path (the word row wins)
  * - degenerate parses keep their messages (no glyphs, multiple groups)
- * - designed TypeErrors name the called method on every surface; gated
- *   targets (fail-flagged word, wrong level) stay silent no-ops, while
- *   builder.addPart guards the arg first (pinned surface divergence)
+ * - designed TypeErrors name the called method on every surface; a wrong-level
+ *   gated target stays a silent no-op (a fail-flagged word is no longer a
+ *   gated target: retention family rows 31/80 drop it at rebuild)
  * - R1 carrier fill: addPart/insertPart on a glyphless group creates a
  *   carrier glyph; a rejected arg leaves no scaffold behind
  * - empty-builder addPart applies options to the part itself
@@ -324,35 +324,10 @@ describe('ElementHandle part mutation args', () => {
   });
 
   describe('when an arg reaches a gated target', () => {
-    it.each([
-      ['group.addPart', (g) => g.addPart(42)],
-      ['group.insertPart', (g) => g.insertPart(0, 42)],
-    ])('silently no-ops %s on a fail-flagged word', (label, act) => {
-      // the terminal-word gate wins over the TypeError guard (design ordering)
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => act(b.group(0))).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
-    it.each([
-      ['glyph.addPart', (h) => h.addPart(42)],
-      ['glyph.insertPart', (h) => h.insertPart(0, 42)],
-      ['glyph.replacePart', (h) => h.replacePart(0, 42)],
-    ])('silently no-ops %s on a glyph inside a fail-flagged word', (label, act) => {
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => act(b.group(0).glyph(0))).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
-    it('silently no-ops replace on a part inside a fail-flagged word', () => {
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => b.group(0).glyph(0).part(0).replace(42)).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
+    // A fail-flagged word is no longer a gated target: it is dropped at rebuild
+    // (retention family, rows 31/80), so it never persists to be handle-reached.
+    // The remaining gate is wrong-level: a part handle has no part-mutation arms,
+    // so the level gate no-ops before ever reading the arg.
     it.each([
       ['part.addPart with a non-string arg', (p) => p.addPart(42)],
       ['part.addPart with a valid single-part code', (p) => p.addPart('B81')],
@@ -367,25 +342,6 @@ describe('ElementHandle part mutation args', () => {
       const b = new BlissSVGBuilder('B291');
       const before = stateOf(b);
       expect(() => act(b.group(0).glyph(0).part(0))).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
-    it('still throws the designed TypeError from builder.addPart when the last word is fail-flagged', () => {
-      // deliberate surface divergence: builder methods guard the arg FIRST
-      // (builder ordering rule), while the handle surface above gates first
-      // and no-ops silently on the same target
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => b.addPart(42)).toThrow(TypeError);
-      expect(() => b.addPart(42)).toThrow('addPart() requires a DSL code string');
-      expect(stateOf(b)).toBe(before);
-    });
-
-    it('keeps builder.addPart with a string arg a silent no-op on a fail-flagged word', () => {
-      // after the builder-level arg guard passes, the handle gates still win
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => b.addPart('B97')).not.toThrow();
       expect(stateOf(b)).toBe(before);
     });
   });

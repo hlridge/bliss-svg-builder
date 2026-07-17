@@ -324,25 +324,10 @@ describe('ElementHandle glyph mutation args', () => {
   });
 
   describe('when a non-string arg reaches a gated target', () => {
-    it.each([
-      ['addGlyph', (g) => g.addGlyph(42)],
-      ['insertGlyph', (g) => g.insertGlyph(0, 42)],
-      ['replaceGlyph', (g) => g.replaceGlyph(0, 42)],
-    ])('silently no-ops %s on a fail-flagged word', (label, act) => {
-      // the terminal-word gate wins over the TypeError guard (design ordering)
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => act(b.group(0))).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
-    it('silently no-ops replace on a glyph inside a fail-flagged word', () => {
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => b.group(0).glyph(0).replace(42)).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
+    // A fail-flagged word is no longer a gated target: it is dropped at rebuild
+    // (retention family, rows 31/80), so it never persists to be handle-reached.
+    // The remaining gate is wrong-level: a group-level operation on a glyph
+    // handle never reads the arg.
     it.each([
       ['addGlyph', (h) => h.addGlyph(42)],
       ['insertGlyph', (h) => h.insertGlyph(0, 42)],
@@ -360,17 +345,6 @@ describe('ElementHandle glyph mutation args', () => {
       const b = new BlissSVGBuilder('B291');
       const before = stateOf(b);
       expect(() => b.group(0).replace(42)).not.toThrow();
-      expect(stateOf(b)).toBe(before);
-    });
-
-    it('still throws the designed TypeError from builder.addGlyph when the last word is fail-flagged', () => {
-      // deliberate surface divergence: builder methods guard the arg FIRST
-      // (builder ordering rule), while the handle surface above gates first
-      // and no-ops silently on the same target
-      const b = new BlissSVGBuilder('B291;;B81;;B86');
-      const before = stateOf(b);
-      expect(() => b.addGlyph(42)).toThrow(TypeError);
-      expect(() => b.addGlyph(42)).toThrow('addGlyph() requires a DSL code string');
       expect(stateOf(b)).toBe(before);
     });
   });

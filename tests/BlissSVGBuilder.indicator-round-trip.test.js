@@ -248,16 +248,15 @@ describe('BlissSVGBuilder indicator round-trip', () => {
       expect(reStr).toBe(str);
     });
 
-    it.each(glyphStripInputs)('warns UNKNOWN_CODE and drops the invalid part on a glyph for "%s"', (input) => {
+    it.each(glyphStripInputs)('warns UNKNOWN_CODE and drops the whole character on a glyph for "%s"', (input) => {
       // `;!`/`;!B81` on a glyph dumb-appends an invalid code (UNKNOWN_CODE at
-      // parse). The invalid part fails the WHOLE character (empty render - the
-      // "fail the character if any part fails" rule), and is dropped from toString
-      // to a stable fixpoint (B291); so the render does not round-trip. We pin only
-      // the documented invariants (UNKNOWN_CODE + fixpoint), not the render, which
-      // the contract leaves unspecified ("render may differ").
+      // parse). A malformed part now fails the WHOLE character and drops it from
+      // both serializations (retention family, rows 31/80): dropping only the bad
+      // part could leave a DIFFERENT valid character (the E->F hazard). So the
+      // input serializes to an empty fixpoint, warned.
       const b = new BlissSVGBuilder(input);
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
-      expect(b.toString()).toBe('B291');
+      expect(b.toString()).toBe('');
     });
   });
 

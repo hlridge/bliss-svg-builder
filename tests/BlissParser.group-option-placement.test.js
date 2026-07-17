@@ -237,13 +237,13 @@ describe('BlissParser group option placement', () => {
   });
 
   describe('when the alias also fails the word-indicator gate', () => {
-    it('keeps the fail-render path unchanged', () => {
-      // The multi-word ;; fail collapses the word breaks (Decision 6), so the
-      // placement gate never sees them; the group keeps its bracket and the
-      // errorSource round-trips verbatim.
+    it('drops the failed word, options and all', () => {
+      // The multi-word ;; fail flags the whole word at parse; the builder then
+      // drops it entirely (retention family, rows 31/80), so its word-level
+      // bracket dies with it rather than round-tripping outside an error source.
       const failed = build('[color=red]|GOPP_MULTI;;B81');
       expect(failed.warnings.map((w) => w.code)).toEqual(['MALFORMED_WORD_INDICATOR']);
-      expect(failed.toString()).toBe('[color=red]|GOPP_MULTI;;B81');
+      expect(failed.toString()).toBe('');
     });
   });
 

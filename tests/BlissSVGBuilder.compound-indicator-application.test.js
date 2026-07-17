@@ -109,12 +109,14 @@ describe('BlissSVGBuilder compound indicator application', () => {
       expect(single.svgCode).toBe(new BlissSVGBuilder('B86;B97;B81').svgCode);
     });
 
-    it('warns UNKNOWN_CODE for a ;!-part (no special strip parse), keeping the base', () => {
+    it('warns UNKNOWN_CODE for a ;!-part and drops the whole character', () => {
       // `!B81` is an invalid code dumb-appended onto the glyph; it is not a
-      // strip-semantic operation. The base compound indicator is unchanged.
+      // strip-semantic operation. A malformed part fails the WHOLE character
+      // (retention family, rows 31/80): keeping the base COMBO_IND (B86;B97)
+      // would be a DIFFERENT valid character.
       const single = new BlissSVGBuilder('COMBO_IND;!B81');
       expect(single.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
-      expect(single.toString()).toBe('B86;B97');
+      expect(single.toString()).toBe('');
     });
 
     it('keeps a baked sub-part offset instead of the from-origin stack position', () => {

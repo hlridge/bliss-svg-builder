@@ -231,11 +231,12 @@ describe('BlissSVGBuilder indicator sequencing', () => {
   });
 
   describe('when the word is fail-flagged', () => {
-    it('leaves a terminal word untouched, misplaced indicator included', () => {
-      // pins the group.errorCode skip (replay fidelity): a fail-flagged word
-      // re-emits verbatim, so its leading indicator must survive normalize
+    it('drops the whole word, so the indicator-sequence pass never reaches it', () => {
+      // A fail-flagged word (doubled ;;) is dropped at rebuild (retention family,
+      // rows 31/80) before the indicator-sequence normalizer runs, so its leading
+      // indicator never needs a separate exemption: the whole word is gone.
       const b = new BlissSVGBuilder('B86;B291;;X;;Y');
-      expect(b.toString()).toBe('B86;B291;;X;;Y');
+      expect(b.toString()).toBe('');
       expect(misplacedWarnings(b)).toHaveLength(0);
       expect(b.warnings.map((w) => w.code)).toContain('MALFORMED_WORD_INDICATOR');
     });

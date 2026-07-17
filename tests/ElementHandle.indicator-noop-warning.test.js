@@ -237,7 +237,10 @@ describe('ElementHandle indicator no-op warning', () => {
 
   describe('when the target part has no resolvable code name', () => {
     it('uses a placeholder name rather than an empty name in the clear warning', () => {
-      const b = new BlissSVGBuilder('@@@');
+      // A DSL malformed token (`@@@`) is now dropped whole at rebuild (retention
+      // family, rows 31/80), so the nameless-part fallback is reached via an
+      // object-input glyph whose part carries neither a code name nor an error.
+      const b = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{}] }] }] });
       b.group(0).glyph(0).clearIndicators();
       const w = noopWarnings(b);
       expect(w).toHaveLength(1);

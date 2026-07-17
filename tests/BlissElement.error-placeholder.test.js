@@ -70,11 +70,12 @@ describe('BlissElement error placeholder', () => {
       expect(builder.svgContent).toBe('<path d=""/>');
     });
 
-    test('activates the placeholder on a malformed-coordinate parse error (B291:5,5,5)', () => {
-      // The activation rule keys off any new warning during construction, not
-      // just a missing code. A valid code with a malformed coordinate suffix
-      // fails the same way and surfaces as MALFORMED_COORDINATES, which also
-      // counts toward placeholder activation.
+    test('drops a malformed-coordinate character even with error-placeholder on (B291:5,5,5)', () => {
+      // A malformed part is not content: it fails the WHOLE character and drops
+      // from render and serialization (retention family, rows 31/80), so
+      // error-placeholder shows NOTHING for it (only retained unknown codes get a
+      // placeholder). The MALFORMED_COORDINATES warning is the only trace, and
+      // the on/off SVGs are identical because nothing renders either way.
       const withPlaceholder = new BlissSVGBuilder('[error-placeholder]||B291:5,5,5');
       const withoutPlaceholder = new BlissSVGBuilder('B291:5,5,5');
 
@@ -85,12 +86,12 @@ describe('BlissElement error placeholder', () => {
       expect(withPlaceholder.warnings).toEqual([warningMatcher]);
       expect(withoutPlaceholder.warnings).toEqual([warningMatcher]);
 
-      const placeholderGlyph = withPlaceholder.elements.children[0].children[0];
-      expect(placeholderGlyph.children.map(child => child.codeName)).toEqual(['REFSQUARE', 'B699']);
-      expect(withPlaceholder.svgCode.length).toBeGreaterThan(withoutPlaceholder.svgCode.length);
-
-      const bareGlyph = withoutPlaceholder.elements.children[0].children[0];
-      expect(bareGlyph.children).toEqual([]);
+      // Only the document option survives (empty content); the character is gone.
+      expect(withPlaceholder.toString()).toBe('[error-placeholder]||');
+      expect(withoutPlaceholder.toString()).toBe('');
+      expect(withPlaceholder.elements.children[0].children).toEqual([]);
+      expect(withoutPlaceholder.elements.children[0].children).toEqual([]);
+      expect(withPlaceholder.svgCode).toBe(withoutPlaceholder.svgCode);
     });
   });
 

@@ -218,18 +218,20 @@ describe('BlissSVGBuilder serializer fidelity', () => {
   });
 
   describe('when an options-prefixed part has no serializable code', () => {
-    it('drops the invalid part instead of serializing a literal undefined', () => {
+    it('drops the whole character rather than serializing a literal undefined', () => {
       // regression: F3 (Chunk 1 audit) - `_FID_PLAIN;[x=2]>!B81` serialized as
       // `B291;[x=2]>undefined:2,0` (the coord/option decoration turned the
-      // codeName-less part into a truthy literal-`undefined` string).
+      // codeName-less part into a truthy literal-`undefined` string). A malformed
+      // part now fails the whole character (retention family, rows 31/80), so the
+      // decorated error node never reaches the serializer.
       const b = new BlissSVGBuilder('_FID_PLAIN;[x=2]>!B81');
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
-      expect(b.toString()).toBe('B291');
+      expect(b.toString()).toBe('');
     });
 
-    it('drops the invalid part when only an option decorates it', () => {
+    it('drops the whole character when only an option decorates the bad part', () => {
       const b = new BlissSVGBuilder('B291;[color=red]>!B81');
-      expect(b.toString()).toBe('B291');
+      expect(b.toString()).toBe('');
     });
 
     it('serializes to a fixpoint with no residual warning', () => {
