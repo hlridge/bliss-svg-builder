@@ -48,8 +48,10 @@ import { BlissSVGBuilder } from '../src/index.js';
 describe('BlissParser part-slot character options', () => {
   beforeAll(() => {
     BlissSVGBuilder.define({ PSLOT_DEF: { codeString: 'S8:0,8;[fill=green]C8:0,8' } });
+    BlissSVGBuilder.define({ PSLOT_QDEF: { codeString: 'S8;[data-x="a]b"]C8' } });
   });
-  afterAll(() => BlissSVGBuilder.removeDefinition('PSLOT_DEF'));
+  afterAll(() => ['PSLOT_DEF', 'PSLOT_QDEF']
+    .forEach((k) => BlissSVGBuilder.removeDefinition(k)));
 
   const build = (input) => new BlissSVGBuilder(input);
   const codes = (input) => build(input).warnings.map((w) => w.code);
@@ -167,6 +169,32 @@ describe('BlissParser part-slot character options', () => {
       const reparsed = build(b.toString());
       expect(reparsed.warnings).toEqual([]);
       expect(reparsed.svgCode).toBe(b.svgCode);
+    });
+
+    // pins the quote-aware peel body: definition codeStrings carry RAW
+    // brackets, so a bare [^\]] body truncated at the quoted `]` and
+    // garbled the warning while the written (tokenized) twin peeled
+    // cleanly (review fix, 2026-07-17)
+    it('peels a quoted-bracket value in a definition like the written twin', () => {
+      const b = build('PSLOT_QDEF');
+      expect(codes('PSLOT_QDEF')).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(b.warnings[0].message).toContain('[data-x="a]b"]');
+      expect(b.svgCode).toBe(build('S8;C8').svgCode);
+      const written = build('S8;[data-x="a]b"]C8');
+      expect(written.warnings.map((w) => w.code)).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(written.svgCode).toBe(b.svgCode);
+    });
+  });
+
+  describe('when the bracket sits in a part slot with an empty base', () => {
+    // a leading ';' makes an indicator-only glyph; the slot AFTER that ';'
+    // is still a part slot, so the peel gates on the raw separator index,
+    // not the filtered part position (review fix, 2026-07-17)
+    it('peels the bracket and renders the indicator-only glyph', () => {
+      const b = build(';[fill=green]B86');
+      expect(codes(';[fill=green]B86')).toEqual(['MISPLACED_CHARACTER_OPTION']);
+      expect(b.svgCode).toBe(build(';B86').svgCode);
+      expect(b.toString()).toBe(build(';B86').toString());
     });
   });
 

@@ -28,11 +28,15 @@ const PART_OPTION_CODESTRING = /^\[.*?\]>/;
 // A `>`-less bracket is a CHARACTER option by syntax; inside a `;`-part slot
 // only part options ([opts]>) apply, so the bracket is misplaced on an
 // otherwise-valid code: peel + warn + drop, then parse the remainder normally.
-// The [^\[\]] class keeps the match to ONE bracket token — a `.*?` class
-// would backtrack across `]…[` and capture a bracket pair as one blob. The
+// The quote-aware grammar keeps the match to ONE bracket token — a `.*?` body
+// would backtrack across `]…[` and capture a bracket pair as one blob, and a
+// bare `[^\]]`-class body would truncate at a quoted `]` in a RAW
+// definition-sourced part string (top-level input is placeholder-tokenized,
+// definition codeStrings are not; review fix, 2026-07-17). Group 1 is the
+// bracket, group 2 the grammar's internal atom, group 3 the remainder. The
 // non-empty remainder (.+) keeps a dangling bracket with no code on the
 // whole-character fail path.
-const PART_SLOT_CHAR_OPTION_PATTERN = /^(\[[^\[\]]*\])(?!>)(.+)$/;
+const PART_SLOT_CHAR_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.+)$`);
 
 // Quote-aware bracket matchers built from the shared grammar (see
 // OPTION_BRACKET_CONTENT in bliss-constants.js for the rationale and the
@@ -372,11 +376,14 @@ export class BlissParser {
         // sequence embedded in a longer code name (e.g. a custom code EXTRA) is not
         // rewritten mid-token. Match Latin, Latin Extended, and Cyrillic letters.
         // An option bracket ([opts] or [opts]>) at the boundary must not hide
-        // the X-run from routing (run-to-stable 2.2): the prefix rides the
-        // FIRST expanded glyph, matching the written /-expansion \u2014 X-runs are
-        // string-level sugar, so [opts]Xab must equal [opts]Xa/Xb in every
-        // observable. An all-fallback run stays ONE XTXT_ glyph, so its
-        // prefix scopes the whole run.
+        // the X-run from routing (run-to-stable 2.2). For an ALL-OUTLINED run
+        // the prefix rides the FIRST expanded glyph, matching the written
+        // /-expansion exactly ([opts]Xab \u2261 [opts]Xa/Xb \u2014 X-runs are
+        // string-level sugar there). A run containing ANY fallback letter
+        // stays ONE XTXT_ glyph (the pre-existing whole-run-fallback rule),
+        // so its prefix scopes the whole run; that deliberately differs from
+        // the written sequence form, where a prefix binds one member and the
+        // member stands alone (review disposition, 2026-07-17).
         let expanded = codeString.replace(/(?<=^|\/)(\[[^\[\]]*\]>?)?X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, optionPrefix = '', chars, offset) => {
           // Skip expansion when followed by ; (word expansion would break composition).
           // A past-the-end index reads as undefined, which is never ';', so no bounds guard.
@@ -1339,26 +1346,33 @@ export class BlissParser {
           if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
           const parts = [];
 
-          // Split on ; (brackets are already replaced with placeholders at this point).
-          // Drop empty segments so a leading ';' (an empty base, e.g. ';B86')
-          // yields an indicator-only glyph instead of a failed empty part.
-          // Word-level ';;' is resolved upstream and never reaches here.
-          const twoPartPartStrings = partsString.split(';').filter(s => s !== '');
-          for (const [partIndex, rawPartString] of twoPartPartStrings.entries()) {
+          // Split on ; (top-level input is placeholder-tokenized here;
+          // definition-sourced strings carry RAW brackets). An empty segment
+          // is inert (a leading ';' yields an indicator-only glyph, a
+          // trailing ';' is normalized away) but still counts as a SEPARATOR:
+          // the peel gate uses the raw index, so a bracket after ANY ';' sits
+          // in a part slot even when the base is empty (';[opts]B86' — review
+          // fix, 2026-07-17). #flagCompositePart keeps the filtered index
+          // (position among real parts). Word-level ';;' is resolved upstream
+          // and never reaches here.
+          const segments = partsString.split(';');
+          let partIndex = 0;
+          for (const [rawIndex, rawPartString] of segments.entries()) {
+            if (rawPartString === '') continue;
             let twoPartPartString = rawPartString;
             // Slot 0 is the character's own option position (its bracket was
             // already stripped at the glyph level); a `>`-less bracket in a
             // LATER slot is a misplaced character option: peel one warning
             // per bracket, drop it, and parse the remaining code normally.
-            if (partIndex > 0) {
+            if (rawIndex > 0) {
               let peeled;
               while ((peeled = twoPartPartString.match(PART_SLOT_CHAR_OPTION_PATTERN)) !== null) {
                 parseWarnings.push({
                   code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
-                  message: `Character option (${restorePlaceholders(peeled[1])}) ignored on "${restorePlaceholders(peeled[2])}": a ; part slot takes part options. Use ${restorePlaceholders(peeled[1])}>${restorePlaceholders(peeled[2])} to style the part.`,
+                  message: `Character option (${restorePlaceholders(peeled[1])}) ignored on "${restorePlaceholders(peeled[3])}": a ; part slot takes part options. Use ${restorePlaceholders(peeled[1])}>${restorePlaceholders(peeled[3])} to style the part.`,
                   source: restorePlaceholders(rawPartString),
                 });
-                twoPartPartString = peeled[2];
+                twoPartPartString = peeled[3];
               }
             }
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
@@ -1394,6 +1408,7 @@ export class BlissParser {
 
             BlissParser.#applyDefinitionMetadata(part, definition);
             BlissParser.#flagCompositePart(part, partIndex);
+            partIndex++;
 
             this.#extractPositionFromOptions(part);
             parts.push(part);
