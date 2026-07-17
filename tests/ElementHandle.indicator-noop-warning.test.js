@@ -138,7 +138,9 @@ describe('ElementHandle indicator no-op warning', () => {
 
   describe('when applyIndicators targets an invalid part pattern', () => {
     it('warns when a non-indicator part follows an indicator part', () => {
-      const b = new BlissSVGBuilder('B291;B86;B303');
+      // the invalid pattern is only constructible through the unknown-code
+      // retention path since row 67 normalizes known misplacements away
+      const b = new BlissSVGBuilder('B291;B86;ZZ9');
       b.group(0).glyph(0).applyIndicators('B81');
       const w = noopWarnings(b);
       expect(w).toHaveLength(1);
@@ -148,7 +150,7 @@ describe('ElementHandle indicator no-op warning', () => {
     it('sources an empty apply with the target code, not the empty string', () => {
       // pins the `code || targetCode` fallback (|| deliberately, not ??): the
       // empty apply's '' must never become an empty warning source.
-      const b = new BlissSVGBuilder('B291;B86;B303');
+      const b = new BlissSVGBuilder('B291;B86;ZZ9');
       b.group(0).glyph(0).applyIndicators('');
       const w = noopWarnings(b);
       expect(w).toHaveLength(1);

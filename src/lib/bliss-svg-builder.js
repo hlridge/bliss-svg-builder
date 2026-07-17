@@ -760,6 +760,66 @@ class BlissSVGBuilder {
     }
   }
 
+  // Indicator-sequence invariant (row 67): an indicator part is only
+  // meaningful inside the maximal trailing indicator run of its glyph's part
+  // list (the character's indicator row: BASE;INDICATOR). An indicator that
+  // precedes default-positioned known content is a misplaced decoration:
+  // dropped LOUDLY (MISPLACED_INDICATOR_PART) from render and serialization,
+  // the warn+drop model of MISPLACED_HEAD_MARKER and
+  // MISPLACED_SPACE_DECORATION, while the character still renders. Three
+  // deliberate exemptions:
+  //  1. Content explicitly positioned at a non-origin `:x,y` does not convict
+  //     a preceding indicator: a compound indicator's decomposed serialization
+  //     (`B86;SDOT:3,4`) is hand-placed anatomy and must round-trip
+  //     (composition portability). An origin `:0,0` counts as
+  //     default-positioned because serialization drops it, so it could not
+  //     carry the exemption across a round-trip.
+  //  2. A part whose nature is uncertain (unknown code awaiting a definition,
+  //     or a malformed error node) is no witness: the character already
+  //     fail-renders, and dropping on uncertainty would destroy input the
+  //     unknown-code retention contract keeps.
+  //  3. A compound-indicator glyph (glyph-level isIndicator) is an atomic
+  //     unit whose internal anatomy is definition-owned.
+  // Enforced here, the chokepoint every input surface and mutation route
+  // passes through (see #normalizeSpaceInvariant above for the rationale).
+  #normalizeIndicatorInvariant() {
+    for (const group of this.#rawBlissObj.groups ?? []) {
+      if (group.errorCode) continue;
+      for (const glyph of group.glyphs ?? []) {
+        if (glyph.isIndicator === true) continue;
+        const parts = glyph.parts;
+        if (!Array.isArray(parts) || parts.length < 2) continue;
+        let lastWitness = -1;
+        for (let i = parts.length - 1; i >= 1 && lastWitness === -1; i--) {
+          const p = parts[i];
+          if (p.isIndicator === true || p.error) continue;
+          if ((p.x ?? 0) !== 0 || (p.y ?? 0) !== 0) continue;
+          if ((p.codeName && blissElementDefinitions[p.codeName]) || p.parts?.length > 0) {
+            lastWitness = i;
+          }
+        }
+        if (lastWitness === -1) continue;
+        const misplaced = [];
+        for (let i = 0; i < lastWitness; i++) {
+          if (parts[i].isIndicator === true) misplaced.push(i);
+        }
+        for (const i of misplaced) {
+          const p = parts[i];
+          const coords = p.x !== undefined || p.y !== undefined ? `:${p.x ?? 0},${p.y ?? 0}` : '';
+          const source = `${p.codeName}${coords}`;
+          this.#mutationWarnings.push({
+            code: WARNING_CODES.MISPLACED_INDICATOR_PART,
+            message: `An indicator can only follow its base parts at the end of a character (BASE;INDICATOR), so "${source}" was dropped.`,
+            source,
+          });
+        }
+        for (let k = misplaced.length - 1; k >= 0; k--) {
+          parts.splice(misplaced[k], 1);
+        }
+      }
+    }
+  }
+
   #rebuild() {
     this.#generation++;
     this.#elementsCache = undefined;
@@ -767,6 +827,7 @@ class BlissSVGBuilder {
     this.#warnings = [];
 
     this.#normalizeSpaceInvariant();
+    this.#normalizeIndicatorInvariant();
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
     const blissObj = structuredClone(this.#rawBlissObj);
 

@@ -42,7 +42,11 @@ describe('BlissSVGBuilder indicator promotion', () => {
     NOUN_BI: { codeString: 'B291;B81' },       // bare alias, grammatical baked
     NOUN_S: { codeString: 'B291;B97' },        // bare alias, semantic baked
     NOUN_B: { codeString: 'B291' },            // bare alias, clean base (no baked indicator)
-    MIXEDTAIL: { codeString: 'B291;B99;VL4' }, // bare alias, multi-part base
+    // bare alias, multi-part base. Re-anchored during row 67: the old
+    // 'B291;B99;VL4' baked a mid-list indicator, which now normalizes away
+    // (MISPLACED_INDICATOR_PART); the multi-part-survival pin needs a base
+    // that is valid on its own.
+    MIXEDTAIL: { codeString: 'B291;H;VL4' },
   };
   const codes = (dsl) => new BlissSVGBuilder(dsl).warnings.map((w) => w.code);
   const svg = (dsl) => new BlissSVGBuilder(dsl).svgCode;
@@ -76,11 +80,11 @@ describe('BlissSVGBuilder indicator promotion', () => {
     });
 
     it('preserves a multi-part baked base when dropping the misplaced part', () => {
-      // MIXEDTAIL = 'B291;B99;VL4': the whole 3-part base survives, not just the
+      // MIXEDTAIL = 'B291;H;VL4': the whole 3-part base survives, not just the
       // first part.
       const b = new BlissSVGBuilder('MIXEDTAIL;B81');
       expect(codes('MIXEDTAIL;B81')).toContain('MISPLACED_CHARACTER_INDICATOR');
-      expect(b.toString()).toBe('B291;B99;VL4');
+      expect(b.toString()).toBe('B291;H;VL4');
     });
   });
 

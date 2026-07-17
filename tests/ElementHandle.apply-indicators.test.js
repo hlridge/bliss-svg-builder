@@ -245,18 +245,23 @@ describe('ElementHandle apply indicators', () => {
       expect(partCodes(b)).toEqual(['B86', 'B81']);
     });
 
-    it('treats the first part as the base even when it is an indicator (B86;B291)', () => {
-      const b = new BlissSVGBuilder('B86;B291');
-      b.group(0).glyph(0).applyIndicators('B81');
-      // R15 Task 5: index 0 is the base under the i>0 rule, so B81 appends.
-      expect(partCodes(b)).toEqual(['B86', 'B291', 'B81']);
+    it('treats the first part as the base even when it is an indicator (B86;B81)', () => {
+      const b = new BlissSVGBuilder('B86;B81');
+      b.group(0).glyph(0).applyIndicators('B90');
+      // R15 Task 5: index 0 is the base under the i>0 rule, so only B81 is the
+      // replaceable existing set and B86 survives the replace-all. (Re-anchored
+      // during row 67: the old B86;B291 fixture now normalizes, its leading
+      // indicator dropped as MISPLACED_INDICATOR_PART.)
+      expect(partCodes(b)).toEqual(['B86', 'B90']);
     });
 
     it('is a no-op when a non-indicator part follows an indicator part (invalid pattern)', () => {
-      const b = new BlissSVGBuilder('B291;B86;B303');
+      // the invalid pattern is only constructible through the unknown-code
+      // retention path since row 67 normalizes known misplacements away
+      const b = new BlissSVGBuilder('B291;B86;ZZ9');
       b.group(0).glyph(0).applyIndicators('B81');
-      // B303 (non-indicator) after B86 (indicator) violates the valid pattern rule
-      expect(partCodes(b)).toEqual(['B291', 'B86', 'B303']);
+      // ZZ9 (non-indicator) after B86 (indicator) violates the valid pattern rule
+      expect(partCodes(b)).toEqual(['B291', 'B86', 'ZZ9']);
     });
 
     // regression: burndown D4 (folds into R14). The surviving no-ops (an invalid
@@ -265,7 +270,7 @@ describe('ElementHandle apply indicators', () => {
     // caller knows the call did nothing. The full warning matrix lives in
     // ElementHandle.indicator-noop-warning.test.js; this pins the named gate.
     it('warns on a surviving no-op (invalid pattern) instead of silently no-opping', () => {
-      const b = new BlissSVGBuilder('B291;B86;B303');
+      const b = new BlissSVGBuilder('B291;B86;ZZ9');
       b.group(0).glyph(0).applyIndicators('B81');
       const noop = b.warnings.filter(w => w.code === 'NOOP_INDICATOR_MUTATION');
       expect(noop).toHaveLength(1);

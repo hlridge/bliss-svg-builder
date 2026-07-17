@@ -95,8 +95,12 @@ describe('BlissElement indicator positioning', () => {
 
   describe('when a trailing non-indicator part invalidates the indicator pattern', () => {
     it('exposes the would-be indicator as a regular part with no centering', () => {
-      const builder = new BlissSVGBuilder('B291;B81;H');
-      const [, indicator, trailingPart] = builder.elements.children[0].children[0].children;
+      // constructed through BlissParser directly: the builder pipeline
+      // normalizes this misplacement away (MISPLACED_INDICATOR_PART, row 67),
+      // but the element layer keeps its defensive no-centering fallback for a
+      // pre-normalization tree
+      const character = new BlissElement(BlissParser.parse('B291;B81;H')).snapshot().children[0].children[0];
+      const [, indicator, trailingPart] = character.children;
 
       expect(indicator.codeName).toBe('B81');
       expect(indicator.offsetX).toBe(0);

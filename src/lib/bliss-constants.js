@@ -249,6 +249,14 @@ export const WARNING_CODES = Object.freeze({
   // so the decoration is dropped and the space keeps its identity (ZSA is
   // content and is exempt; use it for a positionable/styleable blank)
   MISPLACED_SPACE_DECORATION: 'MISPLACED_SPACE_DECORATION',
+  // an indicator part that precedes default-positioned content in a glyph's
+  // part list: an indicator is only meaningful in the trailing indicator run
+  // (BASE;INDICATOR), so the misplaced indicator is dropped from render and
+  // serialization while the character still renders. Content explicitly
+  // positioned at a non-origin `:x,y` does not convict a preceding indicator
+  // (a compound indicator's decomposed anatomy must round-trip), and neither
+  // does an unclassifiable part (unknown code, error node).
+  MISPLACED_INDICATOR_PART: 'MISPLACED_INDICATOR_PART',
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',

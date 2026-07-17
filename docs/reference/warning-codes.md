@@ -175,6 +175,17 @@ QSP:1,2                →  renders a plain quarter-space, coordinate dropped
 
 A global-only option key on a space (`[grid]|QSP`) is reported by `MISPLACED_GLOBAL_OPTION` instead: its scope, not the space, is the mismatch. The space still keeps its identity either way. For a positionable or styleable blank, use `ZSA` instead: it is inkless content, so it keeps its coordinate and options.
 
+### `MISPLACED_INDICATOR_PART`
+
+An indicator part written before a character's base content. A character is written as its base parts followed by its indicators (`BASE;INDICATOR`); an indicator anywhere else has no meaning in Bliss, so it is dropped and the rest of the character renders.
+
+```
+B86;B291               →  renders B291, indicator dropped
+B291;B86;C8            →  renders B291;C8, indicator dropped
+```
+
+Write the indicators last instead: `B291;C8;B86`. Two things never trigger this warning: content you explicitly position at a non-origin coordinate (`B86;SDOT:3,4` is hand-placed artwork and is kept as written), and an unknown code after the indicator (it may later resolve to an indicator, so the sequence is kept).
+
 ## Duplicates
 
 ### `MULTIPLE_HEAD_MARKERS`
