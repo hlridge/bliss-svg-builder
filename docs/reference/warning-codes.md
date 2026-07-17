@@ -186,6 +186,17 @@ B291;B86;C8            →  renders B291;C8, indicator dropped
 
 Write the indicators last instead: `B291;C8;B86`. Two things never trigger this warning: content you explicitly position at a non-origin coordinate (`B86;SDOT:3,4` is hand-placed artwork and is kept as written), and an unknown code after the indicator (it may later resolve to an indicator, so the sequence is kept).
 
+### `MISPLACED_SPACE_PART`
+
+A space (`TSP` or `QSP`) written as a `;`-part. A space separates words; it is not a shape a character can be composed from, so the space part is dropped (along with any coordinate or option on it) and the rest of the character renders.
+
+```
+B313;QSP               →  renders B313, space part dropped
+B313;[color=red]>QSP   →  renders B313, space part and option dropped
+```
+
+Write the space between words instead (`B313//B431`, or `B313/QSP/B431` for an explicit quarter-space). For a positionable blank inside a character, use `ZSA`: it is inkless content, so `B313;ZSA:10,0` keeps its part and position. One thing never triggers this warning: a space beside only unknown codes (`TSP;ZZ9`) is kept, because the character's content is uncertain until those codes resolve.
+
 ## Duplicates
 
 ### `MULTIPLE_HEAD_MARKERS`

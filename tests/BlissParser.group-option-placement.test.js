@@ -177,9 +177,13 @@ describe('BlissParser group option placement', () => {
     it('keeps the option when the space is a composed glyph', () => {
       // regression: review-fix round 2, F3 — a composed TSP;B81 serializes as
       // one in-group token (no bare /TSP/ boundary), so nothing rebinds on
-      // reparse; the old _scanCode check mistook it for a separator
+      // reparse; the old _scanCode check mistook it for a separator. The
+      // placement gate runs at parse, BEFORE the space-as-part invariant
+      // (2026-07-17) drops the composed TSP, so the option must still stay
+      // out of MISPLACED_GROUP_OPTION's scope while the TSP warns and drops.
       const styled = build('[color=red]|GOPP_COMPSPACE');
-      expect(styled.warnings).toEqual([]);
+      expect(styled.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE_PART']);
+      expect(styled.svgCode).toContain('stroke="red"');
       expect(styled.groups.length).toBe(1);
       const reparsed = build(styled.toString());
       expect(reparsed.groups.length).toBe(1);

@@ -257,6 +257,12 @@ export const WARNING_CODES = Object.freeze({
   // (a compound indicator's decomposed anatomy must round-trip), and neither
   // does an unclassifiable part (unknown code, error node).
   MISPLACED_INDICATOR_PART: 'MISPLACED_INDICATOR_PART',
+  // a space code (TSP/QSP) in a `;`-part slot: a space is a word-level
+  // separator, never a character part, so the space part is dropped from
+  // render and serialization while the character still renders. A single-part
+  // space glyph IS the space itself and is untouched; ZSA is content (a
+  // positionable inkless shape) and is exempt.
+  MISPLACED_SPACE_PART: 'MISPLACED_SPACE_PART',
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',

@@ -760,6 +760,72 @@ class BlissSVGBuilder {
     }
   }
 
+  // Space-as-part invariant (row 78): a space (TSP/QSP) is a word-level
+  // separator, never a `;`-part — a space cannot stay a character inside a
+  // word (#normalizeSpaceInvariant Pass 3 splits it out) and cannot carry a
+  // decoration, so a space in a part slot is the same misplacement one level
+  // down. The space part is dropped LOUDLY (MISPLACED_SPACE_PART) from render
+  // and serialization while the character still renders; a coordinate or
+  // option on it dies with the part (a positionable inkless blank is ZSA's
+  // job — ZSA is content and is exempt). A SINGLE-part space glyph IS the
+  // space itself and is never touched (the parts.length >= 2 guard); a
+  // fail-flagged word re-emits verbatim (replay fidelity) and an atomic
+  // compound-indicator glyph's anatomy is definition-owned, so both are
+  // skipped, mirroring #normalizeIndicatorInvariant. define() already rejects
+  // a glyph definition referencing a space, so the isIndicator skip only
+  // matters for hand-authored object input. Uncertainty exemption (the
+  // indicator invariant's exemption 2, one rule over): when the non-space
+  // remainder holds no definition-known part (only unknown codes or error
+  // nodes, e.g. `TSP;SP`), the drop is skipped — a sole surviving transient
+  // token would re-emit bare and the reparse would silently reinterpret it
+  // as a separator or kerning marker (parse-equivalence violation); the
+  // character already fail-renders and the unknown-code warning is the
+  // visibility. An all-space list still drops (the empty glyph is inert
+  // pure state). Runs FIRST among the
+  // rebuild normalizers: before #normalizeSpaceInvariant so an emptied glyph
+  // gets its head-designation cleanup, and before
+  // #normalizeIndicatorInvariant so a space is never a content witness that
+  // convicts a trailing indicator (`B86;QSP` keeps B86).
+  #normalizeSpacePartInvariant() {
+    for (const group of this.#rawBlissObj.groups ?? []) {
+      if (group.errorCode) continue;
+      for (const glyph of group.glyphs ?? []) {
+        if (glyph.isIndicator === true) continue;
+        const parts = glyph.parts;
+        if (!Array.isArray(parts) || parts.length < 2) continue;
+        const misplaced = [];
+        let remainderCount = 0;
+        let knownRemainder = false;
+        for (let i = 0; i < parts.length; i++) {
+          const p = parts[i];
+          if (isSpaceGlyph(p.codeName)) {
+            misplaced.push(i);
+            continue;
+          }
+          remainderCount++;
+          if (!p.error && ((p.codeName && blissElementDefinitions[p.codeName]) || p.parts?.length > 0)) {
+            knownRemainder = true;
+          }
+        }
+        if (misplaced.length === 0) continue;
+        if (remainderCount > 0 && !knownRemainder) continue;
+        for (const i of misplaced) {
+          const p = parts[i];
+          const coords = p.x !== undefined || p.y !== undefined ? `:${p.x ?? 0},${p.y ?? 0}` : '';
+          const source = `${p.codeName}${coords}`;
+          this.#mutationWarnings.push({
+            code: WARNING_CODES.MISPLACED_SPACE_PART,
+            message: `A space is a word separator, not a character part, so "${source}" was dropped.`,
+            source,
+          });
+        }
+        for (let k = misplaced.length - 1; k >= 0; k--) {
+          parts.splice(misplaced[k], 1);
+        }
+      }
+    }
+  }
+
   // Indicator-sequence invariant (row 67): an indicator part is only
   // meaningful inside the maximal trailing indicator run of its glyph's part
   // list (the character's indicator row: BASE;INDICATOR). An indicator that
@@ -826,6 +892,7 @@ class BlissSVGBuilder {
     this.#groupsCache = undefined;
     this.#warnings = [];
 
+    this.#normalizeSpacePartInvariant();
     this.#normalizeSpaceInvariant();
     this.#normalizeIndicatorInvariant();
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
