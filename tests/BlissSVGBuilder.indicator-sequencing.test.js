@@ -230,6 +230,17 @@ describe('BlissSVGBuilder indicator sequencing', () => {
     });
   });
 
+  describe('when the word is fail-flagged', () => {
+    it('leaves a terminal word untouched, misplaced indicator included', () => {
+      // pins the group.errorCode skip (replay fidelity): a fail-flagged word
+      // re-emits verbatim, so its leading indicator must survive normalize
+      const b = new BlissSVGBuilder('B86;B291;;X;;Y');
+      expect(b.toString()).toBe('B86;B291;;X;;Y');
+      expect(misplacedWarnings(b)).toHaveLength(0);
+      expect(b.warnings.map((w) => w.code)).toContain('MALFORMED_WORD_INDICATOR');
+    });
+  });
+
   describe('when the word carries a ;; overlay', () => {
     it('drops the misplaced indicator and keeps the overlay', () => {
       const b = new BlissSVGBuilder('B86;B291;;B90');
