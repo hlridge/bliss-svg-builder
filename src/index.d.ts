@@ -659,8 +659,15 @@ export interface BlissJSON {
 // --- Warnings ---
 
 /**
- * Every warning code the builder can emit. Mirrors the `WARNING_CODES` registry
- * in `bliss-constants.js` (the runtime source of truth).
+ * Every warning code the current builder version can emit. The named literals
+ * mirror the `WARNING_CODES` registry in `bliss-constants.js` (the runtime
+ * source of truth).
+ *
+ * This is an OPEN union: minor releases may add new warning codes (existing
+ * code meanings never change within 1.x), so the type also accepts any string
+ * while keeping autocomplete for the known codes. When switching on a warning
+ * code, always include a default branch for codes added after your build.
+ * See the Compatibility page in the documentation.
  */
 export type WarningCode =
   | 'MALFORMED_GLOBAL_OPTIONS'
@@ -686,7 +693,8 @@ export type WarningCode =
   | 'COMPOSITE_AS_PART'
   | 'WORD_AS_PART'
   | 'NON_INDICATOR_AS_WORD_INDICATOR'
-  | 'NON_INDICATOR_AS_CHARACTER_INDICATOR';
+  | 'NON_INDICATOR_AS_CHARACTER_INDICATOR'
+  | (string & {});
 
 /** A warning generated when the builder encounters a problem it can recover from. */
 export interface Warning {

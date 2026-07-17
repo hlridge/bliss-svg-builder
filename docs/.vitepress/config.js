@@ -93,7 +93,8 @@ export default defineConfig({
             { text: 'Options Quick Reference', link: '/reference/options-quick-reference' },
             { text: 'DSL Syntax Quick Reference', link: '/reference/dsl-syntax-quick-reference' },
             { text: 'Warning Codes', link: '/reference/warning-codes' },
-            { text: 'API Documentation', link: '/reference/api-documentation' }
+            { text: 'API Documentation', link: '/reference/api-documentation' },
+            { text: 'Compatibility', link: '/reference/compatibility' }
           ]
         }
       ]
