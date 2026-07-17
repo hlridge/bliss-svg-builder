@@ -29,6 +29,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   silently dropped.
  * - Round-trip of partial-fallback inputs through `toJSON` preserves
  *   the rendered SVG byte-identically.
+ * - The option-bracket/fallback asymmetry: bare Xλ renders via <text>
+ *   while [color=green]Xλ fails as UNKNOWN_CODE (current behavior; the
+ *   desired contract is an it.todo, fix scheduled with the char-option
+ *   regex work, run-to-stable Phase 2.2).
  * - XTXT_ singleton isolation: rendering a text-fallback input does not
  *   leak `XTXT_` keys into the global definitions registry, and two
  *   builders with different XTXT_ inputs render independently.
@@ -271,6 +275,24 @@ describe('BlissSVGBuilder text fallback', () => {
     it.todo('renders Xḿ as a single text element since the base char lacks hardcoded data (m with acute)');
     it.todo('renders Xpiǎ as a single text element when one mid-word char lacks hardcoded data');
     it.todo('renders Xhello//Xpiǎ as paths for the hardcoded word and a single text element for the fallback word');
+  });
+
+  // A character-level option bracket hides an X-run from XTXT_ routing
+  // (processXCodes only recognizes X-runs at a glyph boundary), so a
+  // fallback letter that renders bare fails with UNKNOWN_CODE once
+  // bracketed. Fix scheduled with the char-option regex work (run-to-stable
+  // Phase 2.2); the it.todo pins the acceptance criterion.
+  describe('when a character-level option bracket precedes a fallback letter', () => {
+    it('renders bare Xλ via text fallback but reports [color=green]Xλ as UNKNOWN_CODE', () => {
+      expect(renderSvg('Xλ')).toContain('<text');
+      const bracketed = new BlissSVGBuilder('[color=green]Xλ');
+      expect(bracketed.svgCode).not.toContain('<text');
+      expect(bracketed.warnings).toContainEqual(expect.objectContaining({
+        code: 'UNKNOWN_CODE',
+      }));
+    });
+
+    it.todo('renders [color=green]Xλ as a green text-fallback element with zero warnings');
   });
 
   describe('when XTXT_ inputs are isolated from global state', () => {

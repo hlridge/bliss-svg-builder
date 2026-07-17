@@ -56,7 +56,7 @@ export default defineConfig({
             { text: 'Characters & B-Codes', link: '/handbook/writing/characters-bcodes' },
             { text: 'Words & Sentences', link: '/handbook/writing/words-sentences' },
             { text: 'Shapes', link: '/handbook/writing/shapes' },
-            { text: 'Latin & Cyrillic', link: '/handbook/writing/latin-cyrillic', badge: 'Soon' },
+            { text: 'Latin & Cyrillic', link: '/handbook/writing/latin-cyrillic' },
             { text: 'Custom Codes', link: '/handbook/writing/custom-codes' },
             { text: 'Spacing', link: '/handbook/writing/spacing' }
           ]
