@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
-import { mergeWordIndicatorsOntoHead, resolveWordIndicatorOverlay } from "./indicator-utils.js";
+import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -2319,10 +2319,53 @@ class BlissSVGBuilder {
   }
 
 
+  // The external-character namespace: X followed by one or more letters in
+  // the parser recognition ranges (Latin, Latin-1/Ext-A, Greek, Cyrillic).
+  // Matches the parser's X-run tokenizer ranges exactly: written input of
+  // this shape is always read as external text, never as a definition name,
+  // so such a definition would be unreachable (1.4 fence; Phase 2.3 guard).
+  static #X_NAMESPACE_PATTERN = /^X[a-zA-ZÀ-ſͰ-ϿЀ-ӿ]+$/;
+
+  // Parser-transient tokens that are DSL syntax, not registry codes: defining
+  // one would change what the bare token means at the use site (a definition
+  // named RK shadows the kerning marker).
+  static #RESERVED_SYNTAX_NAMES = new Set(['RK', 'AK', 'SP']);
+
   // Validates a definition code string
   static #validateCode(code) {
     if (typeof code !== 'string' || code.trim().length === 0) {
       throw new Error('Definition code must be a non-empty, non-whitespace string.');
+    }
+    // Control (Cc) and format (Cf) characters make a key that LOOKS like a
+    // normal code but can never be typed at a use site: the definition
+    // registers unreachable, silently. Reject with the code point named.
+    const invisible = code.match(/[\p{Cc}\p{Cf}]/u);
+    if (invisible) {
+      const hex = invisible[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
+      throw new Error(`Definition code contains an invisible character (U+${hex}). Use visible characters only.`);
+    }
+    if (BlissSVGBuilder.#X_NAMESPACE_PATTERN.test(code)) {
+      throw new Error(`"${code}" collides with the external-character namespace (X followed by letters): the parser reads such tokens as external text, so this definition would be unreachable. Choose a name that is not X followed by letters.`);
+    }
+    if (BlissSVGBuilder.#RESERVED_SYNTAX_NAMES.has(code)) {
+      throw new Error(`"${code}" is reserved DSL syntax (the kerning and space markers RK, AK, SP) and cannot be defined.`);
+    }
+  }
+
+  // Existence/overwrite gate shared by all four define paths. A built-in
+  // definition is part of the universal primitive set every portable
+  // composition relies on: replacing one would change what existing strings
+  // render in this instance only, so overwrite:true refuses it (mirroring
+  // removeDefinition/patchDefinition). Without overwrite, an existing code
+  // (built-in or custom) keeps landing in skipped[] via the already-exists
+  // throw.
+  static #assertReplaceable(code, options) {
+    if (!blissElementDefinitions[code]) return;
+    if (options.overwrite && builtInCodes.has(code)) {
+      throw new Error(`define("${code}"): cannot overwrite built-in definitions.`);
+    }
+    if (!options.overwrite) {
+      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
     }
   }
 
@@ -2427,6 +2470,62 @@ class BlissSVGBuilder {
     return walk(BlissSVGBuilder.#extractReferencedCodes(codeString));
   }
 
+  // Deferred validation of forward references (Phase 2.3): define() accepts
+  // a codeString that references a not-yet-defined code, so the
+  // indicator-bake guard (D-S1a) can be bypassed by definition ORDER — the
+  // glyph registers while its reference is unknown, and a later define/patch
+  // makes that reference an indicator. This scan runs at that later moment,
+  // the completing call: with `code` about to become `newEntry`, every
+  // custom glyph definition (not itself a compound indicator) is re-checked
+  // for a reference that would now resolve to an indicator (through
+  // pure-rename aliases too, so a bare-alias completion cannot slip
+  // through). A conflict rejects the COMPLETING call and changes nothing:
+  // either definition order ends in the same refusal.
+  static #assertNoIndicatorBakeDependents(callName, code, newEntry) {
+    const view = { ...blissElementDefinitions, [code]: newEntry };
+    const dependents = [];
+    for (const [depCode, depDef] of Object.entries(blissElementDefinitions)) {
+      if (depCode === code) continue;
+      if (depDef.isBlissGlyph !== true || depDef.isIndicator === true || typeof depDef.codeString !== 'string') continue;
+      const refs = BlissSVGBuilder.#extractReferencedCodes(depDef.codeString);
+      const bakes = refs.some(ref => {
+        const refDef = Object.prototype.hasOwnProperty.call(view, ref) ? view[ref] : undefined;
+        return refDef !== undefined && resolveEffectiveDefinition(refDef, view)?.isIndicator === true;
+      });
+      if (bakes) dependents.push(depCode);
+    }
+    if (dependents.length > 0) {
+      const plural = dependents.length > 1 ? 's' : '';
+      const list = dependents.map(d => `"${d}"`).join(', ');
+      throw new Error(`${callName}("${code}"): making "${code}" an indicator would make the glyph definition${plural} ${list} bake an indicator, a state define() rejects. Remove or redefine the dependent definition${plural} first, then define "${code}".`);
+    }
+  }
+
+  // Word-internal coordinate guard shared by #defineBare and patchDefinition
+  // (coordinate ownership: coordinates belong at the usage site, never baked
+  // into a portable word alias). Kerning markers (RK:/AK:) are spacing, not
+  // coordinates, so their `:` values are exempt (GH #36 false-positive fix).
+  static #assertNoWordInternalCoordinates(callName, code, codeString) {
+    if (!codeString.includes('/')) return;
+    const segments = codeString.split(/[/;]/).filter(Boolean);
+    const hasCoords = segments.some(seg => !/^(?:RK|AK)(?::|$)/.test(seg) && /:-?[\d.]/.test(seg));
+    if (hasCoords) {
+      throw new Error(`${callName}("${code}"): word definitions (containing /) cannot have internal coordinates. Move coordinates to the usage site.`);
+    }
+  }
+
+  // An SP segment in a stored codeString can never resolve: SP has meaning
+  // only at the top level, where punctuation context turns it into TSP/QSP.
+  // `/SP/` is written sugar for `//`, so a definition using it normalizes to
+  // the `//` form silently (user ruling 2026-07-18). Quote-bearing
+  // codeStrings are left untouched: definition ingestion is quote-unaware
+  // today (post-1.0.0 family), and a naive split could cut inside a quoted
+  // option value.
+  static #normalizeSpaceSegments(codeString) {
+    if (!codeString.includes('/') || /["']/.test(codeString)) return codeString;
+    return codeString.split('/').map(segment => segment === 'SP' ? '' : segment).join('/');
+  }
+
   // ── Private define helpers ──────────────────────────────────────
 
   static #defineShape(code, definition, options = {}) {
@@ -2469,9 +2568,7 @@ class BlissSVGBuilder {
       }
     }
 
-    if (blissElementDefinitions[code] && !options.overwrite) {
-      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
-    }
+    BlissSVGBuilder.#assertReplaceable(code, options);
 
     const entry = { isShape: true };
 
@@ -2566,9 +2663,7 @@ class BlissSVGBuilder {
       }
     }
 
-    if (blissElementDefinitions[code] && !options.overwrite) {
-      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
-    }
+    BlissSVGBuilder.#assertReplaceable(code, options);
 
     const entry = {
       codeString: definition.codeString,
@@ -2603,6 +2698,10 @@ class BlissSVGBuilder {
       }
     }
 
+    if (entry.isIndicator === true) {
+      BlissSVGBuilder.#assertNoIndicatorBakeDependents('define', code, entry);
+    }
+
     blissElementDefinitions[code] = entry;
   }
 
@@ -2619,9 +2718,7 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): "char" must be a non-empty string.`);
     }
 
-    if (blissElementDefinitions[code] && !options.overwrite) {
-      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
-    }
+    BlissSVGBuilder.#assertReplaceable(code, options);
 
     const entry = {
       getPath: definition.getPath,
@@ -2736,21 +2833,15 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): a ; part cannot be a composition ("${definition.codeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
     }
 
-    if (blissElementDefinitions[code] && !options.overwrite) {
-      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
-    }
+    BlissSVGBuilder.#assertReplaceable(code, options);
 
-    const resolved = BlissSVGBuilder.#resolveBareAliases(definition.codeString);
+    const resolved = BlissSVGBuilder.#normalizeSpaceSegments(
+      BlissSVGBuilder.#resolveBareAliases(definition.codeString)
+    );
 
     // Word definitions (containing /) must not have internal position modifiers.
     // Position should be applied at the usage site, e.g. WORD:2,0
-    if (resolved.includes('/')) {
-      const segments = resolved.split(/[/;]/).filter(Boolean);
-      const hasCoords = segments.some(seg => /:-?[\d.]/.test(seg));
-      if (hasCoords) {
-        throw new Error(`define("${code}"): word definitions (containing /) cannot have internal coordinates. Move coordinates to the usage site.`);
-      }
-    }
+    BlissSVGBuilder.#assertNoWordInternalCoordinates('define', code, resolved);
 
     const entry = { codeString: resolved };
 
@@ -2764,6 +2855,10 @@ class BlissSVGBuilder {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
         entry.defaultOptions = defaultOptionsSnapshot;
       }
+    }
+
+    if (resolveEffectiveDefinition(entry, blissElementDefinitions)?.isIndicator === true) {
+      BlissSVGBuilder.#assertNoIndicatorBakeDependents('define', code, entry);
     }
 
     blissElementDefinitions[code] = entry;
@@ -2991,9 +3086,44 @@ class BlissSVGBuilder {
       }
     }
 
-    // For bare definitions, resolve chained aliases in codeString
+    // D-S1a on the patch surface: a glyph (not flagged isIndicator) cannot
+    // bake an indicator, whichever property the patch changes — a codeString
+    // gaining indicator anatomy, or an isIndicator un-flag on a compound
+    // indicator that keeps its anatomy. The POST-patch state is judged, so
+    // codeString + isIndicator:true in one patch stays legal.
+    if (type === 'glyph' && ('codeString' in changes || 'isIndicator' in changes)) {
+      const nextCodeString = 'codeString' in changes ? changes.codeString : def.codeString;
+      const nextIsIndicator = 'isIndicator' in changes ? changes.isIndicator === true : def.isIndicator === true;
+      if (!nextIsIndicator && typeof nextCodeString === 'string') {
+        const refs = BlissSVGBuilder.#extractReferencedCodes(nextCodeString);
+        if (refs.some(ref => blissElementDefinitions[ref]?.isIndicator === true)) {
+          throw new Error(`patchDefinition("${code}"): a glyph definition cannot bake in an indicator. Define a base+indicator combination as a bare alias (omit type:"glyph"), attach the indicator at the use site (BASE;INDICATOR), or flag a compound indicator with isIndicator:true.`);
+        }
+      }
+    }
+
+    // For bare definitions, resolve chained aliases in codeString; SP
+    // segments normalize to word breaks and the word-internal-coordinate
+    // guard applies, mirroring #defineBare (patch cannot construct a state
+    // define() forbids).
     if ('codeString' in changes && type === 'bare') {
-      changes = { ...changes, codeString: BlissSVGBuilder.#resolveBareAliases(changes.codeString) };
+      const resolved = BlissSVGBuilder.#normalizeSpaceSegments(
+        BlissSVGBuilder.#resolveBareAliases(changes.codeString)
+      );
+      BlissSVGBuilder.#assertNoWordInternalCoordinates('patchDefinition', code, resolved);
+      changes = { ...changes, codeString: resolved };
+    }
+
+    // Deferred validation at the completing patch (Phase 2.3): a patch that
+    // makes this definition an indicator — a glyph isIndicator flip, or a
+    // bare codeString now resolving to an indicator — re-checks every custom
+    // glyph referencing it, exactly like the completing define.
+    const becomesIndicator =
+      (type === 'glyph' && changes.isIndicator === true && def.isIndicator !== true) ||
+      (type === 'bare' && 'codeString' in changes &&
+        resolveEffectiveDefinition({ codeString: changes.codeString }, blissElementDefinitions)?.isIndicator === true);
+    if (becomesIndicator) {
+      BlissSVGBuilder.#assertNoIndicatorBakeDependents('patchDefinition', code, { ...def, ...changes });
     }
 
     // Validate BEFORE the apply loop, like every other patch guard: a

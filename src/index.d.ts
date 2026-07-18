@@ -958,11 +958,15 @@ export declare class BlissSVGBuilder {
   /**
    * Defines one or more custom codes (glyphs, shapes, external glyphs, or bare aliases).
    * @param definitions - Map of code names to their definitions
-   * @param options - Pass `{ overwrite: true }` to replace existing custom definitions
+   * @param options - Pass `{ overwrite: true }` to replace existing custom definitions.
+   *   Built-in definitions cannot be overwritten (the entry lands in `errors`).
    *
    * Does NOT throw: each entry is validated independently, and any rejection is reported
    * in `result.errors` (other entries in the same call still register). Always inspect
-   * the returned `{ defined, skipped, errors }`.
+   * the returned `{ defined, skipped, errors }`. Rejected entries include names with
+   * invisible characters, the reserved names (`X` + letters, `RK`, `AK`, `SP`), and
+   * a define that would make an existing glyph definition bake an indicator (deferred
+   * validation of a forward reference).
    */
   static define(
     definitions: Record<string, CodeDefinition>,
@@ -993,8 +997,11 @@ export declare class BlissSVGBuilder {
    *   flag (e.g. `type`, `isBuiltIn`) for the definition;
    *   `getPath` not a function; empty, whitespace-only, or non-string `codeString`; a `;;` in `codeString`;
    *   a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular
-   *   reference; a `;`-part that is itself a composition; or a global-only
-   *   `defaultOptions` key.
+   *   reference; a `;`-part that is itself a composition; a glyph `codeString` that
+   *   bakes an indicator (or an `isIndicator` change that leaves one baked); internal
+   *   coordinates in a multi-character bare `codeString` (kerning markers allowed);
+   *   a patch that would turn an already-referenced code into an indicator; or a
+   *   global-only `defaultOptions` key.
    */
   static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true };
 }
