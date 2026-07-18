@@ -1066,7 +1066,7 @@ builder.glyph(0).applyIndicators('B86', { stripSemantic: true });
 
 An empty `code` (omitted, `''`, or whitespace-only) is now allowed as the deliberate empty set: it has the same state effect as `clearIndicators()`, and `applyIndicators('', { stripSemantic: true })` removes the semantic too. On a bare glyph it is a harmless silent no-op, like a trailing `;` in the DSL.
 
-Every given code must be a single indicator: a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR`, an unknown code with `UNKNOWN_CODE`, a code spanning multiple characters (a top-level `/`) with `MISPLACED_CHARACTER_INDICATOR`, and a code whose decoration fails to parse (e.g. `B81:bad`) is rejected with its parse warning; the valid subset still applies. A call whose codes are *all* invalid is now refused: nothing changes on the glyph (in particular, existing indicators are no longer replaced away, and nothing strips), and the per-code warnings are the only effect. A call that can not change anything for structural reasons (a space glyph, an invalid part pattern) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
+Every given code must be a single indicator (a custom code qualifies when it resolves to one through single-code aliases): a recognized non-indicator is warned with `NON_INDICATOR_AS_CHARACTER_INDICATOR`, an unknown code with `UNKNOWN_CODE`, a code spanning multiple characters (a top-level `/`) with `MISPLACED_CHARACTER_INDICATOR`, and a code whose decoration fails to parse (e.g. `B81:bad`) is rejected with its parse warning; the valid subset still applies. A call whose codes are *all* invalid is now refused: nothing changes on the glyph (in particular, existing indicators are no longer replaced away, and nothing strips), and the per-code warnings are the only effect. A call that can not change anything for structural reasons (a space glyph, an invalid part pattern) adds a `NOOP_INDICATOR_MUTATION` warning instead of silently doing nothing.
 
 On a **group handle**, sets the word-level `;;` overlay on the head glyph, byte-identical to the DSL `;;` (and `{ stripSemantic: true }` to `;;!`). The base glyphs stay intact, so a later `clearIndicators()` restores them:
 
@@ -1082,7 +1082,7 @@ An empty `code` now stores the deliberate empty overlay (`;;`): render-significa
 
 `{ flatten: true }` opts out of the overlay and bakes the indicator onto the head glyph's parts (the pre-overlay shape).
 
-The group-level call validates its codes the same way the DSL `;;` does: a recognized code that is not an indicator is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning, an unknown code with `UNKNOWN_CODE`, and a code carrying a character separator (a top-level `/`, which the `;;` slot cannot hold) with `MALFORMED_WORD_INDICATOR`. A space word cannot carry a word indicator at all: apply and clear on a space group refuse with a `NOOP_INDICATOR_MUTATION` warning. See [Warning Codes](/reference/warning-codes).
+The group-level call validates its codes the same way the DSL `;;` does: a recognized code that is not an indicator is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning, an unknown code with `UNKNOWN_CODE`, and a code carrying a character separator (a top-level `/`, which the `;;` slot cannot hold) with `MALFORMED_WORD_INDICATOR`. A custom code qualifies as an indicator when it resolves to one through single-code aliases (an alias to a multi-code composition does not). A space word cannot carry a word indicator at all: apply and clear on a space group refuse with a `NOOP_INDICATOR_MUTATION` warning. See [Warning Codes](/reference/warning-codes).
 
 #### `.clearIndicators(opts?)`
 
@@ -1194,11 +1194,14 @@ For adding characters from external font systems. Requires providing your own SV
 
 `define()` validates each entry and reports failures per code in `result.errors` (other entries in the same call still register). The rules:
 
+- **Names must be visible and unreserved.** A name containing control or format characters (zero-width space, BOM, direction marks) is rejected, naming the code point. Reserved names are rejected too: `X` followed by letters (the external-character namespace: written input of that shape is always read as external text, so the definition would be unreachable) and the syntax markers `RK`, `AK`, `SP`. Unused B-codes (like `B99999`) may be defined, but future versions may claim new built-in codes, so custom names carry no collision guarantee.
 - **No word-level indicators in definitions.** A `codeString` cannot contain `;;`; apply word indicators at the use site (`WORD;;B81`).
-- **A glyph or shape is a single character.** Its `codeString` cannot contain `/`; define a multi-character word as a bare code (omit `type`).
-- **A glyph cannot bake in an indicator.** Define a base+indicator combination as a bare code, attach the indicator at the use site (`BASE;B81`), or flag a compound indicator glyph with `isIndicator: true`.
+- **A glyph or shape is a single character.** Its `codeString` cannot contain `/`; define a multi-character word as a bare code (omit `type`). A bare codeString may span whole words (`B291//C8`) and compose in sentences like the written form.
+- **A glyph cannot bake in an indicator.** Define a base+indicator combination as a bare code, attach the indicator at the use site (`BASE;B81`), or flag a compound indicator glyph with `isIndicator: true`. This holds in every definition order: a later `define()` or patch that would turn an already-referenced code into an indicator is rejected as well, with an error naming the affected definition.
+- **Word codeStrings carry no internal coordinates.** In a multi-character `codeString` (containing `/`), a position suffix like `B516:2,0` is rejected; apply coordinates at the usage site (`WORD:2,0`). Kerning markers (`RK:-2`, `AK:1`) are spacing, not coordinates, and are allowed. A single-character `codeString` keeps its coordinate freedom.
+- **Spaces spell out as `//` or explicit space codes.** The shorthand `SP` has meaning only in top-level input (punctuation context resolves it), so an `SP` segment in a stored codeString is normalized to `//` at registration.
 - **`defaultOptions` keys must be valid option names**, and cannot include the canvas-wide global-only options (`margin`, `grid`, `svg-title`, …): those configure the whole SVG and would be inert on a definition. Set them in the global bracket (`[opts]||`) or the builder options instead.
-- References are checked: circular reference chains are rejected. A reference to a not-yet-defined code is allowed, so definitions can be registered in any order.
+- References are checked: circular reference chains are rejected. A reference to a not-yet-defined code is allowed, so definitions can be registered in any order; the pending checks complete when the missing code is defined (see the indicator rule above).
 
 `patchDefinition()` applies the same rules and validates before changing anything, so a rejected patch leaves the definition untouched.
 
@@ -1214,7 +1217,7 @@ parser output (`toJSON()`), rendering (`svgCode`), serialization
 | `codeString` | parser, rendering, serialization | the composition; a non-glyph code decomposes to it on export, a `type: 'glyph'` keeps its name in the tree but still decomposes on export |
 | `getPath` / `width` / `height` | rendering, measurements | path geometry and `width`/`height`/`bounds` on snapshot nodes and handles |
 | `anchorOffsetX` / `anchorOffsetY` | rendering (composition) | the anchor point an applied indicator positions against |
-| `isIndicator: true` | parser (part-merge, head-glyph exclusion) | `indicatorKind` / `indicatorLevel` on the resolved part; an `isIndicator` glyph is an atomic indicator unit |
+| `isIndicator: true` | parser (part-merge, head-glyph exclusion) | `indicatorKind` / `indicatorLevel` on the resolved part; an `isIndicator` glyph is an atomic indicator unit. Indicator-ness also reads through single-code bare aliases: an alias resolving to an indicator behaves as that indicator in every indicator slot (`;;`, `;`-parts, `applyIndicators`) |
 | `char` | rendering (text path) | the rendered Unicode character on the snapshot node's `.char` (external glyphs) |
 | `kerningRules` | rendering | inter-glyph positions only (no field on the tree) |
 | `shrinksPrecedingWordSpace: true` | rendering (spacing) | the auto-shrunk word space before the glyph |
@@ -1257,7 +1260,7 @@ do not rely on the definition API for that.
 |--------|---------|-------------|
 | `overwrite` | `false` | Allow replacing existing definitions |
 
-Pass `{ overwrite: true }` as the second argument to replace existing codes. Without it, existing codes are added to `skipped`.
+Pass `{ overwrite: true }` as the second argument to replace existing custom codes. Without it, existing codes are added to `skipped`. Built-in definitions cannot be overwritten (matching `patchDefinition` and `removeDefinition`): replacing one would change what existing compositions render in this instance only, so such an entry lands in `errors` instead.
 
 ## Query API
 
@@ -1310,7 +1313,7 @@ Allowed properties by type:
 
 Patching `defaultOptions` replaces the entire sub-object (not a deep merge). Patching `codeString` validates references and checks for circular dependencies.
 
-**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; or a global-only `defaultOptions` key. A rejected patch leaves the definition untouched (validation runs before any change is applied).
+**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; a glyph `codeString` that bakes an indicator (or an `isIndicator` change that leaves one baked); internal coordinates in a multi-character bare `codeString` (kerning markers stay allowed); a patch that would turn an already-referenced code into an indicator; or a global-only `defaultOptions` key. A rejected patch leaves the definition untouched (validation runs before any change is applied).
 
 ### `listDefinitions(filter?)`
 

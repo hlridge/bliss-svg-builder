@@ -207,9 +207,12 @@ result.errors;
 
 The rules keep definitions portable and unambiguous:
 
+- **Names must be visible and unreserved.** Control and format characters (like a zero-width space) are rejected by naming the code point. So are the reserved names: built-in codes, `X` followed by letters (the external-character namespace), and the syntax markers `RK`, `AK`, `SP`. Unused B-codes may be defined, but future versions may claim new built-in codes, so custom names carry no collision guarantee.
 - **No word-level indicators in definitions.** A `codeString` cannot contain `;;`. A word indicator is a live, reversible overlay, so it belongs at the use site: `MYWORD;;B81`.
-- **A glyph or shape is a single character.** Its `codeString` cannot contain `/`. Define a multi-character word as a bare code (omit `type`).
-- **A glyph cannot bake in an indicator.** Indicators attach to characters at the use site (`SMILEY;B81`) or to words (`;;`). To create a new indicator of its own, flag the glyph with `isIndicator: true`; it then behaves as one atomic indicator unit.
+- **A glyph or shape is a single character.** Its `codeString` cannot contain `/`. Define a multi-character word as a bare code (omit `type`); a bare code may even span whole words (`B291//C8`).
+- **A glyph cannot bake in an indicator.** Indicators attach to characters at the use site (`SMILEY;B81`) or to words (`;;`). To create a new indicator of its own, flag the glyph with `isIndicator: true`; it then behaves as one atomic indicator unit. The rule holds in every definition order: a later `define()` that would turn an already-referenced code into an indicator is rejected too.
+- **Word codeStrings carry no internal coordinates.** In a `/`-spanning codeString, apply positions at the use site (`MYWORD:2,0`) instead. Kerning markers (`RK:-2`, `AK:1`) are spacing, not coordinates, and are allowed. Single-character codeStrings keep their coordinate freedom (see below).
+- **Spaces spell out as `//` or explicit space codes.** The top-level shorthand `SP` normalizes to `//` when stored.
 - **`defaultOptions` keys must be valid option names**, and cannot include canvas-wide global-only options like `margin` or `grid` (they configure the whole SVG and would be inert on a definition).
 
 `patchDefinition()` enforces the same rules and validates before applying, so a rejected patch changes nothing.
@@ -219,6 +222,7 @@ The rules keep definitions portable and unambiguous:
 Custom codes take indicators and options at the use site just like built-ins:
 
 - `SMILEY;B81` attaches the action indicator to the custom character; `B313/SMILEY;;B81` puts a word-level indicator on the word. Indicator positioning is computed from the glyph's actual rendered ink, including glyphs whose definition displaces its parts.
+- An alias to an indicator works as that indicator. After `define({ '6436': { codeString: 'B6436' } })`, writing `MYWORD;;6436` applies the indicator exactly like `MYWORD;;B6436`, on every surface (`;;`, `;`-parts, `applyIndicators`). Only single-code aliases resolve this way; an alias to a multi-code composition needs the `isIndicator: true` flag instead.
 - `[color=blue]>SMILEY` styles the whole glyph as one part. On serialization the option is re-emitted before each decomposed part so the styling survives portably; see [Part Options on Custom Glyphs](/handbook/syntax-options/options-system#part-options-on-custom-glyphs).
 
 ## Coordinates in Definitions
@@ -239,7 +243,7 @@ The same holds for a multi-part definition whose parts share a common offset: th
 
 ## Managing Definitions
 
-Definitions can be overwritten, altered, removed, and inspected. See the [API Documentation](/reference/api-documentation#define-definitions-options) for `define()` options, [Query API](/reference/api-documentation#query-api) for `getDefinition()`, `listDefinitions()`, and `removeDefinition()`.
+Custom definitions can be overwritten, altered, removed, and inspected; built-in definitions cannot be replaced by any route (overwrite, patch, or remove), so the shared vocabulary always renders the same everywhere. See the [API Documentation](/reference/api-documentation#define-definitions-options) for `define()` options, [Query API](/reference/api-documentation#query-api) for `getDefinition()`, `listDefinitions()`, and `removeDefinition()`.
 
 Quick examples:
 
