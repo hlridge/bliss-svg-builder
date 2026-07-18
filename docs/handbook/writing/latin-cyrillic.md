@@ -69,7 +69,7 @@ A letter the parser recognizes but has no embedded outline for (for example Gree
 
 The fallback comes with real limitations, which is why it carries the experimental marking:
 
-- **Environment-dependent appearance.** A `<text>` element is drawn with the fonts available where the SVG is displayed, so the exact appearance varies between systems and is not covered by the [compatibility guarantee](/reference/compatibility#external-glyphs-x-codes).
+- **Environment-dependent appearance.** A `<text>` element is drawn with the fonts available where the SVG is displayed, so the exact appearance varies between systems and is not guaranteed.
 - **SVG display only.** For the same reason, a `<text>` element is typically lost or changed when the SVG is converted to an image (for example PNG) in an environment without matching fonts. Outlined letters survive conversion; fallback letters may not.
 - **Approximate metrics.** Widths for fallback characters are estimated, so precise layouts may need manual kerning or cropping.
 - **The run falls back as a whole.** When a text run mixes outlined and non-outlined letters, the whole run renders as one fallback element, and serializes as one code (`Xa/Xλ/Xb` serializes as `Xaλb`).
@@ -78,4 +78,4 @@ Text rendering covers the Latin, Greek, and Cyrillic letter ranges. `X` followed
 
 ## Compatibility
 
-X-code input keeps its meaning permanently: a string that parses today keeps parsing and keeps meaning the same text in every future version. The X notation is the library's current mechanism for spelled text, not necessarily its final one: the serialized form and the rendering mechanism may evolve in future releases, always release-noted, and a future mechanism may depend on a font being available where the SVG is generated. The letter B-codes (`B29`-`B80`) are stable like every B-code. Details in [Compatibility](/reference/compatibility#external-glyphs-x-codes).
+X-code input keeps its meaning permanently: a string that parses today keeps parsing and keeps meaning the same text in every future version. The X notation is the library's current mechanism for spelled text, not necessarily its final one: the serialized form and the rendering mechanism may evolve in future releases, always release-noted, and a future mechanism may depend on a font being available where the SVG is generated. The letter B-codes (`B29`-`B80`) are stable like every B-code.

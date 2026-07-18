@@ -18,7 +18,7 @@ builder.warnings;
 - `message` — a human-readable description, including how to fix the input
 - `source` — the DSL fragment that triggered the warning
 
-Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully; see [Compatibility](/reference/compatibility#warnings).
+Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully.
 
 ## Naming Scheme
 

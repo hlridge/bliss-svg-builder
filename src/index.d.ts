@@ -667,7 +667,6 @@ export interface BlissJSON {
  * code meanings never change within 1.x), so the type also accepts any string
  * while keeping autocomplete for the known codes. When switching on a warning
  * code, always include a default branch for codes added after your build.
- * See the Compatibility page in the documentation.
  */
 export type WarningCode =
   | 'MALFORMED_GLOBAL_OPTIONS'

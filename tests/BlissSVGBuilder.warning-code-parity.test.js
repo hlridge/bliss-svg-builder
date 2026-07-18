@@ -13,7 +13,7 @@ import { WARNING_CODES } from '../src/lib/bliss-constants.js';
  * diverge. `tsc` cannot catch this: the union is a hand-maintained mirror of a
  * plain frozen object, not a type derived from it.
  *
- * The union is OPEN by contract (compatibility page, decision shipped with the
+ * The union is OPEN by contract (decision shipped with the
  * 1.0.0 contract): it ends with `(string & {})` so a warning code added in a
  * later minor cannot break a consumer's exhaustive switch. The literal members
  * still mirror the registry exactly; the tail is the only non-literal member.
