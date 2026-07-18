@@ -9,7 +9,7 @@ import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js"
 import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
-import { resolveWordIndicatorOverlay } from "./indicator-utils.js";
+import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
@@ -1410,6 +1410,7 @@ export class BlissParser {
             }
 
             BlissParser.#applyDefinitionMetadata(part, definition);
+            BlissParser.#applyEffectiveMetadata(part, definition);
             BlissParser.#flagCompositePart(part, partIndex);
             partIndex++;
 
@@ -1551,6 +1552,22 @@ export class BlissParser {
   }
 
   /**
+   * Apply the EFFECTIVE definition's metadata after the immediate one: a
+   * pure-rename bare alias (single-code codeString, no identity of its own)
+   * is transparent, so the resolved target's indicator-ness and anchor
+   * metadata must reach the part (GH #35 — indicator-ness carries through an
+   * alias). Runs second so explicit part options and the alias's own
+   * defaultOptions keep precedence over the target's. A no-op whenever no
+   * rename chain applies (effective === immediate).
+   */
+  static #applyEffectiveMetadata(part, definition) {
+    const effective = resolveEffectiveDefinition(definition, blissElementDefinitions);
+    if (effective !== definition) {
+      BlissParser.#applyDefinitionMetadata(part, effective);
+    }
+  }
+
+  /**
    * Copy definition metadata (defaultOptions, indicator, anchor offsets)
    * onto a part object. Shared by parseParts, #expandPartRecursive, and
    * #parseCodeStringToParts to keep the logic in one place.
@@ -1595,6 +1612,7 @@ export class BlissParser {
     }
 
     BlissParser.#applyDefinitionMetadata(part, definition);
+    BlissParser.#applyEffectiveMetadata(part, definition);
   }
 
   /**
@@ -1629,6 +1647,7 @@ export class BlissParser {
       }
 
       BlissParser.#applyDefinitionMetadata(part, definition);
+      BlissParser.#applyEffectiveMetadata(part, definition);
       parts.push(part);
     }
 

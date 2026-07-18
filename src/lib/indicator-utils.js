@@ -17,6 +17,65 @@ const CHAR_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT 
 // (mirrors the DSL gate's `(.+)` requirement, round-3 review F3).
 const CHAR_OPTION_STRIP = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.+)$`);
 
+// A codeString that is one clean code token (no separators, coordinates,
+// options, or markers): the only form a pure-rename alias can hold.
+const SINGLE_CODE_TOKEN = /^[A-Za-z_][\w]*$/;
+
+/**
+ * Resolve a definition to its EFFECTIVE definition by following pure-rename
+ * bare aliases: a definition whose whole content is a single-code codeString
+ * (no `/`, `;`, `:`, options, `^`) and which carries no identity or metadata
+ * of its own (no glyph/shape/externalGlyph flags, no getPath, no isIndicator)
+ * is transparent, so indicator-ness and layout metadata read through it.
+ * The chain stops at the first definition with identity (a flagged glyph, a
+ * shape, an external glyph, an indicator) or whose codeString is not a single
+ * clean token — so a multi-code composition NEVER resolves through (the
+ * single-code-target guardrail, user ruling 2026-07-17), and a definition's
+ * own metadata is never bypassed. Unregistered targets end the chain at the
+ * alias itself (classified like any recognized non-indicator).
+ *
+ * Shared by the `;;` classifier (partitionWordIndicators), the render-merge
+ * filter (filterToIndicators), the semantic helpers, and the parser's part
+ * metadata application, so every indicator surface resolves aliases
+ * identically (GH #35).
+ *
+ * @param {Object|undefined} definition - the starting definition entry
+ * @param {Object} definitions - the live definitions registry
+ * @returns {Object|undefined} the effective definition (the input when no
+ *   chain applies)
+ */
+export function resolveEffectiveDefinition(definition, definitions) {
+  let current = definition;
+  const seen = new Set();
+  while (
+    current &&
+    current.isIndicator !== true &&
+    !current.isBlissGlyph && !current.isShape && !current.isExternalGlyph &&
+    !current.glyphCode && typeof current.getPath !== 'function' &&
+    typeof current.codeString === 'string' &&
+    SINGLE_CODE_TOKEN.test(current.codeString) &&
+    !seen.has(current.codeString) &&
+    Object.prototype.hasOwnProperty.call(definitions, current.codeString)
+  ) {
+    seen.add(current.codeString);
+    current = definitions[current.codeString];
+  }
+  return current ?? definition;
+}
+
+/**
+ * Look up a code's effective definition: registry lookup (own properties
+ * only) followed by pure-rename resolution. The single predicate source for
+ * "is this code an indicator" across the `;;` store, the render-merge, and
+ * the semantic classification helpers.
+ */
+function lookupEffectiveDefinition(bareCode, definitions) {
+  const definition = Object.prototype.hasOwnProperty.call(definitions, bareCode)
+    ? definitions[bareCode]
+    : undefined;
+  return definition ? resolveEffectiveDefinition(definition, definitions) : undefined;
+}
+
 /**
  * Extract the bare B-code from a code string that may include
  * option prefixes (e.g. '[color=red]>B81') and position suffixes (':0,4').
@@ -36,7 +95,7 @@ export function getBareCode(str) {
 export function getSemanticRoot(indicatorCodes, definitions) {
   for (const ind of indicatorCodes) {
     const bareInd = getBareCode(ind);
-    const indDef = definitions[bareInd];
+    const indDef = lookupEffectiveDefinition(bareInd, definitions);
     if (indDef?.semanticIndicator) {
       return SEMANTIC_INDICATOR_ROOTS[indDef.semanticIndicator];
     }
@@ -48,15 +107,16 @@ export function getSemanticRoot(indicatorCodes, definitions) {
  * Check if any indicator in the list carries a semanticIndicator flag.
  */
 export function hasSemantic(indicatorCodes, definitions) {
-  return indicatorCodes.some(ind => definitions[getBareCode(ind)]?.semanticIndicator);
+  return indicatorCodes.some(ind => lookupEffectiveDefinition(getBareCode(ind), definitions)?.semanticIndicator);
 }
 
 /**
- * Filter codes to only include real indicators (isIndicator: true).
+ * Filter codes to only include real indicators (isIndicator: true), reading
+ * indicator-ness through pure-rename aliases (GH #35).
  * Non-indicator codes passed in indicator position are silently dropped.
  */
 export function filterToIndicators(codes, definitions) {
-  return codes.filter(code => definitions[getBareCode(code)]?.isIndicator === true);
+  return codes.filter(code => lookupEffectiveDefinition(getBareCode(code), definitions)?.isIndicator === true);
 }
 
 /**
@@ -116,13 +176,16 @@ export function partitionWordIndicators(codes, definitions) {
       continue;
     }
     const bare = getBareCode(code);
-    // Own-property check: a normal definitions object inherits Object.prototype
-    // members (toString, constructor, __proto__), so a plain `definitions[bare]`
-    // lookup would classify those names as recognized non-indicators. Only an
-    // OWN key is a real registered code; everything else is unknown.
-    const definition = Object.prototype.hasOwnProperty.call(definitions, bare)
-      ? definitions[bare]
-      : undefined;
+    // Own-property check (inside lookupEffectiveDefinition): a normal
+    // definitions object inherits Object.prototype members (toString,
+    // constructor, __proto__), so a plain `definitions[bare]` lookup would
+    // classify those names as recognized non-indicators. Only an OWN key is a
+    // real registered code; everything else is unknown. Indicator-ness reads
+    // through pure-rename aliases (GH #35): the effective definition is
+    // checked, so a 1:1 alias to an indicator is accepted, while an alias to
+    // a multi-code composition stays a recognized non-indicator (the
+    // single-code-target guardrail).
+    const definition = lookupEffectiveDefinition(bare, definitions);
     if (definition?.isIndicator === true) {
       valid.push(code);
     } else {
@@ -231,10 +294,10 @@ export function splitTopLevelSemicolons(code) {
  */
 export function semanticGoesLast(newIndicatorCodes, definitions) {
   const nonSemantic = newIndicatorCodes.filter(ind =>
-    !definitions[getBareCode(ind)]?.semanticIndicator);
+    !lookupEffectiveDefinition(getBareCode(ind), definitions)?.semanticIndicator);
   return nonSemantic.length > 0 &&
     nonSemantic.every(ind => {
-      const role = definitions[getBareCode(ind)]?.indicatorRole;
+      const role = lookupEffectiveDefinition(getBareCode(ind), definitions)?.indicatorRole;
       return role === 'verbal' || role === 'adjectival';
     });
 }
@@ -287,7 +350,7 @@ export function resolveIndicatorCodes(existingIndicatorCodes, newCodes, { stripS
  * @returns {'semantic'|'grammatical'|null}
  */
 export function classifyIndicatorKind(code, definitions) {
-  const definition = definitions[code];
+  const definition = lookupEffectiveDefinition(code, definitions) ?? definitions[code];
   if (!definition) return null;
   return definition.semanticIndicator ? 'semantic' : 'grammatical';
 }
