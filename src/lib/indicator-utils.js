@@ -19,7 +19,10 @@ const CHAR_OPTION_STRIP = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT +
 
 // A codeString that is one clean code token (no separators, coordinates,
 // options, or markers): the only form a pure-rename alias can hold.
-const SINGLE_CODE_TOKEN = /^[A-Za-z_][\w]*$/;
+// \w+ rather than letter-first: define() accepts digit-leading names (the
+// Blissary-ID pattern, e.g. '1219'), and an alias to one must resolve like
+// any other single-code rename (review MINOR-4).
+const SINGLE_CODE_TOKEN = /^\w+$/;
 
 /**
  * Resolve a definition to its EFFECTIVE definition by following pure-rename
@@ -350,7 +353,7 @@ export function resolveIndicatorCodes(existingIndicatorCodes, newCodes, { stripS
  * @returns {'semantic'|'grammatical'|null}
  */
 export function classifyIndicatorKind(code, definitions) {
-  const definition = lookupEffectiveDefinition(code, definitions) ?? definitions[code];
+  const definition = lookupEffectiveDefinition(code, definitions);
   if (!definition) return null;
   return definition.semanticIndicator ? 'semantic' : 'grammatical';
 }
@@ -412,7 +415,20 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
       continue;
     }
     const node = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts?.[0];
-    if (node) indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
+    if (node) {
+      // A standalone parse of an alias code lands the alias definition's
+      // defaultOptions at GLYPH level, so the extracted part node would
+      // silently lose them (`;;` diverging from the `;`-part slot, review
+      // MINOR-2). Merge them here with the same precedence as
+      // #applyDefinitionMetadata: explicit options on the code win.
+      const immediate = Object.prototype.hasOwnProperty.call(definitions, getBareCode(code))
+        ? definitions[getBareCode(code)]
+        : undefined;
+      if (immediate?.defaultOptions) {
+        node.options = { ...immediate.defaultOptions, ...(node.options || {}) };
+      }
+      indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
+    }
   }
 
   return [...baseParts, ...indicatorParts];

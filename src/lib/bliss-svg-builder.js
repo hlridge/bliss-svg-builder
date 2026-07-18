@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
@@ -2336,10 +2336,13 @@ class BlissSVGBuilder {
     if (typeof code !== 'string' || code.trim().length === 0) {
       throw new Error('Definition code must be a non-empty, non-whitespace string.');
     }
-    // Control (Cc) and format (Cf) characters make a key that LOOKS like a
-    // normal code but can never be typed at a use site: the definition
-    // registers unreachable, silently. Reject with the code point named.
-    const invisible = code.match(/[\p{Cc}\p{Cf}]/u);
+    // Control (Cc) and format (Cf) characters — and any whitespace other
+    // than a plain space (no-break space, line/paragraph separators) — make
+    // a key that LOOKS like a normal code but can never be typed at a use
+    // site: the definition registers unreachable, silently. Reject with the
+    // code point named. A plain interior space stays allowed (the full code
+    // grammar is a separate decision).
+    const invisible = code.match(/[\p{Cc}\p{Cf}]|[^\S ]/u);
     if (invisible) {
       const hex = invisible[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0');
       throw new Error(`Definition code contains an invisible character (U+${hex}). Use visible characters only.`);
@@ -2361,11 +2364,16 @@ class BlissSVGBuilder {
   // throw.
   static #assertReplaceable(code, options) {
     if (!blissElementDefinitions[code]) return;
-    if (options.overwrite && builtInCodes.has(code)) {
+    if (options.overwrite && protectedCodes.has(code)) {
       throw new Error(`define("${code}"): cannot overwrite built-in definitions.`);
     }
     if (!options.overwrite) {
-      throw new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
+      // Typed so define()'s catch classifies by code, not by message text: a
+      // definition NAMED "already exists" must land in errors, not skipped
+      // (review MINOR-5).
+      const error = new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
+      error.code = 'ALREADY_EXISTS';
+      throw error;
     }
   }
 
@@ -2523,7 +2531,21 @@ class BlissSVGBuilder {
   // option value.
   static #normalizeSpaceSegments(codeString) {
     if (!codeString.includes('/') || /["']/.test(codeString)) return codeString;
-    return codeString.split('/').map(segment => segment === 'SP' ? '' : segment).join('/');
+    const segments = codeString.split('/');
+    const normalized = [];
+    for (let i = 0; i < segments.length; i++) {
+      if (segments[i] === 'SP') {
+        normalized.push('');
+        // An interior SP sits between two real slashes, so one empty segment
+        // reproduces `//`; an edge SP has only one neighboring slash, so it
+        // needs a second empty segment or the space silently vanishes
+        // (`SP/B291` must store `//B291`, not `/B291`; review MAJOR-1).
+        if (i === 0 || i === segments.length - 1) normalized.push('');
+      } else {
+        normalized.push(segments[i]);
+      }
+    }
+    return normalized.join('/');
   }
 
   // ── Private define helpers ──────────────────────────────────────
@@ -2757,8 +2779,13 @@ class BlissSVGBuilder {
     let resolved = codeString;
     for (let depth = 0; depth < 50; depth++) {
       let changed = false;
+      // \w+ (not letter-first): define() accepts digit-leading names (the
+      // Blissary-ID pattern, e.g. '1219'), so aliases to them must resolve
+      // like any other single-code rename (review MINOR-4). The lookbehind/
+      // lookahead boundaries keep coordinate and kerning values (after ':')
+      // out of reach.
       resolved = resolved.replace(
-        /(?<=^|[/;])([A-Za-z_][\w]*)(?=$|[/;:])/g,
+        /(?<=^|[/;])(\w+)(?=$|[/;:])/g,
         (match, token) => {
           const def = blissElementDefinitions[token];
           if (def && def.codeString && !def.codeString.includes('^')
@@ -2917,7 +2944,7 @@ class BlissSVGBuilder {
         }
         result.defined.push(code);
       } catch (err) {
-        if (err.message.includes('already exists')) {
+        if (err.code === 'ALREADY_EXISTS') {
           result.skipped.push(code);
         } else {
           result.errors.push(`"${code}": ${err.message}`);
@@ -2958,7 +2985,7 @@ class BlissSVGBuilder {
 
     copy.type = BlissSVGBuilder.#detectType(def);
 
-    copy.isBuiltIn = builtInCodes.has(code);
+    copy.isBuiltIn = protectedCodes.has(code);
 
     return Object.freeze(copy);
   }
@@ -2988,7 +3015,7 @@ class BlissSVGBuilder {
    * @throws {Error} If attempting to remove a built-in definition
    */
   static removeDefinition(code) {
-    if (builtInCodes.has(code)) {
+    if (protectedCodes.has(code)) {
       throw new Error(`removeDefinition("${code}"): cannot remove built-in definitions.`);
     }
     if (!(code in blissElementDefinitions)) {
@@ -3012,7 +3039,7 @@ class BlissSVGBuilder {
     if (!(code in blissElementDefinitions)) {
       throw new Error(`patchDefinition("${code}"): code is not defined.`);
     }
-    if (builtInCodes.has(code)) {
+    if (protectedCodes.has(code)) {
       throw new Error(`patchDefinition("${code}"): cannot patch built-in definitions.`);
     }
     if (!changes || typeof changes !== 'object') {

@@ -583,4 +583,12 @@ const letterAliases = {
 };
 Object.assign(blissElementDefinitions, letterAliases);
 
-export { blissElementDefinitions, builtInCodes };
+// Every code shipped with the library is permanent vocabulary: the letter
+// aliases stay OUT of builtInCodes (so resolution and decomposition keep
+// treating them as aliases — B29 emits Xa) but must be just as immune to
+// overwrite/patch/remove, or a portable composition using letters could
+// render differently per instance. This is the guard set for those three
+// routes and the isBuiltIn report; builtInCodes stays the resolution set.
+const protectedCodes = new Set([...builtInCodes, ...Object.keys(letterAliases)]);
+
+export { blissElementDefinitions, builtInCodes, protectedCodes };

@@ -134,6 +134,49 @@ describe('BlissSVGBuilder define codeString content', () => {
       expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('B291//C8');
     });
 
+    it('normalizes a leading SP segment to a leading word break', () => {
+      // regression: an edge SP segment used to store a single slash, so the
+      // author's space silently vanished (review MAJOR-1, 2026-07-18)
+      const code = trackCode('SPLEAD1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'SP/B291' } });
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('//B291');
+      const viaAlias = new BlissSVGBuilder(code);
+      const topLevel = new BlissSVGBuilder('SP/B291');
+      expect(viaAlias.svgCode).toBe(topLevel.svgCode);
+    });
+
+    it('normalizes a trailing SP segment to a trailing word break', () => {
+      const code = trackCode('SPTRAIL1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B291/SP' } });
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('B291//');
+      const viaAlias = new BlissSVGBuilder(code);
+      const topLevel = new BlissSVGBuilder('B291/SP');
+      expect(viaAlias.svgCode).toBe(topLevel.svgCode);
+    });
+
+    it('normalizes consecutive interior SP segments like the written form', () => {
+      // stored-form + alias-vs-alias pin: a definition USING a space run
+      // renders narrower than the same string written at top level even
+      // without SP (pre-existing space-run collapse in alias expansion, the
+      // pure-space-alias family) - so the equivalence asserted here is
+      // SP-form alias === SP-free alias, both through the same path
+      const code = trackCode('SPDOUBLE1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'B291/SP/SP/C8' } });
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('B291///C8');
+      BlissSVGBuilder.define({ [trackCode('SPDOUBLE2')]: { codeString: 'B291///C8' } });
+      expect(new BlissSVGBuilder(code).svgCode).toBe(new BlissSVGBuilder('SPDOUBLE2').svgCode);
+    });
+
+    it('stores an all-space codeString as its written equivalent', () => {
+      // stored-form pin only: USING an all-space alias diverges from the
+      // written form even without SP (pre-existing pure-space-alias family,
+      // backlog QSP row) - the normalization itself is exact ('SP/SP' and
+      // '///' are byte-identical at top level)
+      const code = trackCode('SPALL1');
+      BlissSVGBuilder.define({ [code]: { codeString: 'SP/SP' } });
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('///');
+    });
+
     it('keeps an explicit TSP segment as written and renders two words', () => {
       const code = trackCode('SPDEF3');
       BlissSVGBuilder.define({ [code]: { codeString: 'B291/TSP/C8' } });

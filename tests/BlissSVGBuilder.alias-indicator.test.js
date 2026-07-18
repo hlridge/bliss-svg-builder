@@ -162,6 +162,38 @@ describe('BlissSVGBuilder alias indicator carry', () => {
     });
   });
 
+  describe('when the alias definition carries its own defaultOptions', () => {
+    it('applies them on both the ;-part and the ;; overlay surface', () => {
+      // regression: the ;; render-merge parsed the alias standalone, landing
+      // its defaultOptions at glyph level where the extracted part never saw
+      // them, so ; and ;; diverged (review MINOR-2, 2026-07-18)
+      BlissSVGBuilder.define({ [trackCode('DEFOPTIND1')]: { codeString: 'B81', defaultOptions: { color: 'red' } } });
+      expect(new BlissSVGBuilder('B291;DEFOPTIND1').svgCode).toMatch(/red/);
+      expect(new BlissSVGBuilder('B291;;DEFOPTIND1').svgCode).toMatch(/red/);
+    });
+  });
+
+  describe('when the alias chain runs through a digit-leading name', () => {
+    it('resolves a forward reference to a digit-named indicator alias', () => {
+      // regression: the single-code-token pattern required a letter-first
+      // name, so an alias to a Blissary-ID-style name (the documented define
+      // example form) was misclassified as a non-indicator (review MINOR-4)
+      BlissSVGBuilder.define({ [trackCode('DIGAL1')]: { codeString: '9112' } });
+      BlissSVGBuilder.define({ [trackCode('9112')]: { codeString: 'B81' } });
+      const viaChain = new BlissSVGBuilder('B291;;DIGAL1');
+      const direct = new BlissSVGBuilder('B291;;B81');
+      expect(viaChain.warnings).toEqual([]);
+      expect(viaChain.svgCode).toBe(direct.svgCode);
+    });
+
+    it('inlines a digit-named alias reference at define time', () => {
+      BlissSVGBuilder.define({ [trackCode('9111')]: { codeString: 'B81' } });
+      BlissSVGBuilder.define({ [trackCode('DIGAL2')]: { codeString: '9111' } });
+      expect(BlissSVGBuilder.getDefinition('DIGAL2').codeString).toBe('B81');
+      expect(new BlissSVGBuilder('B291;;DIGAL2').warnings).toEqual([]);
+    });
+  });
+
   describe('when hand-authored object input names an alias part without flags', () => {
     it('derives indicator-ness from the registry, rendering like the direct part', () => {
       // a documented-schema part carries only codeName; isIndicator is
