@@ -1418,6 +1418,12 @@ class BlissSVGBuilder {
     // Re-ingest toJSON output into internal format (same order as constructor)
     BlissParser.expandParts({ groups: otherGroups });
     BlissSVGBuilder.#normalizeGlyphCodes(otherGroups);
+    // Parity with the constructor's object-ingest: a partless glyph node
+    // normalizes to the first-class empty glyph. A no-op today (a builder's
+    // toJSON never emits a bare partless node, it emits `{ parts: [] }`), so
+    // this only guards a future toJSON shape or re-ingest path from re-opening
+    // the phantom-advance defect the constructor pass already closes.
+    BlissSVGBuilder.#normalizePartlessGlyphs(otherGroups);
     BlissSVGBuilder.#flagWordParts({ groups: otherGroups });
 
     const groups = this.#rawBlissObj.groups;

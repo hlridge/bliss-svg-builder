@@ -107,6 +107,30 @@ describe('BlissSVGBuilder partless glyph normalization', () => {
     });
   });
 
+  describe('when a builder holding a normalized empty glyph is merged', () => {
+    // contract pin (not a distinguisher): a builder's toJSON never emits a bare
+    // partless node, so merge re-ingests `{ parts: [] }` and stays clean today.
+    // The merge-side normalizer mirrors the constructor for parity; this locks
+    // the interaction so a future toJSON/merge change can't silently re-open the
+    // phantom-advance defect.
+    it('keeps the merged result free of warnings and phantom advance', () => {
+      const host = new BlissSVGBuilder('C8');
+      host.merge(new BlissSVGBuilder({ groups: [{ glyphs: [{}] }] }));
+
+      expect(host.toString()).toBe('C8//');
+      expect(warningCodes(host)).toEqual([]);
+      expect(new BlissSVGBuilder(host.toString()).svgCode).toBe(host.svgCode);
+    });
+
+    it('carries a merged options-only empty glyph through cleanly', () => {
+      const host = new BlissSVGBuilder('C8');
+      host.merge(new BlissSVGBuilder({ groups: [{ glyphs: [{ options: { color: 'red' } }] }] }));
+
+      expect(host.toString()).toBe('C8//[color=red]');
+      expect(warningCodes(host)).toEqual([]);
+    });
+  });
+
   describe('when a glyph node carries content', () => {
     it('leaves a single-part glyph untouched', () => {
       const b = new BlissSVGBuilder({ groups: [{ glyphs: [realGlyph('B291')] }] });
