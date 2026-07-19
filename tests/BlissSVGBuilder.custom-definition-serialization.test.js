@@ -105,17 +105,9 @@ describe('BlissSVGBuilder custom definition serialization', () => {
       expect(b.toString({ flattenIndicators: true, preserve: true })).toBe('B291;BAREIND');
       // matches the `;`-slot twin: `B291;BAREIND` preserve keeps the name
     });
-
-    it('does not stamp a multi-part overlay name onto its first merged part', () => {
-      defineAndTrack({ COMBI: { type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0' } });
-      const b = new BlissSVGBuilder('B291;;COMBI');
-      // pre-existing: the word-overlay merge keeps only the first part of a
-      // multi-part custom compound (backlog: custom compound `;;` anatomy
-      // truncation). Restoring COMBI here would emit a string that reparses
-      // to MORE ink than the original renders, so the name must stay off.
-      expect(b.toString({ flattenIndicators: true, preserve: true })).toBe('B291;B97');
-      // pins the single-part guard on the overlay alias stamp
-    });
+    // A multi-part custom compound applied via `;;` now bakes as one atomic unit
+    // (preserve keeps the whole name); that behavior is homed in
+    // `BlissSVGBuilder.compound-indicator-overlay.test.js` (run-to-stable 2.4b).
   });
 
   describe('when preserve serializes API-built and object-input content', () => {

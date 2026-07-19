@@ -415,7 +415,20 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
       continue;
     }
     const parsedParts = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts;
-    const node = parsedParts?.[0];
+    // A custom flagged compound indicator (e.g. define COMBI = 'B97;B99:3,0')
+    // parses at GLYPH level into multiple decomposed parts, unlike a built-in
+    // compound (B98) which the parser keeps as one nested part. Taking parts[0]
+    // dropped the rest of the anatomy from render AND flatten (`;;COMBI` rendered
+    // only B97; backlog: custom compound `;;` anatomy truncation). Wrap the whole
+    // anatomy back into one atomic indicator part, mirroring the `;`-slot form
+    // (`B291;COMBI`), so `;` and `;;` agree for the same definition.
+    let node = parsedParts?.[0];
+    if (parsedParts && parsedParts.length > 1) {
+      const bare = getBareCode(code);
+      const definition = resolveEffectiveDefinition(definitions[bare], definitions);
+      node = { codeName: bare, isIndicator: true, width: definition?.width ?? 2, parts: parsedParts };
+      if (definition?.anchorOffsetX !== undefined) node.anchorOffsetX = definition.anchorOffsetX;
+    }
     if (node) {
       // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81)
       // loses the written code at parse; record it so preserve-mode
