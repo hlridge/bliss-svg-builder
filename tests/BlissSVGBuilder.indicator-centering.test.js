@@ -22,11 +22,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Non-displaced head: centering unchanged.
  *
  * Does NOT cover:
- * - Canvas width/viewBox truthfulness for a NEGATIVE-displaced SINGLE-child
- *   composite (the reported width counts the frame gap, so the full svg still
- *   diverges from the absolute form) — separate width-semantics defect, see
- *   the backlog "negative composite canvas width" row; the pins here compare
- *   ink geometry.
+ * - Canvas width/advance truthfulness of displaced composites (the moved-min
+ *   displacement rule, both signs), see
+ *   `BlissSVGBuilder.composite-displacement.test.js`; the negative pins here
+ *   assert full svg identity since that fix, but the displacement contract's
+ *   canonical home is that file.
  * - Multi-indicator stacking math, see
  *   `BlissSVGBuilder.multiple-indicators.test.js`.
  * - Element-tree offsetX/offsetY positioning contract, see
@@ -49,9 +49,6 @@ function defineAndTrack(definitions) {
   customCodes.push(...Object.keys(definitions));
   return BlissSVGBuilder.define(definitions);
 }
-
-// all path data of a build, in document order (ink geometry without the canvas)
-const inkPathsOf = (builder) => (builder.svgCode.match(/ d="[^"]*"/g) || []).join(' ');
 
 // concatenated path data (ink geometry tolerant of <path> split boundaries)
 const inkOf = (builder) =>
@@ -117,13 +114,11 @@ describe('BlissSVGBuilder indicator centering', () => {
 
   describe('when the displaced custom glyph carries a negative baked offset', () => {
     // regression: external review F1 (2026-07-02). The reported width of a
-    // negative-min composite is a span SIZE (max - min), not the right-edge
+    // negative-min composite was a span SIZE (max - min), not the right-edge
     // coordinate, so reading it as the ink end centered the indicator 1 right.
-    //
-    // These pins compare INK GEOMETRY (all path data), not the full svg: the
-    // composite's reported width still counts its frame gap, so the CANVAS
-    // (svg width/viewBox) diverges from the absolute form — a separate
-    // pre-existing width-semantics defect, backlogged (out of XC-1's scope).
+    // Since the moved-min displacement rule (single-child XC-2 extension),
+    // the negative offset rides the composite, the frame equals the ink span,
+    // and these pins hold as FULL svg identity (canvas included).
     it('centers the indicator identically to the absolute form', () => {
       defineAndTrack({ NEGSHIFT: { type: 'glyph', codeString: 'B291:-2,3' } });
       const displaced = new BlissSVGBuilder('NEGSHIFT:1,2;B81');
@@ -131,27 +126,27 @@ describe('BlissSVGBuilder indicator centering', () => {
 
       // base ink spans [-1,7] (center 3); the indicator (width 2) starts at 2
       expect(displaced.svgCode).toContain('M2,6l1,-2M3,4l1,2');
-      expect(inkPathsOf(displaced)).toBe(inkPathsOf(absolute));
+      expect(displaced.svgCode).toBe(absolute.svgCode);
     });
 
-    it('round-trips the `;` form ink-identity-true', () => {
+    it('round-trips the `;` form svg-identity-true', () => {
       defineAndTrack({ NEGSHIFT: { type: 'glyph', codeString: 'B291:-2,3' } });
       const displaced = new BlissSVGBuilder('NEGSHIFT:1,2;B81');
 
       expect(displaced.toString()).toBe('B291:-1,5;B81');
       const reparsed = new BlissSVGBuilder(displaced.toString());
-      expect(inkPathsOf(reparsed)).toBe(inkPathsOf(displaced));
+      expect(reparsed.svgCode).toBe(displaced.svgCode);
     });
 
     it('accumulates a nested negative offset into the ink end', () => {
-      // pins the recursive ink-end walk: reading the outer child's reported
-      // width (span 8) instead of its true right edge (6) mis-centers
+      // pins the accumulation through nesting: each layer's moved min adds
+      // exactly once, so the outer frame's right edge is the true ink edge
       defineAndTrack({ NEGSHIFT: { type: 'glyph', codeString: 'B291:-2,3' } });
       defineAndTrack({ NEGNEST: { type: 'glyph', codeString: 'NEGSHIFT:1,1' } });
       const displaced = new BlissSVGBuilder('NEGNEST:1,1;B81');
       const absolute = new BlissSVGBuilder('B291:0,5;B81');
 
-      expect(inkPathsOf(displaced)).toBe(inkPathsOf(absolute));
+      expect(displaced.svgCode).toBe(absolute.svgCode);
     });
   });
 

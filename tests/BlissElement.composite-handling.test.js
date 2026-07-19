@@ -5,16 +5,17 @@ import { BlissElement } from '../src/lib/bliss-element.js';
  *
  * Pins how BlissElement assigns level numbers and codeName identity to
  * nested composite parts, and how composite children are positioned:
- * multi-child non-indicator composites and multi-child indicators below
- * level 3 are re-origined to the leftmost child with the stripped common
- * offset kept as the composite's own displacement (XC-2), while a single
- * child (and level-3 indicators) preserve their explicit x offsets.
+ * non-indicator composites and indicators below level 3 are re-origined to
+ * the leftmost child with the stripped common offset kept as the composite's
+ * own displacement (XC-2, single child included: its x IS the n=1 common
+ * min), while level-3 indicators preserve their explicit x offsets
+ * (atomic-unit contract; the parent positions them).
  *
  * Covers:
  * - level numbering increments with each nested composite layer
  * - composite parts surface an empty codeName while their leaf children keep theirs
  * - multi-child non-indicator composites at level 3 are shifted so the leftmost lands at zero, the common offset moving onto the composite
- * - a single-child composite keeps its child's explicit x offset (nothing to re-origin against)
+ * - a single-child composite moves its child's explicit x offset onto the composite the same way, keeping the render position
  * - indicator composite children at level 3 keep their explicit x offsets
  * - indicator composite children below level 3 are normalized like non-indicators
  *
@@ -113,17 +114,20 @@ describe('BlissElement composite handling', () => {
   });
 
   describe('when a composite has a single non-indicator child with an explicit x offset', () => {
-    test('keeps the child offset instead of re-origining it to zero', () => {
-      // regression: SIB-3 - a single child was re-origined to the leftmost
-      // (itself), zeroing a baked base offset so it replaced rather than added
-      // the use-site displacement. Only multi-child groups have relative layout
-      // to align; one part's offset is pure displacement and must survive.
+    test('moves the offset onto the composite and keeps the render position', () => {
+      // regression: SIB-3 - a single child was once re-origined to the
+      // leftmost (itself), ZEROING a baked base offset so it replaced rather
+      // than added the use-site displacement. The offset must survive; since
+      // the moved-min rule covers n=1 it survives as the composite's own
+      // displacement (like the multi-child XC-2 pin above), so the frame
+      // equals the ink span and the render position is unchanged.
       const element = new BlissElement(treeWithParts([{
         parts: [{ codeName: 'HL2', x: 5 }]
       }]));
       const composite = element.snapshot().children[0].children[0].children[0];
 
-      expect(composite.children[0].offsetX).toBe(5);
+      expect(composite.children[0].offsetX).toBe(0);
+      expect(composite.offsetX).toBe(5);
       expect(element.getSvgContent()).toBe('M5,0h2');
     });
   });

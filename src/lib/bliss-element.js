@@ -1404,22 +1404,23 @@ export class BlissElement {
     // If so, skip normalization here - let level 2 handle the positioning
     const isIndicatorAtLevel3 = this.#level === 3 && this.isIndicator;
 
-    // Normalize: shift all child parts so the leftmost part starts at x=0.
-    // Only for MULTI-child groups (length > 1): re-origining aligns several
-    // parts against their shared leftmost, but a lone child has no relative
-    // layout to align -- its x is pure displacement (a baked base offset on a
-    // custom glyph), so zeroing it would drop the offset and make a use-site
-    // coord REPLACE rather than ADD it (SIB-3). A single child therefore keeps
-    // its x, matching the y axis (never re-origined) and the level-2 rule that
-    // only negative offsets are normalized. Skip too for indicators the parent
-    // #positionIndicatorGroup will place.
-    // The stripped common min is NOT discarded: it moves onto the composite as
-    // displacement, either sign (XC-2) -- the serializer's decompose uniformly
-    // ADDS baked and use-site coords, so dropping the min here made the render
-    // disagree with its own toString. Level 2's negatives-only normalization
-    // then acts on the resulting final absolute position, which is exactly how
-    // the decomposed form is treated.
-    if (!isIndicatorAtLevel3 && this.#children.length > 1) {
+    // Normalize: shift the child parts so the leftmost lands at x=0 and the
+    // stripped common min moves onto the composite as displacement (XC-2),
+    // either sign. This holds for a SINGLE child too (its own x IS the n=1
+    // common min): the offset is not discarded, so a use-site coord still ADDS
+    // to it rather than replacing it (SIB-3's concern), while the composite's
+    // frame now equals its ink span. Keeping the offset on a lone child instead
+    // (the former length > 1 gate) left a nonzero baked offset inside the
+    // frame: a negative one made the frame a span wider than the ink (a phantom
+    // right gap in the canvas + advance) and let the ink escape level-2's
+    // negatives-only normalization, so the render disagreed with its own
+    // decomposed toString. The serializer's decompose uniformly ADDS baked and
+    // use-site coords; moving the min onto the composite matches that, and
+    // level 2's negatives-only normalization then acts on the resulting final
+    // absolute position exactly as it does for the decomposed form. Skip for a
+    // level-3 indicator the parent #positionIndicatorGroup will place; the y
+    // axis is never re-origined.
+    if (!isIndicatorAtLevel3 && this.#children.length > 0) {
       const minX = Math.min(...this.#children.map(child => child.#relativeToParentX));
       if (minX !== 0) {
         for (const child of this.#children) {
