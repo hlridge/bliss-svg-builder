@@ -431,6 +431,7 @@ class BlissSVGBuilder {
     // Reverse toJSON() normalization: codeName → internal field names
     if (typeof input !== 'string' && blissObj.groups) {
       BlissSVGBuilder.#normalizeGlyphCodes(blissObj.groups);
+      BlissSVGBuilder.#normalizePartlessGlyphs(blissObj.groups);
     }
 
     // A `wordIndicators` overlay from object input (persisted toJSON, or hand-
@@ -1698,6 +1699,31 @@ class BlissSVGBuilder {
         part.codeName = BlissSVGBuilder.#textFallbackInternalForm(part.codeName);
       }
       if (part.parts) BlissSVGBuilder.#normalizePartCodes(part.parts);
+    }
+  }
+
+  /**
+   * Normalize a degenerate partless glyph node from object input to the
+   * first-class empty glyph. A glyph with no `parts` array and no code identity
+   * has no renderable content, but the element layer treats a partless glyph as
+   * a glyph-that-IS-one-part shorthand and wraps it, so `{}` became a failed
+   * part that warned UNKNOWN_CODE and reserved a phantom advance while
+   * `toString()` omitted it (svg round-trip false). Setting `parts: []` makes it
+   * render invisibly and match its omitting serialization, exactly like a
+   * `{ parts: [] }` node. Options and key survive (an `{ options: {...} }` node
+   * becomes an options-carrying empty glyph). Object input only; the DSL never
+   * produces a partless glyph node. Must run AFTER `#normalizeGlyphCodes`, which
+   * renames the code identity to `glyphCode`, so a `{ codeName: 'B291' }`
+   * shorthand keeps its identity and still renders (its `glyphCode` is set here).
+   */
+  static #normalizePartlessGlyphs(groups) {
+    for (const group of groups) {
+      if (!group.glyphs) continue;
+      for (const glyph of group.glyphs) {
+        if (!glyph.parts && !glyph.glyphCode) {
+          glyph.parts = [];
+        }
+      }
     }
   }
 
