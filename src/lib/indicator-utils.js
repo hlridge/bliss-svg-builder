@@ -414,8 +414,17 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
       indicatorParts.push({ ...reusable.splice(reuseIndex, 1)[0] });
       continue;
     }
-    const node = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts?.[0];
+    const parsedParts = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts;
+    const node = parsedParts?.[0];
     if (node) {
+      // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81)
+      // loses the written code at parse; record it so preserve-mode
+      // serialization restores it (Phase 2.3b). Multi-part expansions keep
+      // their own codes: stamping the alias on just the first part would
+      // mislabel it.
+      if (parsedParts.length === 1 && node.codeName !== getBareCode(code)) {
+        node._aliasCodeName = getBareCode(code);
+      }
       // A standalone parse of an alias code lands the alias definition's
       // defaultOptions at GLYPH level, so the extracted part node would
       // silently lose them (`;;` diverging from the `;`-part slot, review

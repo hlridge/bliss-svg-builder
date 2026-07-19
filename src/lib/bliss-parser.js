@@ -1399,6 +1399,11 @@ export class BlissParser {
                 part.parts = parseParts(definition.codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {
+                // Single-code rename to a primitive replaces codeName, which
+                // would lose the user-written name even under `preserve`
+                // (Phase 2.3b). Record it so preserve-mode serialization can
+                // restore it; default output keeps the resolved target.
+                part._aliasCodeName = part.codeName;
                 part.codeName = definition.codeString;
               }
             }
@@ -1608,6 +1613,8 @@ export class BlissParser {
         || blissElementDefinitions[codeString]?.codeString) {
       part.parts = BlissParser.#parseCodeStringToParts(codeString);
     } else {
+      // Same single-code rename recording as parseParts (Phase 2.3b).
+      part._aliasCodeName = part.codeName;
       part.codeName = codeString;
     }
 
@@ -1642,6 +1649,8 @@ export class BlissParser {
             || blissElementDefinitions[innerCodeString]?.codeString) {
           part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, depth + 1);
         } else {
+          // Same single-code rename recording as parseParts (Phase 2.3b).
+          part._aliasCodeName = part.codeName;
           part.codeName = innerCodeString;
         }
       }

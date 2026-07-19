@@ -2169,6 +2169,14 @@ class BlissSVGBuilder {
           // Internal origin tag from the word-indicator merge (flatten path):
           // not composition data, never surfaced in serialized output.
           delete part._indicatorOrigin;
+          // Single-code rename resolution records the user-written name
+          // (Phase 2.3b): preserve restores it, so `B291;MYIND` keeps MYIND
+          // instead of leaking the resolved primitive. Deep output keeps the
+          // field for the toString()/merge() pipelines; public output drops it.
+          if (options.preserve && part._aliasCodeName) {
+            part.codeName = part._aliasCodeName;
+          }
+          if (!options.deep) delete part._aliasCodeName;
           if (part.options) delete part.options.key;
           // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
           if (part.codeName?.startsWith('XTXT_')) {
