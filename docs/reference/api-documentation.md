@@ -201,6 +201,13 @@ new BlissSVGBuilder('SMILEY').toString({ preserve: true });
 // 'SMILEY'
 ```
 
+Which mode to use:
+
+- **Default** for output that leaves your environment: files, APIs, other Bliss tools. It contains only built-in codes, so any receiver renders it without your definitions.
+- **`{ preserve: true }`** for output that stays where your definitions live: app-local storage, a document you reload in the same app. You get your own names back on re-parse, including a name that aliases a single primitive (`MYIND` for `C2`).
+
+Definition *metadata* never travels with default output: decomposition keeps the ink but drops fields like `isIndicator`. A custom indicator serializes to its plain anatomy, which re-parses as ordinary ink, not as an indicator. When that matters, run the same `define()` calls in the receiving environment, or keep the string local and use `preserve`. See [Serializing Custom Indicators and Shapes](/handbook/writing/custom-codes#serializing-custom-indicators-and-shapes) for the full behavior table.
+
 ### Word-level indicators in the output
 
 A word-level indicator (`;;`) is kept in `toString()` output by default, because `;;` is universal DSL grammar (every builder parses it and it resolves to the same render), so keeping it is portable and lossless:

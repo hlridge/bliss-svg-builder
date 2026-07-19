@@ -83,6 +83,8 @@ new BlissSVGBuilder('B2661').toString({ preserve: true });
 // 'B2661'
 ```
 
+As a rule of thumb: the default is for output that leaves your app, `preserve` is for output that stays where your definitions live. Custom indicators and shapes have a few extra wrinkles worth knowing; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes) below.
+
 ## Characters (Glyphs)
 
 So far we've created aliases: transparent macros that disappear during parsing. But sometimes you want a custom code that has its own **identity** in the element tree, so you can find it, inspect it, and mutate it by name.
@@ -224,6 +226,48 @@ Custom codes take indicators and options at the use site just like built-ins:
 - `SMILEY;B81` attaches the action indicator to the custom character; `B313/SMILEY;;B81` puts a word-level indicator on the word. Indicator positioning is computed from the glyph's actual rendered ink, including glyphs whose definition displaces its parts.
 - An alias to an indicator works as that indicator. After `define({ '6436': { codeString: 'B6436' } })`, writing `MYWORD;;6436` applies the indicator exactly like `MYWORD;;B6436`, on every surface (`;;`, `;`-parts, `applyIndicators`). Only single-code aliases resolve this way; an alias to a multi-code composition needs the `isIndicator: true` flag instead.
 - `[color=blue]>SMILEY` styles the whole glyph as one part. On serialization the option is re-emitted before each decomposed part so the styling survives portably; see [Part Options on Custom Glyphs](/handbook/syntax-options/options-system#part-options-on-custom-glyphs).
+
+## Serializing Custom Indicators and Shapes
+
+Serialization carries your *composition*, never your *definitions*. For a custom indicator or shape, that split matters, because part of what you defined is metadata:
+
+```js
+BlissSVGBuilder.define({
+  'MYIND': { type: 'glyph', isIndicator: true, codeString: 'C2' }
+});
+
+const builder = new BlissSVGBuilder('B291;MYIND');
+builder.toString();                    // 'B291;C2'    — portable, but plain ink
+builder.toString({ preserve: true });  // 'B291;MYIND' — your name, local use
+```
+
+The default output `B291;C2` renders anywhere, but the receiver sees an ordinary circle part: `isIndicator` is metadata on your definition, and metadata never travels. Re-parsing `B291;C2` places `C2` like any part, not like an indicator.
+
+What travels through default output:
+
+| From your definition | Travels? |
+|---|---|
+| The ink (the `codeString` composition) | Yes, decomposed to built-in codes |
+| Baked and use-site coordinates | Yes, as explicit `:x,y` suffixes |
+| `defaultOptions` | Yes, materialized as explicit options (`[color=red]>C2`) |
+| `isIndicator` and `width` | No. The receiver sees plain parts |
+| `getPath` geometry (primitives) | No. A primitive keeps its bare name and needs its definition to render |
+
+Per definition shape, that works out to:
+
+| Definition | Default output | `preserve` output |
+|---|---|---|
+| Alias of one built-in indicator (`{ codeString: 'B6436' }`) | the target code, still a real indicator | your name |
+| Own indicator over plain ink (`isIndicator: true, codeString: 'C2'`) | the plain shape, indicator behavior lost | your name |
+| Compound indicator (`isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts, no longer one atomic unit | your name |
+| New primitive (`getPath`) | your bare name, unrenderable elsewhere | your bare name |
+
+Two remedies when the default output is not enough:
+
+- **Define at both ends.** Run the same `define()` calls in the receiving environment and send `preserve` output (or `;;` strings). Everything then means the same thing on both sides.
+- **Compose with explicit coordinates.** If you only need the *ink* to arrive exactly, skip the flag and write the anatomy with explicit positions (`B291;C2:3,0`): explicitly positioned parts render at their coordinates in any environment, no definition needed.
+
+Word-level indicators are the asymmetry to remember: `B291;;MYIND` keeps your code in **default** output too, because `;;` is a live overlay resolved at render, not a baked part. A `;;` string that references a custom code therefore always needs the definition at the receiving end. Without it, the receiver warns `UNKNOWN_CODE`, renders the word without the overlay, and drops the unknown code from its own re-serialized output. (A `;`-part with an unknown name is kept in serialized output but fails its whole character at render, or shows a placeholder with the `error-placeholder` option; see [UNKNOWN_CODE](/reference/warning-codes#unknown-code).)
 
 ## Coordinates in Definitions
 
