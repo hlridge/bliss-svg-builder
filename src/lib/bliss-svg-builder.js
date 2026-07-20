@@ -761,27 +761,31 @@ class BlissSVGBuilder {
     }
   }
 
-  // Space-as-part invariant (row 78): a space (TSP/QSP) is a word-level
+  // Space-as-part invariant (row 78, extended row 81): a space (TSP/QSP, and
+  // the transient default-space SP that `//` expands to) is a word-level
   // separator, never a `;`-part — a space cannot stay a character inside a
   // word (#normalizeSpaceInvariant Pass 3 splits it out) and cannot carry a
   // decoration, so a space in a part slot is the same misplacement one level
   // down. The space part is dropped LOUDLY (MISPLACED_SPACE) from render
   // and serialization while the character still renders; a coordinate or
   // option on it dies with the part (a positionable inkless blank is ZSA's
-  // job — ZSA is content and is exempt). A SINGLE-part space glyph IS the
-  // space itself and is never touched (the parts.length >= 2 guard); a
+  // job — ZSA is content and is exempt). SP is barred via a LOCAL check only:
+  // it is never added to the {TSP,QSP} classifier (isSpaceGlyph), which drives
+  // space-run coalescing, navigation, and counting (feedback_zsa_is_content_not_space).
+  // A single-part REAL-space glyph (TSP/QSP) IS the space itself and is
+  // untouched; a lone transient SP (not a real space glyph, so a mutation can
+  // strand it as a lone character part) instead drops to an empty glyph rather
+  // than re-emitting bare and reparsing as a word separator (row 81). A
   // fail-flagged word re-emits verbatim (replay fidelity) and an atomic
   // compound-indicator glyph's anatomy is definition-owned, so both are
   // skipped, mirroring #normalizeIndicatorInvariant. define() already rejects
   // a glyph definition referencing a space, so the isIndicator skip only
   // matters for hand-authored object input. Uncertainty exemption (the
   // indicator invariant's exemption 2, one rule over): when the non-space
-  // remainder holds no definition-known part (only unknown codes or error
-  // nodes, e.g. `TSP;SP`), the drop is skipped — a sole surviving transient
-  // token would re-emit bare and the reparse would silently reinterpret it
-  // as a separator or kerning marker (parse-equivalence violation); the
-  // character already fail-renders and the unknown-code warning is the
-  // visibility. An all-space list still drops (the empty glyph is inert
+  // remainder holds no definition-known part (only an unknown code like `ZZ9`,
+  // whose nature is uncertain), the drop is skipped, applied uniformly to
+  // TSP/QSP/SP; the character already fail-renders and the unknown-code warning
+  // is the visibility. An all-space list still drops (the empty glyph is inert
   // pure state). Runs FIRST among the
   // rebuild normalizers: before #normalizeSpaceInvariant so an emptied glyph
   // gets its head-designation cleanup, and before
@@ -793,13 +797,20 @@ class BlissSVGBuilder {
       for (const glyph of group.glyphs ?? []) {
         if (glyph.isIndicator === true) continue;
         const parts = glyph.parts;
-        if (!Array.isArray(parts) || parts.length < 2) continue;
+        if (!Array.isArray(parts) || parts.length === 0) continue;
+        // A lone REAL-space glyph (TSP/QSP) IS the space itself and is
+        // untouched; a lone transient SP is processed (it drops to an empty
+        // glyph below) instead of surviving to re-emit bare. A lone non-space
+        // part has no misplaced space and falls through the loop as a no-op.
+        if (parts.length === 1 && isSpaceGlyph(parts[0]?.codeName)) continue;
         const misplaced = [];
         let remainderCount = 0;
         let knownRemainder = false;
         for (let i = 0; i < parts.length; i++) {
           const p = parts[i];
-          if (isSpaceGlyph(p.codeName)) {
+          // SP is barred here via a local check but never added to isSpaceGlyph
+          // (the {TSP,QSP} classifier), per feedback_zsa_is_content_not_space.
+          if (p.codeName === 'SP' || isSpaceGlyph(p.codeName)) {
             misplaced.push(i);
             continue;
           }

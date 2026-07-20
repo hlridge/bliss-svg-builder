@@ -2,13 +2,16 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
- * Pins the space-as-part invariant: a space (TSP/QSP) is a word-level
- * separator, never a `;`-part, so a space code inside a multi-part list is
- * dropped from both render and serialization with MISPLACED_SPACE while
- * the rest of the character renders (the warn + drop model of
- * MISPLACED_SPACE_DECORATION and MISPLACED_INDICATOR_PART). Any coordinate or
- * option on the dropped space part dies with it. A single-part space glyph IS
- * the space itself and is never touched.
+ * Pins the space-as-part invariant: a space (TSP, QSP, or the transient
+ * default-space SP) is a word-level separator, never a `;`-part, so a space
+ * code inside a multi-part list is dropped from both render and serialization
+ * with MISPLACED_SPACE while the rest of the character renders (the warn + drop
+ * model of MISPLACED_SPACE_DECORATION and MISPLACED_INDICATOR_PART). Any
+ * coordinate or option on the dropped space part dies with it. A single-part
+ * REAL-space glyph (TSP/QSP) IS the space itself and is never touched; a lone
+ * transient SP, which a mutation can strand as a character part, drops to an
+ * empty glyph (it is not a real space glyph, so it would otherwise re-emit bare
+ * and reparse as a word separator).
  *
  * Covers:
  * - DSL drops: trailing, leading, and mid-sequence space parts; multiple drops
@@ -18,17 +21,19 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   drops with its carrier instead of surviving silently.
  * - Render effect: a far-positioned space part no longer widens the canvas.
  * - Navigation repair: a space-led part list no longer miscounts `.groups`.
- * - Untouched forms: genuine space words, ZSA parts (content, exempt),
- *   the parser-transient SP (unknown-code path, not a space classifier
- *   member). A fail-flagged word is dropped whole before the space-part pass
- *   (retention family, rows 31/80), so it never needs a separate exemption.
+ * - Untouched forms: genuine space words, ZSA parts (content, exempt). A
+ *   fail-flagged word is dropped whole before the space-part pass (retention
+ *   family, rows 31/80), so it never needs a separate exemption.
+ * - The transient SP: barred from a part slot exactly like TSP/QSP, via a
+ *   local check (SP is never added to the {TSP, QSP} classifier); a lone SP
+ *   stranded by a mutation drops to an empty glyph (row 81).
  * - The define() reference-type gate: a glyph definition cannot reference a
  *   space, so no definition anatomy legitimately contains a space part.
  * - Normalizer ordering: a space part is no indicator witness, so the
  *   space drop runs before the indicator-sequencing invariant.
  * - The uncertainty exemption: the drop is skipped when no definition-known
- *   part would remain beside the space (a sole surviving unknown token like
- *   SP would re-emit bare and silently morph on reparse); an all-space list
+ *   part would remain beside the space (only an unknown code like `ZZ9`, whose
+ *   nature is uncertain), applied uniformly to TSP/QSP/SP; an all-space list
  *   still drops to an empty glyph.
  * - Alias expansion, hand-authored object input, and the mutation backdoors
  *   (addPart / insertPart / part.replace).
@@ -152,14 +157,34 @@ describe('BlissSVGBuilder space as a part', () => {
       expect(b.toString()).toBe('B313;ZSA:10,0');
       expect(b.warnings).toHaveLength(0);
     });
+  });
 
-    it('routes the parser-transient SP through the unknown-code path', () => {
-      // pins the classifier boundary: the space set is {TSP, QSP}; SP is a
-      // parser placeholder, never a space on any classifier
+  describe('when the transient default-space SP sits in a part slot', () => {
+    // SP is the token `//` expands to; the {TSP, QSP} classifier deliberately
+    // excludes it, but a space is still not a character part, so a part-slot SP
+    // is barred like TSP/QSP via a local check (never added to the classifier).
+    it('drops a transient SP part and renders the base alone', () => {
       const b = new BlissSVGBuilder('B313;SP');
+      expect(b.toString()).toBe('B313');
+      expect(b.svgCode).toBe(new BlissSVGBuilder('B313').svgCode);
+      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE']);
+    });
+
+    it('drops both a real and a transient space in an all-space glyph', () => {
+      // the middle glyph is only spaces (real TSP + transient SP), so both drop
+      // to an empty glyph and the word round-trips svg-stably
+      const b = new BlissSVGBuilder('B291/TSP;SP/B313');
+      expect(b.toString()).toBe('B291/B313');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps a transient SP beside an unknown code (uncertainty exemption)', () => {
+      // dropping the SP would leave a lone unknown whose nature is uncertain, so
+      // the drop is skipped uniformly with TSP/QSP; the pair round-trips unchanged
+      const b = new BlissSVGBuilder('ZZ9;SP');
+      expect(b.toString()).toBe('ZZ9;SP');
       expect(spaceWarnings(b)).toHaveLength(0);
       expect(b.warnings.map((w) => w.code)).toContain('UNKNOWN_CODE');
-      expect(b.toString()).toBe('B313;SP');
     });
   });
 
@@ -189,17 +214,6 @@ describe('BlissSVGBuilder space as a part', () => {
       expect(b.toString()).toBe('TSP;ZZ9');
       expect(spaceWarnings(b)).toHaveLength(0);
       expect(b.warnings.map((w) => w.code)).toContain('UNKNOWN_CODE');
-    });
-
-    it('keeps the space when only a transient token would remain', () => {
-      // regression: review M1 (2026-07-17) — dropping the TSP left a bare
-      // sole-survivor SP token that the reparse silently reinterpreted as a
-      // real space, breaking parse-equivalence (render diverged, no warning)
-      const b = new BlissSVGBuilder('B291/TSP;SP/B313');
-      expect(b.toString()).toBe('B291/TSP;SP/B313');
-      expect(spaceWarnings(b)).toHaveLength(0);
-      const reparsed = new BlissSVGBuilder(b.toString());
-      expect(reparsed.svgCode).toBe(b.svgCode);
     });
   });
 
@@ -276,6 +290,40 @@ describe('BlissSVGBuilder space as a part', () => {
       });
       expect(b.toString()).toBe('B313');
       expect(spaceWarnings(b).map((w) => w.source)).toEqual(['QSP']);
+    });
+  });
+
+  describe('when a mutation strands a transient SP as a lone character part', () => {
+    it('drops the lone SP to an empty glyph instead of morphing into a word space', () => {
+      // regression (row 81): removing the known sibling used to leave
+      // `B291/SP/B313`, whose bare SP reparsed as a word separator (svg drift,
+      // no warning); the stranded lone SP now drops so the word round-trips
+      const b = new BlissSVGBuilder('B291/ZZ9;SP/B313');
+      b.glyph(1).removePart(0); // remove ZZ9, stranding the SP alone
+      expect(b.toString()).toBe('B291/B313');
+      const reparsed = new BlissSVGBuilder(b.toString());
+      expect(reparsed.svgCode).toBe(b.svgCode);
+      expect(reparsed.warnings).toHaveLength(0);
+      expect(b.warnings.map((w) => w.code)).toContain('MISPLACED_SPACE');
+    });
+
+    it('drops the SP at build when a known sibling is present, so removal just empties the glyph', () => {
+      // the originally reported shape: C8 is a known remainder, so SP drops at
+      // build and the glyph is C8; removePart(0) then empties it cleanly
+      const b = new BlissSVGBuilder('B291/C8;SP/B313');
+      expect(b.toString()).toBe('B291/C8/B313');
+      b.glyph(1).removePart(0);
+      expect(b.toString()).toBe('B291/B313');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('drops a hand-authored lone SP glyph part to an empty glyph', () => {
+      const b = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ parts: [{ codeName: 'SP' }] }] }],
+      });
+      expect(b.toJSON().groups[0].glyphs[0].parts).toEqual([]);
+      expect(b.toString()).toBe('');
+      expect(b.warnings.map((w) => w.code)).toContain('MISPLACED_SPACE');
     });
   });
 

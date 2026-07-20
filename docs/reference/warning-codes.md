@@ -189,14 +189,15 @@ Write the indicators last instead: `B291;C8;B86`. Two things never trigger this 
 
 ### `MISPLACED_SPACE`
 
-A space (`TSP` or `QSP`) written as a `;`-part. A space separates words; it is not a shape a character can be composed from, so the space part is dropped (along with any coordinate or option on it) and the rest of the character renders.
+A space (`TSP`, `QSP`, or the default space `SP` that `//` expands to) written as a `;`-part. A space separates words; it is not a shape a character can be composed from, so the space part is dropped (along with any coordinate or option on it) and the rest of the character renders.
 
 ```
 B313;QSP               →  renders B313, space part dropped
+B313;SP                →  renders B313, space part dropped
 B313;[color=red]>QSP   →  renders B313, space part and option dropped
 ```
 
-Write the space between words instead (`B313//B431`, or `B313/QSP/B431` for an explicit quarter-space). For a positionable blank inside a character, use `ZSA`: it is inkless content, so `B313;ZSA:10,0` keeps its part and position. One thing never triggers this warning: a space beside only unknown codes (`TSP;ZZ9`) is kept, because the character's content is uncertain until those codes resolve.
+Write the space between words instead (`B313//B431`, or `B313/QSP/B431` for an explicit quarter-space). For a positionable blank inside a character, use `ZSA`: it is inkless content, so `B313;ZSA:10,0` keeps its part and position. One thing never triggers this warning: a space beside only unknown codes (`TSP;ZZ9`) is kept, because the character's content is uncertain until those codes resolve. If a mutation strips a character down to a lone `SP`, it drops to an empty character for the same reason.
 
 ## Duplicates
 

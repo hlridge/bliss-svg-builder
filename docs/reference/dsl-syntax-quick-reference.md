@@ -22,7 +22,7 @@ Because `;` targets one glyph, it has no meaning on a code that expands to a who
 
 Within one character, indicators come last: `base;base;indicator;indicator`. An indicator written before base content has no meaning in Bliss, so it is dropped with a `MISPLACED_INDICATOR_PART` warning and the rest of the character renders: `B86;B291` renders as `B291`. Parts you explicitly position at a non-origin `:x,y` are hand-placed artwork and never trigger this.
 
-A space (`TSP` or `QSP`) separates words and is not a shape a character can be composed from: written in a `;`-slot it is dropped with a `MISPLACED_SPACE` warning (any coordinate or option on it drops too) and the rest of the character renders. For a positionable blank inside a character, use `ZSA` instead.
+A space (`TSP`, `QSP`, or the default `SP` that `//` expands to) separates words and is not a shape a character can be composed from: written in a `;`-slot it is dropped with a `MISPLACED_SPACE` warning (any coordinate or option on it drops too) and the rest of the character renders. For a positionable blank inside a character, use `ZSA` instead.
 
 A `;`-part must itself be a single part (a primitive or defined shape, or a defined glyph — a glyph is one atomic part even when its definition composes several). Composing a whole word or a plain multi-part alias into a `;`-slot fails that character with a `WORD_AS_PART` / `COMPOSITE_AS_PART` warning. See [Warning Codes](/reference/warning-codes).
 
