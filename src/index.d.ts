@@ -526,7 +526,13 @@ export interface ShapeContext {
 export interface GlyphDefinition {
   type?: 'glyph';
   codeString: string;
-  /** Marks an all-indicator definition as a compound indicator. */
+  /**
+   * Marks an all-indicator definition as a compound indicator. Valid only on a
+   * `type: 'glyph'` definition; on a bare alias, shape, or external glyph
+   * `define()` reports a violation in its `errors` result. Indicator-ness still
+   * rides through an unflagged bare alias whose target is itself an indicator
+   * (e.g. `{ codeString: 'B81' }`).
+   */
   isIndicator?: boolean;
   anchorOffsetX?: number;
   anchorOffsetY?: number;

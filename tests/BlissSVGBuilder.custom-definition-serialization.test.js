@@ -63,10 +63,13 @@ describe('BlissSVGBuilder custom definition serialization', () => {
       expect(new BlissSVGBuilder('B291;MYSH').toString({ preserve: true })).toBe('B291;MYSH');
     });
 
-    it('keeps a typeless flagged alias name whose target is a primitive', () => {
-      defineAndTrack({ FLAGALIAS: { isIndicator: true, codeString: 'C2' } });
-      expect(new BlissSVGBuilder('B291;FLAGALIAS').toString({ preserve: true }))
-        .toBe('B291;FLAGALIAS');
+    it('keeps a typeless bare alias name whose target is a primitive', () => {
+      // a flagged typeless alias is rejected at define (isIndicator needs
+      // type:'glyph'; see define-hardening); a plain bare alias still keeps its
+      // name under preserve
+      defineAndTrack({ BAREPRIM: { codeString: 'C2' } });
+      expect(new BlissSVGBuilder('B291;BAREPRIM').toString({ preserve: true }))
+        .toBe('B291;BAREPRIM');
     });
 
     it('keeps the name in preserve toJSON output', () => {
@@ -104,7 +107,7 @@ describe('BlissSVGBuilder custom definition serialization', () => {
     });
 
     it('bakes a composed-target alias name under flattenIndicators with preserve', () => {
-      defineAndTrack({ BAREIND: { codeString: 'B81', isIndicator: true } });
+      defineAndTrack({ BAREIND: { codeString: 'B81' } });
       const b = new BlissSVGBuilder('B291;;BAREIND');
       expect(b.toString({ flattenIndicators: true })).toBe('B291;B81');
       expect(b.toString({ flattenIndicators: true, preserve: true })).toBe('B291;BAREIND');
@@ -176,7 +179,7 @@ describe('BlissSVGBuilder custom definition serialization', () => {
     });
 
     it('keeps a name resolving to a composed indicator in preserve only', () => {
-      defineAndTrack({ BAREIND: { codeString: 'B81', isIndicator: true } });
+      defineAndTrack({ BAREIND: { codeString: 'B81' } });
       const b = new BlissSVGBuilder('B291;BAREIND');
       expect(b.toString()).toBe('B291;B81');
       expect(b.toString({ preserve: true })).toBe('B291;BAREIND');

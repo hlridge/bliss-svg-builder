@@ -2966,6 +2966,19 @@ class BlissSVGBuilder {
           continue;
         }
 
+        // isIndicator declares a compound indicator glyph and is honored only
+        // on a type:'glyph' definition. On a bare alias, shape, or external
+        // glyph the flag was silently dropped, so the `;`-slot render and the
+        // `;;` gate disagreed with the stated intent (run-to-stable Phase 2.4c).
+        // Reject it and point to the documented form. Indicator-ness still
+        // rides through an unflagged bare alias whose target is a real
+        // indicator (e.g. { codeString: 'B81' }); only the flag on a non-glyph
+        // definition is rejected.
+        if (definition?.isIndicator === true && type !== 'glyph') {
+          result.errors.push(`"${code}": isIndicator is only valid on a type:'glyph' definition (a compound indicator glyph). To declare a custom indicator, use type:'glyph' with isIndicator:true.`);
+          continue;
+        }
+
         if (type === 'glyph') {
           BlissSVGBuilder.#defineGlyph(code, definition, options);
         } else if (type === 'shape') {

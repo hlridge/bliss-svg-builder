@@ -98,7 +98,7 @@ describe('BlissSVGBuilder compound indicator overlay', () => {
 
   describe('when a single-code alias indicator is applied via `;;`', () => {
     it('bakes the resolved primitive and preserves the alias name', () => {
-      defineAndTrack({ BAREIND: { codeString: 'B81', isIndicator: true } });
+      defineAndTrack({ BAREIND: { codeString: 'B81' } });
       const b = new BlissSVGBuilder('B291;;BAREIND');
       expect(b.toString({ flattenIndicators: true })).toBe('B291;B81');
       expect(b.toString({ flattenIndicators: true, preserve: true })).toBe('B291;BAREIND');
