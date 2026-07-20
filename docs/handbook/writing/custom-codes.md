@@ -241,9 +241,9 @@ builder.toString();                    // 'B291;C2'    — portable, but plain i
 builder.toString({ preserve: true });  // 'B291;MYIND' — your name, local use
 ```
 
-The default output `B291;C2` renders anywhere, but the receiver sees an ordinary circle part: `isIndicator` is metadata on your definition, and metadata never travels. Re-parsing `B291;C2` places `C2` like any part, not like an indicator.
+The default string `B291;C2` renders anywhere, but the receiver sees an ordinary circle part: `isIndicator` is metadata on your definition, and the decomposed string carries none of it. Re-parsing `B291;C2` places `C2` like any part, not like an indicator.
 
-What travels through default output:
+What travels through the default **string** output (`toString()`):
 
 | From your definition | Travels? |
 |---|---|
@@ -252,6 +252,8 @@ What travels through default output:
 | `defaultOptions` | Yes, materialized as explicit options (`[color=red]>C2`) |
 | `isIndicator` and `width` | No. The receiver sees plain parts |
 | `getPath` geometry (primitives) | No. A primitive keeps its bare name and needs its definition to render |
+
+That table is about the `toString()` string. `toJSON()` is the exception: it serializes the full part tree, so it *does* carry `isIndicator` and `width`, and a builder built from that object applies them, preserving indicator placement across an object round trip. Use `toJSON()` (or `preserve`) when you need the indicator to survive without redefining it at the far end.
 
 Per definition shape, that works out to:
 
