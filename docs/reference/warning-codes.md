@@ -300,7 +300,7 @@ builder.group(0).applyIndicators('B291'); // same rule on the API
 
 An *unrecognized* code in the same slot warns `UNKNOWN_CODE` instead.
 
-A custom code counts as an indicator when it resolves to one through single-code aliases: after `define({ MYIND: { codeString: 'B81' } })`, `WORD;;MYIND` applies like `WORD;;B81`. An alias to a multi-code composition does not resolve this way and still warns (flag a compound indicator glyph with `isIndicator: true` instead).
+A custom code counts as an indicator when it resolves to one through single-code aliases: after `define({ MYIND: { codeString: 'B81' } })`, `WORD;;MYIND` applies like `WORD;;B81`. An alias to a multi-code composition does not resolve this way and still warns (define it as a `type: 'glyph'` flagged `isIndicator: true` instead).
 
 ### `NON_INDICATOR_AS_CHARACTER_INDICATOR`
 

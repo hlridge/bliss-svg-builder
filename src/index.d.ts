@@ -524,7 +524,7 @@ export interface ShapeContext {
  * `errors` result rather than throwing.
  */
 export interface GlyphDefinition {
-  type?: 'glyph';
+  type: 'glyph';
   codeString: string;
   /**
    * Marks an all-indicator definition as a compound indicator. Valid only on a
@@ -554,6 +554,8 @@ export interface GlyphDefinition {
 /** Definition for a custom shape (rendered via getPath or codeString). */
 export interface ShapeDefinition {
   type?: 'shape';
+  /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
+  isIndicator?: never;
   getPath?: (ctx: ShapeContext) => string;
   codeString?: string;
   width?: number;
@@ -568,6 +570,8 @@ export interface ShapeDefinition {
 /** Definition for an external glyph (custom rendering around a Unicode character). */
 export interface ExternalGlyphDefinition {
   type: 'externalGlyph';
+  /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
+  isIndicator?: never;
   getPath: (ctx: ShapeContext) => string;
   width: number;
   /** The rendered Unicode character (e.g. `'a'` for the external glyph registered as `'Xa'`). */
@@ -582,6 +586,8 @@ export interface ExternalGlyphDefinition {
 /** Bare alias definition (maps a code name to a code string). */
 export interface BareDefinition {
   codeString: string;
+  /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
+  isIndicator?: never;
   /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
