@@ -213,6 +213,7 @@ The rules keep definitions portable and unambiguous:
 - **No word-level indicators in definitions.** A `codeString` cannot contain `;;`. A word indicator is a live, reversible overlay, so it belongs at the use site: `MYWORD;;B81`.
 - **A glyph or shape is a single character.** Its `codeString` cannot contain `/`. Define a multi-character word as a bare code (omit `type`); a bare code may even span whole words (`B291//C8`).
 - **A glyph cannot bake in an indicator.** Indicators attach to characters at the use site (`SMILEY;B81`) or to words (`;;`). To create a new indicator of its own, flag the glyph with `isIndicator: true`; it then behaves as one atomic indicator unit. The rule holds in every definition order: a later `define()` that would turn an already-referenced code into an indicator is rejected too.
+- **`isIndicator` is glyph-only.** The flag marks a `type: 'glyph'` definition as a compound indicator; setting it on a bare alias, shape, or external glyph is rejected. Indicator-ness still rides through an unflagged bare alias whose target is itself an indicator (`{ codeString: 'B81' }`).
 - **Word codeStrings carry no internal coordinates.** In a `/`-spanning codeString, apply positions at the use site (`MYWORD:2,0`) instead. Kerning markers (`RK:-2`, `AK:1`) are spacing, not coordinates, and are allowed. Single-character codeStrings keep their coordinate freedom (see below).
 - **Spaces spell out as `//` or explicit space codes.** The top-level shorthand `SP` normalizes to `//` when stored.
 - **`defaultOptions` keys must be valid option names**, and cannot include canvas-wide global-only options like `margin` or `grid` (they configure the whole SVG and would be inert on a definition).
@@ -224,7 +225,7 @@ The rules keep definitions portable and unambiguous:
 Custom codes take indicators and options at the use site just like built-ins:
 
 - `SMILEY;B81` attaches the action indicator to the custom character; `B313/SMILEY;;B81` puts a word-level indicator on the word. Indicator positioning is computed from the glyph's actual rendered ink, including glyphs whose definition displaces its parts.
-- An alias to an indicator works as that indicator. After `define({ '6436': { codeString: 'B6436' } })`, writing `MYWORD;;6436` applies the indicator exactly like `MYWORD;;B6436`, on every surface (`;;`, `;`-parts, `applyIndicators`). Only single-code aliases resolve this way; an alias to a multi-code composition needs the `isIndicator: true` flag instead.
+- An alias to an indicator works as that indicator. After `define({ '6436': { codeString: 'B6436' } })`, writing `MYWORD;;6436` applies the indicator exactly like `MYWORD;;B6436`, on every surface (`;;`, `;`-parts, `applyIndicators`). Only single-code aliases resolve this way; to make an alias to a multi-code composition act as an indicator, define it as a `type: 'glyph'` flagged `isIndicator: true` instead.
 - `[color=blue]>SMILEY` styles the whole glyph as one part. On serialization the option is re-emitted before each decomposed part so the styling survives portably; see [Part Options on Custom Glyphs](/handbook/syntax-options/options-system#part-options-on-custom-glyphs).
 
 ## Serializing Custom Indicators and Shapes
@@ -260,8 +261,8 @@ Per definition shape, that works out to:
 | Definition | Default output | `preserve` output |
 |---|---|---|
 | Alias of one built-in indicator (`{ codeString: 'B6436' }`) | the target code, still a real indicator | your name |
-| Own indicator over plain ink (`isIndicator: true, codeString: 'C2'`) | the plain shape, indicator behavior lost | your name |
-| Compound indicator (`isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts, no longer one atomic unit | your name |
+| Own indicator over plain ink (`type: 'glyph', isIndicator: true, codeString: 'C2'`) | the plain shape, indicator behavior lost | your name |
+| Compound indicator (`type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts, no longer one atomic unit | your name |
 | New primitive (`getPath`) | your bare name, unrenderable elsewhere | your bare name |
 
 Two remedies when the default output is not enough:
