@@ -262,7 +262,7 @@ export const WARNING_CODES = Object.freeze({
   // render and serialization while the character still renders. A single-part
   // space glyph IS the space itself and is untouched; ZSA is content (a
   // positionable inkless shape) and is exempt.
-  MISPLACED_SPACE_PART: 'MISPLACED_SPACE_PART',
+  MISPLACED_SPACE: 'MISPLACED_SPACE',
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',

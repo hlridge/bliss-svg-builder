@@ -4,7 +4,7 @@ import { BlissSVGBuilder } from '../src/index.js';
 /**
  * Pins the space-as-part invariant: a space (TSP/QSP) is a word-level
  * separator, never a `;`-part, so a space code inside a multi-part list is
- * dropped from both render and serialization with MISPLACED_SPACE_PART while
+ * dropped from both render and serialization with MISPLACED_SPACE while
  * the rest of the character renders (the warn + drop model of
  * MISPLACED_SPACE_DECORATION and MISPLACED_INDICATOR_PART). Any coordinate or
  * option on the dropped space part dies with it. A single-part space glyph IS
@@ -45,7 +45,7 @@ import { BlissSVGBuilder } from '../src/index.js';
  */
 describe('BlissSVGBuilder space as a part', () => {
   const spaceWarnings = (builder) =>
-    builder.warnings.filter((w) => w.code === 'MISPLACED_SPACE_PART');
+    builder.warnings.filter((w) => w.code === 'MISPLACED_SPACE');
 
   describe('when a space code sits in a multi-part list', () => {
     it('drops a trailing space part and renders the base alone', () => {
@@ -105,7 +105,7 @@ describe('BlissSVGBuilder space as a part', () => {
       const b = new BlissSVGBuilder('B313;[color=red]>QSP');
       expect(b.toString()).toBe('B313');
       expect(b.svgCode).toBe(new BlissSVGBuilder('B313').svgCode);
-      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE_PART']);
+      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE']);
     });
 
     it('restores group navigation over a space-led part list', () => {
@@ -170,7 +170,7 @@ describe('BlissSVGBuilder space as a part', () => {
       const b = new BlissSVGBuilder('B86;QSP');
       expect(b.toString()).toBe('B86');
       expect(b.svgCode).toBe(new BlissSVGBuilder('B86').svgCode);
-      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE_PART']);
+      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE']);
     });
   });
 

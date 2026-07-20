@@ -182,7 +182,7 @@ describe('BlissParser group option placement', () => {
       // (2026-07-17) drops the composed TSP, so the option must still stay
       // out of MISPLACED_GROUP_OPTION's scope while the TSP warns and drops.
       const styled = build('[color=red]|GOPP_COMPSPACE');
-      expect(styled.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE_PART']);
+      expect(styled.warnings.map((w) => w.code)).toEqual(['MISPLACED_SPACE']);
       expect(styled.svgCode).toContain('stroke="red"');
       expect(styled.groups.length).toBe(1);
       const reparsed = build(styled.toString());

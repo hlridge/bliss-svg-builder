@@ -765,7 +765,7 @@ class BlissSVGBuilder {
   // separator, never a `;`-part — a space cannot stay a character inside a
   // word (#normalizeSpaceInvariant Pass 3 splits it out) and cannot carry a
   // decoration, so a space in a part slot is the same misplacement one level
-  // down. The space part is dropped LOUDLY (MISPLACED_SPACE_PART) from render
+  // down. The space part is dropped LOUDLY (MISPLACED_SPACE) from render
   // and serialization while the character still renders; a coordinate or
   // option on it dies with the part (a positionable inkless blank is ZSA's
   // job — ZSA is content and is exempt). A SINGLE-part space glyph IS the
@@ -815,7 +815,7 @@ class BlissSVGBuilder {
           const coords = p.x !== undefined || p.y !== undefined ? `:${p.x ?? 0},${p.y ?? 0}` : '';
           const source = `${p.codeName}${coords}`;
           this.#mutationWarnings.push({
-            code: WARNING_CODES.MISPLACED_SPACE_PART,
+            code: WARNING_CODES.MISPLACED_SPACE,
             message: `A space is a word separator, not a character part, so "${source}" was dropped.`,
             source,
           });

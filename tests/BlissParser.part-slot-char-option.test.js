@@ -29,7 +29,7 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - DSL/API parity: `addPart('[opts]CODE')` behaves byte-identically to the
  *   DSL spelling.
  * - A peeled space part still meets the space-part invariant
- *   (MISPLACED_SPACE_PART) afterwards.
+ *   (MISPLACED_SPACE) afterwards.
  * - Unchanged contracts: valid placements stay warn-free; a dangling
  *   bracket with no code and slot-0 doubled char brackets keep failing the
  *   whole character.
@@ -222,7 +222,7 @@ describe('BlissParser part-slot character options', () => {
       const b = build('B291;[color=red]QSP');
       const warned = codes('B291;[color=red]QSP');
       expect(warned).toContain('MISPLACED_CHARACTER_OPTION');
-      expect(warned).toContain('MISPLACED_SPACE_PART');
+      expect(warned).toContain('MISPLACED_SPACE');
       expect(b.toString()).toBe('B291');
       expect(b.svgCode).toBe(build('B291').svgCode);
     });
