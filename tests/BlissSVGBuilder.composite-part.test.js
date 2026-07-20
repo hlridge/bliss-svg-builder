@@ -191,17 +191,17 @@ describe('BlissSVGBuilder composite part', () => {
   });
 
   describe('when a failed composite part is serialized', () => {
-    it('decomposes to the explicit literal form on toString, which round-trips clean', () => {
-      // pins review F2 (accepted by-design): the guard is an authoring-layer check;
-      // toString export is NFD decompose, so H;NOUN_BI (which fails) serializes to
-      // the explicit H;B291;B81 - a legitimate character, NOT a surviving
-      // composite-as-part - and that re-parses without the warning and renders.
+    it('re-emits by its written name so the warned string round-trips to the same failure', () => {
+      // row 80 (supersedes the old decompose-to-literal behavior): decomposing
+      // H;NOUN_BI to the explicit H;B291;B81 changed what the warned string meant
+      // (a legitimate character, the COMPOSITE_AS_PART lost, svg drift). The
+      // failed part now re-emits by name, so the reparse fails identically.
       const failed = new BlissSVGBuilder('H;NOUN_BI');
       expect(failed.warnings.map((w) => w.code)).toContain('COMPOSITE_AS_PART');
-      expect(failed.toString()).toBe('H;B291;B81');
+      expect(failed.toString()).toBe('H;NOUN_BI');
       const roundTripped = new BlissSVGBuilder(failed.toString());
-      expect(roundTripped.warnings.map((w) => w.code)).not.toContain('COMPOSITE_AS_PART');
-      expect(roundTripped.svgCode.length).toBeGreaterThan(0);
+      expect(roundTripped.warnings.map((w) => w.code)).toContain('COMPOSITE_AS_PART');
+      expect(roundTripped.svgCode).toBe(failed.svgCode);
     });
   });
 });

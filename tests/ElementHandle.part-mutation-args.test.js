@@ -131,7 +131,9 @@ describe('ElementHandle part mutation args', () => {
       expect(parts).toHaveLength(2);
       expect(parts[1].errorCode).toBe('COMPOSITE_AS_PART');
       expect(b.warnings.some((w) => w.code === 'COMPOSITE_AS_PART')).toBe(true);
-      expect(b.toString()).toBe('B291;B81;B97');
+      // re-emits the alias by name (row 80): decomposing to B291;B81;B97 would
+      // contradict "one error part" and reparse to a different character
+      expect(b.toString()).toBe('B291;TPAIR');
     });
   });
 

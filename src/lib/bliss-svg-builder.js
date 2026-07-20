@@ -972,12 +972,17 @@ class BlissSVGBuilder {
     this.#normalizeSpaceInvariant();
     this.#normalizeIndicatorInvariant();
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
-    const blissObj = structuredClone(this.#rawBlissObj);
 
-    // Re-derive position-dependent composite-as-part flags on the rebuilt
-    // structure: a mutation (insertPart via its `H;<code>` scaffold, removePart)
-    // can move a part to/from the leading slot, so a parse-time flag may be stale.
-    BlissParser.reflagCompositeParts(blissObj);
+    // Re-derive position-dependent composite-as-part flags on the AUTHORING
+    // structure (#rawBlissObj), before the render clone: a mutation (insertPart
+    // via its `H;<code>` scaffold, removePart) can move a part to/from the
+    // leading slot, staling the parse-time flag. Serialization reads
+    // #rawBlissObj, so the flag must be accurate there, not only on the clone:
+    // a genuinely-failed part re-emits by its written name (row 80) while a
+    // legal leading alias re-flattens. reflag only touches error/errorCode (no
+    // expansion), so it is safe on the base-only structure; the clone inherits.
+    BlissParser.reflagCompositeParts(this.#rawBlissObj);
+    const blissObj = structuredClone(this.#rawBlissObj);
 
     // R14 resolve site 1 (render): merge each group's word-level indicator
     // overlay onto its head glyph, on the clone only so #rawBlissObj (and the
@@ -1921,7 +1926,14 @@ class BlissSVGBuilder {
         if (!part.codeName) return '';
         const x = (part.x ?? 0) + offsetX;
         const y = (part.y ?? 0) + offsetY;
-        if (!options.preserve && !builtInCodes.has(part.codeName)) {
+        // A failed part (COMPOSITE_AS_PART keeps its expanded `.parts`) must
+        // re-emit by its written name, never decomposed: decomposing a
+        // composite alias (`_X` -> `B291;B81`) changes what the warned string
+        // re-parses to (the buried baked indicator resurfaces, the whole-char
+        // failure becomes a different valid character). preserve already keeps
+        // the name; this makes default agree. (Row 80.) WORD_AS_PART has no
+        // `.parts`, so it already round-tripped; the guard just unifies them.
+        if (!options.preserve && !builtInCodes.has(part.codeName) && !part.errorCode) {
           // Custom code with nested parts (e.g., positioned custom glyph)
           if (part.parts) {
             // A part-level option on the custom base must survive decomposition,

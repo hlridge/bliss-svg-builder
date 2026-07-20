@@ -32,6 +32,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   identical key). [TF-3G]
  * - An invalid part (no codeName) decorated by `[opts]>` and/or a coordinate is
  *   dropped from `toString()` instead of emitting a literal `undefined`. [F3]
+ * - A failed composite `;`-part (COMPOSITE_AS_PART) re-emits by its written name,
+ *   not decomposed, so the warned string round-trips to the same failure instead
+ *   of re-parsing to a different character. [row 80]
  *
  * Does NOT cover:
  * - Compound-indicator glyph preserve decomposition (D2), see
@@ -68,6 +71,10 @@ describe('BlissSVGBuilder serializer fidelity', () => {
     // Multi-base composition whose definition bakes a part option of its own:
     // an outer option must merge BENEATH it on decomposition (inner keys win).
     _FID_INNEROPT: { type: 'glyph', codeString: '[color=red]>B291;C8' },
+    // Bare-alias composite (no type): a multi-part composition that is a legal
+    // WORD/character on its own but NOT a legal `;`-part, so a non-leading use
+    // fails COMPOSITE_AS_PART (a flagged glyph/shape would be exempt).
+    _FID_COMPOSITE: { codeString: 'B291;B81' },
   };
   beforeAll(() => BlissSVGBuilder.define(FIDELITY_DEFS));
   afterAll(() => Object.keys(FIDELITY_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
@@ -239,6 +246,39 @@ describe('BlissSVGBuilder serializer fidelity', () => {
       const reparsed = new BlissSVGBuilder(first);
       expect(reparsed.toString()).toBe(first);
       expect(reparsed.warnings).toEqual([]);
+    });
+  });
+
+  describe('when a failed composite alias sits in a part slot', () => {
+    it('re-emits the failed composite by its written name instead of decomposing it', () => {
+      // regression (row 80): a COMPOSITE_AS_PART part keeps its expanded parts,
+      // so default toString decomposed `_FID_COMPOSITE` to `B291;B81`, whose
+      // reparse is a DIFFERENT character (the baked indicator no longer buried)
+      const b = new BlissSVGBuilder('B303;_FID_COMPOSITE');
+      expect(b.warnings.map((w) => w.code)).toContain('COMPOSITE_AS_PART');
+      expect(b.toString()).toBe('B303;_FID_COMPOSITE');
+    });
+
+    it('round-trips the failed composite character svg-stably', () => {
+      const b = new BlissSVGBuilder('B303;_FID_COMPOSITE');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('does not re-convict a preceding indicator after a round-trip', () => {
+      // the expanded re-emission `B303;B86;B291;B81` re-convicted B86 under the
+      // 1.2 misplaced-indicator rule; the faithful form reparses to the same
+      // COMPOSITE_AS_PART instead of MISPLACED_INDICATOR_PART
+      const b = new BlissSVGBuilder('B303;B86;_FID_COMPOSITE');
+      expect(b.toString()).toBe('B303;B86;_FID_COMPOSITE');
+      const reparsed = new BlissSVGBuilder(b.toString());
+      expect(reparsed.warnings.map((w) => w.code)).toContain('COMPOSITE_AS_PART');
+      expect(reparsed.warnings.map((w) => w.code)).not.toContain('MISPLACED_INDICATOR_PART');
+      expect(reparsed.svgCode).toBe(b.svgCode);
+    });
+
+    it('agrees with preserve mode, which already kept the name', () => {
+      const b = new BlissSVGBuilder('B303;_FID_COMPOSITE');
+      expect(b.toString()).toBe(b.toString({ preserve: true }));
     });
   });
 });
