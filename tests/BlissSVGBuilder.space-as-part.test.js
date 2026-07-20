@@ -305,6 +305,11 @@ describe('BlissSVGBuilder space as a part', () => {
       expect(reparsed.svgCode).toBe(b.svgCode);
       expect(reparsed.warnings).toHaveLength(0);
       expect(b.warnings.map((w) => w.code)).toContain('MISPLACED_SPACE');
+      // navigation stays consistent: the dropped SP leaves a clean addressable
+      // empty glyph (one word, three glyphs: B291, empty, B313), not a phantom
+      // or a word split
+      expect(b.stats).toEqual({ groupCount: 1, glyphCount: 3 });
+      expect(b.toJSON().groups[0].glyphs[1].parts).toEqual([]);
     });
 
     it('drops the SP at build when a known sibling is present, so removal just empties the glyph', () => {
