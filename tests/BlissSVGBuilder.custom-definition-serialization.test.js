@@ -96,6 +96,11 @@ describe('BlissSVGBuilder custom definition serialization', () => {
       expect(b.toString()).toBe('B291;;MYIND');
       expect(b.toString({ flattenIndicators: true })).toBe('B291;C2');
       expect(b.toString({ flattenIndicators: true, preserve: true })).toBe('B291;MYIND');
+      // review MAJOR-1: the flatten+preserve output re-parses to the SVG the
+      // original renders (the ;; overlay carries the alias's indicator metadata
+      // now, matching the ;-slot twin), so the round trip is svg-stable.
+      expect(new BlissSVGBuilder(b.toString({ flattenIndicators: true, preserve: true })).svgCode)
+        .toBe(b.svgCode);
     });
 
     it('bakes a composed-target alias name under flattenIndicators with preserve', () => {

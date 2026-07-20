@@ -90,6 +90,17 @@ describe('BlissSVGBuilder alias indicator carry', () => {
       expect(warningCodes(builder)).toEqual([]);
     });
 
+    it('places a flagged glyph over a non-indicator primitive like its ;-slot twin', () => {
+      // review MAJOR-1: the ;; render-merge parsed the alias standalone, so it
+      // never carried isIndicator/width from a definition whose target is not
+      // itself an indicator (C2), placing the ink at the origin while the ;-slot
+      // placed it at the indicator offset. The two surfaces now agree.
+      BlissSVGBuilder.define({ [trackCode('PRIMIND1')]: { type: 'glyph', isIndicator: true, codeString: 'C2' } });
+      const overlay = new BlissSVGBuilder('B291;;PRIMIND1');
+      expect(warningCodes(overlay)).toEqual([]);
+      expect(overlay.svgCode).toBe(new BlissSVGBuilder('B291;PRIMIND1').svgCode);
+    });
+
     it('honors a use-site coordinate suffix on the alias', () => {
       const alias = defineActionAlias('WIALIAS4');
       const viaAlias = new BlissSVGBuilder(`B291;;${alias}:0,4`);

@@ -420,32 +420,49 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
     // compound (B98) which the parser keeps as one nested part. Taking parts[0]
     // dropped the rest of the anatomy from render AND flatten (`;;COMBI` rendered
     // only B97; backlog: custom compound `;;` anatomy truncation). Wrap the whole
-    // anatomy back into one atomic indicator part, mirroring the `;`-slot form
-    // (`B291;COMBI`), so `;` and `;;` agree for the same definition.
-    let node = parsedParts?.[0];
-    if (parsedParts && parsedParts.length > 1) {
-      const bare = getBareCode(code);
-      const definition = resolveEffectiveDefinition(definitions[bare], definitions);
-      node = { codeName: bare, isIndicator: true, width: definition?.width ?? 2, parts: parsedParts };
-      if (definition?.anchorOffsetX !== undefined) node.anchorOffsetX = definition.anchorOffsetX;
-    }
+    // anatomy back into one atomic part, mirroring the `;`-slot form (`B291;COMBI`);
+    // the shared indicator-metadata stamp below then flags it, so `;` and `;;`
+    // agree for the same definition.
+    let node = parsedParts?.length > 1
+      ? { codeName: getBareCode(code), parts: parsedParts }
+      : parsedParts?.[0];
     if (node) {
-      // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81)
-      // loses the written code at parse; record it so preserve-mode
-      // serialization restores it (Phase 2.3b). Multi-part expansions keep
-      // their own codes: stamping the alias on just the first part would
-      // mislabel it.
-      if (parsedParts.length === 1 && node.codeName !== getBareCode(code)) {
-        node._aliasCodeName = getBareCode(code);
+      const bare = getBareCode(code);
+      const immediate = Object.prototype.hasOwnProperty.call(definitions, bare)
+        ? definitions[bare]
+        : undefined;
+      // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81) loses
+      // the written code at parse; record it so preserve-mode serialization
+      // restores it (Phase 2.3b). This stamp is load-bearing for the `;;`
+      // surface: the standalone parse resolves the alias at glyph level, so the
+      // parser's own single-ref rename recording never fires for this node
+      // (unlike an object-input part, where it does). A multi-part wrap keeps its
+      // own code (its codeName is already `bare`): stamping the alias on just the
+      // first part would mislabel it.
+      if (parsedParts.length === 1 && node.codeName !== bare) {
+        node._aliasCodeName = bare;
+      }
+      // The `;;` overlay parses its code standalone, which (unlike the `;`-slot's
+      // #applyDefinitionMetadata) does not carry a single-code alias's own
+      // indicator metadata onto the node when the alias target is not itself an
+      // indicator (MYIND -> C2, isIndicator on the definition); the compound wrap
+      // above also starts bare. Apply it here from the effective definition so
+      // `;` and `;;` place the indicator identically and the flatten+preserve
+      // round-trip is svg-stable (external review MAJOR-1). Built-in indicators
+      // already carry the flag, so the guard makes this a no-op for them.
+      if (node.isIndicator !== true) {
+        const effective = resolveEffectiveDefinition(immediate, definitions);
+        if (effective?.isIndicator) {
+          node.isIndicator = true;
+          node.width = effective.width ?? 2;
+          if (effective.anchorOffsetX !== undefined) node.anchorOffsetX = effective.anchorOffsetX;
+        }
       }
       // A standalone parse of an alias code lands the alias definition's
       // defaultOptions at GLYPH level, so the extracted part node would
-      // silently lose them (`;;` diverging from the `;`-part slot, review
-      // MINOR-2). Merge them here with the same precedence as
-      // #applyDefinitionMetadata: explicit options on the code win.
-      const immediate = Object.prototype.hasOwnProperty.call(definitions, getBareCode(code))
-        ? definitions[getBareCode(code)]
-        : undefined;
+      // silently lose them (`;;` diverging from the `;`-part slot). Merge them
+      // here with the same precedence as #applyDefinitionMetadata: explicit
+      // options on the code win.
       if (immediate?.defaultOptions) {
         node.options = { ...immediate.defaultOptions, ...(node.options || {}) };
       }
