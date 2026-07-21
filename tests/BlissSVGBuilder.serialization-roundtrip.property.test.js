@@ -16,8 +16,11 @@ import { validCompositionArb, SEED, VALID_AST_RUNS } from './utils/property-arbi
  * failure prints the seed and a shrunk counterexample for replay.
  *
  * Covers (Codex-formulated properties 1-3 of the run-to-stable Phase 3 spec):
- * - Generated valid compositions emit zero warnings (generator-scope + the
- *   library invariant that well-formed built-in input does not spuriously warn).
+ * - Generated valid compositions emit zero warnings. This is a generator-health
+ *   check FIRST (the pools are curated for zero warnings) and secondarily a
+ *   library invariant (well-formed built-in input does not spuriously warn); it
+ *   also guards grammar-COMBINATION regressions the curation alone would not
+ *   (kerning, `;;` overlays, `^` head markers, part-options interacting).
  * - toString() idempotence: canonicalize(canonicalize(s)) === canonicalize(s).
  * - svg round-trip: rebuilding from toString() renders byte-identical SVG.
  * - toJSON round-trip: rebuilding from EMITTED toJSON() yields a structurally
@@ -79,6 +82,10 @@ describe('BlissSVGBuilder serialization round-trip (property-based)', { tags: ['
           const emitted = new BlissSVGBuilder(s).toJSON();
           const rebuilt = new BlissSVGBuilder(emitted).toJSON();
           expect(rebuilt).toEqual(emitted);
+          // toEqual ignores object key order and undefined-valued keys;
+          // JSON.stringify pins both. toJSON() key order is stable (verified at
+          // 50k runs), so this is a strict-but-safe strengthening.
+          expect(JSON.stringify(rebuilt)).toBe(JSON.stringify(emitted));
         }),
         config,
       );
