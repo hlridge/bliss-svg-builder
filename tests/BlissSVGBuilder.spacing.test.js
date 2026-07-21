@@ -40,7 +40,10 @@ import { BlissSVGBuilder } from '../src/index';
  * - Parser-side kerning grammar (decimal forms, malformed fallthrough),
  *   see `BlissParser.kerning.test.js`. This file pins the rendered
  *   inter-character positions and total composition width that result
- *   from RK / AK markers (closing the prior backlog gap noted here).
+ *   from EXPLICIT RK / AK values (RK:0, AK:0, cascading values).
+ * - Bare RK/AK markers (absent-marker semantics: no kerning applied, omitted
+ *   from toString; a bare AK renders the default gap, not AK:0's collapsed
+ *   gap), see `BlissSVGBuilder.kerning-markers.test.js`.
  */
 
 describe('BlissSVGBuilder spacing', () => {

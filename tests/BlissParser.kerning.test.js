@@ -13,7 +13,11 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Multi-digit RK values (RK:25; pins regex \d+ quantifier).
  * - Decimal-only multi-digit RK values (RK:.55; pins the \.\d+ alternative
  *   quantifier).
- * - Bare RK defaulting to 0, both between glyphs and at the start of input.
+ * - Bare RK and AK markers (no `:value`) applying NO kerning: they are absent,
+ *   not a materialized 0, so they leave the next glyph unshifted, do not
+ *   persist relativeKerning/absoluteKerning, and are consumed without warning
+ *   (never falling through to UNKNOWN_CODE), both between glyphs and at the
+ *   start of input.
  * - A malformed kerning value (RK:/AK: followed by a non-number: RK:., RK:abc,
  *   RK:.5.5, RK:5e2, RK:, AK:.) warns MALFORMED_KERNING_VALUE and applies no
  *   kerning (the marker is dropped, the next glyph unshifted), rather than the
@@ -90,17 +94,25 @@ describe('BlissParser kerning', () => {
       expect(r.groups[0].glyphs[0].options.relativeKerning).toBe(0.55);
     });
 
-    it('bare RK with no value defaults to 0', () => {
+    it('applies no relative kerning for a bare RK with no value', () => {
+      // A bare marker is absent, not a materialized 0: persisting
+      // relativeKerning=0 would re-emit RK:0, a value the user never wrote.
       const glyphs = probe('RK');
       expect(glyphs).toHaveLength(2);
-      expect(glyphs[1].relativeKerning).toBe(0);
+      expect(glyphs[1].relativeKerning).toBeUndefined();
     });
 
-    it('accepts a bare RK at the start of input (defaults to 0)', () => {
-      // kills 2402 (outer `?` removed → colon-value group required)
-      const r = BlissParser.parse('RK/H');
-      expect(r.groups[0].glyphs).toHaveLength(1);
-      expect(r.groups[0].glyphs[0].options.relativeKerning).toBe(0);
+    it('consumes a bare RK at the start of input without applying kerning', () => {
+      // kills 2402 (outer `?` removed → colon-value required): without the `?`
+      // a bare RK stops matching and falls through to code parsing as
+      // UNKNOWN_CODE; also pins that a bare marker persists no kerning value.
+      const b = new BlissSVGBuilder('RK/H');
+      const glyphs = b.toJSON().groups[0].glyphs;
+      expect(glyphs).toHaveLength(1);
+      expect(glyphs[0].options?.relativeKerning).toBeUndefined();
+      const codes = b.warnings.map(w => w.code);
+      expect(codes).not.toContain('UNKNOWN_CODE');
+      expect(codes).not.toContain('MALFORMED_KERNING_VALUE');
     });
   });
 
@@ -123,6 +135,24 @@ describe('BlissParser kerning', () => {
     it('applies an integer AK to the next glyph', () => {
       const result = BlissParser.parse('B231/AK:2/B231');
       expect(result.groups[0].glyphs[1].options.absoluteKerning).toBe(2);
+    });
+
+    it('applies no absolute kerning for a bare AK with no value', () => {
+      // A bare AK is absent (the pair's default gap), NOT AK:0 (a collapsed
+      // gap): it must not persist absoluteKerning=0.
+      const glyphs = probe('AK');
+      expect(glyphs).toHaveLength(2);
+      expect(glyphs[1].absoluteKerning).toBeUndefined();
+    });
+
+    it('consumes a bare AK at the start of input without applying kerning', () => {
+      // kills the AK arm of 2402: a bare AK stays a consumed marker, not a
+      // fall-through UNKNOWN_CODE, and persists no kerning value.
+      const b = new BlissSVGBuilder('AK/H');
+      const glyphs = b.toJSON().groups[0].glyphs;
+      expect(glyphs).toHaveLength(1);
+      expect(glyphs[0].options?.absoluteKerning).toBeUndefined();
+      expect(b.warnings.map(w => w.code)).not.toContain('UNKNOWN_CODE');
     });
   });
 

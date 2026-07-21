@@ -1291,9 +1291,17 @@ export class BlissParser {
 
         const kerningMatch = part.match(/^(RK|AK)(?::([+-]?(?:\d+(?:\.\d*)?|\.\d+)))?$/);
         if (kerningMatch) {
-          const [_, kerningType, kerningValue = 0] = kerningMatch;
-          if (kerningType === "RK") pendingRelativeKerning = Number(kerningValue);
-          if (kerningType === "AK") pendingAbsoluteKerning = Number(kerningValue);
+          const [_, kerningType, kerningValue] = kerningMatch;
+          // A bare marker (RK/AK with no `:value`) is absent: it applies no
+          // kerning and is not persisted, so it never materializes a default
+          // (RK:0/AK:0 on serialization) or collapses the pair gap (a bare AK).
+          // Only an explicit value (including :0, the deliberate zero-gap
+          // spelling) is kept. Still `continue` so a bare marker is consumed,
+          // not misread as an UNKNOWN_CODE.
+          if (kerningValue !== undefined) {
+            if (kerningType === "RK") pendingRelativeKerning = Number(kerningValue);
+            if (kerningType === "AK") pendingAbsoluteKerning = Number(kerningValue);
+          }
           continue;
         }
 
