@@ -12,6 +12,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Sanctioned run-category tags (testing-guide 7). Vitest 4.1 requires a tag
+    // to be declared here before a test may apply it.
+    tags: [
+      { name: '@property', description: 'Property-based (fast-check) tests.' },
+    ],
     // Keep vitest's default module isolation (`isolate: true`) on: several
     // parser/element test files mutate the shared blissElementDefinitions
     // singleton. Most pair their setup with afterAll cleanup, but do not switch
@@ -34,6 +39,10 @@ export default defineConfig({
           exclude: [
             'tests/**/*.e2e.{test,spec}.js',
             'tests/**/*.dist.{test,spec}.js',
+            // Property-based tests (fast-check) run randomized/seeded iterations;
+            // they are a distinct runtime profile kept out of the fast default
+            // loop and run as their own gate (`pnpm test:property`).
+            'tests/**/*.property.{test,spec}.js',
           ],
           name: 'lib',
           // The lib project includes canvas-backed meta-tests
@@ -59,6 +68,17 @@ export default defineConfig({
         test: {
           include: ['tests/**/*.dist.{test,spec}.js'],
           name: 'dist',
+        }
+      },
+      {
+        extends: true,
+        test: {
+          include: ['tests/**/*.property.{test,spec}.js'],
+          name: 'property',
+          // fast-check runs many iterations per property; give the same
+          // allowance as e2e so a cold run is not spuriously red.
+          testTimeout: 30000,
+          hookTimeout: 30000,
         }
       },
     ],
