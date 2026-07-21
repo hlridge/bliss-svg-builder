@@ -15,6 +15,11 @@ import { BlissSVGBuilder } from '../src/index';
  *   spelling; RK:0 is kept although it renders like no marker).
  * - Explicit AK:2 (== the default gap) kept verbatim, distinguishing an
  *   explicit value from an absent bare marker even when they render alike.
+ * - Coherence under a non-default char-space: a bare AK tracks the effective
+ *   default gap (absent), while AK:2 is a FIXED gap, so the two diverge once
+ *   char-space is not the default. This is the property the fix exists to
+ *   guarantee, invisible at the default char-space where bare AK and AK:2
+ *   render alike.
  * - Round-trip: bare-marker inputs are idempotent under toString and
  *   svg-stable across a reparse.
  *
@@ -65,6 +70,21 @@ describe('BlissSVGBuilder kerning markers', () => {
       // they render alike: AK:2 == the default gap == a bare (absent) AK
       expect(emitted('B291/AK:2/B291')).toBe('B291/AK:2/B291');
       expect(svg('B291/AK:2/B291')).toBe(svg('B291/B291'));
+    });
+  });
+
+  describe('when a bare AK is applied under a non-default char-space', () => {
+    // The coherence property behind "bare = absent": a bare AK tracks the
+    // effective default gap, while AK:2 is a fixed 2. They render alike only at
+    // the default char-space (2); under char-space=5 they must diverge, which is
+    // the actual point of the fix.
+    it('tracks the char-space like no marker, unlike the fixed AK:2', () => {
+      expect(svg('[char-space=5]||H/AK/C8')).toBe(svg('[char-space=5]||H/C8'));
+      expect(svg('[char-space=5]||H/AK:2/C8')).not.toBe(svg('[char-space=5]||H/C8'));
+    });
+
+    it('renders AK:2 at the fixed gap regardless of char-space', () => {
+      expect(svg('[char-space=5]||H/AK:2/C8')).toBe(svg('H/AK:2/C8'));
     });
   });
 
