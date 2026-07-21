@@ -254,7 +254,7 @@ What travels through the default **string** output (`toString()`):
 | `isIndicator` and `width` | No. The receiver sees plain parts |
 | `getPath` geometry (primitives) | No. A primitive keeps its bare name and needs its definition to render |
 
-That table is about the `toString()` string. `toJSON()` is the exception: it serializes the full part tree, so it *does* carry `isIndicator` and `width`, and a builder built from that object applies them, preserving indicator placement across an object round trip. Use `toJSON()` (or `preserve`) when you need the indicator to survive without redefining it at the far end.
+That table is about the `toString()` string. `toJSON()` carries more: it serializes the full part tree, so it *does* include `isIndicator` and `width`, and a builder rebuilt from that object applies them, preserving indicator placement across an object round trip in the same environment (your definitions still registered). To move a custom indicator to an environment that does not have your definitions, register the same `define()` calls there; that is the reliable path (a custom name that stays in the serialized output needs its definition wherever the output is read).
 
 Per definition shape, that works out to:
 
