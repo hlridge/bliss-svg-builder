@@ -76,13 +76,16 @@ new BlissSVGBuilder('B2661').toJSON();
 // (built-in codes, no custom names)
 ```
 
-The receiver doesn't need your definitions. The output is self-contained.
+For output like this the receiver doesn't need your definitions: it is built-in codes all the way down. Not every name can decompose, though: a `getPath` primitive has no built-in form, and a `;`-part alias to a composed glyph keeps its name even in default output. A custom name that stays in serialized output needs its `define()` wherever the output is read; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes).
 
-If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. That works for codes whose identity survives parsing, like the typed characters and shapes introduced below. A multi-code alias like `B2661` dissolves into its expansion at parse time, so there is no name left to preserve:
+If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. `preserve` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`:
 
 ```js
+new BlissSVGBuilder('LOVE').toString({ preserve: true });
+// 'LOVE' (a bare alias renaming one code keeps its name)
+
 new BlissSVGBuilder('B2661').toString({ preserve: true });
-// 'B1103;B81' (the alias dissolved at parse)
+// 'B1103;B81' (multi-code shorthand always expands)
 ```
 
 As a rule of thumb: the default is for output that leaves your app, `preserve` is for output that stays where your definitions live. Custom indicators and shapes have a few extra wrinkles worth knowing; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes) below.
@@ -114,8 +117,9 @@ builder.glyph(1).codeName;  // 'SMILEY'
 builder.toString();
 // 'B313/C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
 
-// Unlike an alias, a glyph still exists as a unit after parsing,
-// so preserve can keep its name
+// A glyph is a unit whatever its anatomy, so preserve keeps its
+// name even for this multi-code composition (a typeless multi-code
+// shorthand would expand instead)
 builder.toString({ preserve: true });
 // 'B313/SMILEY'
 ```

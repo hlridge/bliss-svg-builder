@@ -108,7 +108,7 @@ Use for: compositing into larger SVG documents, extracting raw path data.
 
 ### `toJSON(options?)`
 
-Returns a normalized plain object representing the parsed composition. Aliases are resolved to canonical codes. Feed this back into the constructor to recreate an identical builder:
+Returns a normalized plain object representing the parsed composition; custom code names follow the serialization rules below. Feed this back into the constructor to recreate an identical builder:
 
 ```js
 const builder = new BlissSVGBuilder('B313/B1103//B431;B81');
@@ -142,9 +142,8 @@ builder.toJSON({ deep: true });
 ```
 
 Custom code behavior:
-- **Typeless aliases** (word-level codes) are always expanded to their underlying codes.
-- **Custom glyphs** are decomposed by default. Simple aliases resolve to their built-in code (e.g., `LOVE` becomes `B431`). Complex compositions drop the custom code entirely (parts are already expanded).
-- Pass `{ preserve: true }` to keep all custom code names as-is.
+- Default output decomposes custom names to built-in codes where a resolved form exists: a standalone alias resolves to its target, and a multi-code `codeString` is always expanded. One kind of name stays even by default: a `;`-part alias whose target is a composed glyph (re-parsing that name needs the same definition registered).
+- Pass `{ preserve: true }` to keep custom names, under the same rule as [`toString()`](#tostring-options): a name is kept when it stands for a single glyph, indicator, or shape.
 
 ```js
 BlissSVGBuilder.define({ 'LOVE': { type: 'glyph', codeString: 'B431' } });
@@ -184,10 +183,7 @@ builder.toString();
 
 Serialized spacing always matches rendered spacing: adjacent space groups serialize as one coalesced run (a run of N space glyphs emits N+1 slashes; an explicit space code that differs from its position's default, like `QSP` between words, keeps its name), and [empty slots](#empty-slots-are-deliberate) contribute nothing. A bare empty group or glyph has no DSL token of its own, so it is omitted from the string (an options-carrying empty does have one: `[color=red]|` for a group, `[color=red]` for a glyph); use `toJSON()` when empty slots must survive a round-trip.
 
-Custom code behavior:
-- **Typeless aliases** (word-level codes) are always expanded, never preserved.
-- **Custom glyphs and shapes** are decomposed to built-in codes by default.
-- Pass `{ preserve: true }` to keep custom code names.
+Custom code behavior: custom names are decomposed to built-in codes by default. `{ preserve: true }` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`.
 
 ```js
 BlissSVGBuilder.define({
@@ -706,7 +702,7 @@ new BlissSVGBuilder('Xα').glyph(0).part(0).codeName; // 'Xα'
 new BlissSVGBuilder('Xhαllo').glyph(0).part(0).codeName; // 'Xhαllo'
 ```
 
-`.codeName` is the live identity. Serialization via `toString()` / `toJSON()` decomposes alias names by default; pass `{ preserve: true }` to keep them in serialized output. The `preserve` option does not affect this getter.
+`.codeName` is the live identity. What serialized output emits for a custom name is governed by `toString()` / `toJSON()` and their `preserve` option (see [Serialization](#serialization)); neither affects this getter.
 
 #### `.char`
 
