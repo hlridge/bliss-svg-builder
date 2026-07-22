@@ -211,9 +211,10 @@ export declare class ElementHandle {
    * Indicator origin level: `'character'` for a single-`;` indicator part, or
    * `null` for a non-indicator or non-part handle. A word-level overlay (`;;`)
    * has no raw node, so a part handle can never reference one — it reads as
-   * `'word'` on `snapshot()` instead.
+   * `'word'` on the resolved `snapshot()` tree instead (see
+   * `ElementSnapshot.indicatorLevel`).
    */
-  readonly indicatorLevel: 'character' | 'word' | null;
+  readonly indicatorLevel: 'character' | null;
 
   /**
    * Indicator kind: `'semantic'` when the definition carries a semantic
@@ -449,7 +450,7 @@ export declare class ElementHandle {
    * nothing.
    * @throws {TypeError} If `code` is provided, is not a string, and is not `null`.
    */
-  applyIndicators(code?: string, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
+  applyIndicators(code?: string | null, opts?: { stripSemantic?: boolean; flatten?: boolean }): this;
 
   /**
    * The PURE UNDO: removes indicators, always preserving an existing semantic
@@ -627,22 +628,14 @@ export interface DefinitionMetadata {
  * code when this object is passed back to the constructor. `{ deep: true }`
  * retains that metadata plus nested sub-parts for `toString()`/`merge()`; those
  * extra fields are not part of this type.
+ *
+ * A word the parser rejects outright (a malformed `;;` word indicator) is
+ * dropped from `groups` entirely; its parse warning is the only trace.
  */
 export interface BlissJSON {
-  options?: Record<string, string>;
+  options?: Record<string, string | boolean>;
   groups: Array<{
     options?: Record<string, string | boolean>;
-    /**
-     * Word-level fail-render flag: set when the parser rejects the whole word
-     * (e.g. a malformed `;;` indicator that is not the trailing part of the
-     * word). The word renders as a single error placeholder (`error-placeholder`
-     * on) or nothing (off) and emits one `MALFORMED_WORD_INDICATOR` warning.
-     * `errorSource` is the original offending string, re-emitted verbatim by
-     * `toString()` so the malformation round-trips.
-     */
-    errorCode?: WarningCode;
-    error?: string;
-    errorSource?: string;
     /**
      * Word-level indicator overlay (the DSL `;;` form): stored on the word and
      * resolved onto the head glyph at render. Present in default output (kept
@@ -662,6 +655,13 @@ export interface BlissJSON {
         width?: number;
         x?: number;
         y?: number;
+        /**
+         * Fail metadata retained when a known composition sits in a `;`-part
+         * slot (`COMPOSITE_AS_PART` / `WORD_AS_PART`): the part is kept and
+         * warned, and both fields round-trip through the constructor.
+         */
+        error?: string;
+        errorCode?: WarningCode;
         parts?: Array<any>;
       }>;
     }>;
