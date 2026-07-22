@@ -33,6 +33,14 @@ const glyphEmitsOptionsToken = (glyph) =>
   Object.entries(glyph.options ?? {}).some(([k, v]) =>
     v !== false && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
 
+// The anchor-attribute family, mirroring the two anchorAttrNames sets inside
+// BlissElement (keep all three in sync: a name added there but not here would
+// leak onto the content <g>). At global scope these travel through the level-0 <a> wrap
+// (with its href safety allowlist), so they must never double-emit as plain
+// content-<g> attributes: href is not a valid <g> attribute, and an
+// allowlist-rejected href would resurface verbatim.
+const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
+
 // Resolves which glyph carries a word-level (`;;`) overlay. A stored
 // designation wins; the fallback resolves among content-bearing glyphs only,
 // because serialization omits a bare empty-parts glyph, so a reparse of
@@ -3400,8 +3408,11 @@ class BlissSVGBuilder {
       const zoneX = round(viewBoxX);
       const zoneWidth = round(viewBoxWidth);
       const topY = round(viewBoxY);
-      const topHeight = round(8 - viewBoxY);
-      const bottomHeight = round(viewBoxY + viewBoxHeight - 16);
+      // Zone heights floor at 0 like the outer viewBox dimensions above: an
+      // ordinary vertical crop can push the viewBox past the sky (y=8) or
+      // earth (y=16) boundary, and a negative height is invalid SVG on <rect>.
+      const topHeight = round(Math.max(0, 8 - viewBoxY));
+      const bottomHeight = round(Math.max(0, viewBoxY + viewBoxHeight - 16));
 
       const zoneRects = [
         topColor ? `    <rect class="bliss-background--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
@@ -3498,6 +3509,8 @@ class BlissSVGBuilder {
     const userClass = contentAttrs['class'];
     delete contentAttrs['class'];
     const contentClass = userClass ? `bliss-content ${userClass}` : 'bliss-content';
+    // Link attributes belong to the level-0 anchor wrap, never the content <g>.
+    for (const name of ANCHOR_ATTRIBUTE_NAMES) delete contentAttrs[name];
     // vector-effect is non-inherited; relocate it from the content group onto
     // the glyph paths so it actually takes effect. Always remove it from the
     // group (even an empty value, which would otherwise be a dead attribute on

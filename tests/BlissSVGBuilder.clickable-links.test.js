@@ -42,6 +42,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   level does not throw and renders the path content directly.
  *
  * Does NOT cover:
+ * - Global-scope link attributes staying off the content wrapper
+ *   `<g class="bliss-content">`, see
+ *   `BlissSVGBuilder.global-link-attributes.test.js`.
  * - The four-level hierarchical option cascade for non-href options (color,
  *   stroke-width, fill), see `BlissSVGBuilder.hierarchical-options.test.js`.
  * - Stroke/color cascade behavior outside the anchor-wrapped scope, see

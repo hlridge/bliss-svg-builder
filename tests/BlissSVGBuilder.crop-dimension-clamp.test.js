@@ -19,6 +19,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The svg-height aspect-ratio branch: a zero-width viewBox yields svg
  *   width 0, and a fully-collapsed box (both viewBox dims 0) does not divide
  *   by zero into NaN.
+ * - Background-zone rects under vertical crops: a crop past the sky (y=8) or
+ *   earth (y=16) boundary clamps the top/bottom zone height to 0 instead of
+ *   negative; in-bounds and uncropped zone heights are untouched.
  *
  * Does NOT cover:
  * - Normal in-bounds crop math (per-side, auto, compact, margin interaction),
@@ -36,6 +39,12 @@ function render(input, opts) {
   const height = Number(svg.match(/\bheight="([^"]+)"/)[1]);
   return { vb, width, height, svg };
 }
+
+// Extract the height attribute of one background-zone rect (top/mid/bottom).
+const zoneHeight = (svg, zone) =>
+  svg.match(new RegExp(`<rect class="bliss-background--${zone}"[^>]*height="([^"]+)"`))[1];
+
+const ZONES = { 'background-top': 'red', 'background-mid': 'green', 'background-bottom': 'blue' };
 
 describe('BlissSVGBuilder crop dimension clamp', () => {
   describe('when an all-empty document is cropped', () => {
@@ -117,6 +126,44 @@ describe('BlissSVGBuilder crop dimension clamp', () => {
       // regression: a crop within the content is unaffected by the clamp
       const { vb } = render('B291', { crop: 2 });
       expect(vb[2]).toBe(5.5); // 9.5 - 2 - 2
+    });
+  });
+
+  describe('when background zones combine with vertical crops', () => {
+    it('clamps the bottom zone height to 0 instead of negative under crop-bottom:6', () => {
+      // the sweep repro (report A12), DSL form: viewBox bottom lands at 14.75,
+      // above the earth line (16), so the raw bottom-zone height is -1.25
+      const svg = new BlissSVGBuilder('[background-top=red;background-mid=green;background-bottom=blue;crop-bottom=6]||B313').svgCode;
+      // pins the zone-height floor; unclamped this emits height="-1.25" (invalid SVG)
+      expect(svg).toContain('<rect class="bliss-background--bottom" x="-0.75" y="16" width="9.5" height="0" stroke="none" fill="blue"/>');
+      expect(svg).not.toContain('height="-');
+    });
+
+    it('clamps the top zone height to 0 instead of negative under crop-top:10', () => {
+      const { svg } = render('B313', { ...ZONES, 'crop-top': 10 });
+      expect(zoneHeight(svg, 'top')).toBe('0');
+      expect(zoneHeight(svg, 'bottom')).toBe('4.75');
+    });
+
+    it('clamps only the negative zone when crop-top:5 and crop-bottom:5 combine', () => {
+      const { svg } = render('B313', { ...ZONES, 'crop-top': 5, 'crop-bottom': 5 });
+      expect(zoneHeight(svg, 'top')).toBe('3.75');
+      expect(zoneHeight(svg, 'mid')).toBe('8');
+      expect(zoneHeight(svg, 'bottom')).toBe('0');
+    });
+
+    it('leaves in-bounds zone heights untouched under crop-top:2', () => {
+      // regression: a crop that stays above the sky boundary must not be clamped
+      const { svg } = render('B313', { ...ZONES, 'crop-top': 2 });
+      expect(zoneHeight(svg, 'top')).toBe('6.75');
+      expect(zoneHeight(svg, 'bottom')).toBe('4.75');
+    });
+
+    it('keeps the uncropped zone heights', () => {
+      const { svg } = render('B313', ZONES);
+      expect(zoneHeight(svg, 'top')).toBe('8.75');
+      expect(zoneHeight(svg, 'mid')).toBe('8');
+      expect(zoneHeight(svg, 'bottom')).toBe('4.75');
     });
   });
 
