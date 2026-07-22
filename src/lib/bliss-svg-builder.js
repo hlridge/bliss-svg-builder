@@ -1171,7 +1171,7 @@ class BlissSVGBuilder {
   group(index) {
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
-    if (index < 0 || index >= indices.length) return null;
+    if (!Number.isInteger(index) || index < 0 || index >= indices.length) return null;
     const rawGroup = this.#rawBlissObj.groups[indices[index]];
     return new ElementHandle(this.#mutationCtx, 1, rawGroup);
   }
@@ -1184,7 +1184,7 @@ class BlissSVGBuilder {
   element(index) {
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
-    if (index < 0 || index >= groups.length) return null;
+    if (!Number.isInteger(index) || index < 0 || index >= groups.length) return null;
     return new ElementHandle(this.#mutationCtx, 1, groups[index]);
   }
 
@@ -1210,7 +1210,7 @@ class BlissSVGBuilder {
       }
       flatIndex = total + flatIndex;
     }
-    if (flatIndex < 0) return null;
+    if (!Number.isInteger(flatIndex) || flatIndex < 0) return null;
     let count = 0;
     for (const gi of indices) {
       const group = this.#rawBlissObj.groups[gi];
@@ -1239,7 +1239,7 @@ class BlissSVGBuilder {
       }
       flatIndex = total + flatIndex;
     }
-    if (flatIndex < 0) return null;
+    if (!Number.isInteger(flatIndex) || flatIndex < 0) return null;
     let count = 0;
     for (const gi of indices) {
       const group = this.#rawBlissObj.groups[gi];
@@ -1289,6 +1289,7 @@ class BlissSVGBuilder {
   insertGroup(index, code, opts) {
     assertCodeArg('insertGroup', code);
     assertOptsArg('insertGroup', opts);
+    if (!Number.isInteger(index)) return this;
     const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     const indices = this.#getNonSpaceGroupIndices();
@@ -1381,7 +1382,7 @@ class BlissSVGBuilder {
   removeGroup(index) {
     const indices = this.#getNonSpaceGroupIndices();
     if (index < 0) index = indices.length + index;
-    if (index < 0 || index >= indices.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= indices.length) return this;
     const rawIndex = indices[index];
     this.#removeGlyphGroup(this.#rawBlissObj, rawIndex);
     this.#rebuild();
@@ -1471,7 +1472,7 @@ class BlissSVGBuilder {
     if (indices.length < 2) {
       throw new Error('splitAt() requires at least 2 groups');
     }
-    if (groupIndex <= 0 || groupIndex >= indices.length) {
+    if (!Number.isInteger(groupIndex) || groupIndex <= 0 || groupIndex >= indices.length) {
       throw new Error(
         `splitAt(${groupIndex}) is out of range: must be between 1 and ${indices.length - 1} (inclusive) for a builder with ${indices.length} groups`
       );
@@ -1595,6 +1596,7 @@ class BlissSVGBuilder {
   insertElement(index, code, opts) {
     assertCodeArg('insertElement', code);
     assertOptsArg('insertElement', opts);
+    if (!Number.isInteger(index)) return this;
     const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
@@ -1616,7 +1618,7 @@ class BlissSVGBuilder {
   removeElement(index) {
     const groups = this.#rawBlissObj.groups;
     if (index < 0) index = groups.length + index;
-    if (index < 0 || index >= groups.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= groups.length) return this;
     groups.splice(index, 1);
     this.#rebuild();
     return this;

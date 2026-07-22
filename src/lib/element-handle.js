@@ -479,7 +479,7 @@ export class ElementHandle {
     const group = this.#nodeRef;
     if (!group?.glyphs?.length) return null;
     if (index < 0) index = group.glyphs.length + index;
-    if (index < 0 || index >= group.glyphs.length) return null;
+    if (!Number.isInteger(index) || index < 0 || index >= group.glyphs.length) return null;
     return new ElementHandle(this.#ctx, 2, group.glyphs[index], group);
   }
 
@@ -489,7 +489,7 @@ export class ElementHandle {
       const glyph = this.#nodeRef;
       if (!glyph?.parts?.length) return null;
       if (index < 0) index = glyph.parts.length + index;
-      if (index < 0 || index >= glyph.parts.length) return null;
+      if (!Number.isInteger(index) || index < 0 || index >= glyph.parts.length) return null;
       return new ElementHandle(this.#ctx, 3, glyph.parts[index], {
         group: this.#parentRef,
         glyph
@@ -499,7 +499,7 @@ export class ElementHandle {
       const part = this.#nodeRef;
       if (!part?.parts?.length) return null;
       if (index < 0) index = part.parts.length + index;
-      if (index < 0 || index >= part.parts.length) return null;
+      if (!Number.isInteger(index) || index < 0 || index >= part.parts.length) return null;
       return new ElementHandle(this.#ctx, 3, part.parts[index], this.#parentRef);
     }
     return null;
@@ -547,6 +547,7 @@ export class ElementHandle {
     if (group.errorCode) return this;
     assertCodeArg('insertGlyph', code);
     assertOptsArg('insertGlyph', opts);
+    if (!Number.isInteger(index)) return this;
     const newGlyph = this.#parseGlyphArg(code);
     this.#applyDefaultsOverrides(newGlyph, opts);
     if (!group.glyphs) group.glyphs = [];
@@ -636,6 +637,7 @@ export class ElementHandle {
     if (this.#inFailFlaggedGroup()) return this;
     assertCodeArg('insertPart', code);
     assertOptsArg('insertPart', opts);
+    if (!Number.isInteger(index)) return this;
     const newPart = this.#parsePartArg(code);
     this.#applyDefaultsOverrides(newPart, opts);
     if (!glyph.parts) glyph.parts = [];
@@ -760,7 +762,7 @@ export class ElementHandle {
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (group.errorCode) return this;
     if (index < 0) index = group.glyphs.length + index;
-    if (index < 0 || index >= group.glyphs.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= group.glyphs.length) return this;
     group.glyphs.splice(index, 1);
     if (group.glyphs.length === 0) {
       const raw = this.#ctx.getRaw();
@@ -782,7 +784,7 @@ export class ElementHandle {
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (this.#inFailFlaggedGroup()) return this;
     if (index < 0) index = glyph.parts.length + index;
-    if (index < 0 || index >= glyph.parts.length) return this;
+    if (!Number.isInteger(index) || index < 0 || index >= glyph.parts.length) return this;
     glyph.parts.splice(index, 1);
     if (glyph.parts.length === 0) {
       this.#removeGlyphFromGroup(
@@ -1310,7 +1312,7 @@ export class ElementHandle {
     // boundary and render as valid. No-op; only replaceGroup recovers it.
     if (group.errorCode) return this;
     const len = group.glyphs.length;
-    if (glyphIndex <= 0 || glyphIndex >= len) {
+    if (!Number.isInteger(glyphIndex) || glyphIndex <= 0 || glyphIndex >= len) {
       throw new Error(`splitAt(${glyphIndex}) is out of range: must be between 1 and ${len - 1} (inclusive) for a group with ${len} glyphs`);
     }
 
