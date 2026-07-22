@@ -313,6 +313,40 @@ describe('BlissSVGBuilder JSON output', () => {
       expect(glyph.codeName).toBe('Xa');
     });
 
+    it('drops glyph shrinksPrecedingWordSpace for punctuation glyphs', () => {
+      // regression: 2026-07-22 chunk-3 review M1: B1-B7 glyphs leaked the flag
+      // into default output; it is definition-derived and re-derived on
+      // reconstruction like the rest of the metadata in this describe.
+      const orig = new BlissSVGBuilder('B291//B5');
+      const glyph = orig.toJSON().groups.at(-1).glyphs[0];
+
+      expect(glyph.codeName).toBe('B5');
+      expect(glyph.shrinksPrecedingWordSpace).toBeUndefined();
+      expect(new BlissSVGBuilder(orig.toJSON()).svgCode).toBe(orig.svgCode);
+    });
+
+    it('drops glyph-level isIndicator for a standalone custom compound indicator', () => {
+      BlissSVGBuilder.define({ COMPIND: { type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0' } });
+      customCodes.push('COMPIND');
+      const orig = new BlissSVGBuilder('COMPIND');
+      const glyph = orig.toJSON().groups[0].glyphs[0];
+
+      expect(glyph.isIndicator).toBeUndefined();
+      // part-level isIndicator/width are the documented deliberate keeps
+      expect(glyph.parts.every(p => p.isIndicator === true)).toBe(true);
+      expect(new BlissSVGBuilder(orig.toJSON()).svgCode).toBe(orig.svgCode);
+    });
+
+    it('retains shrinksPrecedingWordSpace and glyph isIndicator under deep mode', () => {
+      BlissSVGBuilder.define({ COMPIND2: { type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0' } });
+      customCodes.push('COMPIND2');
+      const punct = new BlissSVGBuilder('B291//B5').toJSON({ deep: true }).groups.at(-1).glyphs[0];
+      const compound = new BlissSVGBuilder('COMPIND2').toJSON({ deep: true }).groups[0].glyphs[0];
+
+      expect(punct.shrinksPrecedingWordSpace).toBe(true);
+      expect(compound.isIndicator).toBe(true);
+    });
+
     it('drops anchorOffsetX and anchorOffsetY from parts', () => {
       // B109 carries a nonzero anchorOffsetX in its definition
       const part = new BlissSVGBuilder('B109;B99').toJSON().groups[0].glyphs[0].parts[0];

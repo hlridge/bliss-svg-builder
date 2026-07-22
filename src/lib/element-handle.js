@@ -183,7 +183,7 @@ export class ElementHandle {
    * `snapshot()`. Reading the node also avoids the snapshot's positional
    * lookup, which an overlay-merged head reorders and which cannot resolve a
    * nested sub-part (so this never throws and always describes THIS node).
-   * @returns {'character'|'word'|null}
+   * @returns {'character'|null}
    */
   get indicatorLevel() {
     this.#assertReachable();

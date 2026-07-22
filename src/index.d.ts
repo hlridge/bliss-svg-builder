@@ -622,8 +622,9 @@ export interface DefinitionMetadata {
 /**
  * Normalized parsed structure returned by `toJSON()`. Describes the default
  * (authoring) shape: the composition the user wrote, plus `isIndicator`/`width`
- * on indicator parts. Definition-derived metadata
- * (`isBlissGlyph`/`isExternalGlyph`/`char`/`kerningRules` and part
+ * on indicator parts. Definition-derived metadata (glyph
+ * `isBlissGlyph`/`isExternalGlyph`/`char`/`kerningRules`/
+ * `shrinksPrecedingWordSpace` and the glyph-level `isIndicator` flag, plus part
  * `anchorOffsetX`/`anchorOffsetY`) is omitted — it is fully re-derived from the
  * code when this object is passed back to the constructor. `{ deep: true }`
  * retains that metadata plus nested sub-parts for `toString()`/`merge()`; those

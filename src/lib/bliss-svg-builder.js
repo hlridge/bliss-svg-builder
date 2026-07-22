@@ -2323,6 +2323,8 @@ class BlissSVGBuilder {
               delete glyph.isBlissGlyph;
               delete glyph.isExternalGlyph;
               delete glyph.kerningRules;
+              delete glyph.shrinksPrecedingWordSpace;
+              delete glyph.isIndicator;
             }
           }
         }
