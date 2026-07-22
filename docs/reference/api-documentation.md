@@ -114,15 +114,15 @@ Returns a normalized plain object representing the parsed composition. Aliases a
 const builder = new BlissSVGBuilder('B313/B1103//B431;B81');
 const obj = builder.toJSON();
 // {
+//   options: {},
 //   groups: [
 //     { glyphs: [
-//       { codeName: 'B313', parts: [{ codeName: 'B313' }], ... },
-//       { codeName: 'B1103', parts: [{ codeName: 'B335' }, { codeName: 'B412', x: 4, y: 0 }], ... }
+//       { parts: [{ codeName: 'B313' }], codeName: 'B313' },
+//       { parts: [{ codeName: 'B1103' }], codeName: 'B1103' }
 //     ]},
 //     { glyphs: [{ parts: [{ codeName: 'TSP' }] }] },
 //     { glyphs: [{ parts: [{ codeName: 'B431' }, { codeName: 'B81', isIndicator: true, width: 2 }] }] }
-//   ],
-//   options: {}
+//   ]
 // }
 ```
 

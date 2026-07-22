@@ -71,16 +71,18 @@ new BlissSVGBuilder('B2661').toString();
 // 'B1103;B81' (anyone can read this)
 
 new BlissSVGBuilder('B2661').toJSON();
-// groups[0].glyphs[0].code → 'B1103' (built-in codes, no custom names)
+// groups[0].glyphs[0].parts →
+//   [{ codeName: 'B1103' }, { codeName: 'B81', isIndicator: true, width: 2 }]
+// (built-in codes, no custom names)
 ```
 
 The receiver doesn't need your definitions. The output is self-contained.
 
-If you're serializing for your own use (where the custom codes are defined), you can keep the names with `{ preserve: true }`:
+If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. That works for codes whose identity survives parsing, like the typed characters and shapes introduced below. A multi-code alias like `B2661` dissolves into its expansion at parse time, so there is no name left to preserve:
 
 ```js
 new BlissSVGBuilder('B2661').toString({ preserve: true });
-// 'B2661'
+// 'B1103;B81' (the alias dissolved at parse)
 ```
 
 As a rule of thumb: the default is for output that leaves your app, `preserve` is for output that stays where your definitions live. Custom indicators and shapes have a few extra wrinkles worth knowing; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes) below.
@@ -111,6 +113,11 @@ builder.glyph(1).codeName;  // 'SMILEY'
 // On export: decomposed to built-in codes
 builder.toString();
 // 'B313/C8:0,8;DOT:2,11;DOT:6,11;HC4S:4,14'
+
+// Unlike an alias, a glyph still exists as a unit after parsing,
+// so preserve can keep its name
+builder.toString({ preserve: true });
+// 'B313/SMILEY'
 ```
 
 ### When to Use Which
