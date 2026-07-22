@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions, builtInCodes } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import {
   resolveHeadIndex
@@ -1092,6 +1092,7 @@ export class BlissParser {
                   ...(expandedSubPart._designation && { _designation: true }),
                   ...(expandedSubPart._frag !== undefined && { _frag: expandedSubPart._frag }),
                   ...(expandedSubPart._scanCode !== undefined && { _scanCode: expandedSubPart._scanCode }),
+                  ...(expandedSubPart._aliasCodeName !== undefined && { _aliasCodeName: expandedSubPart._aliasCodeName }),
                   ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions })
                 };
               });
@@ -1141,6 +1142,27 @@ export class BlissParser {
                 });
               } else {
                 expandedParts[0].part = optionsPrefix + expandedParts[0].part;
+              }
+            }
+
+            // A pure single-code rename (a bare alias whose chain bottoms out
+            // at a definition with identity: a glyph, an indicator, a shape,
+            // an external glyph, or a getPath primitive) dissolves its written
+            // name into this expansion, which `preserve` could then never
+            // restore. Record it in the Phase 2.3b side channel, extended to
+            // character level here. The outermost written name wins (this
+            // overwrites an inner frame's recording); a chain ending on a bare
+            // alias (multi-code shorthand or an unresolved forward ref)
+            // records nothing, so shorthand keeps serializing expanded. The
+            // length guard keeps the recording off multi-glyph expansions,
+            // where it would mislabel the first glyph.
+            if (expandedParts.length === 1 && baseIsBareAlias) {
+              const effective = resolveEffectiveDefinition(definition, definitions);
+              if (effective && (effective.isIndicator === true
+                  || effective.isBlissGlyph || effective.isShape
+                  || effective.isExternalGlyph || effective.glyphCode
+                  || typeof effective.getPath === 'function')) {
+                expandedParts[0]._aliasCodeName = potentialBaseCode;
               }
             }
 
@@ -1234,7 +1256,7 @@ export class BlissParser {
       let pendingRelativeKerning;
       let pendingAbsoluteKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
         // Lift a word-level fail-render flag onto its enclosing group (mirrors
         // the _wordIndicators lift below). A malformed `;;` makes the whole word
         // invalid; the element reads group.errorCode and collapses it to one
@@ -1434,6 +1456,18 @@ export class BlissParser {
         };
 
         glyphObj.parts = parseParts(glyphCodeString);
+
+        // Land a character-level rename recording on the parsed sole part,
+        // where the Phase 2.3b preserve-restore already operates. A
+        // multi-part expansion has no single carrier (the shorthand
+        // dissolves); a custom typed glyph keeps its own glyphCode identity
+        // (the typed name governs serialization); a space stays canonical
+        // (spaces take no custom identity).
+        if (_aliasCodeName && glyphObj.parts.length === 1
+            && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode))
+            && !isSpaceGlyph(glyphObj.parts[0].codeName)) {
+          glyphObj.parts[0]._aliasCodeName = _aliasCodeName;
+        }
 
         this.#extractPositionFromOptions(glyphObj);
         group.glyphs.push(glyphObj);

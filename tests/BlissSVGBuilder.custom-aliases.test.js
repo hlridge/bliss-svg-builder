@@ -24,6 +24,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - `define()` API mechanics (overwrite option, removeDefinition), see
  *   `BlissSVGBuilder.define.test.js` and
  *   `BlissSVGBuilder.definition-maintenance.test.js`.
+ * - Preserve-mode name restoration for character-level aliases (default
+ *   output stays decomposed as pinned here), see
+ *   `BlissSVGBuilder.char-alias-preserve.test.js`.
  */
 
 const customCodes = [];

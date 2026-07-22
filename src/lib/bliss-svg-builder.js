@@ -1908,9 +1908,11 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Returns a portable DSL string. Typeless aliases (word-level codes) are
-   * always expanded. Custom glyphs and shapes are decomposed to built-in
-   * codes by default; pass { preserve: true } to keep their names.
+   * Returns a portable DSL string. Custom codes are decomposed to built-in
+   * codes by default. `preserve` keeps a custom name that stands for a
+   * single glyph, indicator, or shape: every typed definition (whatever its
+   * anatomy) and every bare alias renaming one existing code; multi-code
+   * shorthand always serializes expanded.
    *
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
@@ -1939,7 +1941,7 @@ class BlissSVGBuilder {
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
     function serializeParts(parts, offsetX = 0, offsetY = 0) {
-      return parts.map(part => {
+      return parts.map((part, partIndex) => {
         // An invalid part (no codeName, e.g. the `!B81` in `B291;[x=2]>!B81`)
         // must not let a coordinate suffix or `[opts]>` prefix decorate it into
         // a truthy literal-`undefined` string; drop it before decoration. It
@@ -1947,6 +1949,13 @@ class BlissSVGBuilder {
         if (!part.codeName) return '';
         const x = (part.x ?? 0) + offsetX;
         const y = (part.y ?? 0) + offsetY;
+        // Under preserve a BASE-slot custom name with `;`-siblings still
+        // decomposes when the name is a bare alias: a bare-alias base drops
+        // its appended parts on reparse (strict separation), so emitting the
+        // name would silently shed the siblings. A typed custom base keeps
+        // its name (a typed base dumb-appends on reparse).
+        const isBareAliasBase = options.preserve && partIndex === 0 && parts.length > 1
+          && BlissSVGBuilder.#isBareAliasDefinition(blissElementDefinitions[part.codeName]);
         // A failed part (COMPOSITE_AS_PART keeps its expanded `.parts`) must
         // re-emit by its written name, never decomposed: decomposing a
         // composite alias (`_X` -> `B291;B81`) changes what the warned string
@@ -1954,7 +1963,8 @@ class BlissSVGBuilder {
         // failure becomes a different valid character). preserve already keeps
         // the name; this makes default agree. (Row 80.) WORD_AS_PART has no
         // `.parts`, so it already round-tripped; the guard just unifies them.
-        if (!options.preserve && !builtInCodes.has(part.codeName) && !part.errorCode) {
+        if ((!options.preserve || isBareAliasBase)
+            && !builtInCodes.has(part.codeName) && !part.errorCode) {
           // Custom code with nested parts (e.g., positioned custom glyph)
           if (part.parts) {
             // A part-level option on the custom base must survive decomposition,
@@ -2200,11 +2210,10 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Returns the normalized parsed structure. Typeless aliases (word-level
-   * codes) are always expanded. Custom glyphs are decomposed by default:
-   * simple aliases resolve to their built-in code, complex compositions
-   * drop the custom code (parts are already expanded).
-   * Pass { preserve: true } to keep all custom names.
+   * Returns the normalized parsed structure. Custom codes are decomposed to
+   * built-in codes by default; { preserve: true } keeps custom names under
+   * the same rule as toString() (typed definitions and bare aliases to one
+   * existing code; multi-code shorthand always expands).
    *
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
@@ -2229,17 +2238,26 @@ class BlissSVGBuilder {
       // (internal expansion detail). The constructor re-expands from codeName
       // via BlissParser.expandParts().
       const stripParts = (parts) => {
-        for (const part of parts) {
+        for (const [partIndex, part] of parts.entries()) {
           delete part.key;
           // Internal origin tag from the word-indicator merge (flatten path):
           // not composition data, never surfaced in serialized output.
           delete part._indicatorOrigin;
           // Single-code rename resolution records the user-written name
-          // (Phase 2.3b): preserve restores it, so `B291;MYIND` keeps MYIND
-          // instead of leaking the resolved primitive. Deep output keeps the
+          // (Phase 2.3b; extended to character level in Chunk 6): preserve
+          // restores it, so `B291;MYIND` keeps MYIND and a standalone alias
+          // keeps its name instead of leaking the resolved target. A BASE
+          // slot with `;`-siblings restores only a name that survives
+          // reparse: a `;`-part on a bare-alias base drops (strict
+          // separation), so a bare-alias name stays decomposed there, while
+          // a typed name dumb-appends and round-trips. Deep output keeps the
           // field for the toString()/merge() pipelines; public output drops it.
           if (options.preserve && part._aliasCodeName) {
-            part.codeName = part._aliasCodeName;
+            const namedDef = blissElementDefinitions[part._aliasCodeName];
+            if (partIndex > 0 || parts.length === 1
+                || (namedDef && !BlissSVGBuilder.#isBareAliasDefinition(namedDef))) {
+              part.codeName = part._aliasCodeName;
+            }
           }
           if (!options.deep) delete part._aliasCodeName;
           if (part.options) delete part.options.key;
@@ -2515,6 +2533,14 @@ class BlissSVGBuilder {
     if (def.isBlissGlyph || def.glyphCode) return 'glyph';
     if (def.codeString !== undefined) return 'bare';
     return 'space';
+  }
+
+  // The bare-alias discriminator for the preserve-mode base-slot guards: a
+  // name whose definition is a pure rename ({codeString} only, no identity)
+  // sheds its `;`-siblings on reparse (strict separation), so such a name
+  // never heads a multi-part emission; typed names dumb-append and round-trip.
+  static #isBareAliasDefinition(def) {
+    return !!def && BlissSVGBuilder.#detectType(def) === 'bare';
   }
 
   // Check if a codeString references only allowed types

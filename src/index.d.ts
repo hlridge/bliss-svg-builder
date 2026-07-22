@@ -102,8 +102,8 @@ export interface ElementSnapshot {
    * X-codes (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases
    * (`'LOVE'`); `''` for composites, bare shape primitives, and
    * multi-character text fallback. Always `''` at group level. Note: this is
-   * the live identity. `toString()` and `toJSON()` decompose alias names by
-   * default; pass `{ preserve: true }` to keep them in serialized output.
+   * the live identity; what serialized output emits for a custom name is
+   * governed by `toString()`/`toJSON()` and their `preserve` option.
    */
   readonly codeName: string;
   /**
@@ -189,8 +189,8 @@ export declare class ElementHandle {
    * X-codes (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases
    * (`'LOVE'`); `''` for composites, bare shape primitives, and
    * multi-character text fallback. Always `''` at group level. Note: this is
-   * the live identity. `toString()` and `toJSON()` decompose alias names by
-   * default; pass `{ preserve: true }` to keep them in serialized output.
+   * the live identity; what serialized output emits for a custom name is
+   * governed by `toString()`/`toJSON()` and their `preserve` option.
    */
   readonly codeName: string;
 
@@ -941,7 +941,10 @@ export declare class BlissSVGBuilder {
 
   /**
    * Returns a portable DSL string. Custom codes are decomposed to built-in
-   * codes by default; pass `{ preserve: true }` to keep custom names.
+   * codes by default. `{ preserve: true }` keeps a custom name that stands
+   * for a single glyph, indicator, or shape: every `type`d definition
+   * (whatever its anatomy) and every bare alias renaming one existing code;
+   * multi-code shorthand always serializes expanded.
    *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the
@@ -952,8 +955,9 @@ export declare class BlissSVGBuilder {
   toString(options?: { preserve?: boolean; flattenIndicators?: boolean }): string;
 
   /**
-   * Returns a normalized parsed structure (plain object). Custom glyph codes
-   * are resolved to built-in codes by default; pass `{ preserve: true }` to keep them.
+   * Returns a normalized parsed structure (plain object). Custom codes are
+   * decomposed to built-in codes by default; `{ preserve: true }` keeps
+   * custom names under the same rule as `toString()`.
    *
    * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
    * omits the `wordIndicators` field (see `toString`).
