@@ -3033,13 +3033,24 @@ class BlissSVGBuilder {
     return result;
   }
 
+  // Registry membership is OWN-property membership: the definitions object
+  // inherits from Object.prototype, so a plain `in` or truthy lookup reports
+  // inherited names (toString, constructor, __proto__, ...) as defined codes
+  // and hands back JS built-ins as definitions. define()'s existence gate
+  // (#assertReplaceable) intentionally keeps its truthy check: it classifies
+  // inherited names as already-exists, which also blocks a JSON-delivered
+  // "__proto__" key from ever reaching the registry assignment.
+  static #ownsDefinition(code) {
+    return Object.prototype.hasOwnProperty.call(blissElementDefinitions, code);
+  }
+
   /**
    * Check if a code is defined.
    * @param {string} code
    * @returns {boolean}
    */
   static isDefined(code) {
-    return code in blissElementDefinitions;
+    return BlissSVGBuilder.#ownsDefinition(code);
   }
 
   /**
@@ -3049,8 +3060,8 @@ class BlissSVGBuilder {
    * @returns {Object|null} Frozen metadata object, or null if not found
    */
   static getDefinition(code) {
+    if (!BlissSVGBuilder.#ownsDefinition(code)) return null;
     const def = blissElementDefinitions[code];
-    if (!def) return null;
 
     const copy = {};
     for (const [key, value] of Object.entries(def)) {
@@ -3096,7 +3107,7 @@ class BlissSVGBuilder {
     if (protectedCodes.has(code)) {
       throw new Error(`removeDefinition("${code}"): cannot remove built-in definitions.`);
     }
-    if (!(code in blissElementDefinitions)) {
+    if (!BlissSVGBuilder.#ownsDefinition(code)) {
       return false;
     }
     delete blissElementDefinitions[code];
@@ -3114,7 +3125,7 @@ class BlissSVGBuilder {
    * @throws {Error} If code is not defined, is built-in, or changes are invalid
    */
   static patchDefinition(code, changes) {
-    if (!(code in blissElementDefinitions)) {
+    if (!BlissSVGBuilder.#ownsDefinition(code)) {
       throw new Error(`patchDefinition("${code}"): code is not defined.`);
     }
     if (protectedCodes.has(code)) {
