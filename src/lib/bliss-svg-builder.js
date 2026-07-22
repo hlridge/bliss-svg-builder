@@ -3048,8 +3048,11 @@ class BlissSVGBuilder {
   // inherited names (toString, constructor, __proto__, ...) as defined codes
   // and hands back JS built-ins as definitions. define()'s existence gate
   // (#assertReplaceable) intentionally keeps its truthy check: it classifies
-  // inherited names as already-exists, which also blocks a JSON-delivered
-  // "__proto__" key from ever reaching the registry assignment.
+  // inherited names as already-exists in the DEFAULT path. That accident does
+  // NOT hold under overwrite:true, where a non-literal "__proto__" key (e.g.
+  // JSON.parse output) still reaches the registry assignment and reassigns
+  // the registry's prototype through the inherited setter; the define-side
+  // name-policy backlog item tracks closing that vector.
   static #ownsDefinition(code) {
     return Object.prototype.hasOwnProperty.call(blissElementDefinitions, code);
   }

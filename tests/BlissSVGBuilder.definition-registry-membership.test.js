@@ -20,10 +20,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   check (over-rejection guard).
  *
  * Does NOT cover:
- * - define() on an inherited name: the existence gate classifies it as
- *   already-exists -> skipped[], which also blocks the '__proto__' assignment
- *   hazard; whether such names become definable is an open name-policy call
- *   (backlog), not pinned here.
+ * - define() on an inherited name: without overwrite, the existence gate
+ *   classifies it as already-exists -> skipped[]; with overwrite:true a
+ *   non-literal '__proto__' key (JSON.parse output) still reaches the
+ *   assignment and reassigns the registry prototype (deferred hazard, see
+ *   the it.todo tripwires below); the name-policy call (backlog) is not
+ *   pinned here.
  * - Parser-side inherited-name tokens: 'toString' as DSL or object input
  *   warns UNKNOWN_CODE and round-trips like any unknown code (verified in
  *   temp/probe-phase35b-a2.mjs); no dedicated pin here.
@@ -88,6 +90,12 @@ describe('BlissSVGBuilder definition registry membership', () => {
         delete Object.prototype.defaultOptions;
       }
     });
+  });
+
+  describe('when defining an inherited Object.prototype name (deferred name-policy)', () => {
+    // tripwires for the define-side name-policy backlog row; convert when it lands
+    it.todo(`define with overwrite:true and a JSON-delivered '__proto__' key must not reassign the registry prototype`);
+    it.todo(`a glyph or shape codeString referencing an inherited name follows forward-reference tolerance instead of erroring "cannot reference space"`);
   });
 
   describe('when a definition legitimately exists', () => {
