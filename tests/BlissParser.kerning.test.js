@@ -189,11 +189,21 @@ describe('BlissParser kerning', () => {
   });
 
   describe('when a glyph code happens to end with RK or AK', () => {
-    // pins the start-anchor (`^`) on the kerning regex; without it, any
-    // code ending with RK or AK would be consumed as a kerning instruction
-    // (value 0) and silently dropped
-    it.each(['B86RK', 'B86AK'])('treats %s as a code, not a trailing-matched kerning instruction', (codeEndingWithKerning) => {
+    // Pins the START-anchor (`^`) on the kerning regex. Without it the trailing
+    // RK/AK of an ordinary code matches as a kerning marker (a BARE one since
+    // the 3.5a bare-marker change, so it persists no value) and the WHOLE code
+    // is silently consumed and dropped. The distinguishing symptom is the drop,
+    // not the (always-undefined) kerning value: the code must survive as a real
+    // (here unknown) code that round-trips and warns UNKNOWN_CODE.
+    it.each(['B86RK', 'B86AK'])('keeps %s as a code, not a trailing-matched kerning marker', (codeEndingWithKerning) => {
+      const builder = new BlissSVGBuilder(`B291/${codeEndingWithKerning}`);
+      expect(builder.toString()).toBe(`B291/${codeEndingWithKerning}`);
+      expect(builder.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
+
+      // Inside a word a dropped code collapses the glyph count; pin that the
+      // middle glyph survives (3 glyphs, not 2) alongside the value check.
       const glyphs = probe(codeEndingWithKerning);
+      expect(glyphs).toHaveLength(3);
       expect(glyphs[glyphs.length - 1].relativeKerning).toBeUndefined();
       expect(glyphs[glyphs.length - 1].absoluteKerning).toBeUndefined();
     });
