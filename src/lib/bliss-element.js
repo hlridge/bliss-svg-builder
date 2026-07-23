@@ -566,11 +566,9 @@ export class BlissElement {
         return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
       };
 
-      if (this.#blissObj.errorCode && !this.#sharedOptions?.errorPlaceholder) {
-        // Invisible failed word takes zero space (mirrors the L2 character path).
-        this.#advanceX = 0;
-        this.getSvgContent = () => '';
-      }
+      // A fail-flagged group (group.errorCode) can no longer reach here: the
+      // builder's #normalizeFailedWordInvariant drops such groups before
+      // construction, so no L1 fail-render override is needed.
     } else {
       if (this.#level === 2) {
         // Character level
