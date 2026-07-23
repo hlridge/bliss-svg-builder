@@ -197,11 +197,14 @@ describe('BlissSVGBuilder alias indicator carry', () => {
       expect(viaChain.svgCode).toBe(direct.svgCode);
     });
 
-    it('inlines a digit-named alias reference at define time', () => {
+    it('resolves a digit-named alias reference at parse time', () => {
+      // store-as-written (2026-07-22): the reference stores verbatim; the
+      // ;; gate still resolves the digit-named chain at the use site
       BlissSVGBuilder.define({ [trackCode('9111')]: { codeString: 'B81' } });
       BlissSVGBuilder.define({ [trackCode('DIGAL2')]: { codeString: '9111' } });
-      expect(BlissSVGBuilder.getDefinition('DIGAL2').codeString).toBe('B81');
+      expect(BlissSVGBuilder.getDefinition('DIGAL2').codeString).toBe('9111');
       expect(new BlissSVGBuilder('B291;;DIGAL2').warnings).toEqual([]);
+      expect(new BlissSVGBuilder('B291;;DIGAL2').svgCode).toBe(new BlissSVGBuilder('B291;;B81').svgCode);
     });
   });
 

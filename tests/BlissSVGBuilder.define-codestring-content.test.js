@@ -201,12 +201,15 @@ describe('BlissSVGBuilder define codeString content', () => {
       expect(reparsed.svgCode).toBe(builder.svgCode);
     });
 
-    it('inlines a decorated reference to a custom bare target', () => {
+    it('stores a decorated reference to a custom bare target as written', () => {
+      // store-as-written (2026-07-22): the decorated reference keeps its
+      // token; the coordinate applies to the resolved target at parse time
       trackCode('DECTGT1');
       BlissSVGBuilder.define({ DECTGT1: { codeString: 'B291' } });
       const code = trackCode('DECREF2');
       BlissSVGBuilder.define({ [code]: { codeString: 'DECTGT1:1,2' } });
-      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('B291:1,2');
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('DECTGT1:1,2');
+      expect(new BlissSVGBuilder(code).svgCode).toBe(new BlissSVGBuilder('B291:1,2').svgCode);
     });
 
     it('rejects a decorated reference that resolves to a word, visibly', () => {

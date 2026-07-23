@@ -129,16 +129,16 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
       expect(b.toString({ preserve: true })).toBe('LOVE2');
     });
 
-    it('resolves component names inside a word alias at define time', () => {
+    it('keeps component names inside a word alias', () => {
       defineLove();
       defineAndTrack({ PAIR: { codeString: 'LOVE/B313' } });
       defineAndTrack({ MW: { codeString: 'LOVE//B313' } });
-      // define() flattens bare-alias tokens inside a codeString at
-      // registration (#resolveBareAliases), so the registered shorthand IS
-      // the explicit composition; only the written form keeps the name
+      // store-as-written (ratified 2026-07-22): definition content stores
+      // bare-alias references as written and resolves them at parse time, so
+      // the component name survives exactly as on the written path
       expect(new BlissSVGBuilder('PAIR').toString()).toBe('B431/B313');
-      expect(new BlissSVGBuilder('PAIR').toString({ preserve: true })).toBe('B431/B313');
-      expect(new BlissSVGBuilder('MW').toString({ preserve: true })).toBe('B431//B313');
+      expect(new BlissSVGBuilder('PAIR').toString({ preserve: true })).toBe('LOVE/B313');
+      expect(new BlissSVGBuilder('MW').toString({ preserve: true })).toBe('LOVE//B313');
       expect(new BlissSVGBuilder('LOVE/B313').toString({ preserve: true })).toBe('LOVE/B313');
     });
 
@@ -194,9 +194,9 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
     });
 
     it('keeps a surviving forward-referenced component name in a word alias', () => {
-      // a word codeString holding a then-unregistered token cannot flatten at
-      // define time, so the component alias survives to parse and its name
-      // rides the expansion (pins the map propagation of the recording)
+      // store-as-written: every component reference survives to parse, and a
+      // forward-referenced token resolves once its definition lands; the
+      // component's name rides the expansion (pins the map propagation)
       defineAndTrack({ WFUT: { codeString: 'FUT/B313' } });
       defineAndTrack({ FUT: { codeString: 'B431' } });
       const b = new BlissSVGBuilder('WFUT');

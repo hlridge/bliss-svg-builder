@@ -447,7 +447,9 @@ describe('BlissSVGBuilder definition maintenance', () => {
         .toThrow('getPath');
     });
 
-    it('resolves bare aliases when the patched codeString is itself a bare-defined code', () => {
+    it('stores a bare-alias reference as written when patched in', () => {
+      // store-as-written (2026-07-22): the patch keeps the reference
+      // verbatim; the alias resolves at parse time like a native code
       const alias = trackCode('PATCHALIAS_SRC');
       const code = trackCode('PATCHALIAS_TGT');
       BlissSVGBuilder.define({ [alias]: { codeString: 'B431' } });
@@ -455,7 +457,8 @@ describe('BlissSVGBuilder definition maintenance', () => {
       BlissSVGBuilder.patchDefinition(code, { codeString: alias });
 
       const def = BlissSVGBuilder.getDefinition(code);
-      expect(def.codeString).toBe('B431');
+      expect(def.codeString).toBe(alias);
+      expect(new BlissSVGBuilder(code).svgCode).toBe(new BlissSVGBuilder('B431').svgCode);
     });
   });
 

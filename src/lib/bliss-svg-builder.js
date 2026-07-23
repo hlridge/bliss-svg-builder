@@ -2869,9 +2869,13 @@ class BlissSVGBuilder {
     blissElementDefinitions[code] = entry;
   }
 
-  // Resolve chained bare aliases in a codeString.
+  // Resolution VIEW of a codeString, for validation only — never stored
+  // (store-as-written, ratified 2026-07-22: definition content keeps
+  // bare-alias references verbatim and the parser resolves them late).
   // Replaces bare alias tokens with their resolved codeString, repeating
-  // until no more aliases remain (up to depth 50).
+  // until no more aliases remain (up to depth 50), so a guard can judge
+  // what a reference chain would deliver (the word-internal-coordinate
+  // guard in #defineBare and patchDefinition).
   // Head-marker contract: marked invocations (ALIAS^) and aliases whose
   // codeString carries a ^ designation stay as references, so the parser
   // resolves the marker in its own word-string scope (rules 2 and 4).
@@ -2905,8 +2909,8 @@ class BlissSVGBuilder {
   /**
    * Part-merge operand check (reuses the runtime predicate via the parser):
    * true if the codeString uses a composed unflagged alias as a non-leading
-   * ;-part, which the parser flags COMPOSITE_AS_PART. Run on the RAW codeString,
-   * before bare-alias resolution would flatten it to the legal explicit form.
+   * ;-part, which the parser flags COMPOSITE_AS_PART. Run on the written
+   * codeString — the form that gets stored (store-as-written).
    * Parse failures (e.g. a circular reference) are not this check's concern.
    */
   static #hasCompositePartViolation(codeString) {
@@ -2954,24 +2958,30 @@ class BlissSVGBuilder {
 
     // Part-merge operand rule: a ; part must be a part (a primitive or a flagged
     // glyph/indicator), never a composition. Reject a codeString that uses a
-    // composed unflagged alias as a ;-part (checked on the raw codeString, before
-    // #resolveBareAliases flattens it to the legal explicit form), so define() is
-    // consistent with the use-site failure.
+    // composed unflagged alias as a ;-part (checked on the written codeString,
+    // which is also what gets stored), so define() is consistent with the
+    // use-site failure.
     if (BlissSVGBuilder.#hasCompositePartViolation(definition.codeString)) {
       throw new Error(`define("${code}"): a ; part cannot be a composition ("${definition.codeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
     }
 
     BlissSVGBuilder.#assertReplaceable(code, options);
 
-    const resolved = BlissSVGBuilder.#normalizeSpaceSegments(
-      BlissSVGBuilder.#resolveBareAliases(definition.codeString)
+    // Store-as-written (ratified 2026-07-22): bare-alias references in the
+    // codeString stay verbatim, so definition content is late-bound like a
+    // native code (a redefine of a referenced code flows through to every
+    // composition using it). Only /SP/ space segments normalize.
+    const stored = BlissSVGBuilder.#normalizeSpaceSegments(definition.codeString);
+
+    // Word definitions (containing /) must not have internal position
+    // modifiers, not even through a referenced alias: the guard judges the
+    // RESOLVED VIEW so a stored 'POSX/B313' cannot bake coordinates via
+    // POSX = 'B291:2,3'. Position belongs at the usage site, e.g. WORD:2,0.
+    BlissSVGBuilder.#assertNoWordInternalCoordinates(
+      'define', code, BlissSVGBuilder.#resolveBareAliases(stored)
     );
 
-    // Word definitions (containing /) must not have internal position modifiers.
-    // Position should be applied at the usage site, e.g. WORD:2,0
-    BlissSVGBuilder.#assertNoWordInternalCoordinates('define', code, resolved);
-
-    const entry = { codeString: resolved };
+    const entry = { codeString: stored };
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
       // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
@@ -3235,7 +3245,7 @@ class BlissSVGBuilder {
       }
       // Part-merge operand rule, mirroring #defineBare so both definition
       // surfaces agree: a bare codeString cannot use a composed unflagged alias
-      // as a ;-part (checked on the raw codeString, before bare-alias resolution).
+      // as a ;-part (checked on the written codeString, the form that gets stored).
       if (type === 'bare' && BlissSVGBuilder.#hasCompositePartViolation(newCodeString)) {
         throw new Error(`patchDefinition("${code}"): a ; part cannot be a composition ("${newCodeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
       }
@@ -3257,16 +3267,17 @@ class BlissSVGBuilder {
       }
     }
 
-    // For bare definitions, resolve chained aliases in codeString; SP
-    // segments normalize to word breaks and the word-internal-coordinate
-    // guard applies, mirroring #defineBare (patch cannot construct a state
-    // define() forbids).
+    // For bare definitions, store the codeString as written (bare-alias
+    // references stay verbatim and resolve at parse time); SP segments
+    // normalize to word breaks and the word-internal-coordinate guard
+    // judges the resolved view, mirroring #defineBare (patch cannot
+    // construct a state define() forbids).
     if ('codeString' in changes && type === 'bare') {
-      const resolved = BlissSVGBuilder.#normalizeSpaceSegments(
-        BlissSVGBuilder.#resolveBareAliases(changes.codeString)
+      const stored = BlissSVGBuilder.#normalizeSpaceSegments(changes.codeString);
+      BlissSVGBuilder.#assertNoWordInternalCoordinates(
+        'patchDefinition', code, BlissSVGBuilder.#resolveBareAliases(stored)
       );
-      BlissSVGBuilder.#assertNoWordInternalCoordinates('patchDefinition', code, resolved);
-      changes = { ...changes, codeString: resolved };
+      changes = { ...changes, codeString: stored };
     }
 
     // Deferred validation at the completing patch (Phase 2.3): a patch that

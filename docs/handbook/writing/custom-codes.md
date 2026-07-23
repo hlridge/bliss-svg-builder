@@ -51,7 +51,7 @@ BlissSVGBuilder.define({
 
 <Demo code="B335/B412" displayCode="MYWORD" title="MYWORD: B335 (forward) / B412 (knowledge)" />
 
-Aliases can also reference other aliases. All references are resolved during parsing:
+Aliases can also reference other aliases. A definition stores its `codeString` as you wrote it (an `/SP/` segment still normalizes to `//`), and all references are resolved during parsing, so redefining a referenced code (with `overwrite: true`) flows through to every definition that uses it:
 
 ```js
 BlissSVGBuilder.define({
