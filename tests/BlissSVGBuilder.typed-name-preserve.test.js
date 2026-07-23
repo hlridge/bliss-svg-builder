@@ -27,8 +27,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.custom-glyphs.test.js`.
  * - `;`-part-slot preserve channels, see
  *   `BlissSVGBuilder.custom-definition-serialization.test.js`.
- * - merge() losing a typed glyph's OWN name (pre-existing deep-default
- *   normalization gap, backlog row; aliases survive via the recording).
+ * - merge() identity survival for a typed glyph's OWN name (the deep-default
+ *   recording), see `BlissSVGBuilder.merge-name-preserve.test.js`.
  */
 
 const customCodes = [];
@@ -232,8 +232,9 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       const shape = new BlissSVGBuilder('MYSH2').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(shape.codeName).toBe('MYSH2');
       expect(shape.parts.map(p => p.codeName)).toEqual(['C8', 'C2']);
-      // review MAJOR-1: the toJSON consult must canonicalize part options the
-      // same way toString does, or the two preserve surfaces diverge
+      // pins the shared options canonicalizer: the toJSON consult must
+      // canonicalize part options the same way toString does, or the two
+      // preserve surfaces diverge (preserve-completeness review, 2026-07-23)
       defineAndTrack({ MYSHOP: { type: 'shape', codeString: '[color=red]>C8' } });
       const decorated = new BlissSVGBuilder('MYSHOP').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(decorated.codeName).toBe('MYSHOP');
@@ -304,6 +305,10 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       const target2 = new BlissSVGBuilder('B208');
       target2.merge(new BlissSVGBuilder('ALGL'));
       expect(target2.toString({ preserve: true })).toBe('B208//ALGL');
+      defineAndTrack({ AL2GL: { codeString: 'ALGL' } });
+      const target3 = new BlissSVGBuilder('B208');
+      target3.merge(new BlissSVGBuilder('AL2GL'));
+      expect(target3.toString({ preserve: true })).toBe('B208//AL2GL');
     });
   });
 

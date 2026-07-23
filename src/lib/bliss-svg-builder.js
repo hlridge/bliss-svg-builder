@@ -2357,6 +2357,14 @@ class BlissSVGBuilder {
                   // Resolve to the underlying built-in code (null for complex compositions)
                   const resolved = BlissSVGBuilder.#resolveToBuiltInCode(glyph.glyphCode);
                   if (resolved) glyph.codeName = resolved;
+                  // This resolution is the one place a typed glyph's identity
+                  // drops from deep output, which feeds re-ingest pipelines
+                  // (merge): record the written name so preserve can restore
+                  // a clean instance downstream. An existing recording (a
+                  // bare alias written OVER this glyph) outranks its own name.
+                  // The deep gate pairs with the `!options.deep` strip below;
+                  // either alone keeps public output clean, so keep both.
+                  if (options.deep) glyph._aliasCodeName ??= publicCode;
                 } else {
                   glyph.codeName = publicCode;
                 }
