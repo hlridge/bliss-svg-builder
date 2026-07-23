@@ -480,48 +480,24 @@ export class BlissElement {
         this.#blissObj = { glyphs: [this.#blissObj] };
       }
 
-      // Word/group-level fail-render: the L1 analogue of the L2 character
-      // placeholder. A group the parser flagged invalid (errorCode) -- e.g. a
-      // malformed word-level indicator, or an indicator bound to a multi-word
-      // alias -- records ONE warning for the whole word and collapses to a
-      // single error icon (error-placeholder on) or nothing (off), instead of
-      // expanding its glyphs. A malformed *word* property invalidates the word,
-      // not one character, so the failure lives at L1, not L2.
-      if (this.#blissObj.errorCode) {
-        if (!this.#sharedOptions?.warnings) {
-          throw new Error(`Unable to create Bliss element: ${this.#blissObj.error || this.#blissObj.errorCode}`);
-        }
-        this.#sharedOptions.warnings.push({
-          code: this.#blissObj.errorCode,
-          message: this.#blissObj.error,
-          source: this.#blissObj.errorSource,
-        });
-        if (this.#sharedOptions?.errorPlaceholder) {
-          // One placeholder character stands in for the whole failed word.
-          const placeholderChild = new BlissElement(
-            { parts: structuredClone(this.#sharedOptions.errorPlaceholderParts) },
-            { parentElement: this, level: this.#level + 1, sharedOptions: this.#sharedOptions }
-          );
-          this.#children.push(placeholderChild);
-        }
-        // error-placeholder off: leave #children empty (invisible word).
-      } else {
-        // Empty-parts glyphs are skipped in the sibling chain so surviving
-        // neighbors pair up for spacing and kerning exactly as they do when
-        // the serialized form (which omits empty glyphs) is reparsed.
-        let previousLayoutGlyph = null;
-        for (const glyph of this.#blissObj.glyphs) {
-          const child = new BlissElement(glyph, { parentElement: this, previousElement: previousLayoutGlyph, level: this.#level + 1, sharedOptions: this.#sharedOptions });
-          this.#children.push(child);
-          if (!child.#isEmptyGlyph) previousLayoutGlyph = child;
-        }
+      // A fail-flagged group (group.errorCode) can no longer appear here:
+      // the builder's #normalizeFailedWordInvariant drops such groups before
+      // construction, and BlissElement itself is not exported.
 
-        // Content-empty groups (zero glyphs, or only empty-parts glyphs)
-        // render nothing and contribute no document extent, mirroring
-        // #isEmptyGlyph one level up. Fail-flagged groups never reach this
-        // branch: the flag stays unset there, so fail-render keeps its extent.
-        this.#isEmptyGroup = this.#children.every(child => child.#isEmptyGlyph);
+      // Empty-parts glyphs are skipped in the sibling chain so surviving
+      // neighbors pair up for spacing and kerning exactly as they do when
+      // the serialized form (which omits empty glyphs) is reparsed.
+      let previousLayoutGlyph = null;
+      for (const glyph of this.#blissObj.glyphs) {
+        const child = new BlissElement(glyph, { parentElement: this, previousElement: previousLayoutGlyph, level: this.#level + 1, sharedOptions: this.#sharedOptions });
+        this.#children.push(child);
+        if (!child.#isEmptyGlyph) previousLayoutGlyph = child;
       }
+
+      // Content-empty groups (zero glyphs, or only empty-parts glyphs)
+      // render nothing and contribute no document extent, mirroring
+      // #isEmptyGlyph one level up.
+      this.#isEmptyGroup = this.#children.every(child => child.#isEmptyGlyph);
 
 
       // Check if this is a space group (all glyphs are space glyphs: TSP or QSP).

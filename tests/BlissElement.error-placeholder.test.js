@@ -1,13 +1,11 @@
 import { BlissSVGBuilder } from '../src/index';
 import { BlissElement } from '../src/lib/bliss-element.js';
-import { BlissParser } from '../src/lib/bliss-parser.js';
 import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js';
 
 /**
  * Pins the error-placeholder option that controls how a failing element is
- * rendered, at both the character (level 2) and word/group (level 1)
- * granularities, plus the warning-delta mechanism that decides when
- * character-level placeholder rendering activates.
+ * rendered at the character (level 2) granularity, plus the warning-delta
+ * mechanism that decides when placeholder rendering activates.
  *
  * Covers:
  * - error-placeholder ON: a failing character renders REFSQUARE + B699
@@ -21,18 +19,14 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - error-placeholder also activates on malformed-coordinate parse errors
  *   (e.g. B291:5,5,5, which warns MALFORMED_COORDINATES), not only on
  *   unknown-code failures.
- * - Word/group-level fail-render: a group flagged invalid (group.errorCode,
- *   the level-1 analogue of a failed part) records ONE warning and collapses
- *   to a single placeholder icon (ON) or renders invisible and zero-width
- *   (OFF), regardless of how many glyphs the word contained.
  *
  * Does NOT cover:
  * - WORD_AS_PART, UNKNOWN_CODE, MALFORMED_COORDINATES, and parse-error codes themselves,
  *   see `BlissSVGBuilder.word-as-part.test.js` and the forthcoming
  *   `BlissElement.warning-behavior.test.js`.
- * - The parser triggers that SET group.errorCode (malformed `;;`, an
- *   indicator bound to a multi-word alias), see `BlissParser.double-semicolon.test.js`
- *   and `BlissParser.word-indicators.test.js`.
+ * - Word-level failures (group.errorCode): the builder drops fail-flagged
+ *   words before element construction (no L1 fail-render exists), see
+ *   `BlissSVGBuilder.malformed-retention.test.js`.
  * - Defensive option validation (prototype pollution, malformed keys),
  *   see `BlissSVGBuilder.option-hardening.test.js`.
  * - Cascading of error-placeholder through nested option levels,
@@ -92,60 +86,6 @@ describe('BlissElement error placeholder', () => {
       expect(withPlaceholder.elements.children[0].children).toEqual([]);
       expect(withoutPlaceholder.elements.children[0].children).toEqual([]);
       expect(withPlaceholder.svgCode).toBe(withoutPlaceholder.svgCode);
-    });
-  });
-
-  describe('when a word fails to render', () => {
-    // A group the parser flags invalid (group.errorCode) is the level-1
-    // analogue of a failed part: the whole word collapses to ONE icon,
-    // independent of how many glyphs it held. B313/B97 stands in for a word
-    // the parser would reject wholesale (e.g. a malformed `;;`).
-    const PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].glyphs[0].parts;
-
-    const renderFlaggedWord = (errorPlaceholder) => {
-      const shared = {
-        charSpace: 2,
-        wordSpace: 8,
-        externalGlyphSpace: 0.8,
-        warnings: [],
-        errorPlaceholder,
-        errorPlaceholderParts: PLACEHOLDER_PARTS,
-      };
-      const element = new BlissElement({
-        groups: [{
-          errorCode: 'MALFORMED_WORD_INDICATOR',
-          error: 'Malformed word-level indicator in "B313;;B97;;B81".',
-          errorSource: 'B313;;B97;;B81',
-          glyphs: BlissParser.parse('B313/B97').groups[0].glyphs,
-        }],
-      }, { sharedOptions: shared });
-      return { group: element.children[0], warnings: shared.warnings };
-    };
-
-    const EXPECTED_WARNING = {
-      code: 'MALFORMED_WORD_INDICATOR',
-      message: 'Malformed word-level indicator in "B313;;B97;;B81".',
-      source: 'B313;;B97;;B81',
-    };
-
-    test('collapses a multi-glyph word to a single placeholder icon when error-placeholder is enabled', () => {
-      const { group, warnings } = renderFlaggedWord(true);
-
-      expect(warnings).toEqual([EXPECTED_WARNING]);
-      expect(group.children).toHaveLength(1);
-      expect(group.children[0].children.map(child => child.codeName)).toEqual(['REFSQUARE', 'B699']);
-      expect(group.advanceX).toBe(10);
-      expect(group.getSvgContent()).toContain('h8');
-    });
-
-    test('renders invisible and zero-width when error-placeholder is not enabled', () => {
-      const { group, warnings } = renderFlaggedWord(false);
-
-      expect(warnings).toEqual([EXPECTED_WARNING]);
-      expect(group.children).toEqual([]);
-      expect(group.width).toBe(0);
-      expect(group.advanceX).toBe(0);
-      expect(group.getSvgContent()).toBe('');
     });
   });
 
