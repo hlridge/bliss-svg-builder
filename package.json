@@ -30,7 +30,7 @@
     "test:property": "vitest run --project property",
     "mutation-test": "stryker run",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run typecheck && pnpm audit && pnpm run build && pnpm run test:all",
+    "prepublishOnly": "pnpm run typecheck && pnpm run build && pnpm run test:all",
     "example:browser-iife": "vite --open examples/browser-iife.html",
     "example:browser-esm": "vite --open examples/browser-esm.html",
     "example:node-cjs": "node examples/node.cjs",
@@ -65,12 +65,12 @@
   },
   "license": "MPL-2.0",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": ">=20.19"
+      "version": ">=22.12.0"
     }
   },
   "bugs": {

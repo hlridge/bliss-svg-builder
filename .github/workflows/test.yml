@@ -1,0 +1,83 @@
+name: Test
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (e.g. rapid PR pushes).
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Active LTS lines only. `engines` is `>=22`; 22 and 24 are the
+        # supported LTS versions. Non-LTS currents (23, 25, 26) are out of policy.
+        node-version: [22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # node-canvas (used by the lib and e2e projects' render-comparison tests)
+      # links against the system Cairo/Pango libraries at runtime, even with
+      # prebuilt binaries, so install them before pnpm builds/loads canvas.
+      - name: Install canvas system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node ${{ matrix.node-version }}
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Lib tests
+        run: pnpm run test
+
+      - name: Dist smoke tests
+        run: pnpm exec vitest run --project dist
+
+      - name: Property tests
+        run: pnpm run test:property
+
+      # Visual-regression is the only exhaustive artwork-regression guard.
+      # Its comparison rasterizes the generated SVG and the committed reference
+      # SVG with the SAME canvas runtime, so platform rendering quirks cancel and
+      # the result is Node-version-independent; running it on one leg is enough.
+      - name: Visual regression (e2e)
+        if: matrix.node-version == 24
+        run: pnpm run test:e2e
+
+      # A dev-dependency advisory must never block a publish (that was the
+      # reason `pnpm audit` was removed from `prepublishOnly`); audit only the
+      # production dependency tree, which the library ships to consumers.
+      - name: Production dependency audit
+        run: pnpm audit --prod
