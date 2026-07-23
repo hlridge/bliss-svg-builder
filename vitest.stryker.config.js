@@ -36,6 +36,11 @@ export default defineConfig({
       'dist',
       'tests/**/*.e2e.{test,spec}.js',
       'tests/**/*.dist.{test,spec}.js',
+      // The property project (fast-check, 2026-07-21) is its own gate and is
+      // excluded from the lib loop; keep it out of the mutation run too. Its
+      // '@property' tag is also undeclared in this config, so including the
+      // files would fail Vitest 4.1's tag-declaration check in the dry run.
+      'tests/**/*.property.{test,spec}.js',
     ],
   },
   resolve: {
