@@ -7,7 +7,7 @@ Get Bliss SVG Builder installed and render your first SVG.
 Paste this into an `.html` file. Loads the library as a global from a CDN. No install or build step required.
 
 ```html
-<script src="https://unpkg.com/bliss-svg-builder@next/dist/bliss-svg-builder.iife.js"></script>
+<script src="https://unpkg.com/bliss-svg-builder@1/dist/bliss-svg-builder.iife.js"></script>
 <script>
   const builder = new BlissSVGBuilder('B313');  // "feeling"
   document.body.appendChild(builder.svgElement);
@@ -30,15 +30,15 @@ Works with Vite, Webpack, Rollup, esbuild, Parcel, and other modern bundlers tha
 Install with your package manager:
 
 ```bash
-npm install bliss-svg-builder@next
+npm install bliss-svg-builder
 ```
 
 ```bash
-pnpm add bliss-svg-builder@next
+pnpm add bliss-svg-builder
 ```
 
 ```bash
-yarn add bliss-svg-builder@next
+yarn add bliss-svg-builder
 ```
 
 Import it by name. The bundler resolves the right format via the package's [`exports`](https://nodejs.org/api/packages.html#exports) map:
@@ -59,7 +59,7 @@ The IIFE bundle uses a single `<script>` tag and is minified, making it the smal
 ### IIFE bundle
 
 ```html
-<script src="https://unpkg.com/bliss-svg-builder@next/dist/bliss-svg-builder.iife.js"></script>
+<script src="https://unpkg.com/bliss-svg-builder@1/dist/bliss-svg-builder.iife.js"></script>
 <script>
   const builder = new BlissSVGBuilder('B313');  // "feeling"
   document.body.appendChild(builder.svgElement);
@@ -70,7 +70,7 @@ The IIFE bundle uses a single `<script>` tag and is minified, making it the smal
 
 ```html
 <script type="module">
-  import { BlissSVGBuilder } from 'https://unpkg.com/bliss-svg-builder@next/dist/bliss-svg-builder.esm.js';
+  import { BlissSVGBuilder } from 'https://unpkg.com/bliss-svg-builder@1/dist/bliss-svg-builder.esm.js';
 
   const builder = new BlissSVGBuilder('B313');  // "feeling"
   document.body.appendChild(builder.svgElement);
@@ -84,15 +84,15 @@ These also work as-is in CodePen, JSFiddle, or any browser playground.
 Install with your package manager:
 
 ```bash
-npm install bliss-svg-builder@next
+npm install bliss-svg-builder
 ```
 
 ```bash
-pnpm add bliss-svg-builder@next
+pnpm add bliss-svg-builder
 ```
 
 ```bash
-yarn add bliss-svg-builder@next
+yarn add bliss-svg-builder
 ```
 
 Import it by name:
@@ -120,7 +120,7 @@ console.log(builder.svgCode);
 Only for uncommon setups. The sections above cover most projects.
 
 ::: details Self-hosting the bundle
-After installing the package, both bundles are available in `node_modules/bliss-svg-builder/dist/`. Copy them into your own assets and serve them from your origin. Without a package manager, the same files can be downloaded directly from [unpkg](https://unpkg.com/browse/bliss-svg-builder@next/dist/).
+After installing the package, both bundles are available in `node_modules/bliss-svg-builder/dist/`. Copy them into your own assets and serve them from your origin. Without a package manager, the same files can be downloaded directly from [unpkg](https://unpkg.com/browse/bliss-svg-builder@1/dist/).
 
 The IIFE bundle is a single self-contained file:
 
@@ -132,7 +132,7 @@ The ESM bundle can also be self-hosted, but the bare specifier `'bliss-svg-build
 :::
 
 ::: details Choosing a version
-The examples on this page use `@next`, which tracks the current release candidate. After `1.0.0` ships you can pin to a major version with `@1` (recommended; gets patches and minor updates without breaking changes), a specific version like `@1.0.0`, or `@latest` for the most recent stable release.
+Installing without a version (`npm install bliss-svg-builder`) gets the latest stable release and records a caret range (`^1.0.0`), so future installs stay on 1.x and pick up patches and minor updates without breaking changes. The CDN examples pin to `@1` for the same reason: a browser `<script>` has no lockfile, so an unpinned URL would jump to the next major the day it ships. To pin exactly, use a full version like `@1.0.0`.
 :::
 
 ::: details Using jsDelivr instead of unpkg
