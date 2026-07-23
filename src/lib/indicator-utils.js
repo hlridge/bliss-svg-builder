@@ -22,7 +22,7 @@ const CHAR_OPTION_STRIP = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT +
 // \w+ rather than letter-first: define() accepts digit-leading names (the
 // Blissary-ID pattern, e.g. '1219'), and an alias to one must resolve like
 // any other single-code rename (review MINOR-4).
-const SINGLE_CODE_TOKEN = /^\w+$/;
+export const SINGLE_CODE_TOKEN = /^\w+$/;
 
 /**
  * Resolve a definition to its EFFECTIVE definition by following pure-rename

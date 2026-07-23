@@ -1164,6 +1164,13 @@ export class BlissParser {
                   || typeof effective.getPath === 'function')) {
                 expandedParts[0]._aliasCodeName = potentialBaseCode;
               }
+            } else if (expandedParts.length === 1 && definition.isShape) {
+              // A typed shape has no glyphCode identity channel, so its own
+              // written name dissolves into this expansion too. Record it the
+              // same way (a typed definition keeps its name whatever its
+              // anatomy, per the ratified preserve statement); built-in
+              // shapes never reach this branch (early return above).
+              expandedParts[0]._aliasCodeName = potentialBaseCode;
             }
 
             return expandedParts;
@@ -1458,15 +1465,19 @@ export class BlissParser {
         glyphObj.parts = parseParts(glyphCodeString);
 
         // Land a character-level rename recording on the parsed sole part,
-        // where the Phase 2.3b preserve-restore already operates. A
-        // multi-part expansion has no single carrier (the shorthand
-        // dissolves); a custom typed glyph keeps its own glyphCode identity
-        // (the typed name governs serialization); a space stays canonical
-        // (spaces take no custom identity).
-        if (_aliasCodeName && glyphObj.parts.length === 1
-            && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode))
-            && !isSpaceGlyph(glyphObj.parts[0].codeName)) {
-          glyphObj.parts[0]._aliasCodeName = _aliasCodeName;
+        // where the Phase 2.3b preserve-restore already operates; a space
+        // stays canonical (spaces take no custom identity). The recording
+        // also rides the glyph itself: a multi-part anatomy or a custom
+        // typed-glyph identity (glyphCode) has no part-level carrier, and
+        // the serializer consult (preserve-completeness chunk) restores the
+        // written name only for a clean instance of the definition.
+        if (_aliasCodeName
+            && !(glyphObj.parts.length === 1 && isSpaceGlyph(glyphObj.parts[0].codeName))) {
+          if (glyphObj.parts.length === 1
+              && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode))) {
+            glyphObj.parts[0]._aliasCodeName = _aliasCodeName;
+          }
+          glyphObj._aliasCodeName = _aliasCodeName;
         }
 
         this.#extractPositionFromOptions(glyphObj);

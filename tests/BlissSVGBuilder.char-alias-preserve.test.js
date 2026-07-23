@@ -27,6 +27,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.custom-glyphs.test.js`.
  * - Default-mode alias transparency doctrine, see
  *   `BlissSVGBuilder.custom-aliases.test.js`.
+ * - The typed-entity completeness matrix (standalone typed shapes, aliases
+ *   to custom typed targets, glyph-level recording), see
+ *   `BlissSVGBuilder.typed-name-preserve.test.js`.
  */
 
 const customCodes = [];
@@ -169,28 +172,24 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
     });
 
-    it('re-emits the target name for an alias to a custom typed glyph', () => {
+    it('keeps the written alias name over a custom typed glyph target', () => {
       defineAndTrack({ MYGL1: { type: 'glyph', codeString: 'C8' } });
       defineAndTrack({ ALGL: { codeString: 'MYGL1' } });
-      // registered facet: the typed target's own (preserved) name governs; the
-      // written alias token is not restored on the glyphCode identity path
-      expect(new BlissSVGBuilder('ALGL').toString({ preserve: true })).toBe('MYGL1');
-      // pins the transfer's glyphCode guard: the typed identity path leaves
-      // the part resolved instead of carrying an unused alias recording
-      expect(new BlissSVGBuilder('ALGL').toJSON({ preserve: true })
-        .groups[0].glyphs[0].parts[0].codeName).toBe('C8');
+      // preserve-completeness chunk: the written token wins on the glyphCode
+      // identity path too (glyph-level recording); the part stays resolved
+      expect(new BlissSVGBuilder('ALGL').toString({ preserve: true })).toBe('ALGL');
+      const glyph = new BlissSVGBuilder('ALGL').toJSON({ preserve: true }).groups[0].glyphs[0];
+      expect(glyph.codeName).toBe('ALGL');
+      expect(glyph.parts[0].codeName).toBe('C8');
     });
-
-    it.todo('keeps the written alias name over a custom typed glyph target (registered facet, backlog: alias-to-typed-glyph written-name restoration)');
 
     it('keeps the written name for an alias to a custom typed sole-part shape', () => {
       defineAndTrack({ MYSH1: { type: 'shape', codeString: 'C8' } });
       defineAndTrack({ ALSH: { codeString: 'MYSH1' } });
       expect(new BlissSVGBuilder('ALSH').toString({ preserve: true })).toBe('ALSH');
-      // pins the bare-alias discriminator: a TYPED definition takes the
-      // identity path, not the rename side channel (its standalone name loss
-      // is the registered standalone-typed-shape gap, see the todo below)
-      expect(new BlissSVGBuilder('MYSH1').toString({ preserve: true })).toBe('C8');
+      // the typed shape keeps its own name too (glyph-level channel; the
+      // full typed-entity matrix lives in typed-name-preserve)
+      expect(new BlissSVGBuilder('MYSH1').toString({ preserve: true })).toBe('MYSH1');
     });
 
     it('keeps a surviving forward-referenced component name in a word alias', () => {
@@ -207,8 +206,6 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
       defineAndTrack({ FUTB: { codeString: 'B431' } });
       expect(new BlissSVGBuilder('WMID').toString({ preserve: true })).toBe('B313/FUTB');
     });
-
-    it.todo('keeps a typed shape name standalone at character level (registered gap, backlog: standalone typed-shape identity; MYSH1 emits C8 today)');
 
     it('keeps a space alias serializing as its canonical space code', () => {
       defineAndTrack({ SPAL: { codeString: 'QSP' } });

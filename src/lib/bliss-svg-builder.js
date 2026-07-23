@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
-import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
+import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -32,6 +32,20 @@ const GLYPH_OPTION_KEYS_WITHOUT_TOKEN = new Set(['key', 'relativeKerning', 'abso
 const glyphEmitsOptionsToken = (glyph) =>
   Object.entries(glyph.options ?? {}).some(([k, v]) =>
     v !== false && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
+
+// Serialize an options object to [key=val;key2=val2] DSL format. Shared by
+// toString() serialization and the preserve-mode canonical anatomy compare
+// (one emitter, so the two surfaces cannot drift).
+function serializeOptions(opts, skipKeys) {
+  if (!opts) return '';
+  const entries = Object.entries(opts);
+  const filtered = entries.filter(([k, v]) =>
+    v !== false && !(skipKeys?.has(k))
+  );
+  if (filtered.length === 0) return '';
+  const parts = filtered.map(([k, v]) => v === true ? k : `${k}=${serializeOptionValue(v)}`);
+  return `[${parts.join(';')}]`;
+}
 
 // The anchor-attribute family, mirroring the two anchorAttrNames sets inside
 // BlissElement (keep all three in sync: a name added there but not here would
@@ -1926,18 +1940,6 @@ class BlissSVGBuilder {
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
 
-    // Serialize an options object to [key=val;key2=val2] DSL format.
-    function serializeOptions(opts, skipKeys) {
-      if (!opts) return '';
-      const entries = Object.entries(opts);
-      const filtered = entries.filter(([k, v]) =>
-        v !== false && !(skipKeys?.has(k))
-      );
-      if (filtered.length === 0) return '';
-      const parts = filtered.map(([k, v]) => v === true ? k : `${k}=${serializeOptionValue(v)}`);
-      return `[${parts.join(';')}]`;
-    }
-
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
     function serializeParts(parts, offsetX = 0, offsetY = 0) {
@@ -2117,6 +2119,24 @@ class BlissSVGBuilder {
         code = glyph.codeName || '';
       }
 
+      // Written-name consult (preserve-completeness chunk): whatever route
+      // computed `code`, a glyph that is a clean instance of a recorded
+      // definition emits the written name. The recording rides the glyph
+      // (parser stamp, kept in deep output); object input may carry the
+      // name as a glyph-level codeName instead. A diverged glyph never
+      // matches the anatomy, so the route's own output stands ('MYGL1;B81'
+      // stays a typed delta: a `;`-part on a bare-alias base drops on
+      // reparse).
+      if (options.preserve) {
+        const name = glyph._aliasCodeName
+          ?? (!glyph.isBlissGlyph && glyph.codeName && !builtInCodes.has(glyph.codeName)
+              ? glyph.codeName : null);
+        const written = name
+          ? BlissSVGBuilder.#preservedWrittenName(name, serializeParts(glyph.parts ?? []))
+          : null;
+        if (written) code = written;
+      }
+
       // Prefix glyph-level options (skip internal kerning keys)
       const optPrefix = serializeOptions(glyph.options, GLYPH_INTERNAL_KEYS);
       result.push(optPrefix + code);
@@ -2254,8 +2274,15 @@ class BlissSVGBuilder {
           // field for the toString()/merge() pipelines; public output drops it.
           if (options.preserve && part._aliasCodeName) {
             const namedDef = blissElementDefinitions[part._aliasCodeName];
-            if (partIndex > 0 || parts.length === 1
-                || (namedDef && !BlissSVGBuilder.#isBareAliasDefinition(namedDef))) {
+            // A decorated part (coordinates or options) restores only a PURE
+            // rename chain: a decorated custom anatomy dissolved its own
+            // state into this part, and the written name would re-emit it as
+            // instance decoration (preserve-completeness chunk; the glyph-
+            // level consult keeps such a name at the clean-glyph level).
+            const decorated = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0 || part.options;
+            if ((partIndex > 0 || parts.length === 1
+                || (namedDef && !BlissSVGBuilder.#isBareAliasDefinition(namedDef)))
+                && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))) {
               part.codeName = part._aliasCodeName;
             }
           }
@@ -2339,6 +2366,25 @@ class BlissSVGBuilder {
               delete glyph.glyphCode;
             }
             // Parts already use codeName internally, no rename needed
+
+            // Glyph-level rename recording (preserve-completeness chunk):
+            // public preserve output restores the written name only for a
+            // clean instance of the definition's anatomy. Deep output stays
+            // raw (codeName = the typed target) so serializeCustomGlyphDelta
+            // keeps computing the divergence delta against the right
+            // definition; toString restores via its own consult instead.
+            // The recording never reaches public output in either mode.
+            if (options.preserve && !options.deep) {
+              const name = glyph._aliasCodeName
+                ?? (glyph.codeName && !builtInCodes.has(glyph.codeName) ? glyph.codeName : null);
+              if (name) {
+                const canonical = BlissSVGBuilder.#canonicalGlyphParts(glyph.parts);
+                const written = canonical !== null
+                  ? BlissSVGBuilder.#preservedWrittenName(name, canonical) : null;
+                if (written) glyph.codeName = written;
+              }
+            }
+            if (!options.deep) delete glyph._aliasCodeName;
 
             // Default output omits glyph-classification metadata: it is fully
             // derived from the code and re-derived on reconstruction (see
@@ -2541,6 +2587,76 @@ class BlissSVGBuilder {
   // never heads a multi-part emission; typed names dumb-append and round-trip.
   static #isBareAliasDefinition(def) {
     return !!def && BlissSVGBuilder.#detectType(def) === 'bare';
+  }
+
+  // Preserve-completeness chunk: written-name consult for the glyph-level
+  // recording. Walks single-code links from `name`; the chain's anatomy is
+  // the first non-single-token codeString (or the terminal bare token), and
+  // the name is emittable only when the chain passes a CUSTOM definition
+  // with identity (typed shape/glyph/indicator; bare shorthand never
+  // qualifies) AND the glyph's serialized parts equal that anatomy as
+  // written, i.e. the glyph is a clean instance of the definition.
+  static #preservedWrittenName(name, serialized) {
+    let code = name;
+    let identityDef = null;
+    const seen = new Set();
+    while (!seen.has(code)) {
+      seen.add(code);
+      if (builtInCodes.has(code)) break;
+      const def = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
+        ? blissElementDefinitions[code] : undefined;
+      if (!def || typeof def.codeString !== 'string') break;
+      if (def.isBlissGlyph || def.isShape || def.isExternalGlyph
+          || def.glyphCode || def.isIndicator === true
+          || typeof def.getPath === 'function') {
+        identityDef = def;
+      }
+      if (!SINGLE_CODE_TOKEN.test(def.codeString)) {
+        return identityDef && serialized === def.codeString ? name : null;
+      }
+      code = def.codeString;
+    }
+    return identityDef && serialized === code ? name : null;
+  }
+
+  // A rename chain is pure when every link is a single bare token down to a
+  // built-in, primitive, or unknown end. A decorated custom anatomy
+  // (coordinates, options, or several parts) dissolves its state INTO the
+  // parsed part, so restoring the written name onto a decorated part would
+  // re-emit that state as instance decoration and shift the reparse.
+  static #renameChainIsPure(name) {
+    let code = name;
+    const seen = new Set();
+    while (!builtInCodes.has(code)) {
+      if (seen.has(code)) return false;
+      seen.add(code);
+      const def = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
+        ? blissElementDefinitions[code] : undefined;
+      if (!def || typeof def.codeString !== 'string') return true;
+      if (!SINGLE_CODE_TOKEN.test(def.codeString)) return false;
+      code = def.codeString;
+    }
+    return true;
+  }
+
+  // Canonical `;`-joined token form of a glyph's top-level parts (an
+  // `[opts]>` prefix via the shared serializeOptions emitter, codeName, and
+  // a non-origin :x,y suffix), for comparison against a definition's
+  // written codeString. Returns null when any part carries state this form
+  // cannot express (nested parts, an error), so the caller falls back to
+  // decomposed output.
+  static #canonicalGlyphParts(parts) {
+    if (!Array.isArray(parts) || parts.length === 0) return null;
+    const tokens = [];
+    for (const part of parts) {
+      if (!part.codeName || part.parts || part.error || part.errorCode) return null;
+      const optPrefix = serializeOptions(part.options);
+      const x = part.x ?? 0;
+      const y = part.y ?? 0;
+      const token = x !== 0 || y !== 0 ? `${part.codeName}:${x},${y}` : part.codeName;
+      tokens.push(optPrefix ? `${optPrefix}>${token}` : token);
+    }
+    return tokens.join(';');
   }
 
   // Check if a codeString references only allowed types
