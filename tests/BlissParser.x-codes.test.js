@@ -327,7 +327,7 @@ describe('BlissParser X-codes', () => {
   describe('when a definition name starts with X but leaves the letter namespace', () => {
     // define() refuses a name that is X followed only by letters, since the
     // parser would always read it as external text. XRAY1 carries a digit, so
-    // it is outside that namespace and define() allows it — but the expander
+    // it is outside that namespace and define() allows it, but the expander
     // used to eat the letters anyway and leave XY1 as an unknown code, so the
     // guard and the parser disagreed about which names are reachable.
     const DIGIT_DEFS = { XRAY1: { codeString: 'B291' } };
