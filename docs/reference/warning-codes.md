@@ -211,13 +211,17 @@ B313^/B1103^           →  head is B313
 
 ### `MULTIPLE_OPTION_BRACKETS`
 
-Two option brackets at the same scope (global `||` or word `|`). Only the first bracket applies.
+Two option brackets at the same scope. Only the first bracket applies; the content still renders. This holds at every scope: global `||`, word `|`, character, and part `>`.
 
 ```
 [grid][grid-color=red]||B313    →  grid renders, but not in red
+[color=red][fill=green]B313     →  red, not green
+[color=red]>[fill=green]>B313   →  red, not green
 ```
 
-Combine the options in one bracket instead: `[grid;grid-color=red]||B313`. (A character bracket followed by a part bracket, `[char][part]>CODE`, is two different scopes and is valid.)
+Combine the options in one bracket instead: `[grid;grid-color=red]||B313`. One warning is emitted per ignored bracket.
+
+Brackets at *different* scopes are not duplicates and are valid: a character bracket followed by a part bracket (`[char][part]>CODE`) applies both, warning-free, as does `[global]||[word]|CODE`. The `>` is what marks the part scope, so it is what tells the two cases apart.
 
 ### `DUPLICATE_KEY`
 

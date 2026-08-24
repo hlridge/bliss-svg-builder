@@ -1475,17 +1475,36 @@ export class BlissParser {
         // The old `.*?` class backtracked across `]>…;[` when the lookahead
         // failed, capturing `[a]>CODE;[b]` as one character-option blob —
         // every part before the second bracket was silently eaten.
-        const glyphMatch = part.match(/^(\[[^\[\]]*\])(?!>)(.*)/);
-        if (glyphMatch) {
-          const parsedOptions = dropMisplacedGlobalKeys(
-            this.#parseOptions(restorePlaceholders(glyphMatch[1])), 'character');
-          // Merge only when something remains: a bracket fully emptied by the
-          // gate (or written empty) must not leave an options: {} artifact on
-          // the glyph -- the gated form's toJSON matches the bare form's.
-          if (glyphObj.options || parsedOptions) {
-            glyphObj.options = { ...glyphObj.options, ...parsedOptions };
+        //
+        // One bracket per scope, so peel them one at a time: the first applies
+        // and every later one is invalid syntax that warns and drops, matching
+        // what the global and word scopes have always done. Character scope
+        // used to report UNKNOWN_CODE and destroy the whole symbol instead,
+        // although a valid code sat right after the brackets. The loop stops at
+        // a bracket wearing a `>`: that one belongs to the PART scope and is a
+        // legal neighbour, which is what tells `[a][b]` from `[a][b]>`.
+        let charBracketsSeen = 0;
+        let charMatch;
+        while ((charMatch = glyphCodeString.match(/^(\[[^\[\]]*\])(?!>)(.*)/)) !== null) {
+          charBracketsSeen++;
+          if (charBracketsSeen === 1) {
+            const parsedOptions = dropMisplacedGlobalKeys(
+              this.#parseOptions(restorePlaceholders(charMatch[1])), 'character');
+            // Merge only when something remains: a bracket fully emptied by the
+            // gate (or written empty) must not leave an options: {} artifact on
+            // the glyph -- the gated form's toJSON matches the bare form's.
+            if (glyphObj.options || parsedOptions) {
+              glyphObj.options = { ...glyphObj.options, ...parsedOptions };
+            }
+          } else {
+            const dropped = restorePlaceholders(charMatch[1]);
+            parseWarnings.push({
+              code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+              message: `Multiple option brackets on one character: "${dropped}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b].`,
+              source: dropped,
+            });
           }
-          glyphCodeString = glyphMatch[2];
+          glyphCodeString = charMatch[2];
         }
 
         const parseParts = (partsString, depth = 0) => {
@@ -1529,6 +1548,30 @@ export class BlissParser {
                 twoPartPartString = peeled[3];
               }
             }
+            // One PART bracket per slot, same rule and same handling as the
+            // character scope above and the two option-region scopes: the first
+            // applies, every later one warns and drops. Every slot, slot 0
+            // included, since a part bracket is legal there too
+            // (`[color=red]>B291`). Without this a doubled part bracket was
+            // reported as an unknown code and destroyed the whole character.
+            let partBracketsSeen = 0;
+            let head = '';
+            let partMatch;
+            while ((partMatch = twoPartPartString.match(/^(\[[^\[\]]*\])>(.*)$/)) !== null) {
+              partBracketsSeen++;
+              if (partBracketsSeen === 1) {
+                head = `${partMatch[1]}>`;
+              } else {
+                const dropped = restorePlaceholders(partMatch[1]);
+                parseWarnings.push({
+                  code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+                  message: `Multiple option brackets on one part: "${dropped}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b]>.`,
+                  source: dropped,
+                });
+              }
+              twoPartPartString = partMatch[2];
+            }
+            twoPartPartString = head + twoPartPartString;
             const part = this.parsePartString(twoPartPartString, restorePlaceholders);
             if (part.options) {
               part.options = dropMisplacedGlobalKeys(part.options, 'part');

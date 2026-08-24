@@ -250,25 +250,24 @@ describe('BlissParser part-slot character options', () => {
       expect(b.toJSON().groups[0].glyphs[0].parts[1].options).toEqual({ fill: 'green' });
     });
 
-    // slot 0 is the character's own option position; a SECOND bracket there
-    // is a doubled character option, not a part-slot misplacement — the peel
-    // must not fire (unchanged contract: the leftover fails the character)
-    it('leaves slot-0 doubled character brackets to the whole-character fail', () => {
+    // slot 0 is the character's own option position; a SECOND bracket there is
+    // a doubled character option, not a part-slot misplacement, so the peel
+    // must not fire. This is what the test guards; the doubled bracket itself
+    // is handled by the duplicate rule below (it used to fail the character).
+    it('reports a doubled slot-0 bracket as a duplicate, not as a part-slot misplacement', () => {
       const warned = codes('[color=red][fill=green]B291');
-      expect(warned).toContain('UNKNOWN_CODE');
+      expect(warned).toEqual(['MULTIPLE_OPTION_BRACKETS']);
       expect(warned).not.toContain('MISPLACED_CHARACTER_OPTION');
     });
   });
 
-  // note: an option separator written with no bracket in front of it carries no
-  // options, and the global and word scopes tolerate that — `||B291` and
-  // `|B291` render plain content, warn-free. The PART separator does not:
-  // `>B291` fails the whole character, and `S8;>C8` destroys BOTH parts rather
-  // than the offending one. The only fail above that is genuinely settled is
-  // the DANGLING bracket (`S8;[fill=green]`), which has no code left to render;
-  // here a valid code sits directly after the separator. The slot-0 doubled
-  // bracket is NOT settled either — see the cross-scope describe below.
-  // Backlog + GH #40.
+  // An option separator written with no bracket in front of it carries no
+  // options, and all four scopes now tolerate that: the code stays plain
+  // content, warn-free. The part separator used to be the odd one out
+  // (`>B291` failed the whole character, `S8;>C8` destroyed BOTH parts), which
+  // is what GH #40 is about. The one whole-character fail here that IS settled
+  // is the DANGLING bracket (`S8;[fill=green]`), which has no code left to
+  // render; everywhere else a valid code sits right after the separator.
   describe('when an option separator is written without its bracket', () => {
     it('keeps a bare global separator as plain content', () => {
       const b = build('||B291');
@@ -336,19 +335,20 @@ describe('BlissParser part-slot character options', () => {
     });
   });
 
-  // note: two adjacent brackets at ONE scope are invalid syntax ("one bracket
-  // per scope"), but the consequence splits 2/2. Global and word warn
-  // MULTIPLE_OPTION_BRACKETS, apply the first bracket and still render;
-  // character and part report UNKNOWN_CODE and destroy the whole character.
-  // That warning was deliberately scoped to the two option-REGION levels
-  // because char/part duplicates "already surface UNKNOWN_CODE", i.e. were not
-  // silent — but non-silent is weaker than the option system's documented
-  // "content still renders", which the other two scopes meet.
+  // Two adjacent brackets at ONE scope are invalid syntax ("one bracket per
+  // scope"), and all four scopes now handle it the same way: warn
+  // MULTIPLE_OPTION_BRACKETS, apply the first bracket, render. Character and
+  // part used to report UNKNOWN_CODE and destroy the whole character instead;
+  // the warning had been scoped to the two option-REGION levels on the grounds
+  // that char/part duplicates "already surface UNKNOWN_CODE", i.e. were not
+  // silent, but non-silent is weaker than the option system's documented
+  // "content still renders", which the other two scopes met.
   //
-  // The constraint on any fix: adjacent brackets at DIFFERENT scopes are VALID
-  // and warning-free today (`[char][part]>CODE`, `[global]||[word]|CODE`), so a
-  // widened detector must not catch those. That is why this is not a one-line
-  // extension of the existing check. GH #40.
+  // The constraint the fix had to respect: adjacent brackets at DIFFERENT
+  // scopes are VALID and warning-free (`[char][part]>CODE`,
+  // `[global]||[word]|CODE`), so the rule cannot simply count brackets. It is
+  // the `>` that separates the scopes, so the peel stops at a bracket wearing
+  // one, which is what tells `[a][b]` from `[a][b]>`. GH #40.
   describe('when two option brackets are written at one scope', () => {
     it('warns and still renders at global scope, applying the first bracket', () => {
       const b = build('[grid][grid-color=red]||B291');
@@ -363,16 +363,43 @@ describe('BlissParser part-slot character options', () => {
       expect(b.toString()).toBe('[color=red]|B291');
     });
 
-    it.each([
-      ['[color=red][fill=green]B291'],
-      ['[color=red]>[fill=green]>B291'],
-    ])('destroys the whole character instead for %s', (input) => {
-      expect(codes(input)).toContain('UNKNOWN_CODE');
-      expect(build(input).svgCode).not.toContain('<path');
+    it('warns and still renders at character scope, applying the first bracket', () => {
+      const b = build('[color=red][fill=green]B291');
+      expect(codes('[color=red][fill=green]B291')).toEqual(['MULTIPLE_OPTION_BRACKETS']);
+      expect(b.toString()).toBe('[color=red]B291');
+      expect(b.svgCode).toBe(build('[color=red]B291').svgCode);
     });
 
-    it.todo('warns MULTIPLE_OPTION_BRACKETS at character scope, applies the first bracket, and still renders');
-    it.todo('warns MULTIPLE_OPTION_BRACKETS at part scope, applies the first bracket, and still renders');
+    it('warns and still renders at part scope, applying the first bracket', () => {
+      const b = build('[color=red]>[fill=green]>B291');
+      expect(codes('[color=red]>[fill=green]>B291')).toEqual(['MULTIPLE_OPTION_BRACKETS']);
+      expect(b.toString()).toBe('[color=red]>B291');
+      expect(b.svgCode).toBe(build('[color=red]>B291').svgCode);
+    });
+
+    it('warns once per extra bracket, however many are written', () => {
+      expect(codes('[color=red][fill=green][stroke-width=1]B291'))
+        .toEqual(['MULTIPLE_OPTION_BRACKETS', 'MULTIPLE_OPTION_BRACKETS']);
+      expect(build('[color=red][fill=green][stroke-width=1]B291').toString()).toBe('[color=red]B291');
+    });
+
+    it('names the dropped bracket in the warning', () => {
+      const [warning] = build('[color=red][fill=green]B291').warnings;
+      expect(warning.source).toBe('[fill=green]');
+      expect(warning.message).toContain('[fill=green]');
+    });
+
+    it('applies the same rule in a later part slot', () => {
+      const b = build('S8;[color=red]>[fill=green]>C8');
+      expect(codes('S8;[color=red]>[fill=green]>C8')).toEqual(['MULTIPLE_OPTION_BRACKETS']);
+      expect(b.toString()).toBe('S8;[color=red]>C8');
+      expect(b.svgCode).toBe(build('S8;[color=red]>C8').svgCode);
+    });
+
+    it('still fails a dangling bracket, which has no code left to render', () => {
+      // The one whole-character fail in this family that IS settled.
+      expect(codes('S8;[fill=green]')).toContain('UNKNOWN_CODE');
+    });
   });
 
   // The legal adjacency the widened detector above must not break: two brackets
@@ -409,7 +436,24 @@ describe('BlissParser part-slot character options', () => {
       expect(b.toString()).toBe('[color=red][fill=blue]>B291');
     });
 
-    it.todo('applies every bracket written before a part separator, or warns about the one it drops');
-    it.todo('names the dropped option instead of losing it silently');
+    it('applies the outer bracket at character scope and the one wearing the > at part scope', () => {
+      const b = build('[color=red][fill=blue][stroke-width=2]>B291');
+      expect(codes('[color=red][fill=blue][stroke-width=2]>B291')).toEqual(['MULTIPLE_OPTION_BRACKETS']);
+      const glyph = b.toJSON({ preserve: true }).groups[0].glyphs[0];
+      expect(glyph.options).toEqual({ color: 'red' });
+      expect(glyph.parts[0].options).toEqual({ 'stroke-width': '2' });
+    });
+
+    it('names the middle bracket it drops instead of losing it silently', () => {
+      const [warning] = build('[color=red][fill=blue][stroke-width=2]>B291').warnings;
+      expect(warning.source).toBe('[fill=blue]');
+    });
+
+    it('round-trips the surviving spelling', () => {
+      const b = build('[color=red][fill=blue][stroke-width=2]>B291');
+      expect(b.toString()).toBe('[color=red][stroke-width=2]>B291');
+      expect(build(b.toString()).svgCode).toBe(b.svgCode);
+      expect(build(b.toString()).warnings).toEqual([]);
+    });
   });
 });
