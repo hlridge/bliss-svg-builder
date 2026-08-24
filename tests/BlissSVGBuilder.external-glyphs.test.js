@@ -411,8 +411,12 @@ describe('BlissSVGBuilder external glyphs', () => {
 
     it('restores external identity from authored object input written in the public form', () => {
       const authored = new BlissSVGBuilder({
-        groups: [{ glyphs: [{ codeName: 'XM' }, { codeName: 'Xhαllo' }] }],
+        groups: [{ glyphs: [
+          { codeName: 'XM', parts: [{ codeName: 'XM' }] },
+          { codeName: 'Xhαllo', parts: [{ codeName: 'Xhαllo' }] },
+        ] }],
       });
+      expect(authored.warnings).toEqual([]);
       expect(authored.groups[0].children[1].isExternalGlyph).toBe(true);
       expect(glyphGap(authored)).toBeCloseTo(0.8, 6);
     });

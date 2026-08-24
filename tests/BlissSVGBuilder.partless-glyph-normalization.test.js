@@ -159,4 +159,31 @@ describe('BlissSVGBuilder partless glyph normalization', () => {
       expect(warningCodes(b)).toContain('UNKNOWN_CODE');
     });
   });
+
+  // A partless node naming a code that WOULD resolve is a worse case than the
+  // one above: it renders nothing, but `toString()` still emits the code, so
+  // reparsing that string draws a different picture. The warnings it does emit
+  // name neither the code nor anything actionable ("unknown", plus a spurious
+  // DUPLICATE_KEY carrying an internal key string). Object input only; a real
+  // toJSON() always writes `parts`. Backlog: "A glyph authored with only
+  // codeName and no parts serializes to a code it never rendered".
+  describe('when a partless glyph node names a resolvable code', () => {
+    it('round-trips through toJSON without changing the render', () => {
+      // the floor that already holds, so a fix cannot quietly break it
+      const b = new BlissSVGBuilder({ groups: [{ glyphs: [{ codeName: 'B291' }] }] });
+      expect(new BlissSVGBuilder(b.toJSON()).svgCode).toBe(b.svgCode);
+    });
+
+    it('leaves the unresolvable case round-trip stable', () => {
+      // contrast: an unknown code renders nothing on BOTH sides, so its string
+      // round-trip already holds. The defect below is specific to a code that
+      // would have resolved.
+      const b = new BlissSVGBuilder({ groups: [{ glyphs: [{ codeName: 'NOPE' }] }] });
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it.todo('renders the same picture after a toString round-trip');
+    it.todo('names the written code in its warning instead of "unknown"');
+    it.todo('emits no DUPLICATE_KEY for a single authored glyph');
+  });
 });
