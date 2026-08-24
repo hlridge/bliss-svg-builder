@@ -520,4 +520,36 @@ describe('BlissParser part-slot character options', () => {
       expect(viaDefinition.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
     });
   });
+
+  // A definition used in a LATER part slot is re-parsed by a nested pass that
+  // no glyph-level peel has run over, so a doubled bracket baked in its
+  // codeString still reaches the raw string. Parity breaks there: the written
+  // twin renders, the definition does not. Pre-existing (both spellings failed
+  // before GH #40 too) and it belongs to the registered "definition-side
+  // ingestion is quote-unaware" family, so it is pinned, not fixed here. The
+  // active tests pin the floor that DOES hold, visible-not-silent, and they are
+  // also what kills the surviving lazy-bracket-class mutant recorded in
+  // mutation-testing.md.
+  describe('when a definition bakes a doubled bracket and is used as a later part', () => {
+    const NESTED = {
+      _DUP_NESTED: { codeString: '[color=red][fill=green]>[stroke-width=2]>C8' },
+      _DUP_QUOTED: { codeString: '[data-x="a]b"]>[fill=green]>C8' },
+    };
+    beforeAll(() => BlissSVGBuilder.define(NESTED));
+    afterAll(() => Object.keys(NESTED).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it.each(Object.keys(NESTED))('fails %s visibly rather than applying a bracket silently', (name) => {
+      const b = build(`S8;${name}`);
+      expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
+      expect(b.toString()).toBe('S8');
+    });
+
+    it('renders the written twin of each, which is what parity would give', () => {
+      for (const def of Object.values(NESTED)) {
+        expect(build(`S8;${def.codeString}`).svgCode).not.toBe(build('S8').svgCode);
+      }
+    });
+
+    it.todo('renders a definition-baked doubled bracket like its written twin in a part slot');
+  });
 });
