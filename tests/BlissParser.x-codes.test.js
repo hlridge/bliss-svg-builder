@@ -101,6 +101,30 @@ describe('BlissParser X-codes', () => {
     });
   });
 
+  // The glyph-boundary anchor that keeps a WORD from splitting across glyphs in a
+  // part slot also keeps a part-position X code from ever reaching the XTXT_
+  // route, so a letter that needs the text fallback fails there. An outlined
+  // external letter is already a legal part (`B291;Xa` renders), so this is a
+  // routing hole rather than a widening of what may be a part. The active tests
+  // pin the two ends that already hold; the it.todo lines pin the gap. Backlog:
+  // "A text-fallback letter or run cannot be used AS a ;-part".
+  describe('when a text-fallback X code is written in a ;-part slot', () => {
+    it('accepts an outlined external letter as a part', () => {
+      const r = BlissParser.parse('B291;Xa');
+      expect(r.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'Xa']);
+    });
+
+    it('accepts the internal text-fallback key as a part', () => {
+      // the same glyph the DSL spelling below cannot reach today
+      const builder = new BlissSVGBuilder('B291;XTXT_λ');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it.todo('routes a single fallback letter written as a part to the text glyph (B291;Xλ)');
+    it.todo('routes a run that collapses to one glyph written as a part to the text glyph (B291;Xaλ)');
+    it.todo('still refuses an all-outlined run as a part (B291;Xab stays WORD_AS_PART)');
+  });
+
   describe('when Xword is adjacent to / (glyph boundary, not composition)', () => {
     it('expands Xword preceded by /', () => {
       // Distinguishes "before is true at offset>0" (mutant: || makes it always
