@@ -456,4 +456,29 @@ describe('BlissParser part-slot character options', () => {
       expect(build(b.toString()).warnings).toEqual([]);
     });
   });
+
+  // A definition's codeString carries RAW brackets rather than the tokenized
+  // placeholders the top-level input uses, so it reaches the bracket peels by a
+  // different route. Every rule above must mean the same thing on both, which is
+  // the divergence class the GH #37 chunk had to fix for letter runs.
+  describe('when the same spelling is baked in a definition codeString', () => {
+    const DEFS = {
+      _OPT_CHAR: { codeString: '[color=red]B291' },
+      _OPT_DUP_CHAR: { codeString: '[color=red][fill=green]B291' },
+      _OPT_PART: { codeString: '[color=red]>B291' },
+      _OPT_DUP_PART: { codeString: '[color=red]>[fill=green]>B291' },
+      _OPT_CROSS: { codeString: '[color=red][fill=green]>B291' },
+      _OPT_BARE: { codeString: '>B291' },
+      _OPT_BARE_SLOT: { codeString: 'S8;>C8' },
+    };
+    beforeAll(() => BlissSVGBuilder.define(DEFS));
+    afterAll(() => Object.keys(DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it.each(Object.entries(DEFS))('renders %s exactly like its written twin', (name, def) => {
+      const viaDefinition = build(name);
+      const written = build(def.codeString);
+      expect(viaDefinition.svgCode).toBe(written.svgCode);
+      expect(viaDefinition.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
+    });
+  });
 });
