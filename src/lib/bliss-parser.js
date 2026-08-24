@@ -388,10 +388,17 @@ export class BlissParser {
         // the written sequence form, where a prefix binds one member and the
         // member stands alone (review disposition, 2026-07-17).
         let expanded = codeString.replace(/(?<=^|\/)(\[[^\[\]]*\]>?)?X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, optionPrefix = '', chars, offset) => {
-          // Skip expansion when followed by ; (word expansion would break composition).
-          // A past-the-end index reads as undefined, which is never ';', so no bounds guard.
-          const after = codeString[offset + match.length] === ';';
-          if (after) return match;
+          // Skip expansion only when a real `;`-part composes onto the run.
+          // Expanding there would split the run across glyphs and bind the part
+          // to the last letter instead of to the written token, so the run must
+          // stay one token and fail as the word it is. The other two things a
+          // following `;` can mean are not compositions and must not suppress
+          // expansion: `;;` attaches a word-level overlay to the WORD the run
+          // expands into (matching the written `Xa/Xb;;B81` twin), and a bare
+          // trailing `;` composes nothing at all and is inert.
+          const rest = codeString.slice(offset + match.length);
+          const composesAPart = rest.startsWith(';') && !rest.startsWith(';;') && rest.length > 1;
+          if (composesAPart) return match;
 
           const allHavePath = [...chars].every(char => hasPathData(char));
           if (allHavePath) {
@@ -987,7 +994,15 @@ export class BlissParser {
           if (definition.codeString) {
             // Strict Indicator Separation: `;` no longer rewrites a definition's
             // baked indicators, so the codeString expands verbatim.
-            const codeStringToExpand = definition.codeString;
+            //
+            // X-runs are string-level sugar, so they have to be resolved before
+            // the string is read as a sequence of codes. The top-level input is
+            // processed on entry; a definition's codeString is a code string in
+            // its own right and gets the same treatment here, which is the one
+            // point every definition passes through at every nesting depth.
+            // The pass is identity for any string without an X-run, and no
+            // built-in definition contains one.
+            const codeStringToExpand = processXCodes(definition.codeString);
 
             // Built-in single-character codes: skip expansion, let parseParts handle it.
             // This eliminates the flatten-then-unflatten pattern where expand() substitutes

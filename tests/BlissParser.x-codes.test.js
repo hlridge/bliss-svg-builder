@@ -17,6 +17,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Semicolon-adjacency suppression: an Xword preceded or followed
  *   by ; (composition boundary) is preserved as a single literal
  *   part rather than expanded.
+ * - The limit of that suppression: a following ; that starts no
+ *   part (a `;;` word-level overlay, or a bare trailing `;`) does
+ *   NOT suppress expansion, because neither is a composition.
+ * - Expansion inside a definition codeString, at any nesting
+ *   depth, matching what the same run does at top level.
  * - Non-semicolon adjacency: an Xword preceded or followed by /
  *   (glyph boundary, not composition) is expanded normally.
  * - Glyph-boundary anchoring: an X+letters sequence embedded inside
@@ -184,5 +189,74 @@ describe('BlissParser X-codes', () => {
     it.todo('keeps every outlined letter of Xhello-world instead of absorbing the o into the tail token');
     it.todo('reports the whole written token as the failing source, not a sub-token starting mid-run');
     it.todo('treats XM-M and XMM-M alike, so the letter count before an unsupported character does not change the split');
+  });
+
+  // regression: see issue #37. The expansion pass ran on the top-level input
+  // string only, so a run written inside a definition was never expanded and
+  // was then rejected as a multi-character word.
+  describe('when an X-run is written inside a definition codeString', () => {
+    const RUN_DEFS = {
+      DEFXRUNWORD: { codeString: 'B216/XOH' },
+      DEFXRUNWRITTEN: { codeString: 'B216/XO/XH' },
+      DEFXRUNNESTED: { codeString: 'DEFXRUNWORD/B291' },
+      DEFXRUNMIXED: { codeString: 'Xa/Xλ' },
+    };
+    beforeAll(() => BlissSVGBuilder.define(RUN_DEFS));
+    afterAll(() => Object.keys(RUN_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it('expands the run into per-character X-codes', () => {
+      const builder = new BlissSVGBuilder('DEFXRUNWORD');
+      expect(builder.toString()).toBe('B216/XO/XH');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('renders the run identically to the written twin definition', () => {
+      expect(new BlissSVGBuilder('DEFXRUNWORD').svgCode)
+        .toBe(new BlissSVGBuilder('DEFXRUNWRITTEN').svgCode);
+    });
+
+    it('expands a run reached through a nested definition', () => {
+      const builder = new BlissSVGBuilder('DEFXRUNNESTED');
+      expect(builder.toString()).toBe('B216/XO/XH/B291');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('merges a mixed run into one text-fallback glyph, as the top level does', () => {
+      // Greek lambda has no outline, so the whole run falls back to one XTXT_
+      // glyph. Without expansion on this path the lambda was UNKNOWN_CODE.
+      const builder = new BlissSVGBuilder('DEFXRUNMIXED');
+      expect(builder.toString()).toBe('Xaλ');
+      expect(builder.warnings).toEqual([]);
+    });
+  });
+
+  // regression: see issue #37. The ;-adjacency guard suppressed expansion for
+  // ANY following ';'. A part composition is the only thing it exists to
+  // protect; `;;` attaches a word-level overlay to the whole word, and a bare
+  // trailing ';' composes nothing at all.
+  describe('when an X-run is followed by a semicolon that starts no part', () => {
+    it('expands a run carrying a word-level indicator overlay', () => {
+      const builder = new BlissSVGBuilder('B216/XOH;;B99');
+      expect(builder.toString()).toBe('B216/XO/XH;;B99');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('renders an overlaid run identically to its written twin', () => {
+      expect(new BlissSVGBuilder('B216/XOH;;B99').svgCode)
+        .toBe(new BlissSVGBuilder('B216/XO/XH;;B99').svgCode);
+    });
+
+    it('expands a run followed by an inert trailing semicolon', () => {
+      const builder = new BlissSVGBuilder('Xab;');
+      expect(builder.toString()).toBe('Xa/Xb');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('still refuses to expand a run that a real ;-part composes onto', () => {
+      // pins the guard's remaining job; a guard deleted outright would expand
+      // here and split the composition across glyphs
+      expect(new BlissSVGBuilder('Xab;C8').warnings.map(w => w.code))
+        .toContain('WORD_AS_PART');
+    });
   });
 });
