@@ -394,6 +394,53 @@ describe('BlissSVGBuilder text fallback', () => {
     });
   });
 
+  // A `toJSON()` re-ingest used to convert ANY unregistered `X…` code to the
+  // internal text-fallback form, with no check that it was a legal X token. So
+  // a code the DSL rejects came back as accepted content and the warning
+  // vanished: `Xhello-world` warns and renders nothing when parsed, but through
+  // JSON it rendered the text with no warning at all. The object path now asks
+  // the same grammar the DSL asks.
+  describe('when a rejected X code arrives through object input', () => {
+    const authored = (code) => new BlissSVGBuilder({
+      groups: [{ glyphs: [{ codeName: code, parts: [{ codeName: code }] }] }],
+    });
+
+    it('reports the same warning the direct parse reports', () => {
+      for (const code of ['Xhello-world', 'X9', 'Xab9', 'X-', 'XRAY1']) {
+        const direct = new BlissSVGBuilder(code);
+        expect(direct.warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
+        expect(authored(code).warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
+      }
+    });
+
+    it('renders byte-identically to the direct parse after a toJSON round-trip', () => {
+      for (const code of ['Xhello-world', 'X9', 'X-']) {
+        const direct = new BlissSVGBuilder(code);
+        expect(new BlissSVGBuilder(direct.toJSON()).svgCode).toBe(direct.svgCode);
+      }
+    });
+
+    it('still ingests a legal text-fallback code arriving from a real toJSON', () => {
+      for (const input of ['Xλ', 'Xhαllo', 'XTXT_hi']) {
+        const direct = new BlissSVGBuilder(input);
+        expect(direct.warnings).toEqual([]);
+        const rebuilt = new BlissSVGBuilder(direct.toJSON());
+        expect(rebuilt.warnings).toEqual([]);
+        expect(rebuilt.svgCode).toBe(direct.svgCode);
+      }
+    });
+
+    it('leaves an all-outlined run routed to text, the one divergence still open', () => {
+      // `XOH` renders two outlined letters when written and one text glyph when
+      // authored as object data. That is the separate "should authored object
+      // data accept DSL shorthand" question, deliberately untouched here;
+      // pinned so a later change to it is a decision, not a side effect.
+      expect(authored('XOH').warnings).toEqual([]);
+      expect(authored('XOH').svgCode).toContain('<text');
+      expect(new BlissSVGBuilder('XOH').svgCode).not.toContain('<text');
+    });
+  });
+
   describe('when XTXT_ inputs are isolated from global state', () => {
     it('does not leak XTXT_ keys into the global definitions registry', () => {
       new BlissSVGBuilder('Xhéllo');

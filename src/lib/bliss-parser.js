@@ -99,9 +99,15 @@ const X_BARE_LETTERS_PATTERN = new RegExp(`^X([${X_RUN_LETTERS}]+)$`);
 //             digit, punctuation, the internal `XTXT_` routing key). Leave the
 //             token exactly as written and let it resolve, or fail, as the
 //             single code it is.
+// The one outline test the whole X grammar turns on: if every letter has a
+// built-in outline the token stands for that many outlined letters, and if any
+// letter lacks one the WHOLE token is a single text glyph. Letters of one
+// written token never split across two rendering mechanisms.
+const allLettersOutlined = (chars) => [...chars].every(hasPathData);
+
 const classifyXRunBody = (body) =>
   !X_RUN_BODY_PATTERN.test(body) ? null
-    : [...body].every(hasPathData) ? 'word'
+    : allLettersOutlined(body) ? 'word'
     : 'glyph';
 
 // Rewrites the X shorthand in a code string into the codes the renderer knows:
@@ -191,19 +197,21 @@ export function processXCodes(codeString) {
   return result.join('/');
 }
 
-// The internal text-fallback form of an X code that denotes exactly ONE glyph,
-// or null when it denotes anything else. A `;`-part slot asks this: a part is a
-// single character, so it can take the one-glyph answer and only that. The
-// `word` answer (every letter has an outline, so the run is many glyphs) stays
-// as written and fails as the word it is, and a token that is not letters at
-// all (`Xab9`, `X-`) stays as written and fails as the single unknown code it
-// is. Same rule as processXCodes applies at a glyph boundary, asked here for a
-// position that boundary deliberately excludes.
-export function xOneGlyphForm(code) {
+// What a bare X code denotes, for the sites that meet one already stripped of
+// its options and decoration (a `;`-part slot, object input). The same question
+// processXCodes asks of a written token, asked of a finished code:
+//   'glyph'   - some letter has no built-in outline, so the whole code is ONE
+//               text-fallback glyph.
+//   'letters' - every letter has an outline, so the code stands for that many
+//               outlined letters: one character if there is one letter, a word
+//               if there are more.
+//   null      - not X-plus-letters at all (`Xab9`, `X-`, `XTXT_hi`, `B291`), so
+//               it denotes nothing here and has to resolve, or fail, as the
+//               single code it is.
+export function classifyXCode(code) {
   const match = typeof code === 'string' ? code.match(X_BARE_LETTERS_PATTERN) : null;
   if (!match) return null;
-  const chars = match[1];
-  return [...chars].every(hasPathData) ? null : `XTXT_${chars}`;
+  return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
 
 export class BlissParser {
@@ -1509,8 +1517,9 @@ export class BlissParser {
             // character. Ask the shared grammar for the one-glyph answer only;
             // a real word still fails here, which is what keeps a run from
             // splitting one glyph across many.
-            const oneGlyphForm = xOneGlyphForm(part.codeName);
-            if (oneGlyphForm) part.codeName = oneGlyphForm;
+            if (classifyXCode(part.codeName) === 'glyph') {
+              part.codeName = `XTXT_${part.codeName.slice(1)}`;
+            }
 
             const definition = part.codeName?.startsWith('XTXT_')
               ? (() => { const g = createTextFallbackGlyph(part.codeName.slice(5)); g.isShape = true; return g; })()

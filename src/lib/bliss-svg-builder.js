@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, processXCodes } from "./bliss-parser.js";
+import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
@@ -1780,7 +1780,18 @@ class BlissSVGBuilder {
     if (code.startsWith('XTXT_')) return code;
     if (code.length < 2 || code[0] !== 'X') return code;
     if (blissElementDefinitions[code]) return code;
-    return 'XTXT_' + code.slice(1);
+    // Route only what the shared X grammar recognizes. Converting anything that
+    // merely starts with X laundered a REJECTED code into accepted content and
+    // dropped its warning: `Xhello-world` warns UNKNOWN_CODE and renders nothing
+    // when parsed, but came back through JSON as rendered text with no warning
+    // at all. A code the grammar does not recognize now fails here exactly as it
+    // fails on the DSL path.
+    //
+    // The 'letters' answer keeps its current text routing rather than expanding
+    // to a letter sequence: whether authored object data should accept DSL
+    // shorthand at all is an open question of its own (backlog, object-input
+    // validation), and settling it here would settle it by accident.
+    return classifyXCode(code) === null ? code : 'XTXT_' + code.slice(1);
   }
 
   // Re-derive glyph-classification metadata (isBlissGlyph / isExternalGlyph /
