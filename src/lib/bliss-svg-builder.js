@@ -2480,9 +2480,17 @@ class BlissSVGBuilder {
   // codeString is; a run holding a letter with no built-in outline collapses to
   // ONE text-fallback glyph and stays a legal single character. Returns the
   // expanded word form, or null when the codeString is one character.
+  //
+  // The BASE is classified separately because a `;`-part suppresses expansion:
+  // `Xab;C8` keeps its run whole and so carries no `/`, yet the base is still a
+  // word and the definition would fail WORD_AS_PART at every use. Composing a
+  // part onto a run does not turn the run into one character.
   static #expandedRunWord(codeString) {
     const expanded = processXCodes(codeString);
-    return expanded.includes('/') ? expanded : null;
+    if (expanded.includes('/')) return expanded;
+    const base = codeString.split(';')[0];
+    const expandedBase = base === codeString ? expanded : processXCodes(base);
+    return expandedBase.includes('/') ? expandedBase : null;
   }
 
   // Parser-transient tokens that are DSL syntax, not registry codes: defining

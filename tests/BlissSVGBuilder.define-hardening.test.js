@@ -381,6 +381,23 @@ describe('BlissSVGBuilder define hardening', () => {
       expect(result.defined).toEqual([code]);
     });
 
+    it('rejects a glyph definition whose run carries a ;-part', () => {
+      // the ;-part suppresses expansion, so the codeString holds no `/` and a
+      // guard that only looked at the expanded string let this through
+      const code = trackCode('XRUNPART1');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'Xab;C8' } });
+      expect(result.defined).toEqual([]);
+      expect(result.errors[0]).toContain('multi-character word');
+      expect(BlissSVGBuilder.isDefined(code)).toBe(false);
+    });
+
+    it('keeps accepting a one-glyph run that carries a ;-part', () => {
+      // Xaλ is one text glyph, so composing a part onto it is a single character
+      const code = trackCode('XRUNPART2');
+      const result = BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'Xaλ;C8' } });
+      expect(result.defined).toEqual([code]);
+    });
+
     it('keeps accepting a bare alias whose codeString is a letter sequence', () => {
       // a bare alias IS the way to name a word, so the guard must not reach it
       const code = trackCode('XRUNBARE1');
