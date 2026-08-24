@@ -76,6 +76,12 @@ export const X_RUN_LETTERS = 'a-zA-ZÀ-ſͰ-ϿЀ-ӿ';
 // (run-to-stable 2.2).
 const X_TOKEN_PATTERN = new RegExp(String.raw`(?<=^|\/)(\[[^\[\]]*\]>?)?X([^/;^:]+)`, 'g');
 const X_RUN_BODY_PATTERN = new RegExp(`^[${X_RUN_LETTERS}]{2,}$`);
+// An unexpanded multi-letter run reaching a `;`-part slot: the run is a word,
+// and a word cannot be composed onto a character. Anchored at both ends so a
+// code that merely CONTAINS X+letters (MAXWELL) or ends in a non-letter
+// (Xhello9) is not mis-flagged. Built from the shared ranges for the same
+// reason as the pattern above: three copies of this class had drifted apart.
+const WORD_AS_PART_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]{2,}$`);
 // One X letter, optionally behind an option bracket and optionally carrying a
 // trailing decoration, as written in a `/`-separated sequence.
 const X_LETTER_TOKEN_PATTERN = new RegExp(String.raw`^(\[[^\[\]]*\]>?)?X([${X_RUN_LETTERS}])([;^:].*)?$`);
@@ -1497,7 +1503,7 @@ export class BlissParser {
             }
 
             // Detect unexpanded multi-char X-codes (word text used as ; part)
-            if (/^X[a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,}$/.test(part.codeName)) {
+            if (WORD_AS_PART_PATTERN.test(part.codeName)) {
               part.error = `Multi-character text "${part.codeName.slice(1)}" is a word and cannot be composed with ;`;
               part.errorCode = 'WORD_AS_PART';
             }
