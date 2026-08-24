@@ -688,14 +688,14 @@ builder.group(0).headGlyph();
 Returns the input code that produces this element. The exact meaning depends on level:
 
 - **Part level** (`builder.glyph(0).part(0).codeName`): the structural lookup key the user would write (e.g. `'B81'`, `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`).
-- **Glyph level** (`builder.glyph(0).codeName`): the live identity, set only when the glyph is actually a glyph: B-codes (`'B431'`), single X-codes (`'Xa'`, `'Xα'` — built-in alphabet OR single-character text fallback, X-prefix preserved), or `define()`d `type: 'glyph'` aliases (`'LOVE'`). Returns `''` for composites (`H;C8`), bare shape primitives written alone (`H`), and multi-character text fallback (`Xhαllo` is a string of glyphs, not a glyph).
+- **Glyph level** (`builder.glyph(0).codeName`): the live identity, set only when the glyph is actually a glyph: B-codes (`'B431'`), single X-codes (`'Xa'`, `'Xα'` — built-in alphabet OR single-character text fallback, X-prefix preserved), or `define()`d `type: 'glyph'` aliases (`'LOVE'`). Returns `''` for composites (`H;C8`), bare shape primitives written alone (`H`), and multi-character text fallback (`Xhαllo` renders as one glyph but has no identity code of its own; its code lives on its part).
 - **Group level** (`builder.group(0).codeName`): always `''`. Groups are containers without identity.
 
 ```js
 new BlissSVGBuilder('B431').glyph(0).codeName;   // 'B431'
 new BlissSVGBuilder('Xa').glyph(0).codeName;     // 'Xa'
 new BlissSVGBuilder('Xα').glyph(0).codeName;     // 'Xα'  (single-char fallback)
-new BlissSVGBuilder('Xhαllo').glyph(0).codeName; // ''   (text, not a glyph)
+new BlissSVGBuilder('Xhαllo').glyph(0).codeName; // ''   (no code of its own)
 new BlissSVGBuilder('H').glyph(0).codeName;      // ''   (shape primitive)
 new BlissSVGBuilder('H').glyph(0).part(0).codeName; // 'H'
 new BlissSVGBuilder('Xα').glyph(0).part(0).codeName; // 'Xα'
