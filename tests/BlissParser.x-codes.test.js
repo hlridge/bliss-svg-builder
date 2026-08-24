@@ -126,9 +126,70 @@ describe('BlissParser X-codes', () => {
       expect(builder.warnings).toEqual([]);
     });
 
-    it.todo('routes a single fallback letter written as a part to the text glyph (B291;Xλ)');
-    it.todo('routes a run that collapses to one glyph written as a part to the text glyph (B291;Xaλ)');
-    it.todo('still refuses an all-outlined run as a part (B291;Xab stays WORD_AS_PART)');
+    it('routes a single fallback letter written as a part to the text glyph (B291;Xλ)', () => {
+      const builder = new BlissSVGBuilder('B291;Xλ');
+      expect(builder.warnings).toEqual([]);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;XTXT_λ').svgCode);
+    });
+
+    it('routes a run that collapses to one glyph written as a part to the text glyph (B291;Xaλ)', () => {
+      const builder = new BlissSVGBuilder('B291;Xaλ');
+      expect(builder.warnings).toEqual([]);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;XTXT_aλ').svgCode);
+    });
+
+    it('still refuses an all-outlined run as a part (B291;Xab stays WORD_AS_PART)', () => {
+      const builder = new BlissSVGBuilder('B291;Xab');
+      expect(builder.warnings.map(w => w.code)).toEqual(['WORD_AS_PART']);
+    });
+
+    it('keeps a routed part a single part rather than splitting it across glyphs', () => {
+      // criterion (d): the boundary anchor exists so a WORD cannot split one
+      // glyph into many here. Routing the one-glyph answer must not weaken it.
+      const oneGlyph = BlissParser.parse('B81;Xhello');
+      expect(oneGlyph.groups[0].glyphs).toHaveLength(1);
+      const routed = BlissParser.parse('B291;Xaλ');
+      expect(routed.groups[0].glyphs).toHaveLength(1);
+      expect(routed.groups[0].glyphs[0].parts.map(p => p.codeName)).toEqual(['B291', 'XTXT_aλ']);
+    });
+
+    it('serializes a routed part back to the form that was written', () => {
+      const builder = new BlissSVGBuilder('B291;Xaλ');
+      expect(builder.toString()).toBe('B291;Xaλ');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('routes a part behind a part option and a coordinate suffix too', () => {
+      const options = new BlissSVGBuilder('B291;[color=red]>Xaλ');
+      expect(options.warnings).toEqual([]);
+      expect(options.svgCode).toContain('red');
+      const placed = new BlissSVGBuilder('B291;Xaλ:2,3');
+      expect(placed.warnings).toEqual([]);
+      expect(placed.svgCode).toBe(new BlissSVGBuilder('B291;XTXT_aλ:2,3').svgCode);
+    });
+
+    it('leaves a part that is not X-plus-letters to fail as the code it is', () => {
+      // `Xab9` is not a letter run, so the part slot must not invent a text
+      // glyph for it: it stays the single unknown code it was written as,
+      // matching what the same token does at the top level.
+      const builder = new BlissSVGBuilder('B291;Xab9');
+      expect(builder.warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
+      expect(builder.warnings[0].source).toBe('Xab9');
+    });
+
+    it('matches what the same composition does through object input', () => {
+      // Object input already routed these (its own normalization step rewrites
+      // an unregistered X code); the DSL was the surface that could not.
+      for (const code of ['Xλ', 'Xaλ']) {
+        const dsl = new BlissSVGBuilder(`B291;${code}`);
+        const obj = new BlissSVGBuilder({
+          groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }, { codeName: code }] }] }],
+        });
+        expect(obj.svgCode).toBe(dsl.svgCode);
+        expect(obj.warnings).toEqual(dsl.warnings);
+      }
+    });
   });
 
   describe('when Xword is adjacent to / (glyph boundary, not composition)', () => {

@@ -37,8 +37,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   its written `/`-expansion (option rides the first expanded glyph;
  *   an all-fallback run stays one <text> glyph); an option-prefixed
  *   member of an X-sequence stands alone instead of merging into the
- *   whole-run fallback. X-codes in a `;`-part slot stay out of fallback
- *   routing (unchanged).
+ *   whole-run fallback. A `;`-part slot routes the one-glyph answer
+ *   (`B291;Xλ`) and still refuses a word (`B291;Xab`).
  * - XTXT_ singleton isolation: rendering a text-fallback input does not
  *   leak `XTXT_` keys into the global definitions registry, and two
  *   builders with different XTXT_ inputs render independently.
@@ -373,9 +373,23 @@ describe('BlissSVGBuilder text fallback', () => {
   });
 
   describe('when an X-code sits in a ;-part slot', () => {
-    it('stays out of fallback routing (unchanged contract)', () => {
+    // This describe used to pin the opposite: `B291;Xλ` warned UNKNOWN_CODE
+    // because the part slot never routed X codes at all. That was a routing
+    // hole rather than a contract (the very same glyph was reachable by
+    // writing `B291;XTXT_λ`), and it became visibly asymmetric once a `;`-part
+    // was legalized ON a one-glyph run. The part slot now asks the shared run
+    // grammar for the ONE-glyph answer; the word answer still fails, which is
+    // the boundary this describe really guards.
+    it('routes a fallback letter to the text glyph', () => {
       const b = new BlissSVGBuilder('B291;Xλ');
-      expect(b.warnings.map((w) => w.code)).toContain('UNKNOWN_CODE');
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toContain('<text');
+      expect(b.svgCode).toBe(new BlissSVGBuilder('B291;XTXT_λ').svgCode);
+    });
+
+    it('refuses a word, so a run never splits one glyph across many', () => {
+      const b = new BlissSVGBuilder('B291;Xab');
+      expect(b.warnings.map((w) => w.code)).toContain('WORD_AS_PART');
       expect(b.svgCode).not.toContain('<text');
     });
   });

@@ -85,6 +85,8 @@ const WORD_AS_PART_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]{2,}$`);
 // One X letter, optionally behind an option bracket and optionally carrying a
 // trailing decoration, as written in a `/`-separated sequence.
 const X_LETTER_TOKEN_PATTERN = new RegExp(String.raw`^(\[[^\[\]]*\]>?)?X([${X_RUN_LETTERS}])([;^:].*)?$`);
+// A bare X code that is nothing but letters, with no decoration of any kind.
+const X_BARE_LETTERS_PATTERN = new RegExp(`^X([${X_RUN_LETTERS}]+)$`);
 
 // What a written X token DENOTES, which is the one question every X site asks:
 //   'word'  - every letter has a built-in outline, so the run is shorthand for
@@ -187,6 +189,21 @@ export function processXCodes(codeString) {
   flushXSequence();
 
   return result.join('/');
+}
+
+// The internal text-fallback form of an X code that denotes exactly ONE glyph,
+// or null when it denotes anything else. A `;`-part slot asks this: a part is a
+// single character, so it can take the one-glyph answer and only that. The
+// `word` answer (every letter has an outline, so the run is many glyphs) stays
+// as written and fails as the word it is, and a token that is not letters at
+// all (`Xab9`, `X-`) stays as written and fails as the single unknown code it
+// is. Same rule as processXCodes applies at a glyph boundary, asked here for a
+// position that boundary deliberately excludes.
+export function xOneGlyphForm(code) {
+  const match = typeof code === 'string' ? code.match(X_BARE_LETTERS_PATTERN) : null;
+  if (!match) return null;
+  const chars = match[1];
+  return [...chars].every(hasPathData) ? null : `XTXT_${chars}`;
 }
 
 export class BlissParser {
@@ -1483,6 +1500,17 @@ export class BlissParser {
               part.options = dropMisplacedGlobalKeys(part.options, 'part');
               if (!part.options) delete part.options;
             }
+
+            // A `;`-part slot sits inside a glyph, so the glyph-boundary
+            // anchored expansion pass above never sees it: without this, a
+            // fallback letter written as a part failed as an unknown code
+            // although the same glyph is reachable as `XTXT_λ`, and a run that
+            // collapses to one glyph was refused as a word although it is one
+            // character. Ask the shared grammar for the one-glyph answer only;
+            // a real word still fails here, which is what keeps a run from
+            // splitting one glyph across many.
+            const oneGlyphForm = xOneGlyphForm(part.codeName);
+            if (oneGlyphForm) part.codeName = oneGlyphForm;
 
             const definition = part.codeName?.startsWith('XTXT_')
               ? (() => { const g = createTextFallbackGlyph(part.codeName.slice(5)); g.isShape = true; return g; })()
