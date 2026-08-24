@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser } from "./bliss-parser.js";
+import { BlissParser, X_RUN_LETTERS, processXCodes } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
@@ -2468,10 +2468,22 @@ class BlissSVGBuilder {
 
   // The external-character namespace: X followed by one or more letters in
   // the parser recognition ranges (Latin, Latin-1/Ext-A, Greek, Cyrillic).
-  // Matches the parser's X-run tokenizer ranges exactly: written input of
-  // this shape is always read as external text, never as a definition name,
-  // so such a definition would be unreachable (1.4 fence; Phase 2.3 guard).
-  static #X_NAMESPACE_PATTERN = /^X[a-zA-ZÀ-ſͰ-ϿЀ-ӿ]+$/;
+  // Built from the parser's own letter ranges so the two cannot drift: written
+  // input of this shape is always read as external text, never as a definition
+  // name, so such a definition would be unreachable (1.4 fence; Phase 2.3
+  // guard). A name that leaves the ranges (XRAY1) reaches its definition.
+  static #X_NAMESPACE_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]+$`);
+
+  // A multi-letter external-letter run is a word WITHOUT a `/` in it: XOH is
+  // shorthand for XO/XH. Asking the parser's own expansion keeps a typed
+  // definition and its use site from disagreeing about how many characters a
+  // codeString is; a run holding a letter with no built-in outline collapses to
+  // ONE text-fallback glyph and stays a legal single character. Returns the
+  // expanded word form, or null when the codeString is one character.
+  static #expandedRunWord(codeString) {
+    const expanded = processXCodes(codeString);
+    return expanded.includes('/') ? expanded : null;
+  }
 
   // Parser-transient tokens that are DSL syntax, not registry codes: defining
   // one would change what the bare token means at the use site (a definition
@@ -2813,6 +2825,11 @@ class BlissSVGBuilder {
       if (definition.codeString.includes(';;')) {
         throw new Error(`define("${code}"): a shape definition cannot contain a word-level indicator (";;"); a shape is a single character.`);
       }
+
+      const shapeRunWord = BlissSVGBuilder.#expandedRunWord(definition.codeString);
+      if (shapeRunWord) {
+        throw new Error(`define("${code}"): a shape definition cannot be a multi-character word ("${definition.codeString}" is shorthand for "${shapeRunWord}"). Define a word as a bare alias (omit type:"shape").`);
+      }
     }
 
     BlissSVGBuilder.#assertReplaceable(code, options);
@@ -2891,6 +2908,11 @@ class BlissSVGBuilder {
     // character, so it cannot carry one. (Strict Indicator Separation.)
     if (definition.codeString.includes(';;')) {
       throw new Error(`define("${code}"): a glyph definition cannot contain a word-level indicator (";;"); a glyph is a single character. Apply a word indicator at the use site (WORD;;INDICATOR).`);
+    }
+
+    const glyphRunWord = BlissSVGBuilder.#expandedRunWord(definition.codeString);
+    if (glyphRunWord) {
+      throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word ("${definition.codeString}" is shorthand for "${glyphRunWord}"). Define a word as a bare alias (omit type:"glyph").`);
     }
 
     // Glyphs can reference other glyphs and shapes, but not external glyphs or bare aliases
@@ -3358,6 +3380,11 @@ class BlissSVGBuilder {
       }
       if ((type === 'glyph' || type === 'shape') && newCodeString.includes('/')) {
         throw new Error(`patchDefinition("${code}"): a ${type} definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"${type}").`);
+      }
+      const patchRunWord = (type === 'glyph' || type === 'shape')
+        && BlissSVGBuilder.#expandedRunWord(newCodeString);
+      if (patchRunWord) {
+        throw new Error(`patchDefinition("${code}"): a ${type} definition cannot be a multi-character word ("${newCodeString}" is shorthand for "${patchRunWord}"). Define a word as a bare alias (omit type:"${type}").`);
       }
       const allowedRefTypes = type === 'glyph' ? ['glyph', 'shape']
         : type === 'shape' ? ['shape']
