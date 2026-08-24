@@ -258,5 +258,19 @@ describe('BlissParser X-codes', () => {
       expect(new BlissSVGBuilder('Xab;C8').warnings.map(w => w.code))
         .toContain('WORD_AS_PART');
     });
+
+    it('expands an option-prefixed run carrying an overlay', () => {
+      const builder = new BlissSVGBuilder('[color=red]Xab;;B81');
+      expect(builder.toString()).toBe('[color=red]Xa/Xb;;B81');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('is not confused by a semicolon inside a quoted option value', () => {
+      // the value's ; is placeholder-stored before expansion runs; if it ever
+      // leaked into the raw string the guard would read it as a part boundary
+      const builder = new BlissSVGBuilder('[data-x="a;b"]Xab;;B81');
+      expect(builder.toString()).toBe('[data-x="a;b"]Xa/Xb;;B81');
+      expect(builder.warnings).toEqual([]);
+    });
   });
 });
