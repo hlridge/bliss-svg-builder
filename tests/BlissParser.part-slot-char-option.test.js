@@ -354,4 +354,22 @@ describe('BlissParser part-slot character options', () => {
       expect(build(input).warnings).toEqual([]);
     });
   });
+
+  // Three brackets before a `>` silently lose one. The part-level matcher uses a
+  // lazy `.*?` bracket class, so when the first bracket is not followed by `>`
+  // it backtracks ACROSS the following brackets until it finds one, capturing
+  // several as a single "bracket" whose option parse keeps only the first. The
+  // character-level matcher was tightened to `[^\[\]]*` for exactly this reason;
+  // the part-level one was not. The option written with the `>` is the one that
+  // vanishes, and nothing warns. Backlog: the GH #40 row, extra criteria (e)/(f).
+  describe('when three option brackets precede a part separator', () => {
+    it('keeps the two-bracket case whole, the boundary the three-bracket case crosses', () => {
+      const b = build('[color=red][fill=blue]>B291');
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe('[color=red][fill=blue]>B291');
+    });
+
+    it.todo('applies every bracket written before a part separator, or warns about the one it drops');
+    it.todo('names the dropped option instead of losing it silently');
+  });
 });
