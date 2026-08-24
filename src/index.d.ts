@@ -526,6 +526,13 @@ export interface ShapeContext {
  */
 export interface GlyphDefinition {
   type: 'glyph';
+  /**
+   * A glyph is a single character, so this may not be a multi-character word:
+   * neither a `/` nor an external-letter run standing for several letters
+   * (`XOH` is shorthand for `XO/XH`). Define a word as a {@link BareDefinition}
+   * alias. A run that renders as one text element (`Xaλ`, where a letter has no
+   * embedded outline) is a single character and is accepted.
+   */
   codeString: string;
   /**
    * Marks an all-indicator definition as a compound indicator. Valid only on a
@@ -558,6 +565,7 @@ export interface ShapeDefinition {
   /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
   isIndicator?: never;
   getPath?: (ctx: ShapeContext) => string;
+  /** A shape is a single character; the same word rule as {@link GlyphDefinition.codeString} applies. */
   codeString?: string;
   width?: number;
   height?: number;
@@ -1012,7 +1020,9 @@ export declare class BlissSVGBuilder {
    *   or a change violates the definition rules: an unknown property or internal/type
    *   flag (e.g. `type`, `isBuiltIn`) for the definition;
    *   `getPath` not a function; empty, whitespace-only, or non-string `codeString`; a `;;` in `codeString`;
-   *   a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular
+   *   a `/` in a glyph-or-shape `codeString`, or one that is an external-letter run
+   *   standing for several letters (`XOH` is shorthand for `XO/XH`); a disallowed
+   *   reference type; a circular
    *   reference; a `;`-part that is itself a composition; a glyph `codeString` that
    *   bakes an indicator (or an `isIndicator` change that leaves one baked); internal
    *   coordinates in a multi-character bare `codeString` (kerning markers allowed);
