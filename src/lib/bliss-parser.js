@@ -73,8 +73,11 @@ export const X_RUN_LETTERS = 'a-zA-ZÀ-ſͰ-ϿЀ-ӿ';
 // leaving its tail to glue onto the last expanded letter, which destroyed the
 // letter before it (`Xhello-world` rendered `hell`). An option bracket at the
 // boundary is part of the token, not a place for a run to hide from routing
-// (run-to-stable 2.2).
-const X_TOKEN_PATTERN = new RegExp(String.raw`(?<=^|\/)(\[[^\[\]]*\]>?)?X([^/;^:]+)`, 'g');
+// (run-to-stable 2.2). A BARE `>` is an option region carrying nothing, and it
+// belongs to the prefix for the same reason: without it a run written behind
+// one was never expanded and then failed as a whole word, while `||`, `|` and
+// even an empty `[]>` all rendered it.
+const X_TOKEN_PATTERN = new RegExp(String.raw`(?<=^|\/)(\[[^\[\]]*\]>?|>)?X([^/;^:]+)`, 'g');
 const X_RUN_BODY_PATTERN = new RegExp(`^[${X_RUN_LETTERS}]{2,}$`);
 // An unexpanded multi-letter run reaching a `;`-part slot: the run is a word,
 // and a word cannot be composed onto a character. Anchored at both ends so a
@@ -950,6 +953,33 @@ export class BlissParser {
           if (partLevelMatch) {
             const optionBracket = partLevelMatch[1];
             let partContent = partLevelMatch[2];
+            // A SECOND part bracket is invalid syntax that parseParts warns
+            // about and drops, so strip the extras here as well: the gate below
+            // and the metadata lift both need to see the real code behind them.
+            // `str` is left intact, so parseParts still reports each extra
+            // exactly once. Without this a word alias behind two part brackets
+            // was never recognized as a word and failed as a part.
+            const extraPartBrackets = [];
+            let extraPartBracket;
+            while ((extraPartBracket = partContent.match(/^(\[[^\[\]]*\])>(.+)$/)) !== null) {
+              extraPartBrackets.push(extraPartBracket[1]);
+              partContent = extraPartBracket[2];
+            }
+            // When the code turns out to be a WORD the branch below recurses on
+            // the stripped content, so parseParts never sees those extras and
+            // cannot report them. Report them here in that case only, or they
+            // would vanish with nothing said (the character scope does the same
+            // for the same reason, a few lines down).
+            const warnDroppedPartBrackets = () => {
+              for (const dropped of extraPartBrackets) {
+                const restored = restorePlaceholders(dropped);
+                parseWarnings.push({
+                  code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+                  message: `Multiple option brackets on one part: "${restored}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b]>.`,
+                  source: restored,
+                });
+              }
+            };
             // Option-placement scope gate (mirrors the char-level `;` MISPLACED
             // gate below). A part option binds to a single part, so `[opts]>` on
             // an alias that expands to a WORD is MISPLACED: warn, drop the
@@ -968,6 +998,7 @@ export class BlissParser {
               ? gateBaseRaw.slice(0, gateCoordMatch.index)
               : gateBaseRaw;
             if (resolveToFinalCodeString(gateBase)?.includes('/')) {
+              warnDroppedPartBrackets();
               parseWarnings.push({
                 code: WARNING_CODES.MISPLACED_PART_OPTION,
                 message: `Part option (${restorePlaceholders(optionBracket)}>) ignored on "${restorePlaceholders(gateBase)}": > applies an option to a single part, but this is a word. Use ${restorePlaceholders(optionBracket)}|| to apply it to the whole content.`,
@@ -1016,10 +1047,22 @@ export class BlissParser {
             }];
           }
 
-          // Strip leading glyph-level bracket options
+          // Strip leading glyph-level bracket options. EVERY one of them, not
+          // just the first: a second bracket at one scope is invalid syntax
+          // that the glyph-level peel warns about and drops, so the code behind
+          // it must still resolve. Stripping only the first left a word alias
+          // unresolvable (`[a][b]MYWORD` looked up `[b]MYWORD`), so the
+          // character failed with WORD_AS_PART although the single-bracket
+          // spelling renders it. The prefix that APPLIES is still the first.
           const optionsMatch = str.match(/^(\[.*?\])(?!>)/);
           const optionsPrefix = optionsMatch ? optionsMatch[1] : '';
-          const codeForLookup = optionsPrefix ? str.slice(optionsPrefix.length) : str;
+          let codeForLookup = str;
+          const strippedBrackets = [];
+          let strippedBracket;
+          while ((strippedBracket = codeForLookup.match(/^(\[.*?\])(?!>)/)) !== null) {
+            strippedBrackets.push(strippedBracket[1]);
+            codeForLookup = codeForLookup.slice(strippedBracket[1].length);
+          }
 
           const [potentialBaseCodeRaw, ...rawIndicators] = codeForLookup.split(';');
           // Strict Indicator Separation: `;` is dumb part-composition, so the
@@ -1241,6 +1284,18 @@ export class BlissParser {
             // top level; nested expansion keeps its prepend behavior.
             if (optionsPrefix && expandedParts.length > 0) {
               if (isTopLevel && isMultiGlyphWord) {
+                // A word expands into several glyph tokens, so the bracket text
+                // never reaches the glyph-level peel that reports duplicates.
+                // Report them here instead, or a second bracket on a word alias
+                // would vanish with nothing said about it.
+                for (const dropped of strippedBrackets.slice(1)) {
+                  const restored = restorePlaceholders(dropped);
+                  parseWarnings.push({
+                    code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+                    message: `Multiple option brackets on one character: "${restored}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b].`,
+                    source: restored,
+                  });
+                }
                 parseWarnings.push({
                   code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
                   message: `Character option (${restorePlaceholders(optionsPrefix)}) ignored on "${restorePlaceholders(potentialBaseCode)}": it applies to a single character, but this expands to a word. Use ${restorePlaceholders(optionsPrefix)}|| to apply it to the whole content.`,

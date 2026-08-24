@@ -30,17 +30,19 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   DSL spelling.
  * - A peeled space part still meets the space-part invariant
  *   (MISPLACED_SPACE) afterwards.
- * - Unchanged contracts: valid placements stay warn-free; a dangling
- *   bracket with no code and slot-0 doubled char brackets keep failing the
- *   whole character.
- * - Cross-scope asymmetry floor (GH #40), two independent inputs: a bare
- *   option separator (`||CODE`/`|CODE` render, `>CODE` destroys the
- *   character), and two brackets at one scope (global/word warn
- *   `MULTIPLE_OPTION_BRACKETS` and render; character/part destroy the
- *   character). Plus the legal different-scope adjacency
- *   (`[char][part]>CODE`, `[global]||[word]|CODE`) that any widened
- *   duplicate-detector must keep warning-free, and it.todo tripwires for the
- *   intended end state.
+ * - Unchanged contracts: valid placements stay warn-free, and a dangling
+ *   bracket with no code left to render still fails the whole character.
+ * - Cross-scope consistency (GH #40). A separator written with no bracket
+ *   carries no options at every scope, so the code stays plain content
+ *   (`||CODE`, `|CODE`, `>CODE`), including in a later part slot
+ *   (`S8;>C8` renders both parts) and over an empty slot (`S8;>` is inert);
+ *   a doubled separator (`>>CODE`) is still refused. More than one bracket
+ *   at ONE scope warns `MULTIPLE_OPTION_BRACKETS`, applies the first and
+ *   renders, at every scope and for every code class including word aliases.
+ *   The legal different-scope adjacency (`[char][part]>CODE`,
+ *   `[global]||[word]|CODE`) stays warning-free, which is what the `>` stop
+ *   condition in the peel is for. All of it pinned on the definition path
+ *   too, where a codeString carries RAW brackets rather than placeholders.
  *
  * Does NOT cover:
  * - `;;` overlay char-form bracket strips, see
@@ -325,6 +327,20 @@ describe('BlissParser part-slot character options', () => {
       expect(codes('>>B291')).toContain('UNKNOWN_CODE');
     });
 
+    it('gives a letter run behind a bare separator the same treatment as the other scopes', () => {
+      // A letter run is expanded before the option regions are read, and the
+      // pass only recognized a BRACKETED prefix, so a bare `>` blocked it: the
+      // run reached the code lookup whole and failed. `||`, `|` and even an
+      // empty `[]>` all rendered it, which left the part scope the odd one out
+      // at exactly the boundary this describe exists to remove.
+      for (const prefix of ['||', '|', '[]>', '>']) {
+        const b = build(`${prefix}Xhello`);
+        expect(b.warnings).toEqual([]);
+        expect(b.toString()).toBe('Xh/Xe/Xl/Xl/Xo');
+        expect(b.svgCode).toBe(build('Xhello').svgCode);
+      }
+    });
+
     it('keeps the glyph identity, so the code is plain content and not an empty option region', () => {
       // The documented rule for a bare separator is that it "carries no options
       // and stays plain content", so `>B291` must be `B291`, not `[]>B291`
@@ -399,6 +415,29 @@ describe('BlissParser part-slot character options', () => {
     it('still fails a dangling bracket, which has no code left to render', () => {
       // The one whole-character fail in this family that IS settled.
       expect(codes('S8;[fill=green]')).toContain('UNKNOWN_CODE');
+    });
+
+    it('renders a word alias behind a doubled bracket, not just a single one', () => {
+      // "the content still renders" has to hold for every code class, not only
+      // single characters. The code behind the brackets must still RESOLVE, so
+      // the doubled spelling reaches the same word path the single one does.
+      BlissSVGBuilder.define({ _DUPWORD: { codeString: 'B291/B431' } });
+      try {
+        const single = build('[color=red]_DUPWORD');
+        const doubled = build('[color=red][fill=green]_DUPWORD');
+        expect(codes('[color=red]_DUPWORD')).toEqual(['MISPLACED_CHARACTER_OPTION']);
+        expect(codes('[color=red][fill=green]_DUPWORD'))
+          .toEqual(['MULTIPLE_OPTION_BRACKETS', 'MISPLACED_CHARACTER_OPTION']);
+        expect(doubled.svgCode).toBe(single.svgCode);
+        const partSingle = build('[color=red]>_DUPWORD');
+        const partDoubled = build('[color=red]>[fill=green]>_DUPWORD');
+        expect(codes('[color=red]>_DUPWORD')).toEqual(['MISPLACED_PART_OPTION']);
+        expect(codes('[color=red]>[fill=green]>_DUPWORD'))
+          .toEqual(['MULTIPLE_OPTION_BRACKETS', 'MISPLACED_PART_OPTION']);
+        expect(partDoubled.svgCode).toBe(partSingle.svgCode);
+      } finally {
+        BlissSVGBuilder.removeDefinition('_DUPWORD');
+      }
     });
   });
 
