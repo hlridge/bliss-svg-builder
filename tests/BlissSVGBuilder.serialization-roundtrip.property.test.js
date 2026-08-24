@@ -90,5 +90,20 @@ describe('BlissSVGBuilder serialization round-trip (property-based)', { tags: ['
         config,
       );
     });
+
+    // The JSON→JSON property above compares serializations, so a class of bug
+    // that drops derived RENDER metadata (glyph identity, and with it external
+    // -glyph spacing) survives it: both sides omit the metadata, so both agree
+    // while the pictures differ. GH #38 was exactly that. Compare what the user
+    // sees, on the same footing as the toString→SVG property above.
+    it('renders byte-identical SVG', () => {
+      fc.assert(
+        fc.property(validCompositionArb, (s) => {
+          const b = new BlissSVGBuilder(s);
+          expect(new BlissSVGBuilder(b.toJSON()).svgCode).toBe(b.svgCode);
+        }),
+        config,
+      );
+    });
   });
 });

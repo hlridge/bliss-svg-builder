@@ -2344,6 +2344,13 @@ class BlissSVGBuilder {
             if (glyph.options) delete glyph.options.key;
             if (glyph.parts) stripParts(glyph.parts);
 
+            // Did this glyph ever have an identity code? Read it BEFORE the
+            // rename below, which drops the code for a custom glyph decomposed
+            // to portable parts. That glyph is anonymous on purpose and its
+            // parts still re-derive its metadata; a glyph that never had a code
+            // has nothing to re-derive from. See the metadata gate further down.
+            const hadIdentityCode = !!glyph.glyphCode;
+
             // Normalize glyphCode → codeName for public API
             if (glyph.glyphCode) {
               // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
@@ -2398,7 +2405,16 @@ class BlissSVGBuilder {
             // derived from the code and re-derived on reconstruction (see
             // #reapplyGlyphMetadata), so it is not user-authored composition data.
             // deep output keeps it for toString()/merge(). (issue #28 toJSON audit)
-            if (!options.deep) {
+            //
+            // "Derived from the code" only holds where there IS a code. Two
+            // glyphs have none: one wearing a part-scope option (`[opts]>Xm`,
+            // where the option binds the code to the PART) and a multi-character
+            // text fallback (`Xhαllo`, which is one <text> glyph with no code of
+            // its own). Dropping their metadata made a rebuild forget they were
+            // external, so every following glyph shifted by 1.2 units -- the
+            // difference between external-glyph-space and char-space (GH #38).
+            // Keep the metadata exactly where nothing can re-derive it.
+            if (!options.deep && hadIdentityCode) {
               delete glyph.char;
               delete glyph.isBlissGlyph;
               delete glyph.isExternalGlyph;

@@ -26,11 +26,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   (e.g. B55 → XA, B76 → XV) produces byte-identical SVG to its X-code
  *   counterpart, both as raw codes and when wrapped in a custom-definition
  *   alias (BCI55 = "B55", BCI76 = "B76").
- * - Part-scope-option floor: the direct render and the `toString()`
- *   round-trip both keep external-glyph spacing, and `toJSON()` keeps the
- *   glyph `codeName` for every spelling except the DSL `[opts]>` one. The
- *   toJSON drift for that spelling is pinned as it.todo (see the describe
- *   comment and the backlog row it names).
+ * - External-glyph spacing survives a `toJSON()` round-trip (GH #38), for both
+ *   glyph shapes that carry no code of their own: one whose option is written
+ *   in part scope (`[color=red]>Xm`) and a multi-character text fallback
+ *   (`Xhαllo`). Includes the boundary in the other direction: a Bliss
+ *   character, which has no metadata at risk, gains nothing in its JSON.
  *
  * Does NOT cover:
  * - The text-fallback boundary (multi-character X-prefix `Xhello`, `Xα`,
@@ -59,6 +59,14 @@ function extractExternalGlyphPaths(svg) {
 function extractXCoordinates(svg) {
   const matches = [...svg.matchAll(/d="M(-?[\d.]+),/g)];
   return matches.map(m => parseFloat(m[1]));
+}
+
+// Ink-independent gap between the first two glyphs, in grid units: reads the
+// laid-out element snapshots rather than path coordinates, so it measures a
+// <text> fallback glyph the same way it measures an outlined one.
+function glyphGap(builder) {
+  const [first, second] = builder.groups[0].children;
+  return second.x - (first.x + first.width);
 }
 
 describe('BlissSVGBuilder external glyphs', () => {
@@ -320,8 +328,104 @@ describe('BlissSVGBuilder external glyphs', () => {
       expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('Xm');
     });
 
-    it.todo('keeps the glyph codeName in toJSON when the part carries a DSL part-scope option');
-    it.todo('round-trips through toJSON with byte-identical SVG, matching the toString round-trip');
-    it.todo('preserves external-glyph spacing after a toJSON round-trip instead of widening to char-space');
+    it('keeps the external-glyph metadata in toJSON when the part carries a DSL part-scope option', () => {
+      // `[opts]>` binds the code to the PART, so the glyph itself stays
+      // anonymous by design and there is no glyph codeName to keep. toJSON
+      // normally drops glyph-classification metadata because the code
+      // re-derives it; with no code, it has to be written out instead.
+      const glyph = new BlissSVGBuilder('[color=red]>Xm/XV/XA').toJSON({ preserve: true }).groups[0].glyphs[0];
+      expect(glyph.codeName).toBeUndefined();
+      expect(glyph.isExternalGlyph).toBe(true);
+      expect(glyph.char).toBe('m');
+    });
+
+    it('round-trips through toJSON with byte-identical SVG, matching the toString round-trip', () => {
+      const direct = new BlissSVGBuilder('[color=red]>Xm/XV/XA');
+      const viaJson = new BlissSVGBuilder(direct.toJSON());
+      const viaString = new BlissSVGBuilder(direct.toString());
+      expect(viaJson.svgCode).toBe(direct.svgCode);
+      expect(viaJson.svgCode).toBe(viaString.svgCode);
+    });
+
+    it('preserves external-glyph spacing after a toJSON round-trip instead of widening to char-space', () => {
+      const direct = new BlissSVGBuilder('[color=red]>Xm/XV/XA');
+      const rebuilt = new BlissSVGBuilder(direct.toJSON());
+      // external-glyph-space is 0.8; char-space is 2, so the regression this
+      // pins is a 1.2-unit widening of every gap after the affected glyph.
+      expect(glyphGap(rebuilt)).toBeCloseTo(glyphGap(direct), 6);
+      expect(glyphGap(rebuilt)).toBeCloseTo(0.8, 6);
+    });
+
+    it('adds nothing to the JSON of a Bliss character, which carries no metadata at risk', () => {
+      // The metadata is written out only where nothing can re-derive it. A
+      // Bliss character under the same spelling lifts no glyph-level metadata
+      // in the first place, so its JSON must stay exactly as lean as before.
+      const glyph = new BlissSVGBuilder('[color=red]>B291/B291').toJSON({ preserve: true }).groups[0].glyphs[0];
+      expect(Object.keys(glyph)).toEqual(['parts']);
+    });
+
+    it('round-trips the composed and repositioned spellings through toJSON too', () => {
+      for (const input of ['[color=red]>Xm;B81/XV', '[color=red]>Xm:2,3/XV']) {
+        const direct = new BlissSVGBuilder(input);
+        expect(new BlissSVGBuilder(direct.toJSON()).svgCode).toBe(direct.svgCode);
+      }
+    });
+  });
+
+  // note: a multi-character text-fallback glyph (`Xhαllo` — Greek alpha has no
+  // outline, so the whole run renders as one `<text>` element) had no
+  // glyph-level identity code at all. `toJSON()` therefore emitted no glyph
+  // `codeName`, and rebuilding from that JSON could not tell the glyph was
+  // external — so the gap to its neighbour widened from `external-glyph-space`
+  // (0.8) to `char-space` (2). The single-character fallback (`Xλ`) never had
+  // the problem because it carries an identity code. This is the second
+  // trigger of the same user-visible symptom as the part-scope-option describe
+  // above (external letters 1.2 units too far apart); GH #38 carries both.
+  describe('when a multi-character text-fallback glyph is rebuilt from toJSON', () => {
+    it('writes the external-glyph flag into the JSON, having no code to re-derive it from', () => {
+      const glyph = new BlissSVGBuilder('XM/Xhαllo').toJSON({ preserve: true }).groups[0].glyphs[1];
+      expect(glyph.codeName).toBeUndefined();
+      expect(glyph.isExternalGlyph).toBe(true);
+    });
+
+    it('reports the rebuilt glyph as an external glyph', () => {
+      const b = new BlissSVGBuilder('XM/Xhαllo');
+      const rebuilt = new BlissSVGBuilder(b.toJSON());
+      expect(b.groups[0].children[1].isExternalGlyph).toBe(true);
+      expect(rebuilt.groups[0].children[1].isExternalGlyph).toBe(true);
+    });
+
+    it('renders byte-identical SVG after a toJSON round-trip', () => {
+      const b = new BlissSVGBuilder('XM/Xhαllo');
+      expect(new BlissSVGBuilder(b.toJSON()).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps external-glyph spacing on both sides of the fallback glyph', () => {
+      for (const input of ['XM/Xhαllo', 'Xhαllo/XM']) {
+        const b = new BlissSVGBuilder(input);
+        const rebuilt = new BlissSVGBuilder(b.toJSON());
+        expect(glyphGap(b)).toBeCloseTo(0.8, 6);
+        expect(glyphGap(rebuilt)).toBeCloseTo(0.8, 6);
+      }
+    });
+
+    it('restores external identity from authored object input written in the public form', () => {
+      const authored = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: 'XM' }, { codeName: 'Xhαllo' }] }],
+      });
+      expect(authored.groups[0].children[1].isExternalGlyph).toBe(true);
+      expect(glyphGap(authored)).toBeCloseTo(0.8, 6);
+    });
+
+    it('leaves the single-character fallback and the Bliss-character neighbour unchanged', () => {
+      // Regression floor: the fix must not turn a Bliss character into an
+      // external one, nor disturb the single-char fallback that already worked.
+      expect(glyphGap(new BlissSVGBuilder('XM/B291'))).toBeCloseTo(2, 6);
+      // `XM/Xλ` would merge into ONE fallback glyph (λ has no outline), so the
+      // single-char floor needs a neighbour that does not merge with it.
+      const single = new BlissSVGBuilder('B291/Xλ');
+      expect(new BlissSVGBuilder(single.toJSON()).svgCode).toBe(single.svgCode);
+      expect(single.groups[0].children[1].codeName).toBe('Xλ');
+    });
   });
 });

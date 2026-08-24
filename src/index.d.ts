@@ -634,7 +634,11 @@ export interface DefinitionMetadata {
  * `isBlissGlyph`/`isExternalGlyph`/`char`/`kerningRules`/
  * `shrinksPrecedingWordSpace` and the glyph-level `isIndicator` flag, plus part
  * `anchorOffsetX`/`anchorOffsetY`) is omitted — it is fully re-derived from the
- * code when this object is passed back to the constructor. `{ deep: true }`
+ * code when this object is passed back to the constructor. The one exception is
+ * a glyph with no code of its own to re-derive it from, such as a
+ * multi-character text fallback (`Xhαllo`) or a glyph whose option binds to its
+ * part (`[color=red]>Xm`); there the metadata is written out so the
+ * reconstruction still lays the glyph out the same way. `{ deep: true }`
  * retains that metadata plus nested sub-parts for `toString()`/`merge()`; those
  * extra fields are not part of this type.
  *
@@ -655,6 +659,17 @@ export interface BlissJSON {
       codeName?: string;
       options?: Record<string, string | boolean>;
       isHeadGlyph?: boolean;
+      /**
+       * Classification metadata, present only on a glyph that has no `codeName`
+       * to re-derive it from (see the interface comment). Read back on
+       * reconstruction; do not author it by hand on a glyph that has a code.
+       */
+      isBlissGlyph?: boolean;
+      isExternalGlyph?: boolean;
+      char?: string;
+      kerningRules?: Record<string, number>;
+      shrinksPrecedingWordSpace?: boolean;
+      isIndicator?: boolean;
       parts?: Array<{
         codeName: string;
         options?: Record<string, string | boolean>;

@@ -958,6 +958,12 @@ export class BlissParser {
             }
             const codeForKerning = partContent.split(':')[0];
             const definition = definitions[codeForKerning] || {};
+            // The identity code stays on the PART here: `[opts]>` binds the
+            // option to a part, so the glyph is an anonymous wrapper around a
+            // named part. Only the glyph-classification metadata is lifted, so
+            // layout (external-glyph spacing, kerning) matches the bare
+            // spelling. See the toJSON metadata gate in bliss-svg-builder.js,
+            // which must keep that metadata for a glyph with no code of its own.
             return [{
               part: str,
               _scanCode: partContent.split(';')[0].split(':')[0],
