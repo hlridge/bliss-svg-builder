@@ -37,6 +37,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   in-range whole-run-fallback contrast still holds.
  *
  * Does NOT cover:
+ * - Object input: a hand-authored `{codeName:'XOH'}` node is not
+ *   run through the expansion pass at all, so it renders one text
+ *   glyph where the DSL renders two outlined letters. Outside the
+ *   documented object surface (a `toJSON()` form never contains a
+ *   run); tracked in `backlog.md` with the object-input validation
+ *   family.
  * - XTXT_ fallback metadata propagation (isExternalGlyph / char
  *   fields on the expanded glyph), see
  *   `BlissParser.definition-expansion.test.js`.
@@ -201,6 +207,8 @@ describe('BlissParser X-codes', () => {
       DEFXRUNNESTED: { codeString: 'DEFXRUNWORD/B291' },
       DEFXRUNMIXED: { codeString: 'Xa/Xλ' },
       DEFXTEXTKEY: { codeString: 'XTXT_hello' },
+      DEFXOPTTEXTKEY: { codeString: '[color=red]XTXT_hello' },
+      DEFXSEMIBREAK: { codeString: 'Xab;//B291' },
     };
     beforeAll(() => BlissSVGBuilder.define(RUN_DEFS));
     afterAll(() => Object.keys(RUN_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
@@ -227,6 +235,22 @@ describe('BlissParser X-codes', () => {
       // run pattern, so expanding it produced XT/XX/XT plus an unknown tail
       const builder = new BlissSVGBuilder('DEFXTEXTKEY');
       expect(builder.toString()).toBe('Xhello');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('recognises the routing key behind an option bracket', () => {
+      // pins that the key is looked for at the run, not at the start of the
+      // string; a mutant reading offset 0 misses the prefixed form entirely
+      const builder = new BlissSVGBuilder('DEFXOPTTEXTKEY');
+      expect(builder.toString()).toBe('[color=red]Xhello');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('expands a run whose inert semicolon is followed by a word break', () => {
+      // a definition keeps `//` raw, so unlike the top level the expansion pass
+      // sees the ';//' sequence; the ';' there composes nothing
+      const builder = new BlissSVGBuilder('DEFXSEMIBREAK');
+      expect(builder.toString()).toBe('Xa/Xb//B291');
       expect(builder.warnings).toEqual([]);
     });
 
@@ -261,10 +285,22 @@ describe('BlissParser X-codes', () => {
       expect(builder.warnings).toEqual([]);
     });
 
+    it('expands a run whose inert semicolon is followed by a glyph boundary', () => {
+      expect(new BlissSVGBuilder('Xab;/B291').toString())
+        .toBe(new BlissSVGBuilder('Xa/Xb;/B291').toString());
+    });
+
     it('still refuses to expand a run that a real ;-part composes onto', () => {
       // pins the guard's remaining job; a guard deleted outright would expand
       // here and split the composition across glyphs
       expect(new BlissSVGBuilder('Xab;C8').warnings.map(w => w.code))
+        .toContain('WORD_AS_PART');
+    });
+
+    it('counts a single-character part as a composition', () => {
+      // pins the "there is something after the ;" length boundary: one
+      // character is already a part, so this run must stay whole
+      expect(new BlissSVGBuilder('Xab;H').warnings.map(w => w.code))
         .toContain('WORD_AS_PART');
     });
 

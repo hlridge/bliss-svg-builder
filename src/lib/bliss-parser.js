@@ -399,13 +399,21 @@ export class BlissParser {
           // Skip expansion only when a real `;`-part composes onto the run.
           // Expanding there would split the run across glyphs and bind the part
           // to the last letter instead of to the written token, so the run must
-          // stay one token and fail as the word it is. The other two things a
+          // stay one token and fail as the word it is. The other things a
           // following `;` can mean are not compositions and must not suppress
           // expansion: `;;` attaches a word-level overlay to the WORD the run
-          // expands into (matching the written `Xa/Xb;;B81` twin), and a bare
-          // trailing `;` composes nothing at all and is inert.
+          // expands into (matching the written `Xa/Xb;;B81` twin); a bare
+          // trailing `;` composes nothing at all and is inert; and a `;`
+          // immediately before a `/` or `//` is equally inert, because the part
+          // slot it opens is empty. That last case only reaches this pass from
+          // a definition codeString, which stores word breaks as written, so
+          // without it the same content expands at top level and fails inside a
+          // definition.
           const rest = codeString.slice(offset + match.length);
-          const composesAPart = rest.startsWith(';') && !rest.startsWith(';;') && rest.length > 1;
+          const composesAPart = rest.startsWith(';')
+            && !rest.startsWith(';;')
+            && rest.length > 1
+            && !rest.startsWith(';/');
           if (composesAPart) return match;
 
           const allHavePath = [...chars].every(char => hasPathData(char));
