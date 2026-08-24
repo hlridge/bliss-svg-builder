@@ -27,6 +27,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   (`^`) to end (`$`) so a code that merely contains `X<letters>`
  *   mid-string, or an X-code whose suffix ends in a non-letter, is
  *   NOT mis-flagged.
+ * - Run-integrity floor for a run carrying a character outside the
+ *   accepted ranges: the rejection is warned, never silent, and the
+ *   in-range whole-run-fallback contrast still holds.
  *
  * Does NOT cover:
  * - XTXT_ fallback metadata propagation (isExternalGlyph / char
@@ -34,6 +37,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissParser.definition-expansion.test.js`.
  * - Single-character X-codes (`Xh` etc.) outside the Xword
  *   expansion path, see `BlissParser.internal-mechanics.test.js`.
+ * - WHICH characters an X-run should accept (the hyphen/apostrophe
+ *   char-set question) — that is issue #26, pinned as it.todo in
+ *   `BlissSVGBuilder.text-fallback.test.js`. The run-integrity
+ *   tripwires below are about the failure MODE at whatever boundary
+ *   #26 settles on, and are independent of it.
  */
 describe('BlissParser X-codes', () => {
   describe('when Xword has path data for every character', () => {
@@ -136,5 +144,45 @@ describe('BlissParser X-codes', () => {
       const r = BlissParser.parse('B291;Xhello9');
       expect(r.groups[0].glyphs[0].parts[1].errorCode).not.toBe('WORD_AS_PART');
     });
+  });
+
+  // note: the expander holds a run TOGETHER when a character inside the matched
+  // sub-run lacks path data (whole-run XTXT_ fallback), but a character outside
+  // the accepted ranges never enters that sub-run at all — the `{2,}` character
+  // class stops early, so the untouched tail splices onto the LAST expanded code
+  // and destroys the letter before it (`Xhello-world` renders `hell`, then fails
+  // on `Xo-world`). The active tests below pin only the visible-not-silent floor
+  // and the in-range contrast that already holds; the it.todo lines pin the
+  // desired run-integrity contract. Backlog: "X-run truncation splices the
+  // unmatched tail onto the last expanded letter".
+  describe('when an X-run carries a character outside the accepted ranges', () => {
+    it('holds the run together when an in-range character merely lacks path data', () => {
+      // contrast case, correct today: Greek alpha IS inside the recognised
+      // ranges, so the whole run reaches the fallback rule and no letter is lost
+      const r = BlissParser.parse('Xhαllo');
+      expect(r.groups[0].glyphs.map(g => g.parts[0].codeName)).toEqual(['XTXT_hαllo']);
+    });
+
+    it.each([
+      ['XM-M'],
+      ['XMM-M'],
+      ['XAnna-Karin'],
+      ['Xhello-world'],
+    ])('warns rather than silently accepting %s', (input) => {
+      expect(new BlissSVGBuilder(input).warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
+    });
+
+    it.each([
+      ['XM-M'],
+      ['XMM-M'],
+      ['XAnna-Karin'],
+    ])('serializes %s to a form that reparses to the same render', (input) => {
+      const b = new BlissSVGBuilder(input);
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it.todo('keeps every outlined letter of Xhello-world instead of absorbing the o into the tail token');
+    it.todo('reports the whole written token as the failing source, not a sub-token starting mid-run');
+    it.todo('treats XM-M and XMM-M alike, so the letter count before an unsupported character does not change the split');
   });
 });

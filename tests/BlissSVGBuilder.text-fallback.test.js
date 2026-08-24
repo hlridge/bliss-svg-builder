@@ -253,6 +253,14 @@ describe('BlissSVGBuilder text fallback', () => {
       }));
     });
 
+    // note: the source is `Xiǎ`, not `Xpiǎ` — the run is truncated at the
+    // character class and the tail splices onto the last expanded code, so the
+    // ordinary outlined letter `i` is consumed by the failing token and Xpiǎ
+    // renders `p` alone. That letter loss is a separate registered bug (backlog:
+    // "X-run truncation splices the unmatched tail onto the last expanded
+    // letter", tripwires in `BlissParser.x-codes.test.js`); this assertion
+    // records today's source string, it does not endorse the splice. Update it
+    // when either that fix or #26 lands.
     it('emits an UNKNOWN_CODE warning for the failing portion of Xpiǎ (mid-word)', () => {
       const builder = new BlissSVGBuilder('Xpiǎ');
       expect(builder.warnings).toContainEqual(expect.objectContaining({

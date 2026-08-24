@@ -26,6 +26,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   (e.g. B55 → XA, B76 → XV) produces byte-identical SVG to its X-code
  *   counterpart, both as raw codes and when wrapped in a custom-definition
  *   alias (BCI55 = "B55", BCI76 = "B76").
+ * - Part-scope-option floor: the direct render and the `toString()`
+ *   round-trip both keep external-glyph spacing, and `toJSON()` keeps the
+ *   glyph `codeName` for every spelling except the DSL `[opts]>` one. The
+ *   toJSON drift for that spelling is pinned as it.todo (see the describe
+ *   comment and the backlog row it names).
  *
  * Does NOT cover:
  * - The text-fallback boundary (multi-character X-prefix `Xhello`, `Xα`,
@@ -269,5 +274,54 @@ describe('BlissSVGBuilder external glyphs', () => {
         BlissSVGBuilder.removeDefinition('BCI76');
       }
     });
+  });
+
+  // note: a DSL part-scope option (`[opts]>CODE`) makes `toJSON()` omit the
+  // glyph's `codeName`, and rebuilding from that JSON loses the glyph's
+  // external-glyph identity — so the gap to the next glyph falls back from
+  // `external-glyph-space` (0.8) to `char-space` (2), a 1.2-unit widening.
+  // The DIRECT render and the `toString()` round-trip are both correct; only
+  // the toJSON path drifts, which breaks the documented "toJSON() output
+  // round-trips via constructor" promise. A part option added through
+  // `setOptions()` does NOT trigger it, only the DSL spelling. Backlog:
+  // "toJSON drops external-glyph identity when a part carries a part-scope
+  // option". Reported via Bliss Maker, whose display-min-width clone
+  // round-trips through toJSON on the render path.
+  describe('when an external glyph carries a DSL part-scope option', () => {
+    const gapToNextGlyph = (input) => {
+      const xs = extractXCoordinates(new BlissSVGBuilder(input).svgCode);
+      return +(xs[1] - xs[0]).toFixed(4);
+    };
+
+    it('renders the same glyph advance as the no-option baseline', () => {
+      expect(gapToNextGlyph('[color=red]>Xm/XV/XA')).toBe(gapToNextGlyph('Xm/XV/XA'));
+    });
+
+    it('renders the same glyph advance as the char-scope spelling', () => {
+      expect(gapToNextGlyph('[color=red]>Xm/XV/XA')).toBe(gapToNextGlyph('[color=red]Xm/XV/XA'));
+    });
+
+    it('round-trips through toString with byte-identical SVG', () => {
+      const direct = new BlissSVGBuilder('[color=red]>Xm/XV/XA');
+      const reparsed = new BlissSVGBuilder(direct.toString({ preserve: true }));
+      expect(reparsed.svgCode).toBe(direct.svgCode);
+    });
+
+    it('keeps the glyph codeName in toJSON for the char-scope and bare spellings', () => {
+      const codeNameOf = (input) =>
+        new BlissSVGBuilder(input).toJSON({ preserve: true }).groups[0].glyphs[0].codeName;
+      expect(codeNameOf('Xm/XV/XA')).toBe('Xm');
+      expect(codeNameOf('[color=red]Xm/XV/XA')).toBe('Xm');
+    });
+
+    it('keeps the glyph codeName in toJSON when the part option arrives via setOptions', () => {
+      const b = new BlissSVGBuilder('Xm/XV/XA');
+      b.group(0).glyph(0).part(0).setOptions({ 'data-draggable': 'true' });
+      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('Xm');
+    });
+
+    it.todo('keeps the glyph codeName in toJSON when the part carries a DSL part-scope option');
+    it.todo('round-trips through toJSON with byte-identical SVG, matching the toString round-trip');
+    it.todo('preserves external-glyph spacing after a toJSON round-trip instead of widening to char-space');
   });
 });
