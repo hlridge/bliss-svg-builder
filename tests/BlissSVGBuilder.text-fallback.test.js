@@ -26,7 +26,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   across the glyphs of Xcafé).
  * - Out-of-range X-prefix inputs (Xǎ, Xǔ, Xḿ; mid-word Xpiǎ; cross-word
  *   Xhello//Xpiǎ) are surfaced as UNKNOWN_CODE warnings rather than
- *   silently dropped.
+ *   silently dropped, naming the whole written token and taking no
+ *   outlined letter down with them.
  * - Round-trip of partial-fallback inputs through `toJSON` preserves
  *   the rendered SVG byte-identically.
  * - Option-bracket routing (run-to-stable Phase 2.2): a character-level
@@ -234,9 +235,10 @@ describe('BlissSVGBuilder text fallback', () => {
   });
 
   // The X-prefix DSL today accepts only ASCII letters, Latin Extended-A,
-  // Greek, and Cyrillic. Characters outside that set are surfaced as
-  // UNKNOWN_CODE warnings (not silently dropped); the active tests below
-  // pin that warning contract. Wider character support (so the parser
+  // Greek, and Cyrillic. A token carrying anything else is rejected WHOLE and
+  // surfaced as an UNKNOWN_CODE warning (not silently dropped, and never split
+  // at the character class); the active tests below pin that warning contract.
+  // Wider character support (so the parser
   // falls through to the XTXT <text> path instead of rejecting) is
   // tracked at https://github.com/hlridge/bliss-svg-builder/issues/26;
   // the it.todo lines pin the desired future contract.
@@ -253,28 +255,33 @@ describe('BlissSVGBuilder text fallback', () => {
       }));
     });
 
-    // note: the source is `Xiǎ`, not `Xpiǎ` — the run is truncated at the
-    // character class and the tail splices onto the last expanded code, so the
-    // ordinary outlined letter `i` is consumed by the failing token and Xpiǎ
-    // renders `p` alone. That letter loss is a separate registered bug (backlog:
-    // "X-run truncation splices the unmatched tail onto the last expanded
-    // letter", tripwires in `BlissParser.x-codes.test.js`); this assertion
-    // records today's source string, it does not endorse the splice. Update it
-    // when either that fix or #26 lands.
-    it('emits an UNKNOWN_CODE warning for the failing portion of Xpiǎ (mid-word)', () => {
+    // regression: see issue #39. The source used to be `Xiǎ`, a token starting
+    // mid-run: the run was truncated at the character class and the tail
+    // spliced onto the last expanded code, so the ordinary outlined letter `i`
+    // was consumed by the failing token and Xpiǎ rendered `p` alone. The whole
+    // written token is now judged as one unit.
+    it('emits an UNKNOWN_CODE warning naming the whole of Xpiǎ (mid-word)', () => {
       const builder = new BlissSVGBuilder('Xpiǎ');
       expect(builder.warnings).toContainEqual(expect.objectContaining({
         code: 'UNKNOWN_CODE',
-        source: 'Invalid format: Xiǎ',
+        source: 'Invalid format: Xpiǎ',
       }));
     });
 
-    it('emits an UNKNOWN_CODE warning for the failing word in Xhello//Xpiǎ (cross-word)', () => {
+    it('emits an UNKNOWN_CODE warning naming the whole failing word in Xhello//Xpiǎ (cross-word)', () => {
       const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
       expect(builder.warnings).toContainEqual(expect.objectContaining({
         code: 'UNKNOWN_CODE',
-        source: 'Invalid format: Xiǎ',
+        source: 'Invalid format: Xpiǎ',
       }));
+    });
+
+    it('keeps the outlined word of Xhello//Xpiǎ intact when the other word fails', () => {
+      // the token does not lex, so the whole word drops and only its word break
+      // survives, the same shape a trailing `B291//` already serializes to
+      const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
+      expect(builder.toString()).toBe('Xh/Xe/Xl/Xl/Xo//');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
 
     it('round-trips Xpiǎ through toJSON with byte-identical SVG output', () => {

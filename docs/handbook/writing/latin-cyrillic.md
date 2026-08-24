@@ -36,7 +36,7 @@ The Russian Cyrillic alphabet (а-я, А-Я, including ё/Ё) is fully covered b
 
 ## Letters only
 
-The X notation spells letters, nothing else. Punctuation and digits have no X form: in `XAnna-Karin`, the letters of `Anna` render and `-Karin` is reported as an unknown code. Combining Bliss with full text beyond letters is an open design area; see [Compatibility](#compatibility) below.
+The X notation spells letters, nothing else. Punctuation and digits have no X form, and a run is read as one word: `XAnna-Karin` contains a hyphen, so the whole of `XAnna-Karin` is reported as an unknown code and nothing from it renders. Write the letters that do have an X form as their own word (`XAnna//XKarin`) if you need them. Combining Bliss with full text beyond letters is an open design area; see [Compatibility](#compatibility) below.
 
 ## Spacing and styling
 
@@ -74,7 +74,7 @@ The fallback comes with real limitations, which is why it carries the experiment
 - **Approximate metrics.** Widths for fallback characters are estimated, so precise layouts may need manual kerning or cropping.
 - **The run falls back as a whole.** When a text run mixes outlined and non-outlined letters, the whole run renders as one fallback element, and serializes as one code (`Xa/Xλ/Xb` serializes as `Xaλb`).
 
-Text rendering covers the Latin, Greek, and Cyrillic letter ranges. `X` followed by a character outside them (a digit, punctuation) is an unknown code, reported with an `UNKNOWN_CODE` warning.
+Text rendering covers the Latin, Greek, and Cyrillic letter ranges. `X` followed by a character outside them (a digit, punctuation) makes the whole token an unknown code, reported with an `UNKNOWN_CODE` warning. Letters written before that character belong to the same token and do not render on their own.
 
 ## Compatibility
 

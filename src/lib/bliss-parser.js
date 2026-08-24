@@ -60,6 +60,129 @@ const stripReferenceDecoration = (s) => s
   .replace(/\^+$/, '')
   .replace(COORD_SUFFIX_PATTERN, '');
 
+// The external-character letter ranges: Latin, Latin-1/Extended-A, Greek and
+// Cyrillic. Exported so the define() namespace guard tests the SAME ranges the
+// tokenizer below reads; a name this pattern accepts is always read as
+// external text, so it could never be reached as a definition.
+export const X_RUN_LETTERS = 'a-zA-ZÀ-ſͰ-ϿЀ-ӿ';
+
+// A written X token runs from a glyph boundary to the next structural
+// character: another glyph boundary (`/`), a part boundary (`;`), a head
+// marker (`^`) or a coordinate suffix (`:`). Taking the token WHOLE is what
+// stops a character outside the letter ranges from ending the match early and
+// leaving its tail to glue onto the last expanded letter, which destroyed the
+// letter before it (`Xhello-world` rendered `hell`). An option bracket at the
+// boundary is part of the token, not a place for a run to hide from routing
+// (run-to-stable 2.2).
+const X_TOKEN_PATTERN = new RegExp(String.raw`(?<=^|\/)(\[[^\[\]]*\]>?)?X([^/;^:]+)`, 'g');
+const X_RUN_BODY_PATTERN = new RegExp(`^[${X_RUN_LETTERS}]{2,}$`);
+// One X letter, optionally behind an option bracket and optionally carrying a
+// trailing decoration, as written in a `/`-separated sequence.
+const X_LETTER_TOKEN_PATTERN = new RegExp(String.raw`^(\[[^\[\]]*\]>?)?X([${X_RUN_LETTERS}])([;^:].*)?$`);
+
+// What a written X token DENOTES, which is the one question every X site asks:
+//   'word'  - every letter has a built-in outline, so the run is shorthand for
+//             a `/`-separated sequence of glyphs.
+//   'glyph' - some letter has no outline, so the WHOLE run becomes one
+//             text-fallback glyph; letters of one run never split across two
+//             rendering mechanisms.
+//   null    - not a multi-letter run: one letter (the sequence pass below
+//             decides those), or something that is not a letter at all (a
+//             digit, punctuation, the internal `XTXT_` routing key). Leave the
+//             token exactly as written and let it resolve, or fail, as the
+//             single code it is.
+const classifyXRunBody = (body) =>
+  !X_RUN_BODY_PATTERN.test(body) ? null
+    : [...body].every(hasPathData) ? 'word'
+    : 'glyph';
+
+// Rewrites the X shorthand in a code string into the codes the renderer knows:
+// per-character `X<letter>` codes for an outlined run, one `XTXT_<chars>` glyph
+// for a run that needs the text fallback. Shared by the top-level input and the
+// definition-expansion path so a run means the same thing wherever it is
+// written, and exported so define() can ask what a codeString expands to.
+export function processXCodes(codeString) {
+  let expanded = codeString.replace(X_TOKEN_PATTERN, (match, optionPrefix = '', chars, offset) => {
+    const denotes = classifyXRunBody(chars);
+    if (!denotes) return match;
+
+    // A real `;`-part composes onto ONE character. A run that is a word must
+    // therefore stay whole and fail as the word it is; expanding it would bind
+    // the part to the last letter instead of to the written token. A run that
+    // collapses to one glyph is a character like any other and takes the part.
+    // The other things a following `;` can mean are not compositions and never
+    // suppress expansion: `;;` attaches a word-level overlay to the WORD the
+    // run expands into (matching the written `Xa/Xb;;B81` twin), a bare
+    // trailing `;` composes nothing, and a `;` immediately before a `/` opens an
+    // empty part slot. That last case only reaches this pass from a definition
+    // codeString, which stores word breaks as written, so without it the same
+    // content expands at top level and fails inside a definition.
+    const rest = codeString.slice(offset + match.length);
+    const composesAPart = rest.startsWith(';')
+      && !rest.startsWith(';;')
+      && rest.length > 1
+      && !rest.startsWith(';/');
+    if (composesAPart && denotes === 'word') return match;
+
+    // For an outlined run the option prefix rides the FIRST expanded glyph,
+    // matching the written /-expansion exactly ([opts]Xab === [opts]Xa/Xb).
+    // A run that collapses to one glyph keeps the prefix on that glyph, so the
+    // option scopes the whole run; that deliberately differs from the written
+    // sequence form, where a prefix binds one member and the member stands
+    // alone (review disposition, 2026-07-17).
+    return denotes === 'word'
+      ? optionPrefix + [...chars].map(char => `X${char}`).join('/')
+      : `${optionPrefix}XTXT_${chars}`;
+  });
+
+  // A written sequence of single-letter X codes merges by the same rule, so
+  // `Xa/Xλ` and `Xaλ` both mean one text glyph. A decoration on the LAST member
+  // belongs to whatever the merge produces: without that, the decorated letter
+  // stayed outside the merge and failed as an unknown code.
+  const parts = expanded.split('/');
+  const result = [];
+  let currentXSequence = [];
+
+  const flushXSequence = (decoration = '') => {
+    if (currentXSequence.length === 0) return;
+
+    const letters = currentXSequence;
+    if (letters.every(hasPathData)) {
+      letters.forEach((char, i) => {
+        result.push(`X${char}${i === letters.length - 1 ? decoration : ''}`);
+      });
+    } else {
+      result.push(`XTXT_${letters.join('')}${decoration}`);
+    }
+    currentXSequence = [];
+  };
+
+  for (const part of parts) {
+    const token = part.match(X_LETTER_TOKEN_PATTERN);
+
+    if (token && !token[1]) {
+      currentXSequence.push(token[2]);
+      if (token[3]) flushXSequence(token[3]);
+      continue;
+    }
+
+    flushXSequence();
+    // An option-prefixed single-char X-code stands alone: the option scopes to
+    // that one character, so it never merges into a whole-run fallback. An
+    // outlined letter passes through unchanged (it resolves via its definition
+    // downstream); only a fallback letter is rewritten so the XTXT_ route can
+    // see it.
+    if (token && !hasPathData(token[2])) {
+      result.push(`${token[1]}XTXT_${token[2]}${token[3] ?? ''}`);
+    } else {
+      result.push(part);
+    }
+  }
+  flushXSequence();
+
+  return result.join('/');
+}
+
 export class BlissParser {
   static parse(codeStr, options) {
       const result = this.fromString(codeStr);
@@ -371,109 +494,6 @@ export class BlissParser {
         }
       } else {
         groupCodeString = twoPartGroupString;
-      }
-
-      function processXCodes(codeString) {
-        // First, expand multi-char X-codes (like Xhello -> Xh/Xe/Xl/Xl/Xo or XTXT_héllo)
-        // Anchor to a glyph boundary (start of string or after /) so an X+letters
-        // sequence embedded in a longer code name (e.g. a custom code EXTRA) is not
-        // rewritten mid-token. Match Latin, Latin Extended, and Cyrillic letters.
-        // An option bracket ([opts] or [opts]>) at the boundary must not hide
-        // the X-run from routing (run-to-stable 2.2). For an ALL-OUTLINED run
-        // the prefix rides the FIRST expanded glyph, matching the written
-        // /-expansion exactly ([opts]Xab \u2261 [opts]Xa/Xb \u2014 X-runs are
-        // string-level sugar there). A run containing ANY fallback letter
-        // stays ONE XTXT_ glyph (the pre-existing whole-run-fallback rule),
-        // so its prefix scopes the whole run; that deliberately differs from
-        // the written sequence form, where a prefix binds one member and the
-        // member stands alone (review disposition, 2026-07-17).
-        let expanded = codeString.replace(/(?<=^|\/)(\[[^\[\]]*\]>?)?X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, optionPrefix = '', chars, offset) => {
-          // `XTXT_<chars>` is the internal routing key for a single
-          // text-fallback glyph, not a letter run. Its leading `XTXT` would
-          // otherwise match as a run and splice the rest of the token onto the
-          // last expanded letter, turning one text glyph into two outlined
-          // letters plus an unknown code. Definition code strings are stored as
-          // written, so this form reaches the pass whenever one names it.
-          if (codeString.startsWith('XTXT_', offset + optionPrefix.length)) return match;
-
-          // Skip expansion only when a real `;`-part composes onto the run.
-          // Expanding there would split the run across glyphs and bind the part
-          // to the last letter instead of to the written token, so the run must
-          // stay one token and fail as the word it is. The other things a
-          // following `;` can mean are not compositions and must not suppress
-          // expansion: `;;` attaches a word-level overlay to the WORD the run
-          // expands into (matching the written `Xa/Xb;;B81` twin); a bare
-          // trailing `;` composes nothing at all and is inert; and a `;`
-          // immediately before a `/` or `//` is equally inert, because the part
-          // slot it opens is empty. That last case only reaches this pass from
-          // a definition codeString, which stores word breaks as written, so
-          // without it the same content expands at top level and fails inside a
-          // definition.
-          const rest = codeString.slice(offset + match.length);
-          const composesAPart = rest.startsWith(';')
-            && !rest.startsWith(';;')
-            && rest.length > 1
-            && !rest.startsWith(';/');
-          if (composesAPart) return match;
-
-          const allHavePath = [...chars].every(char => hasPathData(char));
-          if (allHavePath) {
-            return optionPrefix + [...chars].map(char => `X${char}`).join('/');
-          } else {
-            return `${optionPrefix}XTXT_${chars}`;
-          }
-        });
-
-        // Then, process sequences of single-char X-codes (like Xh/Xé/Xl -> XTXT_hél if any needs fallback)
-        const parts = expanded.split('/');
-        const result = [];
-        let currentXSequence = [];
-
-        const flushXSequence = () => {
-          if (currentXSequence.length === 0) return;
-
-          if (currentXSequence.length === 1) {
-            const char = currentXSequence[0].slice(1);
-            if (hasPathData(char)) {
-              result.push(currentXSequence[0]);
-            } else {
-              result.push(`XTXT_${char}`);
-            }
-          } else {
-            const chars = currentXSequence.map(code => code.slice(1)).join('');
-            const allHavePath = [...chars].every(char => hasPathData(char));
-
-            if (allHavePath) {
-              currentXSequence.forEach(code => result.push(code));
-            } else {
-              result.push(`XTXT_${chars}`);
-            }
-          }
-          currentXSequence = [];
-        };
-
-        for (const part of parts) {
-          // Match single-char X-codes: Latin, Latin Extended, and Cyrillic letters
-          if (/^X[a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]$/.test(part)) {
-            currentXSequence.push(part);
-            continue;
-          }
-          flushXSequence();
-          // An option-prefixed single-char X-code stands alone: the option
-          // scopes to that one character, so it never merges into a
-          // whole-run fallback. An outlined letter passes through unchanged
-          // (it resolves via its definition downstream); only a fallback
-          // letter is rewritten so the XTXT_ route can see it.
-          const prefixed = part.match(/^(\[[^\[\]]*\]>?)X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF])$/);
-          if (prefixed && !hasPathData(prefixed[2])) {
-            result.push(`${prefixed[1]}XTXT_${prefixed[2]}`);
-          } else {
-            result.push(part);
-          }
-        }
-        flushXSequence();
-
-        return result.join('/');
       }
 
       function replaceWithDefinition(str, definitions) {

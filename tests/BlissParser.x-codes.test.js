@@ -32,9 +32,18 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   (`^`) to end (`$`) so a code that merely contains `X<letters>`
  *   mid-string, or an X-code whose suffix ends in a non-letter, is
  *   NOT mis-flagged.
- * - Run-integrity floor for a run carrying a character outside the
- *   accepted ranges: the rejection is warned, never silent, and the
- *   in-range whole-run-fallback contrast still holds.
+ * - Run integrity for a run carrying a character outside the
+ *   accepted ranges: the whole written token is judged as one unit,
+ *   so no outlined letter is absorbed into a failing tail, and the
+ *   warning names the token exactly as written.
+ * - What a run DENOTES: an all-outlined run is a word (many glyphs)
+ *   and refuses a ;-part; a run holding a letter with no outline is
+ *   ONE text-fallback glyph and accepts one.
+ * - Trailing decorations (head marker, coordinate, ;-part, ;;-overlay)
+ *   on the last member of a written single-letter sequence, which
+ *   ride the merged glyph instead of stranding it.
+ * - Reachability of a definition name that starts with X but leaves
+ *   the reserved letter namespace (XRAY1).
  *
  * Does NOT cover:
  * - Object input: a hand-authored `{codeName:'XOH'}` node is not
@@ -157,15 +166,14 @@ describe('BlissParser X-codes', () => {
     });
   });
 
-  // note: the expander holds a run TOGETHER when a character inside the matched
-  // sub-run lacks path data (whole-run XTXT_ fallback), but a character outside
-  // the accepted ranges never enters that sub-run at all — the `{2,}` character
-  // class stops early, so the untouched tail splices onto the LAST expanded code
-  // and destroys the letter before it (`Xhello-world` renders `hell`, then fails
-  // on `Xo-world`). The active tests below pin only the visible-not-silent floor
-  // and the in-range contrast that already holds; the it.todo lines pin the
-  // desired run-integrity contract. Backlog: "X-run truncation splices the
-  // unmatched tail onto the last expanded letter".
+  // regression: see issue #39. The expander used to match only the letters
+  // after the X, so a character outside the accepted ranges ended the match and
+  // the untouched tail glued onto the LAST expanded code, destroying the letter
+  // before it (`Xhello-world` rendered `hell` and failed on `Xo-world`). The
+  // token is now taken as written, up to the next `/`, `;`, `^` or `:`, and an
+  // out-of-range character makes the WHOLE token an unknown code. WHICH
+  // characters an X-run should accept is a separate question, issue #26; this
+  // describe pins the failure mode at whatever boundary that settles on.
   describe('when an X-run carries a character outside the accepted ranges', () => {
     it('holds the run together when an in-range character merely lacks path data', () => {
       // contrast case, correct today: Greek alpha IS inside the recognised
@@ -192,9 +200,104 @@ describe('BlissParser X-codes', () => {
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
-    it.todo('keeps every outlined letter of Xhello-world instead of absorbing the o into the tail token');
-    it.todo('reports the whole written token as the failing source, not a sub-token starting mid-run');
-    it.todo('treats XM-M and XMM-M alike, so the letter count before an unsupported character does not change the split');
+    it('absorbs no outlined letter into a failing tail token', () => {
+      const glyphs = BlissParser.parse('Xhello-world').groups[0].glyphs;
+      expect(glyphs.map(g => g.parts[0].codeName)).toEqual(['Xhello-world']);
+    });
+
+    it('reports the token as written, not a sub-token starting mid-run', () => {
+      expect(new BlissSVGBuilder('Xhello-world').warnings).toContainEqual(
+        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Xhello-world' })
+      );
+    });
+
+    it('treats one and two letters before the unsupported character alike', () => {
+      // the `{2,}` quantifier used to decide the outcome class on its own: XM-M
+      // stayed one token, XMM-M split into an outlined M plus a failing XM-M
+      const one = new BlissSVGBuilder('XM-M');
+      const two = new BlissSVGBuilder('XMM-M');
+      expect(one.toString()).toBe('XM-M');
+      expect(two.toString()).toBe('XMM-M');
+      expect(two.warnings.map(w => w.source)).toEqual(['XMM-M']);
+    });
+
+    it('holds a run together when the unsupported character is itself a letter', () => {
+      // ǎ (U+01CE) sits just above Latin Extended-A, so it never enters the run;
+      // the ordinary `i` before it used to be consumed by the failing tail
+      const builder = new BlissSVGBuilder('Xpiǎ');
+      expect(builder.toString()).toBe('');
+      expect(builder.warnings).toContainEqual(
+        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Invalid format: Xpiǎ' })
+      );
+    });
+
+    it('reports the token as written when it carries a head marker', () => {
+      // the head marker ends the token; without that the `^` would be read as
+      // part of the run and every marked word would fail
+      expect(new BlissSVGBuilder('B291/Xhello-world^').warnings.map(w => w.source))
+        .toEqual(['Xhello-world']);
+    });
+  });
+
+  // The discriminator is what a run DENOTES, and it is the same question in
+  // three places: whether a ;-part may attach, whether a written sequence
+  // merges, and whether define() may call the run one character. An all-
+  // outlined run is a word; a run holding a letter with no outline is one
+  // text-fallback glyph. The refusal side is pinned above, under the
+  // semicolon-adjacency describe.
+  describe('when a real ;-part composes onto a run that collapses to one glyph', () => {
+    it('composes the part instead of rejecting the run as a word', () => {
+      const builder = new BlissSVGBuilder('Xaλ;C8');
+      expect(builder.warnings).toEqual([]);
+      expect(builder.toString()).toBe('Xaλ;C8');
+    });
+
+    it('renders it identically to the written twin of the same run', () => {
+      expect(new BlissSVGBuilder('Xaλ;C8').svgCode)
+        .toBe(new BlissSVGBuilder('Xa/Xλ;C8').svgCode);
+    });
+  });
+
+  // regression: see issue #39. Phase 2 of the expander merged only BARE
+  // single-letter tokens, so a decoration on the last member stranded that
+  // letter outside the merge and it failed as an unknown code.
+  describe('when the last letter of a written sequence carries a decoration', () => {
+    it.each([
+      [';;B81', 'a word-level overlay'],
+      ['^', 'a head marker'],
+      [':5', 'a coordinate'],
+      [';C8', 'a ;-part'],
+    ])('merges the sequence when the last letter carries %s (%s)', (decoration) => {
+      const written = new BlissSVGBuilder(`Xa/Xλ${decoration}`);
+      expect(written.warnings).toEqual([]);
+      expect(written.toString()).toBe(new BlissSVGBuilder(`Xaλ${decoration}`).toString());
+    });
+
+    it('routes a lone decorated fallback letter to the text glyph', () => {
+      const result = BlissParser.parse('B291/Xλ;;B81');
+      expect(result.groups[0].glyphs.map(g => g.parts[0].codeName)).toEqual(['B291', 'XTXT_λ']);
+    });
+
+    it('leaves an all-outlined sequence unmerged, with the decoration on its last letter', () => {
+      const result = BlissParser.parse('Xa/Xb^');
+      expect(result.groups[0].glyphs.map(g => g.parts[0].codeName)).toEqual(['Xa', 'Xb']);
+    });
+  });
+
+  describe('when a definition name starts with X but leaves the letter namespace', () => {
+    // define() refuses a name that is X followed only by letters, since the
+    // parser would always read it as external text. XRAY1 carries a digit, so
+    // it is outside that namespace and define() allows it — but the expander
+    // used to eat the letters anyway and leave XY1 as an unknown code, so the
+    // guard and the parser disagreed about which names are reachable.
+    const DIGIT_DEFS = { XRAY1: { codeString: 'B291' } };
+    beforeAll(() => BlissSVGBuilder.define(DIGIT_DEFS));
+    afterAll(() => Object.keys(DIGIT_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+
+    it('resolves the definition instead of expanding its letters', () => {
+      const result = BlissParser.parse('XRAY1');
+      expect(result.groups[0].glyphs.map(g => g.parts[0].codeName)).toEqual(['B291']);
+    });
   });
 
   // regression: see issue #37. The expansion pass ran on the top-level input
