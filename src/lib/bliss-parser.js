@@ -388,6 +388,14 @@ export class BlissParser {
         // the written sequence form, where a prefix binds one member and the
         // member stands alone (review disposition, 2026-07-17).
         let expanded = codeString.replace(/(?<=^|\/)(\[[^\[\]]*\]>?)?X([a-zA-Z\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF]{2,})/g, (match, optionPrefix = '', chars, offset) => {
+          // `XTXT_<chars>` is the internal routing key for a single
+          // text-fallback glyph, not a letter run. Its leading `XTXT` would
+          // otherwise match as a run and splice the rest of the token onto the
+          // last expanded letter, turning one text glyph into two outlined
+          // letters plus an unknown code. Definition code strings are stored as
+          // written, so this form reaches the pass whenever one names it.
+          if (codeString.startsWith('XTXT_', offset + optionPrefix.length)) return match;
+
           // Skip expansion only when a real `;`-part composes onto the run.
           // Expanding there would split the run across glyphs and bind the part
           // to the last letter instead of to the written token, so the run must

@@ -200,6 +200,7 @@ describe('BlissParser X-codes', () => {
       DEFXRUNWRITTEN: { codeString: 'B216/XO/XH' },
       DEFXRUNNESTED: { codeString: 'DEFXRUNWORD/B291' },
       DEFXRUNMIXED: { codeString: 'Xa/Xλ' },
+      DEFXTEXTKEY: { codeString: 'XTXT_hello' },
     };
     beforeAll(() => BlissSVGBuilder.define(RUN_DEFS));
     afterAll(() => Object.keys(RUN_DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
@@ -218,6 +219,14 @@ describe('BlissParser X-codes', () => {
     it('expands a run reached through a nested definition', () => {
       const builder = new BlissSVGBuilder('DEFXRUNNESTED');
       expect(builder.toString()).toBe('B216/XO/XH/B291');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('leaves the internal text-fallback routing key intact', () => {
+      // regression: XTXT_<chars> is one glyph, but its leading XTXT matches the
+      // run pattern, so expanding it produced XT/XX/XT plus an unknown tail
+      const builder = new BlissSVGBuilder('DEFXTEXTKEY');
+      expect(builder.toString()).toBe('Xhello');
       expect(builder.warnings).toEqual([]);
     });
 
@@ -263,6 +272,12 @@ describe('BlissParser X-codes', () => {
       const builder = new BlissSVGBuilder('[color=red]Xab;;B81');
       expect(builder.toString()).toBe('[color=red]Xa/Xb;;B81');
       expect(builder.warnings).toEqual([]);
+    });
+
+    it('expands a run whose overlay is empty', () => {
+      // rest is exactly ';;', which is neither a part nor an overlay code
+      expect(new BlissSVGBuilder('Xab;;').toString())
+        .toBe(new BlissSVGBuilder('Xa/Xb;;').toString());
     });
 
     it('is not confused by a semicolon inside a quoted option value', () => {

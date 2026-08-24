@@ -29,8 +29,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissParser.global-option-scope.test.js`.
  * - Group options on a multi-word alias (MISPLACED_GROUP_OPTION), see
  *   `BlissParser.group-option-placement.test.js`.
- * - Multi-character X-text words (`[opts]>Xab`), which keep WORD_AS_PART; the
- *   gate covers alias-based words only.
+ * - Multi-character X-text words in a `;`-part slot (`B291;[opts]>Xab`), which
+ *   keep WORD_AS_PART; the gate covers alias-based words only. Written on its
+ *   own (`[opts]>Xab`) such a run expands and renders, see
+ *   `BlissParser.x-codes.test.js`.
  * - `[opts]>WORD` in a `;`-part slot (`B291;[opts]>WORD`), which keeps
  *   WORD_AS_PART: a word can never BE a part of a character, options or not.
  * - The bare (un-prefixed) `;`-on-alias gate itself, see
