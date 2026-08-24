@@ -102,18 +102,14 @@ describe('BlissParser X-codes', () => {
   });
 
   // The glyph-boundary anchor that keeps a WORD from splitting across glyphs in a
-  // part slot also keeps a part-position X code from ever reaching the XTXT_
-  // route, so a letter that needs the text fallback fails there. An outlined
-  // external letter is already a legal part (`B291;Xa` renders), so this is a
-  // routing hole rather than a widening of what may be a part. The active tests
-  // pin the two ends that already hold; the it.todo lines pin the gap. Backlog:
-  // "A text-fallback letter or run cannot be used AS a ;-part".
-  //
-  // note: closing this gap means deliberately CHANGING an active test, not just
-  // making a todo pass. `BlissSVGBuilder.text-fallback.test.js` describe-path
-  // `... > when an X-code sits in a ;-part slot` pins `B291;Xλ` as UNKNOWN_CODE
-  // and calls it the unchanged contract (the Phase 2.2 option-bracket work drew
-  // that scope line on purpose). Decide it, then move both.
+  // part slot also kept a part-position X code from ever reaching the XTXT_
+  // route, so a letter that needs the text fallback failed there although an
+  // outlined external letter was already a legal part (`B291;Xa` renders). It
+  // was a routing hole rather than a widening of what may be a part, and it is
+  // closed: the slot now asks the shared run grammar for the ONE-glyph answer
+  // only, so a word still fails and a run still cannot split across glyphs.
+  // The sibling describe in `BlissSVGBuilder.text-fallback.test.js`
+  // (`... > when an X-code sits in a ;-part slot`) moved with it.
   describe('when a text-fallback X code is written in a ;-part slot', () => {
     it('accepts an outlined external letter as a part', () => {
       const r = BlissParser.parse('B291;Xa');
@@ -176,6 +172,18 @@ describe('BlissParser X-codes', () => {
       const builder = new BlissSVGBuilder('B291;Xab9');
       expect(builder.warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
       expect(builder.warnings[0].source).toBe('Xab9');
+    });
+
+    it('matches what the same part added through the mutation API does', () => {
+      // addPart re-embeds its argument through the full parser, so the routing
+      // reaches the API surface too. Multi-surface feature, byte-identical pin.
+      for (const code of ['Xλ', 'Xaλ', 'Xa', 'Xab']) {
+        const dsl = new BlissSVGBuilder(`B291;${code}`);
+        const api = new BlissSVGBuilder('B291');
+        api.group(0).glyph(0).addPart(code);
+        expect(api.svgCode).toBe(dsl.svgCode);
+        expect(api.warnings.map(w => w.code)).toEqual(dsl.warnings.map(w => w.code));
+      }
     });
 
     it('matches what the same composition does through object input', () => {

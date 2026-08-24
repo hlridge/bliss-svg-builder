@@ -284,17 +284,17 @@ describe('BlissSVGBuilder external glyphs', () => {
     });
   });
 
-  // note: a DSL part-scope option (`[opts]>CODE`) makes `toJSON()` omit the
-  // glyph's `codeName`, and rebuilding from that JSON loses the glyph's
-  // external-glyph identity — so the gap to the next glyph falls back from
-  // `external-glyph-space` (0.8) to `char-space` (2), a 1.2-unit widening.
-  // The DIRECT render and the `toString()` round-trip are both correct; only
-  // the toJSON path drifts, which breaks the documented "toJSON() output
-  // round-trips via constructor" promise. A part option added through
-  // `setOptions()` does NOT trigger it, only the DSL spelling. Backlog:
-  // "toJSON drops external-glyph identity when a part carries a part-scope
-  // option". Reported via Bliss Maker, whose display-min-width clone
-  // round-trips through toJSON on the render path.
+  // A DSL part-scope option (`[opts]>CODE`) binds the code to the PART, so the
+  // glyph itself is an anonymous wrapper with no `codeName` of its own. That is
+  // by design; what was broken is that `toJSON()` then dropped the glyph's
+  // classification metadata as "derived from the code" although there was no
+  // code left to derive it from, so a rebuild spaced the glyph at `char-space`
+  // (2) instead of `external-glyph-space` (0.8) and every following glyph moved
+  // 1.2 units. `toString()` was always correct; only the toJSON path drifted,
+  // which broke the documented "toJSON() output round-trips via constructor"
+  // promise. A part option added through `setOptions()` never triggered it,
+  // only the DSL spelling. Reported via Bliss Maker, whose display-min-width
+  // clone round-trips through toJSON on the render path. GH #38.
   describe('when an external glyph carries a DSL part-scope option', () => {
     const gapToNextGlyph = (input) => {
       const xs = extractXCoordinates(new BlissSVGBuilder(input).svgCode);
@@ -419,6 +419,46 @@ describe('BlissSVGBuilder external glyphs', () => {
       expect(authored.warnings).toEqual([]);
       expect(authored.groups[0].children[1].isExternalGlyph).toBe(true);
       expect(glyphGap(authored)).toBeCloseTo(0.8, 6);
+    });
+
+    it('keeps external spacing when the fallback glyph also carries a part-scope option', () => {
+      // The two triggers meet: a text fallback (no identity code) wearing a
+      // part-scope option (the code binds to the PART). The metadata lift for
+      // `[opts]>` reads the definitions registry, and a text-fallback code is
+      // never registered, so it used to lift nothing and the glyph was spaced
+      // as a Bliss character. Direct render, no round-trip involved.
+      for (const [plain, optioned] of [
+        ['Xhαllo/XM', '[color=red]>Xhαllo/XM'],
+        ['XM/Xhαllo', 'XM/[color=red]>Xhαllo'],
+        ['Xλ/B291', '[color=red]>Xλ/B291'],
+      ]) {
+        expect(glyphGap(new BlissSVGBuilder(optioned))).toBeCloseTo(glyphGap(new BlissSVGBuilder(plain)), 6);
+      }
+      expect(glyphGap(new BlissSVGBuilder('[color=red]>Xhαllo/XM'))).toBeCloseTo(0.8, 6);
+      const b = new BlissSVGBuilder('[color=red]>Xhαllo/XM');
+      expect(new BlissSVGBuilder(b.toJSON()).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps the kern table on the anonymous wrapper, not just the external flag', () => {
+      // `Xm` has no kern pairs, so every other test here would still pass if
+      // the kept set shrank to the flag alone. `XV` after `Xa` kerns hard, and
+      // the pair is read off the CURRENT glyph's own table.
+      const direct = new BlissSVGBuilder('Xa/[color=red]>XV');
+      expect(glyphGap(direct)).toBeCloseTo(glyphGap(new BlissSVGBuilder('Xa/XV')), 6);
+      expect(glyphGap(direct)).not.toBeCloseTo(0.8, 6);
+      expect(new BlissSVGBuilder(direct.toJSON()).svgCode).toBe(direct.svgCode);
+      const json = direct.toJSON().groups[0].glyphs[1];
+      expect(Object.keys(json.kerningRules)).toHaveLength(56);
+    });
+
+    it('keeps external metadata on a flattened word-indicator head', () => {
+      // toJSON({flattenIndicators:true}) bakes the overlay onto the head and
+      // deletes the head's identity code, which makes the head one of the
+      // codeless glyphs this fix covers.
+      const b = new BlissSVGBuilder('Xa/Xb;;B81');
+      const json = b.toJSON({ flattenIndicators: true });
+      expect(json.groups[0].glyphs[0].isExternalGlyph).toBe(true);
+      expect(new BlissSVGBuilder(json).svgCode).toBe(b.svgCode);
     });
 
     it('leaves the single-character fallback and the Bliss-character neighbour unchanged', () => {

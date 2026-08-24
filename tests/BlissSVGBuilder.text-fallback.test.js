@@ -406,7 +406,10 @@ describe('BlissSVGBuilder text fallback', () => {
     });
 
     it('reports the same warning the direct parse reports', () => {
-      for (const code of ['Xhello-world', 'X9', 'Xab9', 'X-', 'XRAY1']) {
+      // `Xa-Xb` is the one that pins the pattern's LEADING anchor: without it,
+      // the trailing `Xb` alone would match and the whole token would route to
+      // text on the object path while the DSL rejects it.
+      for (const code of ['Xhello-world', 'X9', 'Xab9', 'X-', 'XRAY1', 'Xa-Xb']) {
         const direct = new BlissSVGBuilder(code);
         expect(direct.warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
         expect(authored(code).warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);

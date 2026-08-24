@@ -982,7 +982,15 @@ export class BlissParser {
               }
             }
             const codeForKerning = partContent.split(':')[0];
-            const definition = definitions[codeForKerning] || {};
+            // A text-fallback code is never in the registry (XTXT_ keys are
+            // deliberately unregistered), so a registry lookup alone lifted
+            // nothing for one and the glyph was spaced as a Bliss character:
+            // `[color=red]>Xhαllo` sat 1.2 units from its neighbour where the
+            // bare `Xhαllo` sits 0.8. Derive it the same way the other two
+            // XTXT_ resolution sites do.
+            const definition = codeForKerning.startsWith('XTXT_')
+              ? createTextFallbackGlyph(codeForKerning.slice(5))
+              : (definitions[codeForKerning] || {});
             // The identity code stays on the PART here: `[opts]>` binds the
             // option to a part, so the glyph is an anonymous wrapper around a
             // named part. Only the glyph-classification metadata is lifted, so

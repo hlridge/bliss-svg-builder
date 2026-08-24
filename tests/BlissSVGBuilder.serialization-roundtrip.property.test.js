@@ -96,6 +96,13 @@ describe('BlissSVGBuilder serialization round-trip (property-based)', { tags: ['
     // -glyph spacing) survives it: both sides omit the metadata, so both agree
     // while the pictures differ. GH #38 was exactly that. Compare what the user
     // sees, on the same footing as the toString→SVG property above.
+    //
+    // Reach, stated plainly so this is not mistaken for a #38 guard: the
+    // generator excludes external X-characters by documented exclusion, so it
+    // cannot produce the #38 inputs themselves. This property covers the CLASS
+    // over everything the generator does reach; the #38 shapes are pinned by
+    // example in `BlissSVGBuilder.external-glyphs.test.js`. Widening the
+    // generator to X-codes would close that, and is its own piece of work.
     it('renders byte-identical SVG', () => {
       fc.assert(
         fc.property(validCompositionArb, (s) => {
