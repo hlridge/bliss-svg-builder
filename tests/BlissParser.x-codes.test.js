@@ -108,6 +108,12 @@ describe('BlissParser X-codes', () => {
   // routing hole rather than a widening of what may be a part. The active tests
   // pin the two ends that already hold; the it.todo lines pin the gap. Backlog:
   // "A text-fallback letter or run cannot be used AS a ;-part".
+  //
+  // note: closing this gap means deliberately CHANGING an active test, not just
+  // making a todo pass. `BlissSVGBuilder.text-fallback.test.js` describe-path
+  // `... > when an X-code sits in a ;-part slot` pins `B291;Xλ` as UNKNOWN_CODE
+  // and calls it the unchanged contract (the Phase 2.2 option-bracket work drew
+  // that scope line on purpose). Decide it, then move both.
   describe('when a text-fallback X code is written in a ;-part slot', () => {
     it('accepts an outlined external letter as a part', () => {
       const r = BlissParser.parse('B291;Xa');
@@ -305,6 +311,16 @@ describe('BlissParser X-codes', () => {
     it('leaves an all-outlined sequence unmerged, with the decoration on its last letter', () => {
       const result = BlissParser.parse('Xa/Xb^');
       expect(result.groups[0].glyphs.map(g => g.parts[0].codeName)).toEqual(['Xa', 'Xb']);
+    });
+
+    it('puts a run decoration on the last expanded glyph, not the first', () => {
+      // absolute rather than twin-compared on purpose: a mutant that moves the
+      // decoration to the first glyph moves it in the twin too, so comparing the
+      // two spellings cannot see it. Also pins that ^ and : end the token; if
+      // either left the boundary set the whole run would fail as one code
+      expect(new BlissSVGBuilder('Xab^').toString()).toBe('Xa/Xb^');
+      expect(new BlissSVGBuilder('Xab:5').toString()).toBe('Xa/Xb:5,0');
+      expect(new BlissSVGBuilder('Xab^').warnings).toEqual([]);
     });
   });
 
