@@ -285,15 +285,55 @@ describe('BlissParser part-slot character options', () => {
     });
 
     it.each([
-      ['>B291'],
-      ['>Xm'],
-      ['S8;>C8'],
-    ])('warns rather than silently dropping the character for %s', (input) => {
-      expect(codes(input)).toContain('UNKNOWN_CODE');
+      ['>B291', 'B291'],
+      ['>Xm', 'Xm'],
+      ['>B291/B99', 'B291/B99'],
+    ])('keeps a bare part separator as plain content: %s', (input, plain) => {
+      const b = build(input);
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe(plain);
+      expect(b.svgCode).toBe(build(plain).svgCode);
     });
 
-    it.todo('renders the code after a bare > separator as plain content, matching the bare || and | scopes');
-    it.todo('limits a bare > in a later part slot to that part instead of failing the whole character');
+    it('keeps both parts when the bare separator opens a later part slot', () => {
+      const b = build('S8;>C8');
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe('S8;C8');
+      expect(b.svgCode).toBe(build('S8;C8').svgCode);
+    });
+
+    it('leaves a bracketed part option working exactly as before', () => {
+      const b = build('[color=red]>B291');
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe('[color=red]>B291');
+      expect(b.svgCode).toContain('red');
+    });
+
+    it('treats a bare separator over an empty part slot as the inert slot it is', () => {
+      // `S8;` is inert and renders S8; `S8;>` is the same empty slot with an
+      // empty option region in front of it, so it must be inert too. It used
+      // to fail and serialize to `S8`, which reparsed into a different render.
+      const b = build('S8;>');
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe('S8');
+      expect(b.svgCode).toBe(build('S8;').svgCode);
+      expect(build(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('still refuses a doubled bare separator, as the global scope does', () => {
+      // One empty option region is tolerated; two is not a spelling of
+      // anything. `||||B291` is not tolerated at the global scope either.
+      expect(codes('>>B291')).toContain('UNKNOWN_CODE');
+    });
+
+    it('keeps the glyph identity, so the code is plain content and not an empty option region', () => {
+      // The documented rule for a bare separator is that it "carries no options
+      // and stays plain content", so `>B291` must be `B291`, not `[]>B291`
+      // (which is a real, if empty, part-option region and leaves the glyph
+      // anonymous). Identity is what tells the two apart.
+      expect(build('>B291').toJSON().groups[0].glyphs[0].codeName).toBe('B291');
+      expect(build('>B291').toJSON()).toEqual(build('B291').toJSON());
+    });
   });
 
   // note: two adjacent brackets at ONE scope are invalid syntax ("one bracket

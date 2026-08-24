@@ -935,6 +935,16 @@ export class BlissParser {
         function expandSegment(str, definitions, isTopLevel, depth) {
           if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
 
+          // A `>` with no bracket in front of it is an option region carrying
+          // nothing, exactly like a bare `||` or `|`, and the documented rule
+          // for those is that the code "stays plain content". Consume it here,
+          // before any bracket matching, so the code keeps the identity it
+          // would have had written bare -- `>B291` IS `B291`, not the empty
+          // part region `[]>B291`, which leaves the glyph anonymous. Exactly
+          // one is consumed: two empty regions spell nothing, and the global
+          // scope does not tolerate a doubled separator either.
+          str = str.replace(/^>/, '');
+
           // Handle part-level options with > (like [x=2]>B291 or [color=red]>XW)
           const partLevelMatch = str.match(/^(\[.*?\])>(.+)$/);
           if (partLevelMatch) {
@@ -1501,6 +1511,14 @@ export class BlissParser {
             // LATER slot is a misplaced character option: peel one warning
             // per bracket, drop it, and parse the remaining code normally.
             if (rawIndex > 0) {
+              // The same empty-option-region tolerance expandSegment applies to
+              // slot 0. Without it a bare `>` in a LATER slot failed the whole
+              // character, taking the other parts down with it. Slot 0 is not
+              // stripped again here: it already was, so `>>B291` still fails.
+              // An empty region over an empty slot (`S8;>`) is still an empty
+              // slot, and an empty slot is inert, exactly like `S8;`.
+              twoPartPartString = twoPartPartString.replace(/^>/, '');
+              if (twoPartPartString === '') continue;
               let peeled;
               while ((peeled = twoPartPartString.match(PART_SLOT_CHAR_OPTION_PATTERN)) !== null) {
                 parseWarnings.push({
