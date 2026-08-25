@@ -188,6 +188,38 @@ describe('BlissSVGBuilder positioning options', () => {
     });
   });
 
+  describe('when a positioned part is serialized', () => {
+    // Canonicalize within a level, preserve across levels. At part scope the
+    // option and the `:x,y` suffix are the same level, so the output settles on
+    // one spelling: the coordinate, which is the one a part written without an
+    // option already uses. At glyph scope `[x=N]` is the only spelling there is,
+    // so it stays a bracket.
+    it.each([
+      ['[x=2]>S8;C8', 'S8:2,0;C8'],
+      ['[y=3]>B291', 'B291:0,3'],
+      ['[color=red;x=2]>B291', '[color=red]>B291:2,0'],
+      ['[x=5;y=10]>B291:3,7', 'B291:5,10'],
+      ['[x=5]B291', '[x=5]B291'],
+    ])('writes the position once: %s', (input, expected) => {
+      expect(new BlissSVGBuilder(input).toString()).toBe(expected);
+    });
+
+    it('renders the serialized form identically', () => {
+      for (const input of ['[x=2]>S8;C8', '[color=red;x=2]>B291', '[x=5;y=10]>B291:3,7']) {
+        const direct = new BlissSVGBuilder(input);
+        expect(new BlissSVGBuilder(direct.toString()).svgCode).toBe(direct.svgCode);
+      }
+    });
+
+    it('stops repeating the value it already reported', () => {
+      // The conflict is in the input, not in the output: re-parsing what was
+      // serialized must not raise the warning a second time.
+      const direct = new BlissSVGBuilder('[x=5;y=10]>B291:3,7');
+      expect(direct.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
+      expect(new BlissSVGBuilder(direct.toString()).warnings).toEqual([]);
+    });
+  });
+
   describe('when the composition round-trips', () => {
     it.each([
       ['B99/[x=5]B291'],
