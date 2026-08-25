@@ -87,6 +87,33 @@ describe('BlissSVGBuilder positioning options', () => {
       expect(third.x).toBe(second.x + second.advanceX);
     });
 
+    it('adds the blank on top of the glyph\'s own normalized layout', () => {
+      // A part written left of the glyph origin is normalized back to the
+      // origin first, and the blank is added to the result. Adding the blank
+      // before that normalization instead would let the overhang eat it: the
+      // ink would land at 1 and 5 and the glyph would measure 7, not 11.
+      const plain = new BlissSVGBuilder('HL2;HL2:-4');
+      const blanked = new BlissSVGBuilder('[x=5]HL2;HL2:-4');
+      expect(inkXs(plain)).toEqual([4, 0]);
+      expect(inkXs(blanked)).toEqual([9, 5]);
+      expect(glyphs(plain)[0].width).toBe(6);
+      expect(glyphs(blanked)[0].width).toBe(11);
+    });
+
+    it('lets a negative value pull ink left without moving the glyph', () => {
+      // The mirror of leading blank, and the same ownership rule: a negative
+      // value is a negative side bearing. The ink pokes left of the glyph box,
+      // the box itself stays where the flow put it, and the next glyph follows
+      // the box rather than the ink. The old rule dragged the whole rest of the
+      // word left with it.
+      const plain = new BlissSVGBuilder('B99/B291/B99');
+      const pulled = new BlissSVGBuilder('B99/[x=-2]B291/B99');
+      expect(glyphs(pulled)[1].x).toBe(glyphs(plain)[1].x);
+      expect(glyphs(pulled)[1].width).toBe(glyphs(plain)[1].width);
+      expect(inkXs(pulled)[2]).toBe(inkXs(plain)[2] - 2);
+      expect(glyphs(pulled)[2].x).toBe(glyphs(plain)[2].x);
+    });
+
     it('applies the same rule to the first glyph of a word', () => {
       const b = new BlissSVGBuilder('[x=5]B291');
       expect(glyphs(b)[0].x).toBe(0);
