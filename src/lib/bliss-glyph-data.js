@@ -3959,6 +3959,10 @@ const glyphData = {
     indicatorRole: 'nominal',
     name: "INDICATOR INDIRECT OBJECT",
     width: 3.5
+  },
+  // Contains "all of a thing", not added yet.
+  B6443: {
+    codeString: "B651;HL4:0,8;DC4:0,10;HL4:0,16"
   }
 }
 
