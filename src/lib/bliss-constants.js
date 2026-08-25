@@ -189,11 +189,17 @@ export const INTERNAL_OPTIONS = new Set([
   // Element identity (extracted to node.key before option processing)
   'key',
 
-  // Element positioning (handled by positioning logic, not SVG attributes)
+  // Element positioning (handled by positioning logic, not SVG attributes).
+  // Both spellings of the two kerning keys: a user writes the kebab form in a
+  // bracket, and without it here an unrecognized `relative-kerning` fell
+  // through to the attribute pass-through and landed in the shipped SVG as
+  // `<g relative-kerning="3">`, which is not an attribute of anything.
   'x',
   'y',
   'relativeKerning',
-  'absoluteKerning'
+  'absoluteKerning',
+  'relative-kerning',
+  'absolute-kerning'
 ]);
 
 /**
@@ -246,6 +252,11 @@ export const WARNING_CODES = Object.freeze({
   // a global-only (builder-canvas) option KEY inside a group/character/part
   // bracket: the key is well-formed but its scope is the whole SVG
   MISPLACED_GLOBAL_OPTION: 'MISPLACED_GLOBAL_OPTION',
+  // the mirror image: a kerning option KEY outside character scope. Kerning is
+  // the gap before a character, so the key means nothing at part, word or
+  // global scope; it is dropped there rather than passing through to the SVG as
+  // an attribute, which is what an unrecognized key deliberately does.
+  MISPLACED_KERNING_OPTION: 'MISPLACED_KERNING_OPTION',
   // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
   // space: a space is a pure word-separator with no ink to position or style,
   // so the decoration is dropped and the space keeps its identity (ZSA is

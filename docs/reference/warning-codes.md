@@ -173,6 +173,20 @@ A canvas-wide option key placed at word, character, or part scope. These keys co
 
 The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background`/`background-*`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
 
+### `MISPLACED_KERNING_OPTION`
+
+The mirror image of the one above: a kerning option (`relative-kerning`, `absolute-kerning`, in either the kebab or camel spelling) written at part, word, or global scope. Kerning is the gap **before a character**, so those scopes have nothing for it to do; the key is dropped and the content renders unchanged.
+
+```
+[relative-kerning=3]>B291   →  renders B291, kerning dropped
+[absolute-kerning=4]||B291  →  renders B291, kerning dropped
+B99/[relative-kerning=3]B291 →  valid: character scope is where kerning lives
+```
+
+Any other option in the same bracket is kept, so `[relative-kerning=3;color=red]>B291` still renders the part in red.
+
+Dropping it is what keeps it out of the drawing. An option key the library does not recognize at a given scope is passed through to the SVG as an attribute (that is what `[data-*]` options are for), so leaving a misplaced kerning option in place would put `relative-kerning="3"` into the output, where it means nothing to any renderer. An unrecognized key still passes through, warning-free, exactly as before.
+
 ### `MISPLACED_SPACE_DECORATION`
 
 A coordinate (`:x,y`) or a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.

@@ -540,14 +540,41 @@ export class BlissParser {
     // mutated object, or undefined when every key was dropped, so call sites
     // store "no options" instead of an empty artifact. `text` is exempt via
     // the curated set (an unimplemented stub at EVERY level, not misplaced).
+    // Some option keys mean something at exactly ONE scope. Written anywhere
+    // else they are dropped with a warning rather than left in place, because
+    // an option the library does not recognize AT THAT SCOPE falls through to
+    // the SVG attribute pass-through (what `[data-*]` options are for), so a
+    // silent drop would make a real option and a pass-through attribute look
+    // identical in the source and behave differently with nothing said.
+    //
+    // One row per bound key set. A future key with a home scope of its own
+    // needs a row and a warning code, not new machinery.
+    const SCOPE_BOUND_OPTIONS = [
+      {
+        home: 'global',
+        has: (key) => GLOBAL_ONLY_OPTION_KEYS.has(key),
+        code: WARNING_CODES.MISPLACED_GLOBAL_OPTION,
+        message: (written, levelName) =>
+          `Global option (${written}) ignored at ${levelName} level: it configures the whole SVG. Use [${written}]|| to apply it globally.`,
+      },
+      {
+        home: 'character',
+        has: (key) => KERNING_OPTION_KEYS[key] !== undefined,
+        code: WARNING_CODES.MISPLACED_KERNING_OPTION,
+        message: (written, levelName) =>
+          `Kerning option (${written}) ignored at ${levelName} level: kerning is the gap before a character. Write it on the character, or use the RK:/AK: marker before it.`,
+      },
+    ];
+
     const dropMisplacedGlobalKeys = (options, levelName) => {
       if (!options) return options;
       for (const key of Object.keys(options)) {
-        if (!GLOBAL_ONLY_OPTION_KEYS.has(key)) continue;
+        const rule = SCOPE_BOUND_OPTIONS.find(r => r.home !== levelName && r.has(key));
+        if (!rule) continue;
         const written = options[key] === true ? key : `${key}=${options[key]}`;
         parseWarnings.push({
-          code: WARNING_CODES.MISPLACED_GLOBAL_OPTION,
-          message: `Global option (${written}) ignored at ${levelName} level: it configures the whole SVG. Use [${written}]|| to apply it globally.`,
+          code: rule.code,
+          message: rule.message(written, levelName),
           source: written,
         });
         delete options[key];
@@ -567,7 +594,10 @@ export class BlissParser {
           source: restoredGlobal,
         });
       }
-      result.options = this.#parseOptions(restoredGlobal) || {};
+      // Gated like every other scope: a global-only key is at HOME here, but a
+      // key bound to a lower scope (kerning) is as misplaced here as a global
+      // key is down there.
+      result.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredGlobal), 'global') || {};
     } else {
       if (globalOptionsString && globalOptionsString.length > 0) {
         const restored = restorePlaceholders(globalOptionsString);

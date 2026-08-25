@@ -168,6 +168,62 @@ describe('BlissSVGBuilder kerning options', () => {
     });
   });
 
+  describe('when a kerning option is written outside character scope', () => {
+    // Kerning is the gap before a CHARACTER, so the key means nothing at part,
+    // word or global scope. A known option key written where it cannot work is
+    // dropped with a warning and never reaches the markup, the same treatment a
+    // canvas-wide key gets at a lower scope (MISPLACED_GLOBAL_OPTION). Silence
+    // is not available: an UNRECOGNIZED key is passed through to the SVG as an
+    // attribute by design, so a silent drop would make a real option and a
+    // pass-through attribute look identical in the source and behave
+    // differently with nothing said.
+    it.each([
+      ['[relative-kerning=3]>B291', 'part', 'relative-kerning=3'],
+      ['[absolute-kerning=4]>B291', 'part', 'absolute-kerning=4'],
+      ['[relative-kerning=3]|B291', 'group', 'relative-kerning=3'],
+      ['[relative-kerning=3]||B291', 'global', 'relative-kerning=3'],
+      ['[relativeKerning=3]>B291', 'part', 'relativeKerning=3'],
+      ['[relative-kerning]>B291', 'part', 'relative-kerning'],
+    ])('reports and drops %s', (input, level, source) => {
+      const b = new BlissSVGBuilder(input);
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_KERNING_OPTION']);
+      expect(b.warnings[0].source).toBe(source);
+      expect(b.warnings[0].message).toContain(`${level} level`);
+      expect(b.svgCode).toBe(new BlissSVGBuilder('B291').svgCode);
+      expect(b.toString()).toBe('B291');
+    });
+
+    it('keeps it out of the markup, which is where it used to end up', () => {
+      // `<g relative-kerning="3">` is not an SVG attribute; it was reaching the
+      // shipped bytes only because the key was unrecognized at that scope.
+      for (const input of ['[relative-kerning=3]>B291', '[relative-kerning=3]|B291', '[relative-kerning=3]||B291']) {
+        expect(new BlissSVGBuilder(input).svgCode).not.toContain('kerning=');
+      }
+    });
+
+    it('keeps it out of the markup on the object surface too', () => {
+      // The attribute emitter is shared, so the same key list covers a value
+      // set through the API, which never passes the DSL scope gate.
+      const built = new BlissSVGBuilder('B291;C8');
+      built.glyph(0).part(1).setOptions({ relativeKerning: 3 });
+      expect(built.svgCode).not.toContain('kerning=');
+      expect(built.svgCode).toBe(new BlissSVGBuilder('B291;C8').svgCode);
+    });
+
+    it('leaves character scope, where kerning belongs, alone', () => {
+      expect(codes('B99/[relative-kerning=3]B291')).toEqual([]);
+      expect(glyphXs('B99/[relative-kerning=3]B291')[1]).toBe(7);
+    });
+
+    it('still passes an unrecognized key through to the SVG, warning-free', () => {
+      // The gate keys off the known-kerning set and nothing else: the
+      // pass-through feature is what `[data-*]` options are for.
+      const b = new BlissSVGBuilder('[data-kerning=3]>B291');
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toContain('data-kerning="3"');
+    });
+  });
+
   describe('when a definition carries kerning in its defaultOptions', () => {
     const KDEF = 'C5_KERN_DEFAULT';
 

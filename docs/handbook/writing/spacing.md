@@ -105,6 +105,8 @@ builder.glyph(1).setOptions({ relativeKerning: -1 });
 
 All three spellings draw the same picture, and the output settles on the short one: `[relative-kerning=-1]` comes back from `toString()` as `RK:-1`.
 
+Kerning is the gap before a **character**, so the option belongs on one. Written at part, word or global scope it is dropped with a [`MISPLACED_KERNING_OPTION`](/reference/warning-codes) warning and the content renders unchanged.
+
 ### Mixing Kerning Types
 
 Combine different kerning approaches in one composition:

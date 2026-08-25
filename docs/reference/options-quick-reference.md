@@ -54,8 +54,8 @@ These four are the exception to the scope note above: they are not canvas-wide, 
 | `x` | character `[opts]` | Leading blank owned by the character: it widens the character and moves its ink in, without moving the character. See [Positioning](/handbook/appearance/positioning#character-level-x-is-leading-blank) |
 | `x` | word `[opts]\|`, global `[opts]\|\|` | Moves the word itself, measured from the end of what precedes it, so `[x=0]\|` drops the word space back to a character space |
 | `y` | any | A plain offset at every scope, since nothing else decides the vertical |
-| `relative-kerning` | character | The `RK:` marker as an option: adjusts the gap before this character |
-| `absolute-kerning` | character | The `AK:` marker as an option: sets the gap before this character |
+| `relative-kerning` | character `[opts]` only | The `RK:` marker as an option: adjusts the gap before this character. At any other scope it is dropped with a [`MISPLACED_KERNING_OPTION`](/reference/warning-codes) warning |
+| `absolute-kerning` | character `[opts]` only | The `AK:` marker as an option: sets the gap before this character. Same rule about other scopes |
 
 One position per part and one kerning value per character, however you spell it. The last value written wins, an option beats the positional shorthand, and every value that loses is reported rather than dropped in silence.
 
