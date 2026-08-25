@@ -5,7 +5,7 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * Pins parser handling of the `[x=N]` and `[y=N]` bracket-option syntax: the
  * parser extracts these coordinate values at every scope of the element tree
  * (global, word, character, part), accepts negative and zero values, and
- * yields to the inline `CODE:x,y` suffix when both forms appear on the same
+ * overrides the inline `CODE:x,y` suffix when both forms appear on the same
  * part.
  *
  * Covers:
@@ -15,9 +15,9 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * - Combined `[x=N;y=M]` blocks where both axes are set in the same options
  *   group.
  * - Negative and zero coordinate values.
- * - Part-level precedence: inline `CODE:x,y` overrides `[x=N]` / `[y=N]`
- *   when both forms appear on the same part; the bracket option is used when
- *   no inline suffix is given.
+ * - Part-level precedence: `[x=N]` / `[y=N]` overrides the inline `CODE:x,y`
+ *   when both forms appear on the same part; the bracket option is also used
+ *   when no inline suffix is given.
  * - Mixed-scope expressions where every level sets distinct x/y values.
  *
  * Does NOT cover:
@@ -90,10 +90,17 @@ describe('BlissParser coordinate options', () => {
   });
 
   describe('when inline `:x,y` coordinates compete with bracket-option coordinates at part level', () => {
-    it('lets inline `:3,7` override `[x=5;y=10]` on the same part', () => {
+    it('lets the option `[x=5;y=10]` override an inline `:3,7` on the same part', () => {
+      // Options override the positional shorthand, at every level and on both
+      // surfaces: an option written in a bracket beats the `:x,y` written on
+      // the same part, and an option passed to the API beats anything in the
+      // DSL string. This reversed the earlier rule (the inline coordinate used
+      // to win, silently); the losing value is now reported rather than dropped
+      // in silence. See BlissSVGBuilder.positioning-options.test.js for the
+      // warning and the serialized result.
       const result = BlissParser.parse('[x=5;y=10]>B291:3,7');
-      expect(result.groups[0].glyphs[0].parts[0].x).toBe(3);
-      expect(result.groups[0].glyphs[0].parts[0].y).toBe(7);
+      expect(result.groups[0].glyphs[0].parts[0].x).toBe(5);
+      expect(result.groups[0].glyphs[0].parts[0].y).toBe(10);
     });
 
     it('uses the bracket-option `[x=5]` when no inline coordinate is given', () => {

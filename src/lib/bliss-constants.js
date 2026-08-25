@@ -213,7 +213,9 @@ export const DOT_WIDTH_MAX = 1.5;
  *   MALFORMED_   input did not parse in the required shape (a FORMAT failure;
  *                INVALID_/OUT_OF_RANGE are reserved for future VALUE/range checks)
  *   MISPLACED_   a well-formed token in the wrong position
- *   MULTIPLE_    more than one where one is allowed (resolved by picking the first)
+ *   MULTIPLE_    more than one where one is allowed (resolved by a stated rule:
+ *                the first for repeated option brackets and head markers, the
+ *                higher-precedence spelling for a value written two ways)
  *   DUPLICATE_   the same identifier twice
  *   UNKNOWN_     an unrecognized reference
  *   DROPPED_     something discarded (first-wins / merge)
@@ -266,6 +268,12 @@ export const WARNING_CODES = Object.freeze({
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',
+  // one part positioned twice: an `[x=N;y=M]>` option and the `:x,y` suffix on
+  // the same part are two spellings of one value, so the option wins and the
+  // coordinate it overrides is reported. A glyph-level `[x=N]` is a different
+  // level (leading blank on the glyph) and composes with a part coordinate
+  // instead of competing with it, so it never raises this.
+  MULTIPLE_POSITION_VALUES: 'MULTIPLE_POSITION_VALUES',
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',

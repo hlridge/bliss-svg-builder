@@ -228,15 +228,31 @@ export class BlissParser {
       return result;
   }
 
-  static #extractPositionFromOptions(obj) {
-    if (obj.options) {
-      if (obj.options.x !== undefined && obj.x === undefined) {
-        obj.x = Number(obj.options.x);
-      }
-      if (obj.options.y !== undefined && obj.y === undefined) {
-        obj.y = Number(obj.options.y);
-      }
+  // Promotes `[x=N]` / `[y=N]` to the numeric x/y the layout reads. An option
+  // OVERRIDES the positional shorthand it duplicates: on a part, `[x=N]>CODE`
+  // and `CODE:x,y` address the same level, so they are two spellings of one
+  // value and the option is the one that counts. The overridden coordinate is
+  // reported rather than dropped in silence. Only a part can reach that
+  // conflict: at every other scope the options block is the only channel, so
+  // the node's x/y is whatever this function last wrote.
+  static #extractPositionFromOptions(obj, parseWarnings) {
+    if (!obj.options) return;
+    const inline = { x: obj.x, y: obj.y };
+    const overridden = [];
+    for (const axis of ['x', 'y']) {
+      if (obj.options[axis] === undefined) continue;
+      const value = Number(obj.options[axis]);
+      if (inline[axis] !== undefined && inline[axis] !== value) overridden.push(axis);
+      obj[axis] = value;
     }
+    if (overridden.length === 0 || !parseWarnings) return;
+    const ignored = `:${overridden.includes('x') ? inline.x : ''}${
+      overridden.includes('y') ? `,${inline.y}` : ''}`;
+    parseWarnings.push({
+      code: WARNING_CODES.MULTIPLE_POSITION_VALUES,
+      message: `A part takes one position: the option wins, so "${ignored}" is ignored. Write the position as an option or as a coordinate, not both.`,
+      source: ignored,
+    });
   }
 
   // Only one option bracket is allowed per level ([a][b]|| is invalid; the
@@ -1680,7 +1696,7 @@ export class BlissParser {
             BlissParser.#flagCompositePart(part, partIndex);
             partIndex++;
 
-            this.#extractPositionFromOptions(part);
+            this.#extractPositionFromOptions(part, parseWarnings);
             parts.push(part);
           }
           return parts;

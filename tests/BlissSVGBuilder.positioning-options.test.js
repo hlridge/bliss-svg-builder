@@ -152,6 +152,42 @@ describe('BlissSVGBuilder positioning options', () => {
     });
   });
 
+  describe('when an option competes with the positional shorthand it duplicates', () => {
+    // Options override the DSL shorthand, and an option passed to the API
+    // overrides anything written in the DSL string. The part is where the two
+    // spellings meet: `[x=N]>CODE` and `CODE:x,y` both position the part
+    // inside its glyph, so they are two spellings of one value and the option
+    // is the one that counts. A glyph-level `[x=N]` is NOT in this family: it
+    // addresses a different level (the glyph, not the part), so it composes
+    // with a part coordinate instead of competing with it.
+    it('lets the part option win over the coordinate written on the same part', () => {
+      const b = new BlissSVGBuilder('[x=5;y=10]>B291:3,7');
+      expect(b.groups[0].children[0].children[0].x).toBe(5);
+      expect(b.groups[0].children[0].children[0].y).toBe(10);
+    });
+
+    it('reports the coordinate it dropped instead of dropping it in silence', () => {
+      const b = new BlissSVGBuilder('[x=5;y=10]>B291:3,7');
+      expect(b.warnings).toHaveLength(1);
+      expect(b.warnings[0].code).toBe('MULTIPLE_POSITION_VALUES');
+      expect(b.warnings[0].source).toBe(':3,7');
+    });
+
+    it('says nothing when the two spellings agree', () => {
+      const b = new BlissSVGBuilder('[x=3;y=7]>B291:3,7');
+      expect(b.warnings).toEqual([]);
+      expect(b.groups[0].children[0].children[0].x).toBe(3);
+    });
+
+    it('leaves a glyph option and a part coordinate composing, not competing', () => {
+      // Different levels: the glyph carries 2 units of leading blank and the
+      // part sits 3 further in, so the ink lands at 5 with nothing reported.
+      const b = new BlissSVGBuilder('[x=2]B291:3,0');
+      expect(b.warnings).toEqual([]);
+      expect(inkXs(b)[0]).toBe(5);
+    });
+  });
+
   describe('when the composition round-trips', () => {
     it.each([
       ['B99/[x=5]B291'],

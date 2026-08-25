@@ -223,6 +223,18 @@ Combine the options in one bracket instead: `[grid;grid-color=red]||B313`. At ch
 
 Brackets at *different* scopes are not duplicates and are valid: a character bracket followed by a part bracket (`[char][part]>CODE`) applies both, warning-free, as does `[global]||[word]|CODE`. The `>` is what marks the part scope, so it is what tells the two cases apart.
 
+### `MULTIPLE_POSITION_VALUES`
+
+One part positioned twice. A part option (`[x=N;y=M]>`) and the coordinate suffix (`CODE:x,y`) both place the part inside its character, so they are two spellings of one value. The option wins, and the coordinate it overrides is named:
+
+```
+[x=5;y=10]>B291:3,7    →  the part sits at 5,10; ":3,7" is ignored
+[x=5]>B291:3,7         →  the part sits at 5,7;  ":3" is ignored
+[x=3;y=7]>B291:3,7     →  no warning: the two spellings agree
+```
+
+A character-scope `[x=N]` is not a duplicate of a part coordinate. It is a different level (leading blank on the character, see [Positioning](/handbook/appearance/positioning)) and composes with the part's own position, so `[x=2]B291:3,0` puts ink at 5 with nothing reported.
+
 ### `DUPLICATE_KEY`
 
 Two elements carry the same user-assigned `key` (for example in object input passed to the constructor). Keys identify elements for `getElementByKey()`, so they must be unique. Auto-generated keys never collide.
