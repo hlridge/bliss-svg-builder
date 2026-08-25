@@ -274,6 +274,12 @@ export const WARNING_CODES = Object.freeze({
   // level (leading blank on the glyph) and composes with a part coordinate
   // instead of competing with it, so it never raises this.
   MULTIPLE_POSITION_VALUES: 'MULTIPLE_POSITION_VALUES',
+  // one character kerned twice: the `RK:`/`AK:` markers and the long-form
+  // `[relative-kerning=N]` / `[absolute-kerning=N]` options are spellings of
+  // one value, so an option beats a marker, the last one written wins, and
+  // every displaced value is named. A definition default that a written value
+  // overrides is not a conflict and stays silent.
+  MULTIPLE_KERNING_VALUES: 'MULTIPLE_KERNING_VALUES',
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',

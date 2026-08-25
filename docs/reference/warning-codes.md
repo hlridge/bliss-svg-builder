@@ -235,6 +235,18 @@ One part positioned twice. A part option (`[x=N;y=M]>`) and the coordinate suffi
 
 A character-scope `[x=N]` is not a duplicate of a part coordinate. It is a different level (leading blank on the character, see [Positioning](/handbook/appearance/positioning)) and composes with the part's own position, so `[x=2]B291:3,0` puts ink at 5 with nothing reported.
 
+### `MULTIPLE_KERNING_VALUES`
+
+One character kerned more than once. `RK:`/`AK:` and the `[relative-kerning=N]` / `[absolute-kerning=N]` options are spellings of a single value, so one of them survives: an option beats a marker, and among equals the last one written wins. Every value that loses is named:
+
+```
+B99/AK:4/RK:3/B291                    →  kerns by RK:3; "AK:4" is ignored
+B99/RK:3/AK:4/B291                    →  kerns by AK:4; "RK:3" is ignored
+B99/RK:3/[absolute-kerning=4]B291     →  kerns by the option; "RK:3" is ignored
+```
+
+A definition's `defaultOptions` is a default, so a value written on the character overrides it silently. That is what a default is for.
+
 ### `DUPLICATE_KEY`
 
 Two elements carry the same user-assigned `key` (for example in object input passed to the constructor). Keys identify elements for `getElementByKey()`, so they must be unique. Auto-generated keys never collide.

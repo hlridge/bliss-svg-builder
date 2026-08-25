@@ -44,6 +44,22 @@ Precedence within a dot type: **absolute wins over relative**. These options cas
 
 ---
 
+## Positioning
+
+These four are the exception to the scope note above: they are not canvas-wide, they position one element, and what they mean depends on which scope you write them at. They work identically in the DSL and through an options object (`{ x: 5 }`, `{ relativeKerning: -1 }`), including the opts argument of `addGlyph`, `insertPart`, `replaceGlyph` and the rest of that family.
+
+| Option | Scope | Description |
+|--------|-------|-------------|
+| `x` | part `[opts]>` | Position inside the character. Same as the `CODE:x,y` suffix, and the option wins when both are written ([`MULTIPLE_POSITION_VALUES`](/reference/warning-codes)) |
+| `x` | character `[opts]` | Leading blank owned by the character: it widens the character and moves its ink in, without moving the character. See [Positioning](/handbook/appearance/positioning#character-level-x-is-leading-blank) |
+| `y` | any | A plain offset at every scope, since nothing else decides the vertical |
+| `relative-kerning` | character | The `RK:` marker as an option: adjusts the gap before this character |
+| `absolute-kerning` | character | The `AK:` marker as an option: sets the gap before this character |
+
+One position per part and one kerning value per character, however you spell it. The last value written wins, an option beats the positional shorthand, and every value that loses is reported rather than dropped in silence.
+
+---
+
 ## Sizing & Layout
 
 | Option | Default | Values | Description |

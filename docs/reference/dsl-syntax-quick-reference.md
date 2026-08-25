@@ -102,14 +102,17 @@ A dropped option does not come back: `toString()` re-emits only what actually ap
 
 ## Kerning
 
-| Code | Syntax | Effect |
-|------|--------|--------|
-| `RK` | `RK:value` | Relative adjustment |
-| `AK` | `AK:value` | Absolute spacing |
+| Code | Syntax | Option spelling | Effect |
+|------|--------|-----------------|--------|
+| `RK` | `RK:value` | `[relative-kerning=value]` | Relative adjustment |
+| `AK` | `AK:value` | `[absolute-kerning=value]` | Absolute spacing |
 
 Examples:
 - `B313/RK:-1/B1103` - 1 unit tighter
 - `B313/AK:4/B1103` - exactly 4 units apart
+- `B313/[relative-kerning=-1]B1103` - the same as the first, and re-emitted as `RK:-1`
+
+One kerning value per character: the last one written wins, an option beats a marker, and every value that loses is reported ([`MULTIPLE_KERNING_VALUES`](/reference/warning-codes)).
 
 ## Option Syntax
 

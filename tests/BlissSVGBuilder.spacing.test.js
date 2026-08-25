@@ -447,4 +447,33 @@ describe('BlissSVGBuilder spacing', () => {
       expect(comp.width).toBe(136);
     });
   });
+
+  describe('when the same kerning value is written as an option instead of a marker', () => {
+    // The long-form option is the same value in a different place, so it must
+    // render byte-identically to the marker it replaces. The API surface is the
+    // third spelling and is pinned in the same way, since an options object is
+    // where a program sets kerning.
+    it.each([
+      ['B291/RK:0/B291', 'B291/[relative-kerning=0]B291'],
+      ['B291/RK:-1/B291/RK:1/B291', 'B291/[relative-kerning=-1]B291/[relative-kerning=1]B291'],
+      ['B291/AK:0/B291', 'B291/[absolute-kerning=0]B291'],
+      ['B291/AK:7/B291/AK:9/B291', 'B291/[absolute-kerning=7]B291/[absolute-kerning=9]B291'],
+    ])('renders %s and %s identically', (marker, option) => {
+      expect(new BlissSVGBuilder(option).svgCode).toBe(new BlissSVGBuilder(marker).svgCode);
+    });
+
+    it.each([
+      ['B291/RK:-1/B291', { relativeKerning: -1 }],
+      ['B291/AK:7/B291', { absoluteKerning: 7 }],
+    ])('renders %s identically when the value is set through the API', (marker, opts) => {
+      const built = new BlissSVGBuilder('B291/B291');
+      built.glyph(1).setOptions(opts);
+      expect(built.svgCode).toBe(new BlissSVGBuilder(marker).svgCode);
+    });
+
+    it('canonicalizes every spelling to the marker', () => {
+      expect(new BlissSVGBuilder('B291/[relative-kerning=-1]B291').toString()).toBe('B291/RK:-1/B291');
+      expect(new BlissSVGBuilder('B291/[absolute-kerning=7]B291').toString()).toBe('B291/AK:7/B291');
+    });
+  });
 });

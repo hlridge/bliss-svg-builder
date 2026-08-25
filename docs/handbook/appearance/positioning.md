@@ -125,6 +125,29 @@ This is useful when combining position with other part-level options like color:
 
 <Demo code="[grid]||C8:0,8;[color=red;x=2;y=10]>DOT" title="Positioned via options" />
 
+The same options work from a program, at every level and through every call that takes options:
+
+```js
+builder.glyph(0).part(1).setOptions({ x: 2, y: 10 });
+builder.glyph(0).addPart('DOT', { x: 2, y: 10 });
+```
+
+Both spellings position the part inside its character, so they are two ways of saying one thing. Write both and the **option wins**, and the coordinate it overrides is reported ([`MULTIPLE_POSITION_VALUES`](/reference/warning-codes)). The output settles on the coordinate: `[x=2]>DOT` comes back from `toString()` as `DOT:2,0`.
+
+### Character-level x is leading blank
+
+A `[x=N]` written on a **character** (no `>`) is a different thing from a part coordinate: it is blank space that belongs to the character, not a new position for it.
+
+<Demo code="[grid]||B99/B291" title="B99/B291 (no blank)" />
+
+<Demo code="[grid]||B99/[x=5]B291" title="B99/[x=5]B291 (5 units of blank inside the second character)" />
+
+The second character still starts where the writing flow puts it. It is 5 units wider, its ink begins 5 units further in, and whatever follows moves along with it. That keeps a character's reported spacing step (`advanceX`) pointing at where the next character actually starts, whatever the character carries inside.
+
+`y` is not symmetric with `x`, and deliberately so. `x` runs along the writing direction, where the flow already decides the position, so a value written there has to mean something the flow does not. `y` has no flow to negotiate with, so a character-level `[y=N]` is a plain offset.
+
+This is also what tells `[x=N]` apart from [kerning](/handbook/writing/spacing#kerning): `AK:`/`RK:` widen the gap the **previous** character leaves, while `[x=N]` fills the character that carries it. Write both and they add up.
+
 ## Zero-Sized Anchor (ZSA)
 
 `ZSA` is an invisible element that occupies no space, but occupies a position respected by auto-cropping behavior.

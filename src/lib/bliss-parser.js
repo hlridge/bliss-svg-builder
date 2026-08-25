@@ -200,6 +200,123 @@ export function processXCodes(codeString) {
   return result.join('/');
 }
 
+// The long-form option spellings of the two kerning markers, mapped to the one
+// numeric key the layout reads. Kebab is what a writer puts in a bracket, camel
+// is what the API and a definition's `defaultOptions` use; both mean the same
+// value, so both resolve here rather than at each consumer. Exported so no site
+// re-derives the set (the same one-place rule the X-run grammar follows).
+export const KERNING_OPTION_KEYS = Object.freeze({
+  'relative-kerning': 'relativeKerning',
+  relativeKerning: 'relativeKerning',
+  'absolute-kerning': 'absoluteKerning',
+  absoluteKerning: 'absoluteKerning',
+});
+
+// The kerning values an options object carries, in the order they were written,
+// each tagged with the numeric key it resolves to and how to name it in a
+// warning.
+export function kerningOptionEntries(options) {
+  return Object.entries(options ?? {})
+    .filter(([key]) => KERNING_OPTION_KEYS[key] !== undefined)
+    .map(([key, value]) => ({
+      key: KERNING_OPTION_KEYS[key],
+      writtenKey: key,
+      value,
+      source: value === true ? key : `${key}=${value}`,
+    }));
+}
+
+// Promotes `[x=N]` / `[y=N]` to the numeric x/y the layout reads. An option
+// OVERRIDES the positional shorthand it duplicates: on a part, `[x=N]>CODE`
+// and `CODE:x,y` address the same level, so they are two spellings of one
+// value and the option is the one that counts. The overridden coordinate is
+// reported rather than dropped in silence. Only a part can reach that
+// conflict: at every other scope the options block is the only channel, so
+// the node's x/y is whatever this function last wrote.
+export function extractPositionFromOptions(obj, parseWarnings) {
+  if (!obj.options) return;
+  const inline = { x: obj.x, y: obj.y };
+  const overridden = [];
+  for (const axis of ['x', 'y']) {
+    if (obj.options[axis] === undefined) continue;
+    const value = Number(obj.options[axis]);
+    if (inline[axis] !== undefined && inline[axis] !== value) overridden.push(axis);
+    obj[axis] = value;
+  }
+  if (overridden.length === 0 || !parseWarnings) return;
+  const ignored = `:${overridden.includes('x') ? inline.x : ''}${
+    overridden.includes('y') ? `,${inline.y}` : ''}`;
+  parseWarnings.push({
+    code: WARNING_CODES.MULTIPLE_POSITION_VALUES,
+    message: `A part takes one position: the option wins, so "${ignored}" is ignored. Write the position as an option or as a coordinate, not both.`,
+    source: ignored,
+  });
+}
+
+// Kerning is ONE value per character, however it is written: the `RK:`/`AK:`
+// markers and the long-form options are four spellings of the same thing. An
+// OPTION beats a MARKER (options override the DSL shorthand), a written value
+// beats a definition default, and among equals the one written LATER wins.
+// Every value a WRITER supplied and the winner displaced is reported; a
+// displaced default is not, since being overridden is what a default is for.
+// Resolving here leaves the layout one numeric key to read and the serializer
+// one spelling to emit.
+export function resolveKerning(glyphObj, marker, bracketEntries, parseWarnings) {
+  const options = glyphObj.options;
+  if (!options) return;
+
+  const numeric = (entry) => {
+    const value = typeof entry.value === 'boolean' || entry.value === ''
+      ? NaN
+      : Number(entry.value);
+    if (!Number.isFinite(value)) {
+      parseWarnings.push({
+        code: WARNING_CODES.MALFORMED_KERNING_VALUE,
+        message: `Malformed kerning value "${entry.source}"; the option is ignored.`,
+        source: entry.source,
+      });
+      return null;
+    }
+    return { ...entry, value };
+  };
+
+  // The marker first, so the last bracket option outranks it and the losers
+  // fall out as "everything before the winner".
+  const written = [...(marker ? [marker] : []), ...bracketEntries.map(numeric).filter(Boolean)];
+
+  // Clear what this character wrote, in the exact spelling it wrote it, so
+  // whatever is left on the options came from a definition default.
+  for (const entry of bracketEntries) delete options[entry.writtenKey];
+  if (marker) delete options[marker.key];
+
+  if (written.length > 0) {
+    // A written value beats a definition default, including a default of the
+    // other kind, which would otherwise linger and win the layout's own
+    // relative-before-absolute tie-break.
+    for (const key of Object.keys(KERNING_OPTION_KEYS)) delete options[key];
+    for (const displaced of written.slice(0, -1)) {
+      parseWarnings.push({
+        code: WARNING_CODES.MULTIPLE_KERNING_VALUES,
+        message: `A character takes one kerning value, so "${displaced.source}" is ignored. An option beats an RK:/AK: marker, and the last value written wins.`,
+        source: displaced.source,
+      });
+    }
+    const winner = written[written.length - 1];
+    options[winner.key] = winner.value;
+    return;
+  }
+
+  // Nothing usable was written on this character, so a definition default is
+  // all there is. Normalize it to the numeric key whatever spelling it used.
+  // (A malformed written value has already been reported and ignored, which
+  // leaves the default standing, exactly as a malformed marker does.)
+  const defaults = kerningOptionEntries(options);
+  if (defaults.length === 0) return;
+  for (const key of Object.keys(KERNING_OPTION_KEYS)) delete options[key];
+  const winner = numeric(defaults[defaults.length - 1]);
+  if (winner) options[winner.key] = winner.value;
+}
+
 // What a bare X code denotes, for the sites that meet one already stripped of
 // its options and decoration (a `;`-part slot, object input). The same question
 // processXCodes asks of a written token, asked of a finished code:
@@ -226,33 +343,6 @@ export class BlissParser {
       }
 
       return result;
-  }
-
-  // Promotes `[x=N]` / `[y=N]` to the numeric x/y the layout reads. An option
-  // OVERRIDES the positional shorthand it duplicates: on a part, `[x=N]>CODE`
-  // and `CODE:x,y` address the same level, so they are two spellings of one
-  // value and the option is the one that counts. The overridden coordinate is
-  // reported rather than dropped in silence. Only a part can reach that
-  // conflict: at every other scope the options block is the only channel, so
-  // the node's x/y is whatever this function last wrote.
-  static #extractPositionFromOptions(obj, parseWarnings) {
-    if (!obj.options) return;
-    const inline = { x: obj.x, y: obj.y };
-    const overridden = [];
-    for (const axis of ['x', 'y']) {
-      if (obj.options[axis] === undefined) continue;
-      const value = Number(obj.options[axis]);
-      if (inline[axis] !== undefined && inline[axis] !== value) overridden.push(axis);
-      obj[axis] = value;
-    }
-    if (overridden.length === 0 || !parseWarnings) return;
-    const ignored = `:${overridden.includes('x') ? inline.x : ''}${
-      overridden.includes('y') ? `,${inline.y}` : ''}`;
-    parseWarnings.push({
-      code: WARNING_CODES.MULTIPLE_POSITION_VALUES,
-      message: `A part takes one position: the option wins, so "${ignored}" is ignored. Write the position as an option or as a coordinate, not both.`,
-      source: ignored,
-    });
   }
 
   // Only one option bracket is allowed per level ([a][b]|| is invalid; the
@@ -1437,8 +1527,11 @@ export class BlissParser {
         delete group.options;
       }
 
-      let pendingRelativeKerning;
-      let pendingAbsoluteKerning;
+      // The kerning marker that currently wins for the next glyph, as
+      // { key, value, source }. One value survives per character, so a later
+      // marker displaces an earlier one rather than both riding along to a
+      // silent tie-break at layout time.
+      let pendingKerning;
 
       for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
         // Lift a word-level fail-render flag onto its enclosing group (mirrors
@@ -1474,7 +1567,7 @@ export class BlissParser {
         // push current group, add a default space group, start a new group
         if (_wordBreak) {
           if (group.glyphs.length > 0) {
-            this.#extractPositionFromOptions(group);
+            extractPositionFromOptions(group);
             parsedGroups.push(group);
           }
           parsedGroups.push({ glyphs: [{ parts: [{ codeName: 'SP', _fromSP: true }] }], _isSpaceGroup: true, _spaceIndex: parsedGroups.length });
@@ -1505,8 +1598,18 @@ export class BlissParser {
           // spelling) is kept. Still `continue` so a bare marker is consumed,
           // not misread as an UNKNOWN_CODE.
           if (kerningValue !== undefined) {
-            if (kerningType === "RK") pendingRelativeKerning = Number(kerningValue);
-            if (kerningType === "AK") pendingAbsoluteKerning = Number(kerningValue);
+            if (pendingKerning) {
+              parseWarnings.push({
+                code: WARNING_CODES.MULTIPLE_KERNING_VALUES,
+                message: `A character takes one kerning value, so "${pendingKerning.source}" is ignored. An option beats an RK:/AK: marker, and the last value written wins.`,
+                source: pendingKerning.source,
+              });
+            }
+            pendingKerning = {
+              key: kerningType === "RK" ? 'relativeKerning' : 'absoluteKerning',
+              value: Number(kerningValue),
+              source: part,
+            };
           }
           continue;
         }
@@ -1526,14 +1629,14 @@ export class BlissParser {
           continue;
         }
 
-        if (pendingRelativeKerning !== undefined) {
-          (glyphObj.options ??= {}).relativeKerning = pendingRelativeKerning;
-          pendingRelativeKerning = undefined;
-        }
-
-        if (pendingAbsoluteKerning !== undefined) {
-          (glyphObj.options ??= {}).absoluteKerning = pendingAbsoluteKerning;
-          pendingAbsoluteKerning = undefined;
+        // Applied before the defaultOptions merge below, so a written marker
+        // beats a definition default. A bracket option on this character can
+        // still displace it; resolveKerning settles that once the bracket is
+        // parsed.
+        const markerKerning = pendingKerning;
+        if (markerKerning) {
+          (glyphObj.options ??= {})[markerKerning.key] = markerKerning.value;
+          pendingKerning = undefined;
         }
 
         // Merge defaultOptions carried from expand() (standalone/composition case)
@@ -1556,11 +1659,17 @@ export class BlissParser {
         // legal neighbour, which is what tells `[a][b]` from `[a][b]>`.
         let charBracketsSeen = 0;
         let charMatch;
+        // Kerning written in the character bracket, captured here rather than
+        // read back off the merged options: only what the bracket itself
+        // carries outranks a marker, while the same key arriving from a
+        // definition's defaultOptions is a default and loses to one.
+        let bracketKerning = [];
         while ((charMatch = glyphCodeString.match(/^(\[[^\[\]]*\])(?!>)(.*)/)) !== null) {
           charBracketsSeen++;
           if (charBracketsSeen === 1) {
             const parsedOptions = dropMisplacedGlobalKeys(
               this.#parseOptions(restorePlaceholders(charMatch[1])), 'character');
+            bracketKerning = kerningOptionEntries(parsedOptions);
             // Merge only when something remains: a bracket fully emptied by the
             // gate (or written empty) must not leave an options: {} artifact on
             // the glyph -- the gated form's toJSON matches the bare form's.
@@ -1577,6 +1686,8 @@ export class BlissParser {
           }
           glyphCodeString = charMatch[2];
         }
+
+        resolveKerning(glyphObj, markerKerning, bracketKerning, parseWarnings);
 
         const parseParts = (partsString, depth = 0) => {
           if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
@@ -1696,7 +1807,7 @@ export class BlissParser {
             BlissParser.#flagCompositePart(part, partIndex);
             partIndex++;
 
-            this.#extractPositionFromOptions(part, parseWarnings);
+            extractPositionFromOptions(part, parseWarnings);
             parts.push(part);
           }
           return parts;
@@ -1720,11 +1831,11 @@ export class BlissParser {
           glyphObj._aliasCodeName = _aliasCodeName;
         }
 
-        this.#extractPositionFromOptions(glyphObj);
+        extractPositionFromOptions(glyphObj);
         group.glyphs.push(glyphObj);
       }
 
-      this.#extractPositionFromOptions(group);
+      extractPositionFromOptions(group);
       parsedGroups.push(group);
     }
 
@@ -1763,7 +1874,7 @@ export class BlissParser {
     result.groups = parsedGroups;
 
     if (parseWarnings.length) result._parseWarnings = parseWarnings;
-    this.#extractPositionFromOptions(result);
+    extractPositionFromOptions(result);
     return result;
   }
 

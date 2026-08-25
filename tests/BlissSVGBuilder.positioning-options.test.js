@@ -220,6 +220,53 @@ describe('BlissSVGBuilder positioning options', () => {
     });
   });
 
+  describe('when the position arrives as an options object instead of DSL text', () => {
+    // GH #18: `x` and `y` are options a LAYOUT reads, not attributes the
+    // renderer copies, so they have to be promoted the same way whatever
+    // surface sets them. Every one of these was accepted, serialized and
+    // round-tripped while changing nothing on screen, with no warning.
+    // Each row is asserted against the DSL spelling of the same value, byte
+    // for byte, since one library should not have two answers.
+    it.each([
+      ['glyph setOptions', (b) => b.glyph(1).setOptions({ x: 5 }), 'B99/B291', 'B99/[x=5]B291'],
+      ['glyph setOptions with both axes', (b) => b.glyph(1).setOptions({ x: 5, y: 3 }), 'B99/B291', 'B99/[x=5;y=3]B291'],
+      ['part setOptions', (b) => b.glyph(0).part(1).setOptions({ x: 2, y: 3 }), 'B291;C8', 'B291;[x=2;y=3]>C8'],
+      ['addGlyph opts', (b) => b.group(0).addGlyph('B291', { x: 4 }), 'B291', 'B291/[x=4]B291'],
+      ['insertGlyph opts', (b) => b.group(0).insertGlyph(1, 'B291', { x: 4 }), 'B291/B99', 'B291/[x=4]B291/B99'],
+      ['addPart opts', (b) => b.glyph(0).addPart('C8', { x: 3, y: 1 }), 'B291', 'B291;[x=3;y=1]>C8'],
+      ['insertPart opts', (b) => b.glyph(0).insertPart(1, 'C8', { x: 3 }), 'B291;HL2', 'B291;[x=3]>C8;HL2'],
+      ['replaceGlyph opts', (b) => b.group(0).replaceGlyph(1, 'B291', { x: 4 }), 'B291/C8', 'B291/[x=4]B291'],
+      ['replacePart opts', (b) => b.glyph(0).replacePart(1, 'C8', { x: 3 }), 'B291;HL2', 'B291;[x=3]>C8'],
+    ])('positions through %s exactly as the DSL does', (_label, mutate, start, dsl) => {
+      const built = new BlissSVGBuilder(start);
+      mutate(built);
+      expect(built.svgCode).toBe(new BlissSVGBuilder(dsl).svgCode);
+      expect(built.toString()).toBe(new BlissSVGBuilder(dsl).toString());
+    });
+
+    it('positions through constructor object input', () => {
+      const built = new BlissSVGBuilder({ groups: [{ glyphs: [{ options: { x: 5 }, parts: [{ codeName: 'B291' }] }] }] });
+      expect(built.svgCode).toBe(new BlissSVGBuilder('[x=5]B291').svgCode);
+    });
+
+    it('applies the same precedence to authored object data', () => {
+      // The option beats the value written beside it, and says which value it
+      // displaced, exactly as it does for the DSL spelling of the same thing.
+      const built = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B291', x: 3, options: { x: 5 } }] }] }] });
+      expect(built.toString()).toBe('B291:5,0');
+      expect(built.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
+    });
+
+    it('keeps reporting a conflict after an unrelated mutation', () => {
+      // The promotion is idempotent, so the second rebuild finds nothing to
+      // resolve; the warning has to survive that or it would vanish the moment
+      // anything else on the composition changed.
+      const built = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B291', x: 3, options: { x: 5 } }] }] }] });
+      built.group(0).addGlyph('B99');
+      expect(built.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
+    });
+  });
+
   describe('when the composition round-trips', () => {
     it.each([
       ['B99/[x=5]B291'],

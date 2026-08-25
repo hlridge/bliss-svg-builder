@@ -90,6 +90,21 @@ How `AK` works:
 - `AK:2` - Standard-ish spacing
 - Any value sets the exact distance regardless of other settings
 
+### Kerning as an Option
+
+`RK:` and `AK:` are the short spellings. The same two values are also plain options, which is what you need when the value comes from a program rather than from written text:
+
+```
+B106/[relative-kerning=-1]B313      (same as B106/RK:-1/B313)
+B313/[absolute-kerning=0]B1103      (same as B313/AK:0/B1103)
+```
+
+```js
+builder.glyph(1).setOptions({ relativeKerning: -1 });
+```
+
+All three spellings draw the same picture, and the output settles on the short one: `[relative-kerning=-1]` comes back from `toString()` as `RK:-1`.
+
 ### Mixing Kerning Types
 
 Combine different kerning approaches in one composition:
@@ -97,6 +112,8 @@ Combine different kerning approaches in one composition:
 <Demo code="B291/RK:-2/B291/AK:6/B291" title="RK:-2 then AK:6" />
 
 Kerning codes affect the space **before** the next character, not after the previous one.
+
+A character takes **one** kerning value, however you write it. Set it more than once and the last value written wins, with an option beating an `RK:`/`AK:` marker; each value that loses is reported with a [`MULTIPLE_KERNING_VALUES`](/reference/warning-codes) warning rather than disappearing. So `B99/AK:4/RK:3/B291` kerns by `RK:3` and says that `AK:4` was ignored.
 
 Note: When automatic kerning is added in a future version, existing `RK` adjustments will adapt naturally since they are relative to whatever the base spacing is. `AK` values will remain unchanged since they set absolute distances.
 
@@ -108,8 +125,8 @@ Note: When automatic kerning is added in a future version, existing `RK` adjustm
 | `char-space` | `2` | 0 - 10 | Space between characters (`/`) |
 | `external-glyph-space` | `0.8` | 0 - 3 | Space for external glyphs |
 
-| Kerning Code | Syntax | Description |
-|--------------|--------|-------------|
-| `RK` | `RK:value` | Relative adjustment to spacing |
-| `AK` | `AK:value` | Absolute spacing in grid units |
+| Kerning Code | Syntax | Option spelling | Description |
+|--------------|--------|-----------------|-------------|
+| `RK` | `RK:value` | `[relative-kerning=value]`, `{ relativeKerning: value }` | Relative adjustment to spacing |
+| `AK` | `AK:value` | `[absolute-kerning=value]`, `{ absoluteKerning: value }` | Absolute spacing in grid units |
 

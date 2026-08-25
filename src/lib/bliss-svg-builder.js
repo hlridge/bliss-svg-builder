@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes } from "./bliss-parser.js";
+import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
@@ -920,6 +920,45 @@ class BlissSVGBuilder {
     }
   }
 
+  // Positioning family (GH #18): `x`, `y` and the two kerning values are the
+  // options a LAYOUT reads rather than an attribute the renderer copies, so
+  // they need the same promotion an options object gets when it arrives as
+  // DSL text: `x`/`y` onto the node as numbers, and any kerning spelling onto
+  // the single numeric key. The DSL surface gets that inside the parser; every
+  // other surface (constructor object input, `setOptions`, and the opts
+  // argument of the add/insert/replace family) arrives here, where an option
+  // set after construction lands on the authoring structure and never sees a
+  // parse. Without this the option was accepted, serialized, round-tripped,
+  // and changed nothing, with no warning.
+  //
+  // Runs on `#rawBlissObj` rather than the render clone, so the promotion also
+  // reaches what `toString()`/`toJSON()` emit: an option set through the API
+  // serializes exactly like the DSL spelling of the same value. It is
+  // idempotent, so a later rebuild re-normalizes nothing; the warnings ride
+  // `_parseWarnings`, the channel that survives a rebuild, so a conflict
+  // reported once is still reported after an unrelated mutation.
+  #normalizePositioningInvariant() {
+    const raw = this.#rawBlissObj;
+    const warnings = [];
+    extractPositionFromOptions(raw, warnings);
+    for (const group of raw.groups ?? []) {
+      extractPositionFromOptions(group, warnings);
+      for (const glyph of group.glyphs ?? []) {
+        extractPositionFromOptions(glyph, warnings);
+        // Kerning attaches to a character: it is the gap before THIS glyph, and
+        // no other level has a spelling for it. There are no markers on this
+        // path, so every kerning value present was written as an option.
+        if (kerningOptionEntries(glyph.options).length > 0) {
+          resolveKerning(glyph, undefined, kerningOptionEntries(glyph.options), warnings);
+        }
+        for (const part of glyph.parts ?? []) {
+          extractPositionFromOptions(part, warnings);
+        }
+      }
+    }
+    if (warnings.length) (raw._parseWarnings ??= []).push(...warnings);
+  }
+
   // Retention family (row 31): malformed SYNTAX is a parse-time warning, never
   // persisted. A malformed part token is a pure error node (an `{error}` node
   // with no codeName and no nested parts): `!` (Invalid format) or a code with
@@ -1004,6 +1043,7 @@ class BlissSVGBuilder {
     this.#normalizeSpacePartInvariant();
     this.#normalizeSpaceInvariant();
     this.#normalizeIndicatorInvariant();
+    this.#normalizePositioningInvariant();
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
 
     // Re-derive position-dependent composite-as-part flags on the AUTHORING
