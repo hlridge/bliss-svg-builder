@@ -17,8 +17,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *       are not exercised here)
  *   - group advance accounts for explicit x offsets, space-group classification,
  *       and the regular-group fallback when any glyph is not a space glyph
- *   - glyph advance accounts for explicit x offsets, empty-parts edge cases,
- *       and the standard width-plus-character-spacing computation
+ *   - glyph advance accounts for a glyph-level x (leading blank, which widens
+ *       the glyph rather than moving it), empty-parts edge cases, and the
+ *       standard width-plus-character-spacing computation
  *   - external-glyph kerning derived from adjacent character identities
  *       adjusts the advance between two external glyphs
  *   - custom non-external kerning rules apply between non-external glyphs and
@@ -200,7 +201,14 @@ describe('BlissElement sibling positioning', () => {
       expect(glyph.advanceX).toBe(4);
     });
 
-    test("adds the previous glyph's width to a caller-specified glyph x offset", () => {
+    test('starts a glyph with leading blank at the previous advance and indents its ink', () => {
+      // A glyph-level x is leading blank owned by that glyph: the glyph starts
+      // where the flow puts it (the previous glyph's advance, 4), owns 3 units
+      // of blank so it measures 5, and its ink begins 3 further in, at 7.
+      //
+      // The rule this replaced positioned the glyph at the previous glyph's INK
+      // width plus x, so `x: 0` silently deleted the character spacing and
+      // `advanceX` no longer predicted where the next glyph started.
       const element = new BlissElement({
         groups: [{
           glyphs: [
@@ -209,10 +217,12 @@ describe('BlissElement sibling positioning', () => {
           ]
         }]
       });
-      const [, secondGlyph] = element.snapshot().children[0].children;
+      const [firstGlyph, secondGlyph] = element.snapshot().children[0].children;
 
-      expect(secondGlyph.offsetX).toBe(5);
-      expect(element.getSvgContent()).toBe('M0,0h2M5,0h2');
+      expect(secondGlyph.offsetX).toBe(firstGlyph.advanceX);
+      expect(secondGlyph.offsetX).toBe(4);
+      expect(secondGlyph.width).toBe(5);
+      expect(element.getSvgContent()).toBe('M0,0h2M7,0h2');
     });
   });
 

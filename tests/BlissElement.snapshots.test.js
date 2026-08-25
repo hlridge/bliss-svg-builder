@@ -440,9 +440,15 @@ describe('BlissElement snapshots', () => {
       expect(glyph.index).toBe(0);
       expect(part.index).toBe(0);
 
+      // A glyph-level x is leading blank owned by that glyph, so unlike a
+      // group-level or part-level x it stays out of the glyph's own frame and
+      // lands on the glyph's content instead: the glyph sits at the word
+      // origin (offsetX 0) and its part carries 4 + 7. Every absolute position
+      // below the glyph, and therefore every bounds box, is the same as when
+      // the glyph frame carried the 4 itself.
       expect(group).toMatchObject({ x: 3, y: 5, offsetX: 3, offsetY: 5 });
-      expect(glyph).toMatchObject({ x: 7, y: 11, offsetX: 4, offsetY: 6 });
-      expect(part).toMatchObject({ x: 14, y: 19, offsetX: 7, offsetY: 8 });
+      expect(glyph).toMatchObject({ x: 3, y: 11, offsetX: 0, offsetY: 6 });
+      expect(part).toMatchObject({ x: 14, y: 19, offsetX: 11, offsetY: 8 });
 
       expect(root.isHeadGlyph).toBe(false);
       expect(group.isHeadGlyph).toBe(false);

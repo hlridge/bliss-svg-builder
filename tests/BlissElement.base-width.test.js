@@ -18,7 +18,7 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   case, non-indicator part contribution, positioned-part outer-edge
  *   measurement, and empty-parts early-return (no NaN/-Infinity contamination).
  * - Width-helper math at group level (baseGroupWidth, baseWidth, width)
- *   when the first glyph carries an explicit base-x offset.
+ *   when the first glyph carries leading blank.
  * - Root-level baseWidth across multiple groups when the first group
  *   carries a non-zero local x offset: subtracts the first group's
  *   offset from the last group's far edge (not adds).
@@ -120,7 +120,19 @@ describe('BlissElement baseWidth and width helpers', () => {
       expect(glyph.advanceX).toBe(14);
     });
 
-    it('subtracts the first glyph offset from group baseWidth', () => {
+    it('grows group baseWidth by the first glyph\'s leading blank', () => {
+      // A glyph-level x is leading blank owned by that glyph, so it never
+      // moves the glyph frame: the first glyph still starts at the word
+      // origin and is 3 units wider instead (3 blank + 2 ink). The second
+      // glyph follows the widened advance, and every group-level measure
+      // grows with it.
+      //
+      // This replaced a rule that put the glyph AT x, which is the only way a
+      // group's first glyph could ever have carried a non-zero offset; that
+      // makes baseGroupWidth's "minus the first glyph offset" term
+      // unreachable, kept because the formula (measure from the first glyph's
+      // origin) is still what the getter means. The root-level twin of that
+      // subtraction stays live: a first GROUP offset is unchanged by this.
       const element = new BlissElement({
         groups: [{
           glyphs: [
@@ -132,10 +144,11 @@ describe('BlissElement baseWidth and width helpers', () => {
       const group = element.children[0];
       const [firstGlyph, secondGlyph] = group.children;
 
-      expect(firstGlyph.baseX).toBe(3);
+      expect(firstGlyph.baseX).toBe(0);
+      expect(firstGlyph.width).toBe(5);
       expect(secondGlyph.baseX).toBe(7);
-      expect(group.baseGroupWidth).toBe(6);
-      expect(group.baseWidth).toBe(6);
+      expect(group.baseGroupWidth).toBe(9);
+      expect(group.baseWidth).toBe(9);
       expect(group.width).toBe(9);
     });
   });

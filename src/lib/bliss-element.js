@@ -661,8 +661,26 @@ export class BlissElement {
           }
         }
 
+        // A glyph-level `x` is LEADING BLANK owned by this glyph, not a position
+        // for it. The glyph still starts where the flow puts it (below); its own
+        // content begins `x` further in, and the width getter grows the glyph to
+        // match, since at level >= 1 only NEGATIVE child offsets move the left
+        // boundary. Deriving the next position from the previous glyph's ink
+        // width instead (the rule this replaced) made `x=0` delete the
+        // char-space and made `advanceX` disagree with the layout.
+        // Applied after the normalization above, so the blank adds to the
+        // glyph's own internal layout rather than replacing it.
+        const leadingBlank = this.#blissObj.x ?? 0;
+        if (leadingBlank !== 0) {
+          for (const child of this.#children) {
+            child.#relativeToParentX += leadingBlank;
+          }
+        }
+
         if (!this.#previousElement) {
-          this.#relativeToParentX = this.#parentElement.#relativeToParentX + (this.#blissObj.x ?? 0);
+          // The word's first glyph sits at the word's origin. Its leading blank
+          // is already inside it (above), so there is nothing to add here.
+          this.#relativeToParentX = 0;
         } else {
           // An empty-parts glyph must not re-space its neighbor: its serialized
           // form is absent (or a glyphless options token), so the reparse never
@@ -686,13 +704,16 @@ export class BlissElement {
             this.#previousElement.#advanceX = this.#previousElement.width + this.#blissObj.options.absoluteKerning;
           }
 
-          if (this.#blissObj.x === undefined) {
-            this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
-          } else {
-            this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.width + this.#blissObj.x;
-          }
+          // Unconditional: a glyph carrying leading blank still starts where the
+          // previous glyph's advance puts it, so `prev.x + prev.advanceX` is the
+          // next glyph's origin for every input.
+          this.#relativeToParentX = this.#previousElement.#relativeToParentX + this.#previousElement.#advanceX;
         }
 
+        // `y` is deliberately not symmetric with `x`: `x` runs along the writing
+        // direction, where the flow already owns the position, so an authored
+        // value has to say something the flow does not. `y` has no flow to
+        // negotiate with and stays a plain offset.
         this.#relativeToParentY = this.#blissObj.y ?? 0;
 
         if (hasFailedParts && !this.#sharedOptions?.errorPlaceholder) {
