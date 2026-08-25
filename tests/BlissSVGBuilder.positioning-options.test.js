@@ -179,6 +179,33 @@ describe('BlissSVGBuilder positioning options', () => {
       expect(b.groups[0].children[0].children[0].x).toBe(3);
     });
 
+    it('says nothing when only the option is written', () => {
+      expect(new BlissSVGBuilder('[x=2]>S8;C8').warnings).toEqual([]);
+    });
+
+    it('names only the axis it overrode', () => {
+      // `:,7` is the y-only coordinate spelling, so it names the value that
+      // lost without claiming the x was written.
+      expect(new BlissSVGBuilder('[y=10]>B291:3,7').warnings.map(w => w.source)).toEqual([':,7']);
+      expect(new BlissSVGBuilder('[x=5]>B291:3,7').warnings.map(w => w.source)).toEqual([':3']);
+    });
+
+    it('names the level it happened at, since object input can reach any of them', () => {
+      // The DSL can only raise this on a part, where `CODE:x,y` is the other
+      // spelling. Authored object data can carry both channels at any level,
+      // and there the coordinate wording would be describing a spelling that
+      // does not exist at that level.
+      const glyph = new BlissSVGBuilder({ groups: [{ glyphs: [{ x: 3, options: { x: 5 }, parts: [{ codeName: 'B291' }] }] }] });
+      expect(glyph.warnings[0].message).toContain('A character takes one position');
+      expect(glyph.warnings[0].source).toBe('x=3');
+
+      const word = new BlissSVGBuilder({ groups: [{ x: 3, options: { x: 5 }, glyphs: [{ parts: [{ codeName: 'B291' }] }] }] });
+      expect(word.warnings[0].message).toContain('A word takes one position');
+
+      const part = new BlissSVGBuilder('[x=5]>B291:3,7');
+      expect(part.warnings[0].message).toContain('A part takes one position');
+    });
+
     it('leaves a glyph option and a part coordinate composing, not competing', () => {
       // Different levels: the glyph carries 2 units of leading blank and the
       // part sits 3 further in, so the ink lands at 5 with nothing reported.
@@ -257,6 +284,30 @@ describe('BlissSVGBuilder positioning options', () => {
       expect(built.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
     });
 
+    it('replaces a position it already carries, without inventing a conflict', () => {
+      // Setting a position through the API is a command, not a second opinion:
+      // it replaces what the element carries. Reading the value promoted by an
+      // earlier call as a competing coordinate would report a conflict the
+      // caller never wrote, once per change.
+      const built = new BlissSVGBuilder('B99/[x=5]B291');
+      built.glyph(1).setOptions({ x: 7 });
+      expect(built.warnings).toEqual([]);
+      expect(built.svgCode).toBe(new BlissSVGBuilder('B99/[x=7]B291').svgCode);
+      built.glyph(1).setOptions({ x: 9 });
+      expect(built.warnings).toEqual([]);
+      expect(built.svgCode).toBe(new BlissSVGBuilder('B99/[x=9]B291').svgCode);
+    });
+
+    it('reaches a nested part, where every other option already works', () => {
+      const built = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [
+        { codeName: 'S8', parts: [{ codeName: 'HL8' }, { codeName: 'VL8', options: { x: 4 } }] },
+      ] }] }] });
+      const plain = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [
+        { codeName: 'S8', parts: [{ codeName: 'HL8' }, { codeName: 'VL8', x: 4 }] },
+      ] }] }] });
+      expect(built.svgCode).toBe(plain.svgCode);
+    });
+
     it('keeps reporting a conflict after an unrelated mutation', () => {
       // The promotion is idempotent, so the second rebuild finds nothing to
       // resolve; the warning has to survive that or it would vanish the moment
@@ -264,6 +315,70 @@ describe('BlissSVGBuilder positioning options', () => {
       const built = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B291', x: 3, options: { x: 5 } }] }] }] });
       built.group(0).addGlyph('B99');
       expect(built.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
+    });
+  });
+
+  describe('when a position option is not a number', () => {
+    // Warn and drop, and still render: a broken decoration must not destroy
+    // valid content, and it must never reach the layout as NaN, which would
+    // spread through every width and the viewBox.
+    it.each([
+      ['[x=abc]B291', 'x=abc'],
+      ['[x=abc]||B291', 'x=abc'],
+      ['[x=abc]|B291', 'x=abc'],
+      ['[x=abc]>B291', 'x=abc'],
+      ['[y=]B291', 'y='],
+      ['[x]B291', 'x'],
+    ])('reports and ignores %s', (input, source) => {
+      const b = new BlissSVGBuilder(input);
+      expect(b.warnings.map(w => w.code)).toEqual(['MALFORMED_COORDINATES']);
+      expect(b.warnings[0].source).toBe(source);
+      expect(b.svgCode).not.toContain('NaN');
+      expect(b.svgCode).toBe(new BlissSVGBuilder('B291').svgCode);
+    });
+
+    it('leaves a coordinate written beside it standing', () => {
+      const b = new BlissSVGBuilder('[x=abc]>B291:3,7');
+      expect(b.warnings.map(w => w.code)).toEqual(['MALFORMED_COORDINATES']);
+      expect(b.toString()).toBe('B291:3,7');
+    });
+
+    it('reports it once, however many times the composition is rebuilt', () => {
+      // A NaN compares unequal to itself, so an unresolved one would look like
+      // a fresh conflict on every pass and grow the warnings without end.
+      const b = new BlissSVGBuilder('[x=abc]B291');
+      const counts = [b.warnings.length];
+      for (let i = 0; i < 4; i++) {
+        b.group(0).addGlyph('B99');
+        counts.push(b.warnings.length);
+      }
+      expect(counts).toEqual([1, 1, 1, 1, 1]);
+    });
+  });
+
+  describe('when a part positioned by an option sits behind an indicator', () => {
+    it('exempts the indicator exactly as the coordinate spelling does', () => {
+      // An indicator that precedes default-positioned content is misplaced and
+      // dropped; content at a non-origin position does not convict it. The two
+      // spellings of that position must therefore agree, which means the
+      // promotion has to run before the indicator rule reads it.
+      const option = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [
+        { codeName: 'B81' }, { codeName: 'C8', options: { x: 2 } },
+      ] }] }] });
+      const coordinate = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [
+        { codeName: 'B81' }, { codeName: 'C8', x: 2 },
+      ] }] }] });
+      expect(option.toString()).toBe(coordinate.toString());
+      expect(option.warnings).toEqual(coordinate.warnings);
+      expect(option.svgCode).toBe(coordinate.svgCode);
+    });
+
+    it('still lets a space drop one written decoration once', () => {
+      // The promotion must stay AFTER the space rule, which strips a space's
+      // option and its coordinate separately: promoting first would turn one
+      // written decoration into two reports.
+      const b = new BlissSVGBuilder('B291/[x=5]TSP/B291');
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_SPACE_DECORATION']);
     });
   });
 

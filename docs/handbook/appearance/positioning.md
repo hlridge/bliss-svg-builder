@@ -146,6 +146,8 @@ The second character still starts where the writing flow puts it. It is 5 units 
 
 `y` is not symmetric with `x`, and deliberately so. `x` runs along the writing direction, where the flow already decides the position, so a value written there has to mean something the flow does not. `y` has no flow to negotiate with, so a character-level `[y=N]` is a plain offset.
 
+Word and global scope (`[x=N]|`, `[x=N]||`) are a third thing again: there `x` moves the word itself, and it is measured from the end of what precedes it rather than added to the flow. `B291//B99` puts the second word at 16; `B291//[x=0]|B99` puts it at 10, where a mere character space would have put it. Leading blank is a character-level idea.
+
 This is also what tells `[x=N]` apart from [kerning](/handbook/writing/spacing#kerning): `AK:`/`RK:` widen the gap the **previous** character leaves, while `[x=N]` fills the character that carries it. Write both and they add up.
 
 ## Zero-Sized Anchor (ZSA)

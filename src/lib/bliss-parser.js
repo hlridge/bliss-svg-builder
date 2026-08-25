@@ -226,29 +226,51 @@ export function kerningOptionEntries(options) {
     }));
 }
 
+// What an element is called in a positioning warning, by tree level. A part is
+// the only level with a second spelling (`CODE:x,y`), so it is the only one
+// whose message can talk about a coordinate.
+const POSITION_SCOPE_NAMES = ['composition', 'word', 'character', 'part'];
+
 // Promotes `[x=N]` / `[y=N]` to the numeric x/y the layout reads. An option
 // OVERRIDES the positional shorthand it duplicates: on a part, `[x=N]>CODE`
 // and `CODE:x,y` address the same level, so they are two spellings of one
-// value and the option is the one that counts. The overridden coordinate is
-// reported rather than dropped in silence. Only a part can reach that
-// conflict: at every other scope the options block is the only channel, so
-// the node's x/y is whatever this function last wrote.
-export function extractPositionFromOptions(obj, parseWarnings) {
+// value and the option is the one that counts. The overridden value is
+// reported rather than dropped in silence. A part is where the DSL can raise
+// that conflict; object input can author both channels at any level, so the
+// message names the level it happened at. A value that is not a number is
+// dropped with MALFORMED_COORDINATES and the element still renders, since a
+// broken decoration must not destroy valid content.
+export function extractPositionFromOptions(obj, parseWarnings, level = 3) {
   if (!obj.options) return;
   const inline = { x: obj.x, y: obj.y };
   const overridden = [];
   for (const axis of ['x', 'y']) {
     if (obj.options[axis] === undefined) continue;
-    const value = Number(obj.options[axis]);
+    const written = obj.options[axis];
+    const value = typeof written === 'boolean' || written === '' ? NaN : Number(written);
+    if (!Number.isFinite(value)) {
+      delete obj.options[axis];
+      // A bare key is stored as `true`, so name it the way it was written.
+      const source = written === true ? axis : `${axis}=${written}`;
+      parseWarnings?.push({
+        code: WARNING_CODES.MALFORMED_COORDINATES,
+        message: `Malformed position "${source}"; the option is ignored.`,
+        source,
+      });
+      continue;
+    }
     if (inline[axis] !== undefined && inline[axis] !== value) overridden.push(axis);
     obj[axis] = value;
   }
   if (overridden.length === 0 || !parseWarnings) return;
-  const ignored = `:${overridden.includes('x') ? inline.x : ''}${
-    overridden.includes('y') ? `,${inline.y}` : ''}`;
+  const scope = POSITION_SCOPE_NAMES[Math.min(level, 3)];
+  const ignored = level >= 3
+    ? `:${overridden.includes('x') ? inline.x : ''}${overridden.includes('y') ? `,${inline.y}` : ''}`
+    : overridden.map(axis => `${axis}=${inline[axis]}`).join(';');
+  const how = level >= 3 ? 'as an option or as a coordinate' : 'as an option or beside it';
   parseWarnings.push({
     code: WARNING_CODES.MULTIPLE_POSITION_VALUES,
-    message: `A part takes one position: the option wins, so "${ignored}" is ignored. Write the position as an option or as a coordinate, not both.`,
+    message: `A ${scope} takes one position: the option wins, so "${ignored}" is ignored. Write the position ${how}, not both.`,
     source: ignored,
   });
 }
@@ -1567,7 +1589,7 @@ export class BlissParser {
         // push current group, add a default space group, start a new group
         if (_wordBreak) {
           if (group.glyphs.length > 0) {
-            extractPositionFromOptions(group);
+            extractPositionFromOptions(group, parseWarnings, 1);
             parsedGroups.push(group);
           }
           parsedGroups.push({ glyphs: [{ parts: [{ codeName: 'SP', _fromSP: true }] }], _isSpaceGroup: true, _spaceIndex: parsedGroups.length });
@@ -1831,11 +1853,11 @@ export class BlissParser {
           glyphObj._aliasCodeName = _aliasCodeName;
         }
 
-        extractPositionFromOptions(glyphObj);
+        extractPositionFromOptions(glyphObj, parseWarnings, 2);
         group.glyphs.push(glyphObj);
       }
 
-      extractPositionFromOptions(group);
+      extractPositionFromOptions(group, parseWarnings, 1);
       parsedGroups.push(group);
     }
 
@@ -1873,8 +1895,8 @@ export class BlissParser {
 
     result.groups = parsedGroups;
 
+    extractPositionFromOptions(result, parseWarnings, 0);
     if (parseWarnings.length) result._parseWarnings = parseWarnings;
-    extractPositionFromOptions(result);
     return result;
   }
 

@@ -74,6 +74,9 @@ describe('BlissSVGBuilder kerning options', () => {
 
     it('reports a bare kerning key, which carries no value to apply', () => {
       expect(codes('B99/[relative-kerning]B291')).toEqual(['MALFORMED_KERNING_VALUE']);
+      // Named the way it was written: a bare key is stored as `true`, and
+      // reporting "relative-kerning=true" would name something nobody wrote.
+      expect(sources('B99/[relative-kerning]B291')).toEqual(['relative-kerning']);
       expect(glyphXs('B99/[relative-kerning]B291')[1]).toBe(4);
     });
   });
@@ -190,6 +193,31 @@ describe('BlissSVGBuilder kerning options', () => {
     it('lets a written option override it silently', () => {
       expect(glyphXs(`B99/[absolute-kerning=4]${KDEF}`)[1]).toBe(6);
       expect(codes(`B99/[absolute-kerning=4]${KDEF}`)).toEqual([]);
+    });
+
+    it('lets an API-set value override it as silently as the DSL does', () => {
+      // Once the default is normalized onto the character it looks like any
+      // other kerning value, so setting the other kind through the API must
+      // replace it rather than be read as a second authored value. The two
+      // surfaces hold the same state, so they must report the same thing.
+      const built = new BlissSVGBuilder(`B99/${KDEF}`);
+      built.glyph(1).setOptions({ absoluteKerning: 4 });
+      const dsl = new BlissSVGBuilder(`B99/AK:4/${KDEF}`);
+      expect(built.groups[0].children[1].x).toBe(6);
+      expect(built.warnings).toEqual(dsl.warnings);
+      expect(built.svgCode).toBe(dsl.svgCode);
+    });
+
+    it('takes the last of two defaults, silently, since neither was written here', () => {
+      BlissSVGBuilder.define({
+        [`${KDEF}2`]: { type: 'glyph', codeString: 'B291', defaultOptions: { relativeKerning: 3, absoluteKerning: 4 } },
+      });
+      try {
+        expect(glyphXs(`B99/${KDEF}2`)[1]).toBe(6);
+        expect(codes(`B99/${KDEF}2`)).toEqual([]);
+      } finally {
+        BlissSVGBuilder.removeDefinition(`${KDEF}2`);
+      }
     });
   });
 });

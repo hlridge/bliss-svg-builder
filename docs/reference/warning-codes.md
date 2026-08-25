@@ -80,6 +80,14 @@ B313:abc               →  not numbers
 
 Correct forms: `B313:2,4`, `B313:2`, `B313:,4`.
 
+The same code covers a position **option** whose value is not a number, at any scope. There the option alone is ignored and the content still renders, because a broken decoration should not destroy valid content:
+
+```
+[x=abc]B313            →  warns, renders B313 unmoved
+[x=abc]>B313:3,7       →  warns, the part keeps the 3,7 written beside it
+[x]B313                →  warns: a bare key carries no value to position with
+```
+
 ### `MALFORMED_KERNING_VALUE`
 
 An `RK:`/`AK:` kerning marker with a non-numeric value. The marker is ignored; the characters render at normal spacing.
@@ -225,13 +233,17 @@ Brackets at *different* scopes are not duplicates and are valid: a character bra
 
 ### `MULTIPLE_POSITION_VALUES`
 
-One part positioned twice. A part option (`[x=N;y=M]>`) and the coordinate suffix (`CODE:x,y`) both place the part inside its character, so they are two spellings of one value. The option wins, and the coordinate it overrides is named:
+One element positioned twice. A part option (`[x=N;y=M]>`) and the coordinate suffix (`CODE:x,y`) both place the part inside its character, so they are two spellings of one value. The option wins, and the value it overrides is named:
 
 ```
 [x=5;y=10]>B291:3,7    →  the part sits at 5,10; ":3,7" is ignored
 [x=5]>B291:3,7         →  the part sits at 5,7;  ":3" is ignored
 [x=3;y=7]>B291:3,7     →  no warning: the two spellings agree
 ```
+
+In written text a part is the only place this can happen, since `CODE:x,y` is the only other spelling there is. Object input can carry both channels at any level (an `x` beside an `options.x` on the same node), so the message names the level: "A part / character / word / composition takes one position".
+
+Setting a position through the API replaces the one the element carries rather than competing with it, so `glyph.setOptions({ x: 7 })` on a character already carrying `[x=5]` is silent.
 
 A character-scope `[x=N]` is not a duplicate of a part coordinate. It is a different level (leading blank on the character, see [Positioning](/handbook/appearance/positioning)) and composes with the part's own position, so `[x=2]B291:3,0` puts ink at 5 with nothing reported.
 

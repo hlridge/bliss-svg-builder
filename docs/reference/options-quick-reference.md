@@ -52,6 +52,7 @@ These four are the exception to the scope note above: they are not canvas-wide, 
 |--------|-------|-------------|
 | `x` | part `[opts]>` | Position inside the character. Same as the `CODE:x,y` suffix, and the option wins when both are written ([`MULTIPLE_POSITION_VALUES`](/reference/warning-codes)) |
 | `x` | character `[opts]` | Leading blank owned by the character: it widens the character and moves its ink in, without moving the character. See [Positioning](/handbook/appearance/positioning#character-level-x-is-leading-blank) |
+| `x` | word `[opts]\|`, global `[opts]\|\|` | Moves the word itself, measured from the end of what precedes it, so `[x=0]\|` drops the word space back to a character space |
 | `y` | any | A plain offset at every scope, since nothing else decides the vertical |
 | `relative-kerning` | character | The `RK:` marker as an option: adjusts the gap before this character |
 | `absolute-kerning` | character | The `AK:` marker as an option: sets the gap before this character |

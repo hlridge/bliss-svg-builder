@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
+import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
@@ -524,6 +524,8 @@ class BlissSVGBuilder {
         return parsed;
       },
       toRaw: (obj) => BlissSVGBuilder.#toRaw(obj),
+      clearStalePositioning: (node, ...incoming) =>
+        BlissSVGBuilder.#clearStalePositioning(node, ...incoming),
       isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
       makeSpaceGroup: () => BlissSVGBuilder.#makeSpaceGroup(),
       removeGlyphGroup: (obj, gi) => this.#removeGlyphGroup(obj, gi),
@@ -541,6 +543,24 @@ class BlissSVGBuilder {
       return { defaults: opts.defaults, overrides: opts.overrides };
     }
     return { defaults: undefined, overrides: opts };
+  }
+
+  // Setting a position or a kerning value through the API REPLACES the one the
+  // element carries, so the channels it fills are cleared before the merge.
+  // Without this the element keeps what an earlier call promoted (`node.x`, or
+  // the other kerning key) and the promotion pass reads that leftover as a
+  // second authored value: re-setting `{x: 7}` would report the 5 it replaced
+  // as a competing coordinate that was never written, once per change.
+  // Two values written in ONE call still compete, and still warn, because both
+  // arrive in the same incoming object.
+  static #clearStalePositioning(node, ...incoming) {
+    const keys = incoming.flatMap(o => Object.keys(o ?? {}));
+    for (const axis of ['x', 'y']) {
+      if (keys.includes(axis)) delete node[axis];
+    }
+    if (node.options && keys.some(key => KERNING_OPTION_KEYS[key] !== undefined)) {
+      for (const key of Object.keys(KERNING_OPTION_KEYS)) delete node.options[key];
+    }
   }
 
   static #toRaw(obj) {
@@ -940,20 +960,26 @@ class BlissSVGBuilder {
   #normalizePositioningInvariant() {
     const raw = this.#rawBlissObj;
     const warnings = [];
-    extractPositionFromOptions(raw, warnings);
+    // Parts nest (a composite part carries its own), and the parser promotes at
+    // every depth, so this does too: a nested part is reachable through the API
+    // (`glyph(0).part(0).part(1)`), where any other option already works.
+    const walkParts = (parts) => {
+      for (const part of parts ?? []) {
+        extractPositionFromOptions(part, warnings);
+        walkParts(part.parts);
+      }
+    };
+    extractPositionFromOptions(raw, warnings, 0);
     for (const group of raw.groups ?? []) {
-      extractPositionFromOptions(group, warnings);
+      extractPositionFromOptions(group, warnings, 1);
       for (const glyph of group.glyphs ?? []) {
-        extractPositionFromOptions(glyph, warnings);
+        extractPositionFromOptions(glyph, warnings, 2);
         // Kerning attaches to a character: it is the gap before THIS glyph, and
         // no other level has a spelling for it. There are no markers on this
         // path, so every kerning value present was written as an option.
-        if (kerningOptionEntries(glyph.options).length > 0) {
-          resolveKerning(glyph, undefined, kerningOptionEntries(glyph.options), warnings);
-        }
-        for (const part of glyph.parts ?? []) {
-          extractPositionFromOptions(part, warnings);
-        }
+        const kerning = kerningOptionEntries(glyph.options);
+        if (kerning.length > 0) resolveKerning(glyph, undefined, kerning, warnings);
+        walkParts(glyph.parts);
       }
     }
     if (warnings.length) (raw._parseWarnings ??= []).push(...warnings);
@@ -1042,8 +1068,13 @@ class BlissSVGBuilder {
     this.#normalizeFailedWordInvariant();
     this.#normalizeSpacePartInvariant();
     this.#normalizeSpaceInvariant();
-    this.#normalizeIndicatorInvariant();
+    // Before the indicator invariant, which reads a part's `x` to decide
+    // whether it is explicitly positioned (a positioned part does not convict a
+    // preceding indicator), and after the space one, which strips a space's
+    // option and its coordinate separately and would otherwise report one
+    // written decoration twice.
     this.#normalizePositioningInvariant();
+    this.#normalizeIndicatorInvariant();
     BlissSVGBuilder.#assignKeys(this.#rawBlissObj);
 
     // Re-derive position-dependent composite-as-part flags on the AUTHORING

@@ -438,6 +438,11 @@ export class ElementHandle {
     if (!defaults && !overrides) return;
     const rawDefaults = defaults ? this.#ctx.toRaw(defaults) : {};
     const rawOverrides = overrides ? this.#ctx.toRaw(overrides) : {};
+    // A position or a kerning value set here REPLACES the one the element
+    // carries, so the channels this call fills are cleared before the merge:
+    // the leftovers are what an earlier call promoted, not a second value the
+    // caller wrote, and reading them as one would report a phantom conflict.
+    this.#ctx.clearStalePositioning(node, rawDefaults, rawOverrides);
     const merged = { ...rawDefaults, ...(node.options ?? {}), ...rawOverrides };
     // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
     // options:{} onto the node, which would be toJSON noise.

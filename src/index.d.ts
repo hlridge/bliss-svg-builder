@@ -29,6 +29,15 @@ export interface BlissOptions {
   'min-width'?: number;
   center?: boolean;
 
+  // Positioning (element-level, not builder-level). `x` at part scope is the
+  // part's position inside its character, the same value as the `CODE:x,y`
+  // suffix; at character scope it is leading blank owned by that character.
+  // The two kerning options are the `RK:`/`AK:` markers written as options.
+  x?: number;
+  y?: number;
+  'relative-kerning'?: number;
+  'absolute-kerning'?: number;
+
   // Cropping (builder-level)
   crop?: number | 'auto' | 'auto-vertical' | 'compact';
   'crop-top'?: number | 'auto';
