@@ -118,7 +118,9 @@ describe('BlissSVGBuilder empty-glyph layout', () => {
       const b = new BlissSVGBuilder('XA/B208/XV');
       b.glyph(1).part(0).detach();
 
-      expect(b.toString()).toBe('XA/XV');
+      // the emptied glyph contributes no segment, so the two letters become a
+      // run and re-collapse to the compact spelling (#19)
+      expect(b.toString()).toBe('XAV');
       expect(b.svgCode).toBe(new BlissSVGBuilder('XA/XV').svgCode);
     });
 

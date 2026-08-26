@@ -981,6 +981,13 @@ export declare class BlissSVGBuilder {
    * (whatever its anatomy) and every bare alias renaming one existing code;
    * multi-code shorthand always serializes expanded.
    *
+   * The output uses the compact shorthand wherever it means the same thing: a
+   * space that matches the default for its position is written as a bare
+   * separator (`H//QSP/H`, not `H/TSP/QSP/H`), and consecutive single external
+   * letters are written as one word (`Xhello`, not `Xh/Xe/Xl/Xl/Xo`). An
+   * element that diverges stays explicit, and the rendered result is the same
+   * either way.
+   *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the
    * same concept as `applyIndicators(code, { flatten })`; the name is qualified

@@ -100,6 +100,8 @@ A dropped option does not come back: `toString()` re-emits only what actually ap
 
 `//` is shorthand for `/SP/`, an explicit space character. During processing, `SP` is translated to `TSP` (three-quarter space) or `QSP` (quarter space, used before punctuation marks). Each extra `/` in `///` or `////` adds another `TSP`.
 
+The two forms mix freely inside one run of spaces: `H//QSP//H` is three spaces, the middle one a quarter space. That mixed form is also what `toString()` gives back, since each space is written the short way unless it differs from the default for its position.
+
 ## Kerning
 
 | Code | Syntax | Option spelling | Effect |

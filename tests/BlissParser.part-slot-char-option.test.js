@@ -336,7 +336,10 @@ describe('BlissParser part-slot character options', () => {
       for (const prefix of ['||', '|', '[]>', '>']) {
         const b = build(`${prefix}Xhello`);
         expect(b.warnings).toEqual([]);
-        expect(b.toString()).toBe('Xh/Xe/Xl/Xl/Xo');
+        // the run expanded rather than reaching the code lookup whole: counted
+        // in the tree, because toString() re-collapses it to `Xhello` (#19)
+        expect(b.toJSON().groups[0].glyphs).toHaveLength(5);
+        expect(b.toString()).toBe('Xhello');
         expect(b.svgCode).toBe(build('Xhello').svgCode);
       }
     });

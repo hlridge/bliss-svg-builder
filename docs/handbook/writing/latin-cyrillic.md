@@ -16,7 +16,7 @@ Letters render from outlines embedded in the library, so the output is self-cont
 
 ## Writing Latin text
 
-Each letter is its own code: `Xa` through `Xz` and `XA` through `XZ`. A multi-letter code is shorthand for the letter sequence, and serializes in the expanded form:
+Each letter is its own code: `Xa` through `Xz` and `XA` through `XZ`. A multi-letter code is shorthand for the letter sequence, so these two are the same composition written two ways, and `toString()` gives back the short one:
 
 <Demo code="Xh/Xe/Xl/Xl/Xo" title="The same word, written letter by letter" />
 

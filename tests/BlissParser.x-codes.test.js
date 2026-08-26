@@ -46,6 +46,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   the reserved letter namespace (XRAY1).
  *
  * Does NOT cover:
+ * - How an expanded run is SPELLED back out: `toString()` re-collapses
+ *   it to the compact `Xword` form, so the string cannot witness
+ *   whether a run expanded. Tests here read the parsed tree instead;
+ *   the spelling itself is pinned in
+ *   `BlissSVGBuilder.serialization-canonicalization.test.js`.
  * - Object input: a hand-authored `{codeName:'XOH'}` node is not
  *   run through the expansion pass at all, so it renders one text
  *   glyph where the DSL renders two outlined letters. Outside the
@@ -63,6 +68,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   tripwires below are about the failure MODE at whatever boundary
  *   #26 settles on, and are independent of it.
  */
+// The glyph codes a builder's input actually parsed into, one array per word.
+const glyphCodesByWord = (builder) =>
+  builder.toJSON().groups.map(g => g.glyphs.map(glyph => glyph.codeName));
+
 describe('BlissParser X-codes', () => {
   describe('when Xword has path data for every character', () => {
     it('expands Xhello into per-character X-codes', () => {
@@ -427,7 +436,7 @@ describe('BlissParser X-codes', () => {
 
     it('expands the run into per-character X-codes', () => {
       const builder = new BlissSVGBuilder('DEFXRUNWORD');
-      expect(builder.toString()).toBe('B216/XO/XH');
+      expect(glyphCodesByWord(builder)).toEqual([['B216', 'XO', 'XH']]);
       expect(builder.warnings).toEqual([]);
     });
 
@@ -438,7 +447,7 @@ describe('BlissParser X-codes', () => {
 
     it('expands a run reached through a nested definition', () => {
       const builder = new BlissSVGBuilder('DEFXRUNNESTED');
-      expect(builder.toString()).toBe('B216/XO/XH/B291');
+      expect(glyphCodesByWord(builder)).toEqual([['B216', 'XO', 'XH', 'B291']]);
       expect(builder.warnings).toEqual([]);
     });
 
@@ -462,7 +471,8 @@ describe('BlissParser X-codes', () => {
       // a definition keeps `//` raw, so unlike the top level the expansion pass
       // sees the ';//' sequence; the ';' there composes nothing
       const builder = new BlissSVGBuilder('DEFXSEMIBREAK');
-      expect(builder.toString()).toBe('Xa/Xb//B291');
+      expect(glyphCodesByWord(builder)[0]).toEqual(['Xa', 'Xb']);
+      expect(builder.toString()).toBe('Xab//B291');
       expect(builder.warnings).toEqual([]);
     });
 
@@ -482,7 +492,8 @@ describe('BlissParser X-codes', () => {
   describe('when an X-run is followed by a semicolon that starts no part', () => {
     it('expands a run carrying a word-level indicator overlay', () => {
       const builder = new BlissSVGBuilder('B216/XOH;;B99');
-      expect(builder.toString()).toBe('B216/XO/XH;;B99');
+      expect(glyphCodesByWord(builder)).toEqual([['B216', 'XO', 'XH']]);
+      expect(builder.toString()).toBe('B216/XOH;;B99');
       expect(builder.warnings).toEqual([]);
     });
 
@@ -493,7 +504,7 @@ describe('BlissParser X-codes', () => {
 
     it('expands a run followed by an inert trailing semicolon', () => {
       const builder = new BlissSVGBuilder('Xab;');
-      expect(builder.toString()).toBe('Xa/Xb');
+      expect(glyphCodesByWord(builder)).toEqual([['Xa', 'Xb']]);
       expect(builder.warnings).toEqual([]);
     });
 

@@ -280,7 +280,8 @@ describe('BlissSVGBuilder text fallback', () => {
       // the token does not lex, so the whole word drops and only its word break
       // survives, the same shape a trailing `B291//` already serializes to
       const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
-      expect(builder.toString()).toBe('Xh/Xe/Xl/Xl/Xo//');
+      expect(builder.toJSON().groups[0].glyphs).toHaveLength(5);
+      expect(builder.toString()).toBe('Xhello//');
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
 

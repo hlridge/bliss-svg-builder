@@ -33,6 +33,34 @@ const glyphEmitsOptionsToken = (glyph) =>
   Object.entries(glyph.options ?? {}).some(([k, v]) =>
     v !== false && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
 
+// The written `Xword` shorthand expands to one glyph per letter at parse time
+// (`Xab` -> `Xa/Xb`), so serializing each glyph faithfully spells a word out
+// letter by letter. This folds such a run back into the shorthand it came from.
+// It is the exact inverse of that expansion, which is what fixes the membership
+// test: only a BARE code the shared grammar reads as outlined LETTERS may join,
+// because those are precisely the codes the expander re-derives one-for-one. A
+// code carrying any decoration (a coordinate, an option bracket, a head marker)
+// fails the anchored grammar and ends the run, and so does a text fallback,
+// which is one whole glyph already and would swallow its neighbour's letter.
+const collapseExternalLetterRuns = (segments) => {
+  const collapsed = [];
+  let run = [];
+  const flushRun = () => {
+    if (run.length) collapsed.push('X' + run.join(''));
+    run = [];
+  };
+  for (const segment of segments) {
+    if (classifyXCode(segment) === 'letters') {
+      run.push(segment.slice(1));
+      continue;
+    }
+    flushRun();
+    collapsed.push(segment);
+  }
+  flushRun();
+  return collapsed;
+};
+
 // Serialize an options object to [key=val;key2=val2] DSL format. Shared by
 // toString() serialization and the preserve-mode canonical anatomy compare
 // (one emitter, so the two surfaces cannot drift).
@@ -2245,19 +2273,22 @@ class BlissSVGBuilder {
 
     const segments = [];
     // Space groups and bare content-empty groups coalesce into maximal runs so
-    // serialized spacing always matches rendered spacing: N default space
-    // glyphs emit N+1 slashes once per run; a run holding any non-default
-    // space code emits the explicit code list instead; bare empty groups
+    // serialized spacing always matches rendered spacing; bare empty groups
     // contribute no units and never split a run.
     let spaceRun = null;
     const flushSpaceRun = () => {
       if (!spaceRun) return;
       // Defensive: only space groups open a run, and a space group always
       // holds a glyph. Empties never open one (they only skip the flush).
-      if (spaceRun.glyphCount > 0) {
-        segments.push(spaceRun.hasNonDefault
-          ? spaceRun.codes.join('/')
-          : '/'.repeat(spaceRun.glyphCount + 1));
+      if (spaceRun.length > 0) {
+        // Each space is spelled on its own: a bare separator where it matches
+        // the position's default, its explicit code where it diverges. N
+        // default spaces are therefore still N+1 slashes and an all-divergent
+        // run is still the full code list, while a MIXED run keeps its default
+        // members compact instead of writing the whole run out. The result is
+        // self-delimiting (`//`, `/QSP/`, `//QSP/`), which is what lets the
+        // join below place it without doubling a separator.
+        segments.push('/' + spaceRun.map(s => s.differs ? `${s.code}/` : '/').join(''));
       }
       spaceRun = null;
     };
@@ -2267,16 +2298,19 @@ class BlissSVGBuilder {
       // #normalizeFailedWordInvariant drops it from #rawBlissObj at rebuild
       // (retention family, rows 31/80), so no errorSource replay survives here.
       if (isSpaceGroup(group)) {
-        spaceRun ??= { glyphCount: 0, codes: [], hasNonDefault: false };
-        spaceRun.glyphCount += group.glyphs.length;
-        spaceRun.codes.push(...group.glyphs.map(g => g.parts[0].codeName));
-        if (group.glyphs.some(g => g.parts?.some(p => p._differsFromDefault))) {
-          spaceRun.hasNonDefault = true;
-        }
+        spaceRun ??= [];
+        spaceRun.push(...group.glyphs.map(g => ({
+          code: g.parts[0].codeName,
+          differs: g.parts[0]._differsFromDefault === true,
+        })));
         continue;
       }
       const glyphArrays = group.glyphs.map(serializeGlyph);
-      let groupStr = glyphArrays.flat().filter(Boolean).join('/');
+      // Assembled after any head marker is stamped on, so a marked letter fails
+      // the collapse grammar and keeps its run explicit.
+      const assembleGroup = () =>
+        collapseExternalLetterRuns(glyphArrays.flat().filter(Boolean)).join('/');
+      let groupStr = assembleGroup();
       // Head-marker fidelity (rc.4): a stored designation ALWAYS re-emits as
       // `^` on the marked glyph's last segment, matching toJSON's isHeadGlyph,
       // so a string round-trip never loses the designation — even when the
@@ -2288,7 +2322,7 @@ class BlissSVGBuilder {
         const headSegments = glyphArrays[headIndex];
         if (headSegments.length && headSegments[headSegments.length - 1]) {
           headSegments[headSegments.length - 1] += '^';
-          groupStr = glyphArrays.flat().filter(Boolean).join('/');
+          groupStr = assembleGroup();
         }
       }
       // R14: re-emit a word-level indicator overlay as trailing `;;` (kept by
@@ -2312,6 +2346,13 @@ class BlissSVGBuilder {
       if (acc.endsWith('/')) return acc + seg;
       return acc + '/' + seg;
     }, '');
+
+    // A space run is emitted self-delimiting, so at the very start or end of
+    // the string its outer separator can have nothing left to separate. Next to
+    // ANOTHER slash that separator is half of the `//` that spells the space
+    // itself and must stay; next to an explicit space code it is noise.
+    if (result.startsWith('/') && !result.startsWith('//')) result = result.slice(1);
+    if (result.endsWith('/') && !result.endsWith('//')) result = result.slice(0, -1);
 
     // Prefix global options with [opts]|| syntax
     const globalOptPrefix = serializeOptions(obj.options);

@@ -92,8 +92,10 @@ describe('BlissSVGBuilder empty-content serialization', () => {
     it('emits the explicit code list and stays stable across serialize cycles', () => {
       // regression: the per-group emission grew on every cycle
       // (B291/QSP///B208 reparsed to B291/QSP/TSP/TSP/B208).
+      // Since #19 each space is spelled on its own, so only the QSP that
+      // diverges from the default is written out; the run is still one segment.
       const b = new BlissSVGBuilder({ groups: [word('B291'), qspSpace(), empty(), space(), word('B208')] });
-      expect(b.toString()).toBe('B291/QSP/TSP/B208');
+      expect(b.toString()).toBe('B291/QSP//B208');
       expect(viewBoxWidth(b)).toBe(27.5);
       expect(reparsedWidth(b)).toBe(27.5);
       expect(new BlissSVGBuilder(b.toString()).toString()).toBe(b.toString());
