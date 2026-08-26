@@ -493,6 +493,35 @@ describe('BlissSVGBuilder text fallback', () => {
       expect(key.svgCode).toBe(written.svgCode);
     });
 
+    it('refuses to be a part composition, the same way the written letters are', () => {
+      // the `;`-part slot never sees the written-token pass (that pattern is
+      // anchored to a glyph boundary), so it has to read the key itself or the
+      // two disagree: this rendered a text part silently and reloaded as the
+      // failure below, changing the picture with nothing said
+      const key = new BlissSVGBuilder('B291;XTXT_hello');
+      const written = new BlissSVGBuilder('B291;Xhello');
+      expect(key.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
+      expect(key.warnings.map(w => w.code)).toContain('WORD_AS_PART');
+      expect(key.svgCode).toBe(written.svgCode);
+      expect(new BlissSVGBuilder(key.toString()).svgCode).toBe(key.svgCode);
+    });
+
+    it('is still a usable part when it names one letter', () => {
+      const key = new BlissSVGBuilder('B291;XTXT_a');
+      expect(key.warnings).toEqual([]);
+      expect(key.svgCode).toBe(new BlissSVGBuilder('B291;Xa').svgCode);
+    });
+
+    it('leaves a payload the grammar does not call outlined letters alone', () => {
+      // the boundary that decides whether the key is eaten at all: a digit or an
+      // empty payload is not letters, so the key is what it has always been
+      for (const input of ['XTXT_', 'XTXT_ab9', 'XTXT_123']) {
+        const builder = new BlissSVGBuilder(input);
+        expect(builder.warnings).toEqual([]);
+        expect(builder.svgCode).toContain('<text');
+      }
+    });
+
     it('leaves a key holding any letter without an outline as one text element', () => {
       // the whole point of the key: XTXT_hαllo still needs it, and α is why
       expect(new BlissSVGBuilder('XTXT_hαllo').toJSON().groups[0].glyphs).toHaveLength(1);

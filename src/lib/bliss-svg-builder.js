@@ -36,8 +36,9 @@ const glyphEmitsOptionsToken = (glyph) =>
 // The written `Xword` shorthand expands to one glyph per letter at parse time
 // (`Xab` -> `Xa/Xb`), so serializing each glyph faithfully spells a word out
 // letter by letter. This folds such a run back into the shorthand it came from.
-// It is the exact inverse of that expansion, which is what fixes the membership
-// test: only a BARE code the shared grammar reads as outlined LETTERS may join,
+// Re-expanding what it emits must reproduce the very segments it was given, and
+// that requirement is what fixes the membership test: only a BARE code the
+// shared grammar reads as outlined LETTERS may join,
 // because those are precisely the codes the expander re-derives one-for-one. A
 // code carrying any decoration (a coordinate, an option bracket, a head marker)
 // fails the anchored grammar and ends the run, and so does a text fallback,

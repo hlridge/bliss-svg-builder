@@ -8,8 +8,9 @@
  *   emit N+1 slashes once, not per group)
  * - native adjacent space groups (emission-side; reparse-side collapse is
  *   GH #19's, untouched here)
- * - mixed runs holding an explicit space code emit the code list joined
- *   with / and stay byte-stable across serialize cycles
+ * - mixed runs hold their per-space spelling (each default space a bare
+ *   separator, each divergent space its explicit code, GH #19) and stay
+ *   byte-stable across serialize cycles
  * - bare empties never trigger a separator: trailing without a space, solo,
  *   and run-of-only-empties documents
  * - options-carrying empties emit their own [opts]| segment, split runs,

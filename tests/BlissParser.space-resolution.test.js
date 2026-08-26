@@ -11,7 +11,7 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *
  * Covers:
  * - `shrinksPrecedingWordSpace` extracted to `true` on punctuation
- *   definitions (B4 period, B5 comma, B1 question mark) and left
+ *   definitions (B4 period, B5 comma, B1 exclamation mark) and left
  *   undefined on regular characters (H).
  * - The flag is extracted per-glyph through a multi-glyph word
  *   (B4/B5, H/B4).
@@ -55,7 +55,7 @@ describe('BlissParser space resolution', () => {
       expect(result.groups[0].glyphs[0].shrinksPrecedingWordSpace).toBe(true);
     });
 
-    it('extracts shrinksPrecedingWordSpace on a question-mark glyph (B1)', () => {
+    it('extracts shrinksPrecedingWordSpace on an exclamation-mark glyph (B1)', () => {
       const result = BlissParser.parse('B1');
 
       expect(result.groups[0].glyphs[0].shrinksPrecedingWordSpace).toBe(true);

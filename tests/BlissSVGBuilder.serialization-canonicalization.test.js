@@ -43,12 +43,18 @@ import { BlissSVGBuilder } from '../src/index.js';
 
 const serialized = (input) => new BlissSVGBuilder(input).toString();
 
-// A canonicalization may only change the SPELLING, never the picture.
-const survivesRoundTrip = (input) => {
+// A canonicalization may only change the SPELLING, never the picture. Reported
+// as two named fields rather than one boolean so a failure names which half
+// broke, instead of "expected true to be false".
+const roundTrip = (input) => {
   const builder = new BlissSVGBuilder(input);
   const reparsed = new BlissSVGBuilder(builder.toString());
-  return reparsed.svgCode === builder.svgCode && reparsed.toString() === builder.toString();
+  return {
+    samePicture: reparsed.svgCode === builder.svgCode,
+    settled: reparsed.toString() === builder.toString(),
+  };
 };
+const INTACT = { samePicture: true, settled: true };
 
 describe('BlissSVGBuilder serialization canonicalization', () => {
 
@@ -64,9 +70,9 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
     });
 
     it('renders the same picture and settles after one cycle', () => {
-      expect(survivesRoundTrip('H//QSP/H')).toBe(true);
-      expect(survivesRoundTrip('H/TSP/QSP/TSP/H')).toBe(true);
-      expect(survivesRoundTrip('H/QSP//H')).toBe(true);
+      expect(roundTrip('H//QSP/H')).toEqual(INTACT);
+      expect(roundTrip('H/TSP/QSP/TSP/H')).toEqual(INTACT);
+      expect(roundTrip('H/QSP//H')).toEqual(INTACT);
     });
   });
 
@@ -96,9 +102,9 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('/QSP/H')).toBe('QSP/H');
       expect(serialized('/QSP//H')).toBe('QSP//H');
       expect(serialized('H//QSP')).toBe('H//QSP');
-      expect(survivesRoundTrip('//H')).toBe(true);
-      expect(survivesRoundTrip('H//')).toBe(true);
-      expect(survivesRoundTrip('/QSP//H')).toBe(true);
+      expect(roundTrip('//H')).toEqual(INTACT);
+      expect(roundTrip('H//')).toEqual(INTACT);
+      expect(roundTrip('/QSP//H')).toEqual(INTACT);
     });
 
     it('keeps a run that a ZSA splits uniform on both sides', () => {
@@ -122,8 +128,8 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
 
     it('collapses an all-QSP run before punctuation', () => {
       expect(serialized('H/QSP/QSP/B4')).toBe('H///B4');
-      expect(survivesRoundTrip('H/QSP/TSP/B4')).toBe(true);
-      expect(survivesRoundTrip('H/TSP/QSP/B4')).toBe(true);
+      expect(roundTrip('H/QSP/TSP/B4')).toEqual(INTACT);
+      expect(roundTrip('H/TSP/QSP/B4')).toEqual(INTACT);
     });
   });
 
@@ -154,10 +160,10 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
     });
 
     it('renders the same picture and settles after one cycle', () => {
-      expect(survivesRoundTrip('XBlissary')).toBe(true);
-      expect(survivesRoundTrip('Xa/Xb/Xc')).toBe(true);
-      expect(survivesRoundTrip('RK:3/Xab')).toBe(true);
-      expect(survivesRoundTrip('Xab;;B81')).toBe(true);
+      expect(roundTrip('XBlissary')).toEqual(INTACT);
+      expect(roundTrip('Xa/Xb/Xc')).toEqual(INTACT);
+      expect(roundTrip('RK:3/Xab')).toEqual(INTACT);
+      expect(roundTrip('Xab;;B81')).toEqual(INTACT);
     });
   });
 
@@ -186,7 +192,7 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('Xa^/Xb/Xc')).toBe('Xa^/Xbc');
       expect(serialized('Xa/Xb/Xc^')).toBe('Xab/Xc^');
       expect(serialized('Xa/Xb^/Xc')).toBe('Xa/Xb^/Xc');
-      expect(survivesRoundTrip('Xa^/Xb/Xc')).toBe(true);
+      expect(roundTrip('Xa^/Xb/Xc')).toEqual(INTACT);
     });
 
     it('keeps a run explicit around a kerning marker written inside it', () => {
@@ -211,8 +217,8 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('Xc/Xaλ')).toBe('Xc/Xaλ');
       expect(serialized('Xaλ/Xc')).toBe('Xaλ/Xc');
       expect(serialized('XM/Xhαllo')).toBe('XM/Xhαllo');
-      expect(survivesRoundTrip('Xc/Xaλ')).toBe(true);
-      expect(survivesRoundTrip('Xaλ/Xc')).toBe(true);
+      expect(roundTrip('Xc/Xaλ')).toEqual(INTACT);
+      expect(roundTrip('Xaλ/Xc')).toEqual(INTACT);
     });
 
     it('never absorbs a single-character text fallback into a run', () => {
@@ -235,7 +241,7 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
     it('leaves a word that is already one text-fallback glyph alone', () => {
       expect(serialized('Xhαllo')).toBe('Xhαllo');
       expect(serialized('Xλόγος')).toBe('Xλόγος');
-      expect(survivesRoundTrip('Xhαllo')).toBe(true);
+      expect(roundTrip('Xhαllo')).toEqual(INTACT);
     });
   });
 });

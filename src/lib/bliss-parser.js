@@ -90,9 +90,7 @@ const WORD_AS_PART_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]{2,}$`);
 const X_LETTER_TOKEN_PATTERN = new RegExp(String.raw`^(\[[^\[\]]*\]>?)?X([${X_RUN_LETTERS}])([;^:].*)?$`);
 // A bare X code that is nothing but letters, with no decoration of any kind.
 const X_BARE_LETTERS_PATTERN = new RegExp(`^X([${X_RUN_LETTERS}]+)$`);
-// The internal text-fallback routing key is `XTXT_<chars>`; this is what follows
-// the leading `X` of that key inside a written token.
-const X_TEXT_FALLBACK_BODY = 'TXT_';
+const X_TEXT_FALLBACK_PREFIX = 'XTXT_';
 
 // What a written X token DENOTES, which is the one question every X site asks:
 //   'word'  - every letter has a built-in outline, so the run is shorthand for
@@ -104,7 +102,11 @@ const X_TEXT_FALLBACK_BODY = 'TXT_';
 //             decides those), or something that is not a letter at all (a
 //             digit, punctuation, the internal `XTXT_` routing key). Leave the
 //             token exactly as written and let it resolve, or fail, as the
-//             single code it is.
+//             single code it is. The routing key is the one exception, and it
+//             is applied before this is asked: a key whose payload is letters
+//             that ALL have outlines is read as those letters first (see
+//             readTextFallbackKey), so what reaches here still wearing the key
+//             is a key that is genuinely needed.
 // The one outline test the whole X grammar turns on: if every letter has a
 // built-in outline the token stands for that many outlined letters, and if any
 // letter lacks one the WHOLE token is a single text glyph. Letters of one
@@ -116,6 +118,23 @@ const classifyXRunBody = (body) =>
     : allLettersOutlined(body) ? 'word'
     : 'glyph';
 
+// The routing key `XTXT_<chars>` read as the letters it names, or null when it
+// is not that: a key whose payload some letter of has no outline is what the key
+// is FOR, and a digit or an empty payload is not letters at all. The fallback
+// exists for letters that cannot be drawn from outlines and asks for nothing
+// when they can, and it cannot survive its own serialization there, because the
+// key is never emitted: such a glyph came back as the plain letters and reparsed
+// as outlines, a different picture with no warning.
+//
+// ONE place because two sites ask, and they answered differently until they did
+// not: the written-token pass below, and the `;`-part slot, which the token pass
+// never sees because its pattern is anchored to a glyph boundary.
+const readTextFallbackKey = (code) => {
+  if (typeof code !== 'string' || !code.startsWith(X_TEXT_FALLBACK_PREFIX)) return null;
+  const asWritten = `X${code.slice(X_TEXT_FALLBACK_PREFIX.length)}`;
+  return classifyXCode(asWritten) === 'letters' ? asWritten : null;
+};
+
 // Rewrites the X shorthand in a code string into the codes the renderer knows:
 // per-character `X<letter>` codes for an outlined run, one `XTXT_<chars>` glyph
 // for a run that needs the text fallback. Shared by the top-level input and the
@@ -123,23 +142,13 @@ const classifyXRunBody = (body) =>
 // written, and exported so define() can ask what a codeString expands to.
 export function processXCodes(codeString) {
   let expanded = codeString.replace(X_TOKEN_PATTERN, (match, optionPrefix = '', chars, offset) => {
-    // The routing key `XTXT_<chars>` names a glyph drawn as text rather than
-    // from outlines. That is what it is FOR when some letter has no outline, and
-    // it asks for nothing when every letter has one: the key is never
-    // serialized, so such a glyph came back as the plain letters and reparsed as
-    // outlines, a different picture with no warning. Read it as the letters it
-    // names and treat it from here on exactly as if they had been written, so it
-    // means the same thing in every position its written twin can take. The same
-    // one-place grammar decides, so an empty payload, a digit, or any letter
-    // without an outline is what the key is genuinely for and is left as written.
-    const keyPayload = chars.startsWith(X_TEXT_FALLBACK_BODY)
-      ? chars.slice(X_TEXT_FALLBACK_BODY.length)
-      : null;
-    const namesOutlinedLetters = keyPayload !== null
-      && classifyXCode(`X${keyPayload}`) === 'letters';
-    const body = namesOutlinedLetters ? keyPayload : chars;
+    // Read the routing key as the letters it names (see readTextFallbackKey),
+    // then treat it from here on exactly as if they had been written, so it
+    // means the same thing in every position its written twin can take.
+    const asWritten = readTextFallbackKey(`X${chars}`);
+    const body = asWritten !== null ? asWritten.slice(1) : chars;
     // The token as it would have been written, once the key is read.
-    const written = namesOutlinedLetters ? `${optionPrefix}X${body}` : match;
+    const written = asWritten !== null ? optionPrefix + asWritten : match;
 
     const denotes = classifyXRunBody(body);
     if (!denotes) return written;
@@ -1841,7 +1850,15 @@ export class BlissParser {
             // character. Ask the shared grammar for the one-glyph answer only;
             // a real word still fails here, which is what keeps a run from
             // splitting one glyph across many.
-            if (classifyXCode(part.codeName) === 'glyph') {
+            // The written-token pass reads a routing key as the letters it names
+            // (see readTextFallbackKey); this slot has to read it the same way or
+            // the two disagree about what one code means. A multi-letter one is
+            // then a word here and fails below exactly as `B291;Xhello` does,
+            // instead of rendering silently and reloading as that failure.
+            const keyAsLetters = readTextFallbackKey(part.codeName);
+            if (keyAsLetters !== null) {
+              part.codeName = keyAsLetters;
+            } else if (classifyXCode(part.codeName) === 'glyph') {
               part.codeName = `XTXT_${part.codeName.slice(1)}`;
             }
 

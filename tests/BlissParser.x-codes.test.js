@@ -482,7 +482,10 @@ describe('BlissParser X-codes', () => {
       expect(needed.warnings).toEqual([]);
       // read as letters, the option rides the FIRST of them, which is why the
       // remaining four are what re-collapses into a word
-      expect(new BlissSVGBuilder('DEFXOPTTEXTKEY').toString()).toBe('[color=red]Xh/Xello');
+      const outlined = new BlissSVGBuilder('DEFXOPTTEXTKEY');
+      expect(outlined.toString()).toBe('[color=red]Xh/Xello');
+      expect(outlined.warnings).toEqual([]);
+      expect(outlined.svgCode).not.toContain('<text');
     });
 
     it('expands a run whose inert semicolon is followed by a word break', () => {
