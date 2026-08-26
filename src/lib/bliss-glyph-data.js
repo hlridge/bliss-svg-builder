@@ -3963,6 +3963,9 @@ const glyphData = {
   // Contains "all of a thing", not added yet.
   B6443: {
     codeString: "B651;HL4:0,8;DC4:0,10;HL4:0,16"
+  },
+  B6444: {
+    codeString: "B712;B894:2,0"
   }
 }
 
