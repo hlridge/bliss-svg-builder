@@ -445,6 +445,62 @@ describe('BlissSVGBuilder text fallback', () => {
     });
   });
 
+  describe('when the internal routing key names letters that all have outlines', () => {
+    // The text fallback exists for letters that CANNOT be drawn from outlines, so
+    // naming it for letters that can asks for nothing the outlines do not already
+    // give. Reading it as those letters is what makes it round-trip: the key is
+    // never serialized, so `XTXT_hello` came back as `Xhello` and reparsed as five
+    // outlined letters, a different picture with no warning. (GH #19 fold-in.)
+    it('renders the outlined letters rather than one text element', () => {
+      const builder = new BlissSVGBuilder('XTXT_hello');
+      expect(builder.toJSON().groups[0].glyphs).toHaveLength(5);
+      expect(builder.svgCode).not.toContain('<text');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('draws the same picture as the letters written plainly', () => {
+      expect(new BlissSVGBuilder('XTXT_hello').svgCode)
+        .toBe(new BlissSVGBuilder('Xhello').svgCode);
+      expect(new BlissSVGBuilder('B291/XTXT_hello').svgCode)
+        .toBe(new BlissSVGBuilder('B291/Xhello').svgCode);
+    });
+
+    it('survives a round trip that it used to fail', () => {
+      for (const input of ['XTXT_hello', 'XTXT_a', 'B291/XTXT_hello', 'Xb/XTXT_a']) {
+        const builder = new BlissSVGBuilder(input);
+        expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      }
+    });
+
+    it('reads the key the same way inside a definition code string', () => {
+      BlissSVGBuilder.define({ TXTALLOUTLINED: { codeString: 'XTXT_hello' } });
+      try {
+        const builder = new BlissSVGBuilder('TXTALLOUTLINED');
+        expect(builder.toJSON().groups[0].glyphs).toHaveLength(5);
+        expect(builder.svgCode).toBe(new BlissSVGBuilder('Xhello').svgCode);
+      } finally {
+        BlissSVGBuilder.removeDefinition('TXTALLOUTLINED');
+      }
+    });
+
+    it('refuses a part composition the same way the written letters do', () => {
+      // one glyph accepts a `;` part and a word refuses it, so reading the key
+      // as letters has to change this answer too or the two spellings diverge
+      const key = new BlissSVGBuilder('XTXT_hello;C8');
+      const written = new BlissSVGBuilder('Xhello;C8');
+      expect(key.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
+      expect(key.warnings.map(w => w.code)).toContain('WORD_AS_PART');
+      expect(key.svgCode).toBe(written.svgCode);
+    });
+
+    it('leaves a key holding any letter without an outline as one text element', () => {
+      // the whole point of the key: XTXT_hαllo still needs it, and α is why
+      expect(new BlissSVGBuilder('XTXT_hαllo').toJSON().groups[0].glyphs).toHaveLength(1);
+      expect(new BlissSVGBuilder('XTXT_hαllo').svgCode).toContain('<text');
+      expect(new BlissSVGBuilder('XTXT_λ').svgCode).toContain('<text');
+    });
+  });
+
   describe('when XTXT_ inputs are isolated from global state', () => {
     it('does not leak XTXT_ keys into the global definitions registry', () => {
       new BlissSVGBuilder('Xhéllo');

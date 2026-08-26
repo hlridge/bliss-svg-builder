@@ -34,8 +34,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissParser.x-codes.test.js`.
  * - Object-authored adjacent space groups, see
  *   `BlissSVGBuilder.empty-content-serialization.test.js`.
- * - The text-fallback round-trip gap (`XTXT_hello` serializes to `Xhello`,
- *   which reparses as outlined letters), registered on the #19 backlog row.
+ * - What the internal text-fallback routing key means, which the same issue
+ *   settled by reading `XTXT_<letters>` as the letters it names when every one
+ *   of them has an outline, see `BlissSVGBuilder.text-fallback.test.js`.
  *
  * @issue: #19
  */

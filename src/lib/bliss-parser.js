@@ -90,6 +90,9 @@ const WORD_AS_PART_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]{2,}$`);
 const X_LETTER_TOKEN_PATTERN = new RegExp(String.raw`^(\[[^\[\]]*\]>?)?X([${X_RUN_LETTERS}])([;^:].*)?$`);
 // A bare X code that is nothing but letters, with no decoration of any kind.
 const X_BARE_LETTERS_PATTERN = new RegExp(`^X([${X_RUN_LETTERS}]+)$`);
+// The internal text-fallback routing key is `XTXT_<chars>`; this is what follows
+// the leading `X` of that key inside a written token.
+const X_TEXT_FALLBACK_BODY = 'TXT_';
 
 // What a written X token DENOTES, which is the one question every X site asks:
 //   'word'  - every letter has a built-in outline, so the run is shorthand for
@@ -120,8 +123,26 @@ const classifyXRunBody = (body) =>
 // written, and exported so define() can ask what a codeString expands to.
 export function processXCodes(codeString) {
   let expanded = codeString.replace(X_TOKEN_PATTERN, (match, optionPrefix = '', chars, offset) => {
-    const denotes = classifyXRunBody(chars);
-    if (!denotes) return match;
+    // The routing key `XTXT_<chars>` names a glyph drawn as text rather than
+    // from outlines. That is what it is FOR when some letter has no outline, and
+    // it asks for nothing when every letter has one: the key is never
+    // serialized, so such a glyph came back as the plain letters and reparsed as
+    // outlines, a different picture with no warning. Read it as the letters it
+    // names and treat it from here on exactly as if they had been written, so it
+    // means the same thing in every position its written twin can take. The same
+    // one-place grammar decides, so an empty payload, a digit, or any letter
+    // without an outline is what the key is genuinely for and is left as written.
+    const keyPayload = chars.startsWith(X_TEXT_FALLBACK_BODY)
+      ? chars.slice(X_TEXT_FALLBACK_BODY.length)
+      : null;
+    const namesOutlinedLetters = keyPayload !== null
+      && classifyXCode(`X${keyPayload}`) === 'letters';
+    const body = namesOutlinedLetters ? keyPayload : chars;
+    // The token as it would have been written, once the key is read.
+    const written = namesOutlinedLetters ? `${optionPrefix}X${body}` : match;
+
+    const denotes = classifyXRunBody(body);
+    if (!denotes) return written;
 
     // A real `;`-part composes onto ONE character. A run that is a word must
     // therefore stay whole and fail as the word it is; expanding it would bind
@@ -139,7 +160,7 @@ export function processXCodes(codeString) {
       && !rest.startsWith(';;')
       && rest.length > 1
       && !rest.startsWith(';/');
-    if (composesAPart && denotes === 'word') return match;
+    if (composesAPart && denotes === 'word') return written;
 
     // For an outlined run the option prefix rides the FIRST expanded glyph,
     // matching the written /-expansion exactly ([opts]Xab === [opts]Xa/Xb).
@@ -148,8 +169,8 @@ export function processXCodes(codeString) {
     // sequence form, where a prefix binds one member and the member stands
     // alone (review disposition, 2026-07-17).
     return denotes === 'word'
-      ? optionPrefix + [...chars].map(char => `X${char}`).join('/')
-      : `${optionPrefix}XTXT_${chars}`;
+      ? optionPrefix + [...body].map(char => `X${char}`).join('/')
+      : `${optionPrefix}XTXT_${body}`;
   });
 
   // A written sequence of single-letter X codes merges by the same rule, so

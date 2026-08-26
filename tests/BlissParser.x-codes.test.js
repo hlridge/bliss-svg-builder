@@ -429,6 +429,8 @@ describe('BlissParser X-codes', () => {
       DEFXRUNMIXED: { codeString: 'Xa/Xλ' },
       DEFXTEXTKEY: { codeString: 'XTXT_hello' },
       DEFXOPTTEXTKEY: { codeString: '[color=red]XTXT_hello' },
+      DEFXTEXTKEYNEEDED: { codeString: 'XTXT_hαllo' },
+      DEFXOPTTEXTKEYNEEDED: { codeString: '[color=red]XTXT_hαllo' },
       DEFXSEMIBREAK: { codeString: 'Xab;//B291' },
     };
     beforeAll(() => BlissSVGBuilder.define(RUN_DEFS));
@@ -451,20 +453,36 @@ describe('BlissParser X-codes', () => {
       expect(builder.warnings).toEqual([]);
     });
 
-    it('leaves the internal text-fallback routing key intact', () => {
+    it('leaves a routing key that is genuinely needed intact', () => {
       // regression: XTXT_<chars> is one glyph, but its leading XTXT matches the
-      // run pattern, so expanding it produced XT/XX/XT plus an unknown tail
+      // run pattern, so expanding it produced XT/XX/XT plus an unknown tail.
+      // α has no outline, which is what the key is FOR, so it must survive whole
+      const builder = new BlissSVGBuilder('DEFXTEXTKEYNEEDED');
+      expect(builder.toJSON().groups[0].glyphs).toHaveLength(1);
+      expect(builder.toString()).toBe('Xhαllo');
+      expect(builder.svgCode).toContain('<text');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('reads a routing key naming letters that all have outlines as those letters', () => {
+      // the key is never serialized, so a glyph that never needed it came back
+      // as the plain letters and reparsed as outlines, a different picture with
+      // no warning. Reading it as the letters it names is what closes that.
       const builder = new BlissSVGBuilder('DEFXTEXTKEY');
-      expect(builder.toString()).toBe('Xhello');
+      expect(glyphCodesByWord(builder)).toEqual([['Xh', 'Xe', 'Xl', 'Xl', 'Xo']]);
+      expect(builder.svgCode).not.toContain('<text');
       expect(builder.warnings).toEqual([]);
     });
 
     it('recognises the routing key behind an option bracket', () => {
       // pins that the key is looked for at the run, not at the start of the
       // string; a mutant reading offset 0 misses the prefixed form entirely
-      const builder = new BlissSVGBuilder('DEFXOPTTEXTKEY');
-      expect(builder.toString()).toBe('[color=red]Xhello');
-      expect(builder.warnings).toEqual([]);
+      const needed = new BlissSVGBuilder('DEFXOPTTEXTKEYNEEDED');
+      expect(needed.toString()).toBe('[color=red]Xhαllo');
+      expect(needed.warnings).toEqual([]);
+      // read as letters, the option rides the FIRST of them, which is why the
+      // remaining four are what re-collapses into a word
+      expect(new BlissSVGBuilder('DEFXOPTTEXTKEY').toString()).toBe('[color=red]Xh/Xello');
     });
 
     it('expands a run whose inert semicolon is followed by a word break', () => {
