@@ -1052,6 +1052,48 @@ Removes specific option keys:
 builder.glyph(0).removeOptions('color', 'strokeWidth');
 ```
 
+### Transient Options
+
+Transient options reach the rendered SVG and never reach `toString()` or `toJSON()`. Use them for anything that describes the current view rather than the composition: hit-test annotations an editor stamps onto each part, a selection highlight, or a display width that must not end up in the string a user saves or shares.
+
+```js
+const builder = new BlissSVGBuilder('B291/B99');
+
+builder.setTransientOptions({ minWidth: 40 });            // whole SVG
+builder.glyph(0).setOptions({ color: 'red' });            // part of the composition
+builder.glyph(0).setTransientOptions({ color: 'blue' });  // only on this screen
+builder.part(0).setTransientOptions({ 'data-part-index': '0' });
+
+builder.svgCode;     // wide canvas, first character blue, data-part-index on its <g>
+builder.toString();  // "[color=red]B291/B99"
+builder.toJSON();    // no transientOptions field anywhere
+```
+
+They are ordinary options that happen not to serialize, so a named option such as `minWidth` works here too, not only pass-through attributes. `removeTransientOptions(...keys)` removes them again, in either spelling.
+
+#### Precedence
+
+A transient value wins over a normal option of the **same key**. Above the key, ordinary precedence is unchanged and does not care which channel a value came from: an explicitly named attribute still beats an alias of it, and a specific option still beats the bulk option it refines.
+
+```js
+builder.glyph(0).setOptions({ stroke: 'red' });
+builder.glyph(0).setTransientOptions({ color: 'blue' });   // renders red: `stroke` is explicit, `color` is its alias
+```
+
+#### There is no DSL spelling
+
+Transient options exist only in code, by design. The DSL string *is* the serialized form, so a spelling that round-tripped would serialize, and one that did not would break round-tripping.
+
+#### What the channel refuses
+
+Some option keys are read while the composition is being built rather than while it is drawn, so a transient spelling could never reach the picture. Rather than accept one and quietly do nothing, they are dropped with a `MISPLACED_TRANSIENT_OPTION` warning: `x`, `y`, `relativeKerning` and `absoluteKerning` (in either spelling), and `key`. Set those with `setOptions` instead.
+
+An attribute name that can never be emitted — an `on*` event handler, or a name outside letters, digits and dashes — is dropped with `UNSAFE_ATTRIBUTE_NAME`. A space carries no decoration in this channel either, matching how a normal option on a space already behaves (`MISPLACED_SPACE_DECORATION`).
+
+#### They do not survive a JSON round trip
+
+That is the contract working rather than a gap. `new BlissSVGBuilder(builder.toJSON())` gives a builder with no transient options, so an application that clones a builder that way re-applies them to the clone, the same way it applies them in the first place.
+
 ### Indicator Mutation
 
 `applyIndicators` / `clearIndicators` manage indicators and are **polymorphic by handle level**. Unlike other mutation methods, the `opts` parameter is not `BlissOptions`: `applyIndicators` accepts `{ stripSemantic?: boolean, flatten?: boolean }`, while `clearIndicators` accepts only `{ flatten?: boolean }` — it is the pure undo, and `stripSemantic` lives on apply.

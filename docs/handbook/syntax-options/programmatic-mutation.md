@@ -233,6 +233,30 @@ Remove specific options by key:
 builder.glyph(0).removeOptions('color');
 ```
 
+### Transient Options
+
+Sometimes a value belongs to what is on screen rather than to the composition itself: a highlight on the character the user has selected, the index an editor needs on each part to work out what was clicked, a display width so a one-symbol board is not drawn tiny. None of that should end up in the string the user copies, shares or saves.
+
+`setTransientOptions` is that second channel. It renders, and it never serializes:
+
+```js
+const builder = new BlissSVGBuilder('B291/B99');
+
+builder.setTransientOptions({ minWidth: 40 });            // display width, whole SVG
+builder.glyph(0).setTransientOptions({ color: 'blue' });  // selection highlight
+builder.part(0).setTransientOptions({ 'data-part-index': '0' });
+
+builder.toString();  // 'B291/B99' — none of it is here
+```
+
+Deselecting is `removeTransientOptions('color')`, and the character goes back to whatever the composition says, with nothing to undo and nothing marked as changed.
+
+These are ordinary options that happen not to serialize, so named options such as `minWidth` work here too, not only pass-through attributes. A transient value wins over a normal option of the same key. There is deliberately no DSL spelling: the DSL string is the serialized form, so anything writable there would serialize.
+
+A few keys are refused, with a warning rather than a silent no-op, because the library reads them while building the composition rather than while drawing it: `x`, `y`, the two kerning options, and `key`. Set those with `setOptions`.
+
+Full detail, including precedence and what happens on a JSON round trip: [Transient Options](/reference/api-documentation#transient-options).
+
 ## Removing Content
 
 `remove()` deletes an element from its parent:

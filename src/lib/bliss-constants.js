@@ -203,6 +203,29 @@ export const INTERNAL_OPTIONS = new Set([
 ]);
 
 /**
+ * Option keys the transient channel refuses, in every spelling.
+ *
+ * Each of these is consumed while the composition is being built, before the
+ * render copy is taken: position is promoted onto the element itself, kerning
+ * is resolved and rewritten, and `key` becomes element identity. A transient
+ * spelling would therefore never reach the picture, so it is reported and
+ * dropped rather than left to look as though it worked.
+ *
+ * All four kerning spellings are refused together on purpose. The surviving
+ * camelCase numeric key IS read after the render copy, so accepting that one
+ * while refusing its kebab twin would be a subtler trap than refusing both.
+ */
+export const TRANSIENT_REFUSED_OPTION_KEYS = new Set([
+  'x',
+  'y',
+  'key',
+  'relativeKerning',
+  'absoluteKerning',
+  'relative-kerning',
+  'absolute-kerning'
+]);
+
+/**
  * Upper bound for the absolute `dot-width` / `sdot-width` options (a rendered
  * dot diameter in glyph units). Mirrors the `stroke-width` ceiling so an
  * absolute dot cannot exceed what the relative `dot-extra-width` knob can
@@ -227,6 +250,7 @@ export const DOT_WIDTH_MAX = 1.5;
  *   DROPPED_     something discarded (first-wins / merge)
  *   UNSUPPORTED_ valid, but not implemented yet
  *   NOOP_        a mutation call had no effect
+ *   UNSAFE_      refused by a safety gate rather than by the grammar
  *   …_AS_PART    an illegal operand in a ;-part slot
  *
  * Structural attachment points use group/glyph/part (matches `toJSON()`); the
@@ -300,6 +324,16 @@ export const WARNING_CODES = Object.freeze({
   UNSUPPORTED_TEXT_BLOCKS: 'UNSUPPORTED_TEXT_BLOCKS',
   // no-op mutation
   NOOP_INDICATOR_MUTATION: 'NOOP_INDICATOR_MUTATION',
+  // an attribute name refused by the safety gate: an `on*` event handler, or
+  // characters outside the legal name set. Such a name is skipped at render
+  // wherever it appears, so nothing can execute; the warning closes the
+  // VISIBILITY gap, telling the author their key will never be emitted.
+  UNSAFE_ATTRIBUTE_NAME: 'UNSAFE_ATTRIBUTE_NAME',
+  // an option key that cannot travel in the transient channel because the
+  // library consumes it while building the composition rather than while
+  // drawing it (position, kerning, the runtime key). A transient spelling
+  // would be inert, so it is reported and dropped instead of silently ignored.
+  MISPLACED_TRANSIENT_OPTION: 'MISPLACED_TRANSIENT_OPTION',
   // illegal operand in a ;-part slot (also used as an internal part.errorCode)
   COMPOSITE_AS_PART: 'COMPOSITE_AS_PART',
   WORD_AS_PART: 'WORD_AS_PART',

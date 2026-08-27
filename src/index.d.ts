@@ -516,6 +516,29 @@ export declare class ElementHandle {
 
   /** Removes specific option keys from this element. */
   removeOptions(...keys: string[]): this;
+
+  /**
+   * Sets transient options on this element: values that reach the rendered SVG
+   * and never reach `toString()` or `toJSON()`. Use for anything describing the
+   * current view rather than the composition, such as hit-test annotations or a
+   * selection highlight.
+   *
+   * A transient value wins over a normal option of the same key. Above the key,
+   * the ordinary precedence still applies unchanged: an explicitly-named
+   * attribute beats an alias of it, and a specific option beats a bulk one.
+   *
+   * Keys the library reads while building the composition rather than while
+   * drawing it (`x`, `y`, either kerning option in either spelling, and `key`)
+   * are refused with a `MISPLACED_TRANSIENT_OPTION` warning, and an unusable
+   * attribute name with `UNSAFE_ATTRIBUTE_NAME`. A space carries no decoration
+   * in this channel either, matching `MISPLACED_SPACE_DECORATION`.
+   *
+   * @throws {TypeError} If `opts` is provided and is not an object.
+   */
+  setTransientOptions(opts: BlissOptions): this;
+
+  /** Removes specific transient option keys from this element. */
+  removeTransientOptions(...keys: string[]): this;
 }
 
 // --- Definition types ---
@@ -656,8 +679,17 @@ export interface DefinitionMetadata {
  */
 export interface BlissJSON {
   options?: Record<string, string | boolean>;
+  /**
+   * Transient options: values that reach the rendered SVG and never reach
+   * `toString()` or `toJSON()`. Accepted on INPUT at any level, and by design
+   * never present on output — round-tripping a builder through its own JSON
+   * therefore drops them, and the consumer re-applies. Valid at every level
+   * below.
+   */
+  transientOptions?: Record<string, string | number | boolean>;
   groups: Array<{
     options?: Record<string, string | boolean>;
+    transientOptions?: Record<string, string | number | boolean>;
     /**
      * Word-level indicator overlay (the DSL `;;` form): stored on the word and
      * resolved onto the head glyph at render. Present in default output (kept
@@ -667,6 +699,7 @@ export interface BlissJSON {
     glyphs?: Array<{
       codeName?: string;
       options?: Record<string, string | boolean>;
+      transientOptions?: Record<string, string | number | boolean>;
       isHeadGlyph?: boolean;
       /**
        * Classification metadata, present only on a glyph that has no `codeName`
@@ -682,6 +715,7 @@ export interface BlissJSON {
       parts?: Array<{
         codeName: string;
         options?: Record<string, string | boolean>;
+        transientOptions?: Record<string, string | number | boolean>;
         /** Present (true) only on an indicator part. */
         isIndicator?: boolean;
         /** Rendered indicator width; present only on an indicator part. */
@@ -739,6 +773,8 @@ export type WarningCode =
   | 'DROPPED_WORD_INDICATOR'
   | 'UNSUPPORTED_TEXT_BLOCKS'
   | 'NOOP_INDICATOR_MUTATION'
+  | 'UNSAFE_ATTRIBUTE_NAME'
+  | 'MISPLACED_TRANSIENT_OPTION'
   | 'COMPOSITE_AS_PART'
   | 'WORD_AS_PART'
   | 'NON_INDICATOR_AS_WORD_INDICATOR'
@@ -1010,6 +1046,21 @@ export declare class BlissSVGBuilder {
    * described by {@link BlissJSON}.
    */
   toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean }): BlissJSON;
+
+  /**
+   * Sets transient options on the whole SVG: values that reach the rendered
+   * output and never reach `toString()` or `toJSON()`. Repeated calls merge.
+   *
+   * There is no builder-level `setOptions` counterpart, because global options
+   * belong to the composition and arrive with it; this channel is the transient
+   * one, so changing it after construction is what it is for.
+   *
+   * @throws {TypeError} If `opts` is provided and is not an object.
+   */
+  setTransientOptions(opts: BlissOptions): this;
+
+  /** Removes transient option keys from the whole SVG, in either spelling. */
+  removeTransientOptions(...keys: string[]): this;
 
   // --- Static: definition management ---
 

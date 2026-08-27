@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -431,6 +431,22 @@ class BlissSVGBuilder {
 
   // Recursively process options at all levels (groups, glyphs, parts)
   #processAllOptions(obj, isTopLevel = false) {
+    // A transient option is an ordinary option that never serializes, so it
+    // joins the node's options HERE, on the render clone, and is processed,
+    // escaped and normalized by everything downstream exactly like one. The
+    // authoring tree keeps the two bags apart, which is what keeps the
+    // serializers from ever seeing a transient value.
+    //
+    // Transient wins at the key level, because an overlay that lost to what it
+    // overlays could not do its job. Above the key the existing precedence is
+    // unchanged and channel-blind: an explicitly-named attribute still beats an
+    // alias of it, and a specific option still beats the bulk one it refines.
+    //
+    // A node may carry a transient bag and no options at all, so this runs
+    // before the `if (obj.options)` guard and creates the object.
+    if (obj.transientOptions) {
+      obj.options = { ...(obj.options ?? {}), ...obj.transientOptions };
+    }
     if (obj.options) {
       // Extract key from options (key is element identity, not an SVG option)
       if (obj.options.key !== undefined) {
@@ -776,6 +792,10 @@ class BlissSVGBuilder {
         }
         const wordGroup = { glyphs: run.glyphs };
         if (group.options) wordGroup.options = { ...group.options };
+        // A transient option follows its word here for the same reason its
+        // serializing twin does: the split produces several words where the
+        // author wrote one, and both channels describe that same word.
+        if (group.transientOptions) wordGroup.transientOptions = { ...group.transientOptions };
         return wordGroup;
       });
       groups.splice(i, 1, ...replacement);
@@ -986,6 +1006,64 @@ class BlissSVGBuilder {
   // idempotent, so a later rebuild re-normalizes nothing; the warnings ride
   // `_parseWarnings`, the channel that survives a rebuild, so a conflict
   // reported once is still reported after an unrelated mutation.
+  // Gates the transient channel on the AUTHORING structure, so both surfaces
+  // that can fill it (the setters and constructor object input) meet one rule
+  // at one site, and so an offending key is dropped once rather than re-judged
+  // on every rebuild. Three refusals, each of which would otherwise be a silent
+  // no-op with a plausible-looking key sitting in the bag:
+  //
+  //   - a key the library consumes before the render copy is taken, which a
+  //     transient spelling could never reach (TRANSIENT_REFUSED_OPTION_KEYS);
+  //   - a name that is not a legal attribute name, including `on*` handlers,
+  //     which the render path already skips silently at every level;
+  //   - anything at all on a TSP/QSP space, which has no ink to decorate. That
+  //     mirrors the space rule for ordinary options exactly, including its code.
+  //
+  // Warnings go to the one-time channel, like the space rule's own, because the
+  // offending key is deleted here: a per-rebuild channel would report it once
+  // and then forget it ever happened.
+  #normalizeTransientInvariant() {
+    const drop = (bag, keys, code, message) => {
+      for (const key of keys) delete bag[key];
+      this.#mutationWarnings.push({ code, message: message(keys), source: keys[0] });
+    };
+    const visit = (node, onSpace) => {
+      const bag = node.transientOptions;
+      if (bag && typeof bag === 'object') {
+        const keys = Object.keys(bag);
+        if (onSpace) {
+          if (keys.length > 0) {
+            drop(bag, keys, WARNING_CODES.MISPLACED_SPACE_DECORATION,
+              (k) => `A space cannot carry an option, so the transient "${k.join('", "')}" was dropped.`);
+          }
+        } else {
+          const refused = keys.filter(k => TRANSIENT_REFUSED_OPTION_KEYS.has(k));
+          if (refused.length > 0) {
+            drop(bag, refused, WARNING_CODES.MISPLACED_TRANSIENT_OPTION,
+              (k) => `"${k.join('", "')}" cannot be a transient option: the value is read while the composition is built, not while it is drawn, so it would never reach the picture. Set it with setOptions() instead.`);
+          }
+          const unsafe = Object.keys(bag).filter(k => !isSafeAttributeName(k));
+          if (unsafe.length > 0) {
+            drop(bag, unsafe, WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
+              (k) => `"${k.join('", "')}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`);
+          }
+        }
+        if (Object.keys(bag).length === 0) delete node.transientOptions;
+      }
+      // The glyph-level space test is defensive: the space invariant runs just
+      // before this pass and splits a mixed word into pure-space groups, so
+      // today every space is caught one level up. Keeping it makes "a space
+      // carries no transient decoration" an invariant rather than an artifact
+      // of that ordering (probe: temp/probe-c7-m5.mjs).
+      for (const glyph of node.glyphs ?? []) visit(glyph, onSpace || BlissSVGBuilder.#isSpaceGlyphNode(glyph));
+      for (const part of node.parts ?? []) visit(part, onSpace);
+    };
+    visit(this.#rawBlissObj, false);
+    for (const group of this.#rawBlissObj.groups ?? []) {
+      visit(group, BlissSVGBuilder.#isRawSpaceGroup(group));
+    }
+  }
+
   #normalizePositioningInvariant() {
     const raw = this.#rawBlissObj;
     const warnings = [];
@@ -1097,6 +1175,7 @@ class BlissSVGBuilder {
     this.#normalizeFailedWordInvariant();
     this.#normalizeSpacePartInvariant();
     this.#normalizeSpaceInvariant();
+    this.#normalizeTransientInvariant();
     // Before the indicator invariant, which reads a part's `x` to decide
     // whether it is explicitly positioned (a positioned part does not convict a
     // preceding indicator), and after the space one, which strips a space's
@@ -1775,6 +1854,51 @@ class BlissSVGBuilder {
     return this;
   }
 
+  /**
+   * Sets transient options on the whole SVG: values that reach the rendered
+   * output and never reach `toString()` or `toJSON()`.
+   *
+   * Repeated calls MERGE, like `setOptions` on an element. Use it for anything
+   * that describes this view rather than the composition — a display width, a
+   * highlight, an annotation the app re-applies on each render.
+   *
+   * There is no builder-level `setOptions` counterpart: global options belong
+   * to the composition and arrive with it. This channel is the transient one,
+   * so changing it after construction is exactly what it is for.
+   *
+   * @param {Object} opts - Option keys and values
+   * @returns {this}
+   */
+  setTransientOptions(opts) {
+    assertOptsArg('setTransientOptions', opts);
+    // #toRaw kebab-cases the keys and stringifies the values, matching how an
+    // option written in a bracket arrives, and dropping object values that
+    // structuredClone could not carry across a rebuild.
+    const raw = BlissSVGBuilder.#toRaw(opts ?? {});
+    this.#rawBlissObj.transientOptions = { ...(this.#rawBlissObj.transientOptions ?? {}), ...raw };
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Removes transient option keys from the whole SVG. Both spellings of a key
+   * are removed, since the bag stores whatever spelling reached it.
+   *
+   * @param {...string} keys - Option keys to remove
+   * @returns {this}
+   */
+  removeTransientOptions(...keys) {
+    const bag = this.#rawBlissObj.transientOptions;
+    if (!bag) return this;
+    for (const key of keys) {
+      delete bag[camelToKebab(key)];
+      delete bag[key];
+    }
+    if (Object.keys(bag).length === 0) delete this.#rawBlissObj.transientOptions;
+    this.#rebuild();
+    return this;
+  }
+
   #groupsCache;
 
   /**
@@ -2385,6 +2509,11 @@ class BlissSVGBuilder {
     // Strip keys from all levels (keys are runtime identity, not composition data)
     delete obj.key;
     if (obj.options) delete obj.options.key;
+    // Transient options render and never serialize: that is the whole contract
+    // of the channel, so the strip happens at every level it can appear on,
+    // ungated by `deep` (merge() re-ingests deep output, which would otherwise
+    // resurrect a nested bag).
+    delete obj.transientOptions;
 
     if (obj.groups) {
       // Strip keys from parts. Unless deep: true, also strip nested sub-parts
@@ -2393,6 +2522,7 @@ class BlissSVGBuilder {
       const stripParts = (parts) => {
         for (const [partIndex, part] of parts.entries()) {
           delete part.key;
+          delete part.transientOptions;
           // Internal origin tag from the word-indicator merge (flatten path):
           // not composition data, never surfaced in serialized output.
           delete part._indicatorOrigin;
@@ -2442,6 +2572,7 @@ class BlissSVGBuilder {
 
       for (const group of obj.groups) {
         delete group.key;
+        delete group.transientOptions;
         if (group.options) delete group.options.key;
 
         // R14: flattenIndicators bakes the word-level overlay onto the head as
@@ -2474,6 +2605,7 @@ class BlissSVGBuilder {
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
             delete glyph.key;
+            delete glyph.transientOptions;
             if (glyph.options) delete glyph.options.key;
             if (glyph.parts) stripParts(glyph.parts);
 

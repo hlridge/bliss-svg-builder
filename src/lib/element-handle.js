@@ -1465,4 +1465,52 @@ export class ElementHandle {
     this.#syncGeneration();
     return this;
   }
+
+  // --- Mutation: transient options ---
+
+  // Deliberately NOT routed through #applyDefaultsOverrides. That helper calls
+  // clearStalePositioning, which wipes the element's NORMAL position and
+  // kerning channels whenever the incoming object names one of those keys —
+  // correct when the caller is writing that channel, destructive here, where
+  // those keys are refused anyway. A transient call must never be able to
+  // damage the document on its way to being rejected.
+  //
+  // The refusal itself lives in one place on the authoring structure
+  // (#normalizeTransientInvariant), so object input and these setters cannot
+  // drift apart, and an offending key is reported once rather than re-judged
+  // on every rebuild.
+  setTransientOptions(opts) {
+    this.#assertReachable();
+    // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
+    const node = this.#nodeRef;
+    if (!node) return this;
+    assertOptsArg('setTransientOptions', opts);
+    const raw = this.#ctx.toRaw(opts ?? {});
+    node.transientOptions = { ...(node.transientOptions ?? {}), ...raw };
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  // Both spellings are deleted, like removeOptions: the bag stores keys as they
+  // arrived (kebab from a setter, either spelling from object input) and the
+  // normalization that would unify them happens later, on the render copy.
+  removeTransientOptions(...keys) {
+    this.#assertReachable();
+    // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
+    const node = this.#nodeRef;
+    if (!node?.transientOptions) return this;
+    for (const key of keys) {
+      delete node.transientOptions[camelToKebab(key)];
+      delete node.transientOptions[key];
+    }
+    if (Object.keys(node.transientOptions).length === 0) {
+      delete node.transientOptions;
+    }
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
 }

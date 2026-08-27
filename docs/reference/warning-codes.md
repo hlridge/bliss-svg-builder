@@ -327,6 +327,30 @@ new BlissSVGBuilder('B313/B1103').group(0).clearIndicators();
 
 Invalid *codes* passed to `applyIndicators()` are a different case: each one warns individually (`NON_INDICATOR_AS_CHARACTER_INDICATOR` / `UNKNOWN_CODE`, below), and a call whose codes are all invalid is refused without touching the element (one exception: on a group handle, `{ stripSemantic: true }` is itself valid overlay content, so that call still stores the `;;!` strip overlay — matching the DSL `WORD;;!ZZ9`, where the bad code drops and the `!` stays). An *empty* apply (`applyIndicators('')`) is not a no-op case either: it is the deliberate empty indicator set and stays silent on any target that can carry indicators — a space target still warns the structural no-op above.
 
+## Refused by a Safety Gate
+
+### `UNSAFE_ATTRIBUTE_NAME`
+
+An attribute name that can never be emitted: an `on*` event handler, or a name containing anything outside letters, digits and dashes. Such a name is skipped at render wherever it appears, so nothing can execute; this warning exists because the skip used to be silent, leaving an author with a key they had every reason to think was working.
+
+```js
+builder.part(0).setTransientOptions({ 'on-click': 'x' });
+// warns, and nothing is emitted; other keys in the same call are kept
+```
+
+## Misplaced Channel
+
+### `MISPLACED_TRANSIENT_OPTION`
+
+An option key set through [`setTransientOptions`](/reference/api-documentation#transient-options) that the library reads while *building* the composition rather than while *drawing* it, so a transient spelling could never reach the picture: `x`, `y`, `relativeKerning` and `absoluteKerning` (in either spelling), and `key`. The key is dropped and reported rather than left looking as though it worked. Set it with `setOptions` instead.
+
+```js
+builder.part(1).setTransientOptions({ x: 5 });
+// warns; the part does not move. Use setOptions({ x: 5 }).
+```
+
+A transient option written on a space is a different case and reports `MISPLACED_SPACE_DECORATION`, exactly as a normal option on a space already does.
+
 ## Illegal Operands
 
 ### `WORD_AS_PART`

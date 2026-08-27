@@ -57,6 +57,7 @@ const INSTANCE_METHODS = [
   'snapshot', 'addGroup', 'addGlyph', 'addPart', 'insertGroup', 'removeGroup',
   'replaceGroup', 'merge', 'splitAt', 'addElement', 'insertElement',
   'removeElement', 'replaceElement', 'clear', 'toString', 'toJSON',
+  'setTransientOptions', 'removeTransientOptions',
 ];
 
 const INSTANCE_GETTERS = [
@@ -70,6 +71,7 @@ const HANDLE_METHODS = [
   'removePart', 'replacePart', 'applyIndicators', 'clearIndicators',
   'splitAt', 'mergeWithNext',
   'setOptions', 'removeOptions',
+  'setTransientOptions', 'removeTransientOptions',
 ];
 
 // Removed in rc.4 (Chunk 2): the built bundle must NOT expose these. The
