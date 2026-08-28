@@ -76,9 +76,14 @@ export interface BlissOptions {
   // Error handling
   'error-placeholder'?: boolean;
 
-  // SVG pass-through attributes (any key not in the known set). Includes
-  // `boolean` so the boolean options (`grid`, `center`, `error-placeholder`)
-  // conform to the index signature; without it `tsc` rejects this interface.
+  // SVG pass-through attributes (any key not in the known set), emitted with
+  // the name written verbatim. At global scope a bare key lands on the root
+  // <svg>; `<layer>--<attribute>` lands on one layer inside it, where the layer
+  // is `background`, `grid` or `content` (`'grid--opacity': 0.3`). At element
+  // scope the key lands on that element's own <g>, and a layer prefix is
+  // refused. Includes `boolean` so the boolean options (`grid`, `center`,
+  // `error-placeholder`) conform to the index signature; without it `tsc`
+  // rejects this interface.
   [key: string]: string | number | boolean | undefined;
 }
 
