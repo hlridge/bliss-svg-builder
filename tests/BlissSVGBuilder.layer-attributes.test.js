@@ -110,6 +110,50 @@ describe('BlissSVGBuilder layer attributes', () => {
     });
   });
 
+  describe('when a layer key is written below global scope', () => {
+    it.each([
+      ['word', '[grid--opacity=0.3]|B291'],
+      ['character', '[grid--opacity=0.3]B291'],
+      ['part', '[grid--opacity=0.3]>B291'],
+    ])('warns MISPLACED_LAYER_OPTION at %s scope and emits no attribute', (_scope, input) => {
+      const builder = new BlissSVGBuilder(input);
+
+      expect(builder.warnings.some(w => w.code === 'MISPLACED_LAYER_OPTION')).toBe(true);
+      expect(builder.svgCode).not.toContain('grid--opacity');
+      expect(builder.svgCode).toContain('<path');
+    });
+
+    it('keeps the other options written in the same bracket', () => {
+      const builder = new BlissSVGBuilder('[grid--opacity=0.3;fill=red]|B291');
+
+      expect(builder.svgCode).toContain('fill="red"');
+      expect(builder.svgCode).not.toContain('grid--opacity');
+    });
+
+    it('drops the key from the serialized string', () => {
+      const builder = new BlissSVGBuilder('[grid--opacity=0.3;fill=red]|B291');
+
+      expect(builder.toString()).not.toContain('grid--opacity');
+      expect(builder.toString()).toContain('fill=red');
+    });
+
+    it('emits no attribute from object input either, which warns nothing', () => {
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }], options: { 'grid--opacity': 0.3 } }] }],
+      });
+
+      expect(builder.svgCode).not.toContain('grid--opacity');
+      expect(builder.warnings.some(w => w.code === 'MISPLACED_LAYER_OPTION')).toBe(false);
+    });
+
+    it('leaves element-scope pass-through untouched', () => {
+      const builder = new BlissSVGBuilder('[stroke-dasharray=1]>B291');
+
+      expect(builder.svgCode).toContain('stroke-dasharray="1"');
+      expect(builder.warnings).toHaveLength(0);
+    });
+  });
+
   describe('when the same layer key arrives from different surfaces', () => {
     it('renders identically from the DSL, the constructor and the transient channel', () => {
       const dsl = new BlissSVGBuilder('[grid;grid--opacity=0.3]||B291').svgCode;

@@ -327,6 +327,11 @@ export const WARNING_CODES = Object.freeze({
   // global scope; it is dropped there rather than passing through to the SVG as
   // an attribute, which is what an unrecognized key deliberately does.
   MISPLACED_KERNING_OPTION: 'MISPLACED_KERNING_OPTION',
+  // the same rule for a `<layer>--<attribute>` key below global scope: the
+  // layers it can name are the whole SVG's, so there is nothing for the key to
+  // target inside a group, character or part. Dropped there rather than passing
+  // through to the markup as a `<g layer--attr="...">` nothing can use.
+  MISPLACED_LAYER_OPTION: 'MISPLACED_LAYER_OPTION',
   // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
   // space: a space is a pure word-separator with no ink to position or style,
   // so the decoration is dropped and the space keeps its identity (ZSA is
@@ -364,6 +369,12 @@ export const WARNING_CODES = Object.freeze({
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',
+  // a global key in `<layer>--<attribute>` form naming a layer we do not emit
+  // (`foo--x`), or with an empty layer half (`--x`). Never emitted, but KEPT in
+  // the options bag so it round-trips, on the UNKNOWN_ family's own logic: the
+  // reference may become valid later, exactly as UNKNOWN_CODE keeps a code you
+  // might define() afterwards.
+  UNKNOWN_LAYER: 'UNKNOWN_LAYER',
   // discarded
   DROPPED_WORD_INDICATOR: 'DROPPED_WORD_INDICATOR',
   // unsupported feature

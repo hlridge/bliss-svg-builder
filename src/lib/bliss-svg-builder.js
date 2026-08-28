@@ -479,6 +479,17 @@ class BlissSVGBuilder {
         obj.key = obj.options.key;
         delete obj.options.key;
       }
+      if (!isTopLevel) {
+        // A `<layer>--<attribute>` key names a layer of the whole SVG, so below
+        // global scope there is nothing for it to target. The parser drops it
+        // with a warning for DSL input; object input never passes that gate and
+        // would otherwise reach the markup as a `<g layer--attr="...">` nothing
+        // can use. Done on the render clone, so the authoring tree still
+        // round-trips the key the caller wrote.
+        for (const key of Object.keys(obj.options)) {
+          if (isLayerAttributeKey(key)) delete obj.options[key];
+        }
+      }
       obj.options = this.#processOptions(obj.options, isTopLevel);
     }
     if (obj.groups) {

@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, isLayerAttributeKey, serializeOptionValue } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -593,6 +593,13 @@ export class BlissParser {
         code: WARNING_CODES.MISPLACED_KERNING_OPTION,
         message: (written, levelName) =>
           `Kerning option (${written}) ignored at ${levelName} level: kerning is the gap before a character. Write it on the character, or use the RK:/AK: marker before it.`,
+      },
+      {
+        home: 'global',
+        has: (key) => isLayerAttributeKey(key),
+        code: WARNING_CODES.MISPLACED_LAYER_OPTION,
+        message: (written, levelName) =>
+          `Layer option (${written}) ignored at ${levelName} level: it names a layer of the whole SVG. Use [${written}]|| to apply it, or write the attribute without a layer prefix to put it on this element.`,
       },
     ];
 
