@@ -127,7 +127,16 @@ Options use **camelCase** keys with native JavaScript types, not the kebab-case 
 | `relativeKerning` | `relative-kerning` | number | `-1` |
 | `absoluteKerning` | `absolute-kerning` | number | `4` |
 
-All options from the [Options Quick Reference](/reference/options-quick-reference) are supported. The same validation and clamping applies (e.g., `strokeWidth` is clamped to 0.1–1.5).
+All options from the [Options Quick Reference](/reference/options-quick-reference) are supported, with the same validation and clamping as the DSL form (the dot-sizing options are clamped; `strokeWidth` is not).
+
+**The camelCase-to-kebab conversion applies to these named options and to nothing else.** An [SVG pass-through attribute](/handbook/syntax-options/svg-pass-through) is emitted under exactly the name you write, so write it the way SVG spells it, in quotes when it contains a dash:
+
+```js
+new BlissSVGBuilder('B313', { 'stroke-dasharray': 5 });   // emits stroke-dasharray="5"
+new BlissSVGBuilder('B313', { preserveAspectRatio: 'xMidYMid' }); // emits it unchanged
+```
+
+Guessing where the dashes go would be right for the table above, where the library owns both spellings, and wrong for every SVG attribute that is genuinely camelCase.
 
 The last four position a single element rather than the canvas, so they belong on the element that carries them, through `setOptions()` or the opts argument of `addGlyph`/`insertPart`/`replaceGlyph` and the rest of that family. They mean exactly what the DSL spelling of the same value means, and they serialize to it:
 

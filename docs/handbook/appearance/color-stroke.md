@@ -16,7 +16,7 @@ This is useful in teaching materials where you want to focus on a particular wor
 
 ## Stroke Width
 
-Control line thickness with `stroke-width` (default `0.5`, range 0.1 to 1.5):
+Control line thickness with `stroke-width` (default `0.5`). Any number is accepted; roughly 0.1 to 1.5 is the range that reads as Blissymbolics, and values outside it are yours to use if you want them:
 
 <Demo code="[stroke-width=0.3]||B313" title="Thin: 0.3" />
 

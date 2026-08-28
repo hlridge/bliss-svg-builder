@@ -34,6 +34,8 @@ The prefix tells you what kind of problem occurred:
 | `DROPPED_` | Something discarded during an operation |
 | `UNSUPPORTED_` | Valid input for a feature that is not implemented yet |
 | `NOOP_` | A mutation call that had no effect |
+| `UNSAFE_` | Refused by a safety gate rather than by the grammar |
+| `RESERVED_` | Refused because the name belongs to the library |
 | `…_AS_…` | An illegal operand in a slot (e.g. a word used as a part) |
 
 ## Malformed Input
@@ -187,6 +189,19 @@ Any other option in the same bracket is kept, so `[relative-kerning=3;color=red]
 
 Dropping it is what keeps it out of the drawing. An option key the library does not recognize at a given scope is passed through to the SVG as an attribute (that is what `[data-*]` options are for), so leaving a misplaced kerning option in place would put `relative-kerning="3"` into the output, where it means nothing to any renderer. An unrecognized key still passes through, warning-free, exactly as before.
 
+### `MISPLACED_LAYER_OPTION`
+
+A layer-targeting option (`grid--opacity`, `content--color`, anything with a `--` in its key) written at part, word, or character scope. The layers belong to the document as a whole, so below global scope there is nothing for the key to name; it is dropped and the content renders unchanged.
+
+```
+[grid--opacity=0.3]|B291   →  renders B291, the layer key dropped
+[grid;grid--opacity=0.3]||B291 →  valid: global scope is where layers live
+```
+
+Any other option in the same bracket is kept, so `[grid--opacity=0.3;fill=red]|B291` still renders the word filled red.
+
+Dropping it is what keeps it out of the drawing. An unrecognized key is passed through to the SVG as an attribute, so leaving the layer key in place would put `grid--opacity="0.3"` into the output, where it means nothing to any renderer. To style just that element, write the attribute without a prefix.
+
 ### `MISPLACED_SPACE_DECORATION`
 
 A coordinate (`:x,y`) or a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
@@ -273,6 +288,18 @@ B99/RK:3/[absolute-kerning=4]B291     →  kerns by the option; "RK:3" is ignore
 
 A definition's `defaultOptions` is a default, so a value written on the character overrides it silently. That is what a default is for.
 
+### `MULTIPLE_GEOMETRY_VALUES`
+
+The `viewBox` written directly at global scope while `margin`, `crop`, `min-width` or `center` is also set. Those options exist to compute the viewBox, so a written one replaces what they produced, and each option it displaced is named:
+
+```
+[margin=2;viewBox="0 0 10 10"]||B291  →  uses the written viewBox; "margin" is named
+[viewBox="0 0 10 10"]||B291           →  silent: nothing was displaced
+[margin=2]||B291                      →  silent: nothing was overridden
+```
+
+Remove the `viewBox` to size the picture with the options, or remove the options to size it by hand.
+
 ### `DUPLICATE_KEY`
 
 Two elements carry the same user-assigned `key` (for example in object input passed to the constructor). Keys identify elements for `getElementByKey()`, so they must be unique. Auto-generated keys never collide.
@@ -288,6 +315,33 @@ B291;ZZ9               →  warns, toString() still returns 'B291;ZZ9'
 ```
 
 A token that is not even a valid code shape (for example `!B81`) cannot be represented. It is malformed syntax rather than content, so the **whole character** is dropped from render and from both `toString()` and `toJSON()`, also with `UNKNOWN_CODE`. (Only the *bad* part is not dropped in isolation: keeping the rest, `B291;!B81` -> `B291`, could silently form a different valid character.)
+
+### `UNKNOWN_LAYER`
+
+A global option whose key names a layer that is not drawn, or that names no attribute at all. The layers are `background`, `grid` and `content`; anything else has nothing to target, so nothing is emitted for it.
+
+```
+[foo--x=1]||B291       →  warns, nothing emitted, toString() still returns it
+[--x=1]||B291          →  warns: no layer named
+[content--=red]||B291  →  warns: no attribute named
+```
+
+Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a layer this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix.
+
+## Refused Because the Name Is the Library's
+
+### `RESERVED_ATTRIBUTE_NAME`
+
+A global option naming one of the two root attributes the library owns: `xmlns` and `data-generator`. The written value is dropped and the library's own is kept.
+
+```
+[xmlns=http://example.com]||B291  →  warns, the SVG namespace is kept
+[data-generator=me]||B291         →  warns, the library's stamp is kept
+```
+
+`xmlns` has exactly one legal value; changing it does not make a different picture, it makes a file that browsers will not render and that this library's own `svgElement` cannot parse. `data-generator` records what produced the file, and a stamp anyone can overwrite tells a reader nothing. To record your own pipeline, add a `data-` attribute of your own.
+
+Every other root attribute is yours, including `width`, `height` and `viewBox`, which replace the computed values when you write them.
 
 ## Dropped Content
 
