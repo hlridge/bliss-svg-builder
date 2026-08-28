@@ -28,6 +28,29 @@ export const KNOWN_OPTION_KEYS = new Set([
 ]);
 
 /**
+ * The layers a global attribute can name with a `<layer>--<attribute>` key.
+ * A bare key targets the root, so there is deliberately no `svg--`: a second
+ * spelling for one target is a duplicate.
+ */
+export const LAYER_TARGETS = new Set(['background', 'grid', 'content']);
+
+/** True for a key written in the `<layer>--<attribute>` form, valid or not. */
+export const isLayerAttributeKey = (key) => key.includes('--');
+
+/**
+ * Splits `grid--opacity` into its layer and its attribute. Returns null when
+ * the layer is not one we emit or the attribute half is empty, so the caller
+ * can report an unknown layer rather than emit a key nothing can use.
+ */
+export const parseLayerAttributeKey = (key) => {
+  const at = key.indexOf('--');
+  const layer = key.slice(0, at);
+  const attribute = key.slice(at + 2);
+  if (!LAYER_TARGETS.has(layer) || !attribute) return null;
+  return { layer, attribute };
+};
+
+/**
  * Returns false for event handler attribute names (on*) or names containing
  * characters outside the safe allowlist to prevent XSS.
  */

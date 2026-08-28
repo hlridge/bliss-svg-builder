@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -98,6 +98,15 @@ const formatAttributes = (attrs) =>
 const mergeStructuralClass = (structural, authored) =>
   authored ? `${structural} ${authored}` : structural;
 
+// One layer's emitted attributes: its structural class, then what the library
+// computed for it, then the author's `<layer>--` values, which may replace a
+// computed one. The class is put back afterwards so the spread cannot drop the
+// structural name.
+const layerAttributes = (structuralClass, computed, authored = {}) => ({
+  ...{ class: structuralClass, ...computed, ...authored },
+  class: mergeStructuralClass(structuralClass, authored['class']),
+});
+
 // Resolves which glyph carries a word-level (`;;`) overlay. A stored
 // designation wins; the fallback resolves among content-bearing glyphs only,
 // because serialization omits a bare empty-parts glyph, so a reparse of
@@ -117,6 +126,9 @@ const resolveOverlayHeadIndex = (glyphs) => {
 // External consumers always go through src/index.js, where the static is set.
 class BlissSVGBuilder {
   #processedOptions;
+  // Global `<layer>--<attribute>` values, grouped by the layer they name, and
+  // applied at that layer's emission point. Rebuilt with globalSvgAttributes.
+  #layerAttributes = {};
   #sharedOptions;
   #mutationCtx;
   #warnings = [];
@@ -1257,13 +1269,27 @@ class BlissSVGBuilder {
     blissObj.options = remainingOptions;
     this.#processedOptions = blissObj.options;
 
+    // Global options split three ways: the named vocabulary was consumed above,
+    // a `<layer>--<attribute>` key goes to the layer it names, and everything
+    // else goes to the root.
     const attrMap = { 'color': 'stroke' };
     this.globalSvgAttributes = {};
+    this.#layerAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
-      if (!INTERNAL_OPTIONS.has(key) && isSafeAttributeName(key)) {
-        const attrName = attrMap[key] ?? (isNamedOptionKey(key) ? camelToKebab(key) : key);
-        this.globalSvgAttributes[attrName] = value;
+      if (INTERNAL_OPTIONS.has(key)) continue;
+      if (isLayerAttributeKey(key)) {
+        // The prefixed channel is RAW: the name after `--` is emitted verbatim,
+        // with no alias remapping and no kebab-casing. That is what makes an
+        // attribute reachable whose name a named option has taken (`color`),
+        // and what makes a camelCase SVG attribute expressible.
+        const target = parseLayerAttributeKey(key);
+        if (!target || !isSafeAttributeName(target.attribute)) continue;
+        (this.#layerAttributes[target.layer] ??= {})[target.attribute] = value;
+        continue;
       }
+      if (!isSafeAttributeName(key)) continue;
+      const attrName = attrMap[key] ?? (isNamedOptionKey(key) ? camelToKebab(key) : key);
+      this.globalSvgAttributes[attrName] = value;
     }
 
     this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });
@@ -3898,6 +3924,11 @@ class BlissSVGBuilder {
     // sits outside the content group and inherits `fill="none"` from the root.
     let svgText = "";
 
+    // A `background--` attribute belongs to the paper itself, so it lands on
+    // the rect that paints it, or on EACH zone rect when zones are on, never on
+    // the wrapper group, which paints nothing.
+    const backgroundAttrs = this.#layerAttributes.background;
+
     let backgroundContent;
     if (hasZones) {
       const bulkBg = background;
@@ -3913,15 +3944,20 @@ class BlissSVGBuilder {
       const topHeight = round(Math.max(0, 8 - viewBoxY));
       const bottomHeight = round(Math.max(0, viewBoxY + viewBoxHeight - 16));
 
+      const zoneRect = (structuralClass, y, height, fill) =>
+        `    <rect ${formatAttributes(layerAttributes(structuralClass,
+          { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill }, backgroundAttrs))}/>`;
+
       const zoneRects = [
-        topColor ? `    <rect class="bliss-background--top" x="${zoneX}" y="${topY}" width="${zoneWidth}" height="${topHeight}" stroke="none" fill="${topColor}"/>` : '',
-        midColor ? `    <rect class="bliss-background--mid" x="${zoneX}" y="8" width="${zoneWidth}" height="8" stroke="none" fill="${midColor}"/>` : '',
-        bottomColor ? `    <rect class="bliss-background--bottom" x="${zoneX}" y="16" width="${zoneWidth}" height="${bottomHeight}" stroke="none" fill="${bottomColor}"/>` : '',
+        topColor ? zoneRect('bliss-background--top', topY, topHeight, topColor) : '',
+        midColor ? zoneRect('bliss-background--mid', 8, 8, midColor) : '',
+        bottomColor ? zoneRect('bliss-background--bottom', 16, bottomHeight, bottomColor) : '',
       ].filter(Boolean).join('\n');
 
       backgroundContent = `  <g class="bliss-background">\n${zoneRects}\n  </g>`;
     } else {
-      backgroundContent = background === "" ? "" : `  <rect class="bliss-background" x="${viewBoxX}" y="${viewBoxY}" width="100%" height="100%" stroke="none" fill="${background}"/>`;
+      backgroundContent = background === "" ? "" : `  <rect ${formatAttributes(layerAttributes('bliss-background',
+        { x: viewBoxX, y: viewBoxY, width: '100%', height: '100%', stroke: 'none', fill: background }, backgroundAttrs))}/>`;
     }
 
     // Grid boundaries adjusted for cropping
@@ -3988,7 +4024,8 @@ class BlissSVGBuilder {
         '      .bliss-grid-line { shape-rendering: geometricPrecision; }',
         '    }',
         '  </style>',
-        '  <g class="bliss-grid" shape-rendering="crispEdges">',
+        `  <g ${formatAttributes(layerAttributes('bliss-grid',
+          { 'shape-rendering': 'crispEdges' }, this.#layerAttributes.grid))}>`,
         gridLines,
         '  </g>',
       ].join('\n');
@@ -4041,7 +4078,7 @@ class BlissSVGBuilder {
       if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
     }
 
-    const contentAttrs = { class: 'bliss-content' };
+    const contentAttrs = layerAttributes('bliss-content', {}, this.#layerAttributes.content);
 
     let svgStr = [
       `<svg ${formatAttributes(rootAttrs)}>`,
