@@ -113,10 +113,28 @@ export function combineViewBoxes(vb1, vb2) {
   };
 }
 
+// Root attributes that describe the DOCUMENT rather than how it is painted.
+// Everything else on the root is inherited style the extracted content still
+// needs once the root is gone.
+const ROOT_STRUCTURAL_ATTRIBUTES = new Set([
+  'xmlns', 'width', 'height', 'viewBox', 'data-generator', 'class',
+]);
+
 // Helper function to clean SVG content (remove svg wrapper and problematic elements)
 export function cleanSVGContent(svgContent) {
   // Remove XML declaration if present
   let content = svgContent.replace(/<\?xml[^>]*\?>/g, '');
+
+  // The painting values (fill, stroke, stroke-width, stroke-linejoin,
+  // stroke-linecap) and every global attribute an author set live on the root,
+  // so dropping the root tag would draw this preview in the browser's defaults
+  // rather than in the colours of the picture under test. Carry them onto a
+  // wrapper <g> that stands in for the root.
+  const rootTag = content.match(/<svg[^>]*>/)?.[0] ?? '';
+  const inheritedAttrs = [...rootTag.matchAll(/([:\w-]+)="([^"]*)"/g)]
+    .filter(([, name]) => !ROOT_STRUCTURAL_ATTRIBUTES.has(name))
+    .map(([attr]) => attr)
+    .join(' ');
 
   // Remove the outer <svg> tags and extract inner content
   content = content.replace(/<svg[^>]*>/g, '').replace(/<\/svg>/g, '');
@@ -135,7 +153,7 @@ export function cleanSVGContent(svgContent) {
     return match;
   });
 
-  return content;
+  return inheritedAttrs ? `<g ${inheritedAttrs}>${content}</g>` : content;
 }
 
 // Function to generate HTML report with SVG overlays
