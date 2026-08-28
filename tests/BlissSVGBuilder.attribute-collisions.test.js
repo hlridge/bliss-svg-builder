@@ -4,11 +4,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 /**
  * Pins that option collisions never emit the same SVG attribute name twice on
  * one element: the explicitly-named attribute wins over an alias, and a global
- * `class` option merges with the structural `bliss-content` class.
+ * value that collides with one the library computes replaces it rather than
+ * appending a second attribute.
  *
  * Covers:
- * - Global `class` merges into a single `class="bliss-content <value>"` on the
- *   content group (DSL `||` form and the constructor object-options form).
+ * - A global `class` landing on the root as a single attribute (DSL `||` form
+ *   and the constructor object-options form).
  * - Element-scope `color` (alias for `stroke`) and an explicit `stroke` collapse
  *   to one `stroke` attribute; the explicit value wins, order-independently
  *   (DSL `[...]` form and the `addGlyph` object-options form).
@@ -28,25 +29,26 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * @issue: #28
  */
 
+const rootTag = (svg) => svg.match(/<svg[^>]*>/)[0];
 const contentGroupTag = (svg) => svg.match(/<g [^>]*bliss-content[^>]*>/)[0];
 const elementStrokeTag = (svg) => svg.match(/<g stroke="[^"]*"[^>]*>/)[0];
 const countAttr = (tag, name) => (tag.match(new RegExp(`${name}="`, 'g')) || []).length;
 
 describe('BlissSVGBuilder attribute collisions', () => {
 
-  describe('when a global class option collides with the structural bliss-content class', () => {
-    it('merges the option class with bliss-content into a single class attribute', () => {
-      const tag = contentGroupTag(new BlissSVGBuilder('[class=my-class]||B313').svgCode);
+  describe('when a global class option is written', () => {
+    it('lands on the root as a single class attribute', () => {
+      const svg = new BlissSVGBuilder('[class=my-class]||B313').svgCode;
 
-      // regression: #28 - bliss-content must lead, the option class is appended
-      expect(tag).toContain('class="bliss-content my-class"');
-      expect(countAttr(tag, 'class')).toBe(1);
+      expect(rootTag(svg)).toContain('class="my-class"');
+      expect(countAttr(rootTag(svg), 'class')).toBe(1);
+      expect(contentGroupTag(svg)).toContain('class="bliss-content"');
     });
 
-    it('merges the class via the constructor object-options form identically', () => {
-      const tag = contentGroupTag(new BlissSVGBuilder('B313', { class: 'my-class' }).svgCode);
+    it('lands on the root via the constructor object-options form identically', () => {
+      const tag = rootTag(new BlissSVGBuilder('B313', { class: 'my-class' }).svgCode);
 
-      expect(tag).toContain('class="bliss-content my-class"');
+      expect(tag).toContain('class="my-class"');
       expect(countAttr(tag, 'class')).toBe(1);
     });
   });
@@ -85,7 +87,7 @@ describe('BlissSVGBuilder attribute collisions', () => {
 
   describe('when attributes do not collide', () => {
     it('keeps each global pass-through attribute emitted once', () => {
-      const tag = contentGroupTag(new BlissSVGBuilder('[fill=blue;opacity=0.5]||H').svgCode);
+      const tag = rootTag(new BlissSVGBuilder('[fill=blue;opacity=0.5]||H').svgCode);
 
       expect(tag).toContain('fill="blue"');
       expect(tag).toContain('opacity="0.5"');

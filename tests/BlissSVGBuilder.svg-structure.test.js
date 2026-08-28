@@ -12,7 +12,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   absence of version and baseProfile.
  * - Default styling attributes (fill, stroke, stroke-width, stroke-linejoin,
  *   stroke-linecap) and pass-through attributes (opacity, color, custom
- *   stroke-width) sit on the bliss-content group, not on the root.
+ *   stroke-width) sit on the root, not on the bliss-content group, which
+ *   carries nothing but its class in the default case.
+ * - An element-scope attribute stays on the element it was written on.
  * - bliss-grid wrapper attributes (shape-rendering="crispEdges") and the
  *   Safari geometricPrecision override in the embedded <style> block; grid
  *   absence when grid is disabled.
@@ -95,47 +97,53 @@ describe('BlissSVGBuilder svg structure', () => {
       expect(svg).toContain('<g class="bliss-content"');
     });
 
-    it('places default styling attributes on the content group and not on the root', () => {
-      const svg = new BlissSVGBuilder('H').svgCode;
-
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*fill="none"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="#000000"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.5"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-linejoin="round"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-linecap="round"/);
-
-      expect(svg).not.toMatch(/<svg[^>]*fill="/);
-      expect(svg).not.toMatch(/<svg[^>]*stroke="/);
-      expect(svg).not.toMatch(/<svg[^>]*stroke-width="/);
-      expect(svg).not.toMatch(/<svg[^>]*stroke-linejoin="/);
-      expect(svg).not.toMatch(/<svg[^>]*stroke-linecap="/);
-    });
-
-    it('places pass-through option attributes on the content group', () => {
-      const svg = new BlissSVGBuilder('[opacity=0.5]||H').svgCode;
-
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*opacity="0.5"/);
-      expect(svg).not.toMatch(/<svg[^>]*opacity="/);
-    });
-
-    it('places a custom stroke-width on the content group', () => {
-      const svg = new BlissSVGBuilder('[stroke-width=1]||H').svgCode;
-
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="1"/);
-      expect(svg).not.toMatch(/<svg[^>]*stroke-width="/);
-      expect(svg).not.toContain('strokeWidth=');
-    });
-
-    it('places a custom color as the stroke on the content group', () => {
-      const svg = new BlissSVGBuilder('[color=red]||H').svgCode;
-
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
-      expect(svg).not.toMatch(/<svg[^>]*stroke="/);
-    });
-
     it('closes the content group after the path content and before </svg>', () => {
       const svg = new BlissSVGBuilder('H').svgCode;
       expect(svg).toMatch(/<g class="bliss-content"[^>]*>[\s\S]*<path d="[^"]+"[\s\S]*<\/g>\s*<\/svg>/);
+    });
+  });
+
+  describe('when the document carries global paint values', () => {
+    it('puts the five paint defaults on the root and nothing on the content group', () => {
+      const svg = new BlissSVGBuilder('H').svgCode;
+      const root = svg.match(/<svg[^>]*>/)[0];
+
+      expect(root).toContain('fill="none"');
+      expect(root).toContain('stroke="#000000"');
+      expect(root).toContain('stroke-width="0.5"');
+      expect(root).toContain('stroke-linejoin="round"');
+      expect(root).toContain('stroke-linecap="round"');
+
+      expect(svg.match(/<g class="bliss-content"[^>]*>/)[0]).toBe('<g class="bliss-content">');
+    });
+
+    it('puts a pass-through option attribute on the root', () => {
+      const svg = new BlissSVGBuilder('[opacity=0.5]||H').svgCode;
+
+      expect(svg.match(/<svg[^>]*>/)[0]).toContain('opacity="0.5"');
+      expect(svg.match(/<g class="bliss-content"[^>]*>/)[0]).not.toContain('opacity');
+    });
+
+    it('replaces the default stroke-width with a custom one rather than emitting both', () => {
+      const root = new BlissSVGBuilder('[stroke-width=1]||H').svgCode.match(/<svg[^>]*>/)[0];
+
+      expect(root).toContain('stroke-width="1"');
+      expect(root).not.toContain('stroke-width="0.5"');
+      expect(root).not.toContain('strokeWidth=');
+    });
+
+    it('puts a custom color on the root as the stroke', () => {
+      const root = new BlissSVGBuilder('[color=red]||H').svgCode.match(/<svg[^>]*>/)[0];
+
+      expect(root).toContain('stroke="red"');
+      expect(root).not.toContain('stroke="#000000"');
+    });
+
+    it('leaves an element-scope attribute on the element it was written on', () => {
+      const svg = new BlissSVGBuilder('[opacity=0.5]>B291').svgCode;
+
+      expect(svg.match(/<svg[^>]*>/)[0]).not.toContain('opacity');
+      expect(svg).toMatch(/<g[^>]*opacity="0.5"/);
     });
   });
 

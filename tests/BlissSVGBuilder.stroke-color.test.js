@@ -10,7 +10,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * stroke-bearing-output well-formedness checks.
  *
  * Covers:
- * - `stroke-width=N` at global level (on the content group, clamped to
+ * - `stroke-width=N` at global level (on the root, clamped to
  *   max 1.5) and at element level (on the inner `<g>` wrapper).
  * - `stroke-width` multi-level semantics: option appears at global AND
  *   element levels (not in internalOptions).
@@ -24,8 +24,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   attributes, no malformed `="..."<` runs, tag-balance for
  *   complex DOT/COMMA compositions; `standaloneSvg` carries the XML
  *   declaration prologue, `svgCode` does not.
- * - `color=VALUE` at global level (maps to `stroke` on the content
- *   group), at element level (maps to `stroke` on the `<g>` wrapper),
+ * - `color=VALUE` at global level (maps to `stroke` on the root),
+ *   at element level (maps to `stroke` on the `<g>` wrapper),
  *   and the element-overrides-global visual cascade.
  * - `color` multi-level semantics: option appears at global AND
  *   element levels (not in internalOptions).
@@ -38,7 +38,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Cascade rendering across global/element/part wrappers
  *   (`[a]||[b]|[c]H/C8` produces nested `<g>` layers).
  * - SVG-attribute mapping: `color` -> `stroke`, passthrough of
- *   `fill`/`opacity`/etc. onto the content group, HTML-entity
+ *   `fill`/`opacity`/etc. onto the root, HTML-entity
  *   escaping of attribute values.
  * - `dot-extra-width` feeding the DOT/COMMA stroke-width formula
  *   (clamped to max 1) at global and element scopes.
@@ -75,27 +75,27 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 describe('BlissSVGBuilder stroke and color', () => {
 
   describe('when stroke-width is set', () => {
-    it('applies stroke-width at global level (on content group)', () => {
+    it('applies stroke-width at global level (on the root)', () => {
       const builder = new BlissSVGBuilder('[stroke-width=1.0]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="1"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="1"/);
     });
 
-    it('clamps stroke-width on content group to max 1.5', () => {
+    it('clamps stroke-width on the root to max 1.5', () => {
       const builder = new BlissSVGBuilder('[stroke-width=2]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="1.5"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="1.5"/);
     });
 
     it('applies stroke-width at element level (on <g> wrapper only)', () => {
       const builder = new BlissSVGBuilder('[stroke-width=1]|H');
       const svg = builder.svgCode;
 
-      // Element-scope option leaves content group at the default 0.5 stroke-width
+      // Element-scope option leaves the root at the default 0.5 stroke-width
       // and renders the requested value on an inner <g> wrapper.
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.5"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.5"/);
       expect(svg).toMatch(/<g stroke-width="1"/);
     });
 
@@ -103,9 +103,9 @@ describe('BlissSVGBuilder stroke and color', () => {
       const builder = new BlissSVGBuilder('[stroke-width=0.8]||[stroke-width=1.2]|H');
       const svg = builder.svgCode;
 
-      // Global value lands on the content group; the inner <g stroke-width="1.2">
+      // Global value lands on the root; the inner <g stroke-width="1.2">
       // visually overrides for the wrapped element.
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.8"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.8"/);
       expect(svg).toMatch(/<g stroke-width="1.2"/);
     });
 
@@ -319,20 +319,20 @@ describe('BlissSVGBuilder stroke and color', () => {
   });
 
   describe('when color is set', () => {
-    it('applies color (maps to stroke) at global level (on content group)', () => {
+    it('applies color (maps to stroke) at global level (on the root)', () => {
       const builder = new BlissSVGBuilder('[color=red]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
     });
 
     it('applies color (maps to stroke) at element level (on <g> wrapper)', () => {
       const builder = new BlissSVGBuilder('[color=blue]|H');
       const svg = builder.svgCode;
 
-      // Element scope leaves content group at the default stroke (#000000)
+      // Element scope leaves the root at the default stroke (#000000)
       // and renders stroke="blue" on the inner <g>.
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="#000000"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="#000000"/);
       expect(svg).toMatch(/<g stroke="blue"/);
     });
 
@@ -340,9 +340,9 @@ describe('BlissSVGBuilder stroke and color', () => {
       const builder = new BlissSVGBuilder('[color=red]||[color=blue]|H');
       const svg = builder.svgCode;
 
-      // Global color lands on the content group; the inner <g stroke="blue">
+      // Global color lands on the root; the inner <g stroke="blue">
       // visually overrides for the wrapped element.
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toMatch(/<g stroke="blue"/);
     });
 
@@ -358,14 +358,14 @@ describe('BlissSVGBuilder stroke and color', () => {
       const builder = new BlissSVGBuilder('[color=rgba(255,0,0,0.5)]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="rgba\(255,0,0,0\.5\)"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="rgba\(255,0,0,0\.5\)"/);
     });
 
     it('passes an rgb() color value through to the stroke attribute unchanged', () => {
       const builder = new BlissSVGBuilder('[color=rgb(0,128,255)]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="rgb\(0,128,255\)"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="rgb\(0,128,255\)"/);
     });
   });
 
@@ -399,46 +399,46 @@ describe('BlissSVGBuilder stroke and color', () => {
   });
 
   describe('when global, element, and part options cascade through wrapper levels', () => {
-    it('places a global stroke-width on the content group for a multi-character composition', () => {
+    it('places a global stroke-width on the root for a multi-character composition', () => {
       const builder = new BlissSVGBuilder('[stroke-width=0.4]||H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.4"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.4"/);
     });
 
-    it('applies global to content group while element and part scopes create their own <g> wrappers', () => {
+    it('applies global to the root while element and part scopes create their own <g> wrappers', () => {
       const builder = new BlissSVGBuilder('[stroke-width=0.4]||[color=red]|[stroke-width=0.5]H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.4"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.4"/);
       expect(svg).toContain('<g stroke="red">');
       expect(svg).toContain('<g stroke-width="0.5">');
     });
   });
 
   describe('when options map to SVG attributes', () => {
-    it('maps "color" to "stroke" attribute on content group', () => {
+    it('maps "color" to "stroke" attribute on the root', () => {
       const builder = new BlissSVGBuilder('[color=red]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).not.toContain('color="red"');
     });
 
-    it('passes through standard SVG attributes to content group', () => {
+    it('passes through standard SVG attributes to the root', () => {
       const builder = new BlissSVGBuilder('[stroke-width=1.5;fill=blue;opacity=0.5]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="1.5"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*fill="blue"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*opacity="0.5"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="1.5"/);
+      expect(svg).toMatch(/<svg[^>]*fill="blue"/);
+      expect(svg).toMatch(/<svg[^>]*opacity="0.5"/);
     });
 
-    it('escapes HTML entities in attribute values on content group', () => {
+    it('escapes HTML entities in attribute values on the root', () => {
       const builder = new BlissSVGBuilder('[id=test&value]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*id="test&amp;value"/);
+      expect(svg).toMatch(/<svg[^>]*id="test&amp;value"/);
     });
   });
 });

@@ -84,6 +84,11 @@ function serializeOptions(opts, skipKeys) {
 // allowlist-rejected href would resurface verbatim.
 const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
+// Renders one layer's attribute map as markup. An empty map yields an empty
+// string, so a tag built from it closes without a stray space.
+const formatAttributes = (attrs) =>
+  Object.entries(attrs).map(([name, value]) => `${name}="${value}"`).join(' ');
+
 // Resolves which glyph carries a word-level (`;;`) overlay. A stored
 // designation wins; the fallback resolves among content-bearing glyphs only,
 // because serialization omits a bare empty-parts glyph, so a reparse of
@@ -3878,6 +3883,10 @@ class BlissSVGBuilder {
     let title = svgTitle ? `  <title>${svgTitle}</title>` : "";
     let desc = svgDesc ? `  <desc>${svgDesc}</desc>` : "";
     let gridPath = "";
+    // Never assigned yet, and deliberately kept: two coming features emit a
+    // <text> layer here (a caption for the whole SVG, and a gloss under one
+    // word). Whichever lands first must set its own `fill`, because this layer
+    // sits outside the content group and inherits `fill="none"` from the root.
     let svgText = "";
 
     let backgroundContent;
@@ -3976,38 +3985,20 @@ class BlissSVGBuilder {
       ].join('\n');
     }
 
-    // Build content group attributes: defaults + all global SVG attributes
-    const contentDefaults = {
+    const generator = LIB_VERSION ? `bliss-svg-builder/${LIB_VERSION}` : 'bliss-svg-builder';
+
+    // The five paint defaults belong to the DOCUMENT, so they sit on the root
+    // beside the author's own global values rather than on an inner group that
+    // would shadow them. They were on the content group so that a DSL-set value
+    // could not be contradicted by a default written above it; moving the
+    // default target moves the defaults with it, same reason at a new address.
+    const paintDefaults = {
       fill: 'none',
       stroke: color,
       'stroke-linejoin': 'round',
       'stroke-linecap': 'round',
       'stroke-width': strokeWidth,
     };
-    const contentAttrs = { ...contentDefaults, ...this.globalSvgAttributes };
-    // A global `class` option merges with the structural bliss-content class
-    // instead of emitting a second class attribute (invalid SVG; issue #28).
-    const userClass = contentAttrs['class'];
-    delete contentAttrs['class'];
-    const contentClass = userClass ? `bliss-content ${userClass}` : 'bliss-content';
-    // Link attributes belong to the level-0 anchor wrap, never the content <g>.
-    for (const name of ANCHOR_ATTRIBUTE_NAMES) delete contentAttrs[name];
-    // vector-effect is non-inherited; relocate it from the content group onto
-    // the glyph paths so it actually takes effect. Always remove it from the
-    // group (even an empty value, which would otherwise be a dead attribute on
-    // the <g>); only stamp the paths when there is a value, matching the
-    // element-scope handling in BlissElement.
-    let contentInner = content;
-    if ('vector-effect' in contentAttrs) {
-      const vectorEffect = contentAttrs['vector-effect'];
-      delete contentAttrs['vector-effect'];
-      if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
-    }
-    const contentAttrsStr = Object.entries(contentAttrs)
-      .map(([key, value]) => `${key}="${value}"`)
-      .join(' ');
-
-    const generator = LIB_VERSION ? `bliss-svg-builder/${LIB_VERSION}` : 'bliss-svg-builder';
 
     // The root's attributes are a MERGE, not a fixed string, so a user value can
     // replace a computed one rather than appending a duplicate (two width
@@ -4020,18 +4011,32 @@ class BlissSVGBuilder {
       width: round(svgWidth),
       height: round(svgHeight),
       viewBox: `${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}`,
+      ...paintDefaults,
+      ...this.globalSvgAttributes,
     };
-    const rootAttrsStr = Object.entries(rootAttrs)
-      .map(([name, value]) => `${name}="${value}"`)
-      .join(' ');
+
+    // Link attributes belong to the level-0 anchor wrap, never to a layer.
+    for (const name of ANCHOR_ATTRIBUTE_NAMES) delete rootAttrs[name];
+    // vector-effect is non-inherited, so on the root it would be a dead
+    // attribute; relocate it onto the glyph paths, where it takes effect.
+    // Always remove it (even an empty value); only stamp the paths when there
+    // is a value, matching the element-scope handling in BlissElement.
+    let contentInner = content;
+    if ('vector-effect' in rootAttrs) {
+      const vectorEffect = rootAttrs['vector-effect'];
+      delete rootAttrs['vector-effect'];
+      if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
+    }
+
+    const contentAttrs = { class: 'bliss-content' };
 
     let svgStr = [
-      `<svg ${rootAttrsStr}>`,
+      `<svg ${formatAttributes(rootAttrs)}>`,
       title,
       desc,
       backgroundContent,
       gridPath,
-      `  <g class="${contentClass}" ${contentAttrsStr}>`,
+      `  <g ${formatAttributes(contentAttrs)}>`,
       `    ${contentInner}`,
       '  </g>',
       svgText,

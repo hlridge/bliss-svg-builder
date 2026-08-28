@@ -11,7 +11,7 @@ import { BlissSVGBuilder } from '../src/index';
  * option-wrapped path data.
  *
  * Covers:
- * - Single-level option emission at each scope (global → content group;
+ * - Single-level option emission at each scope (global → root `<svg>`;
  *   word → word `<g>`; character → character `<g>`; part → part `<g>`).
  * - Two-level cascade across each pair of scopes (global+word, global+character,
  *   global+part, word+character, word+part, character+part).
@@ -58,29 +58,29 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=green]||B291');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="green"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="green"/);
     });
 
     it('applies global color to a multi-character expression', () => {
       const builder = new BlissSVGBuilder('[color=red]||H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
     });
 
     it('applies global stroke-width to a multi-character expression', () => {
       const builder = new BlissSVGBuilder('[stroke-width=0.3]||H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.3"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.3"/);
     });
 
     it('applies multiple global options together', () => {
       const builder = new BlissSVGBuilder('[color=blue;stroke-width=0.2]||H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="blue"/);
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.2"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="blue"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.2"/);
     });
   });
 
@@ -219,7 +219,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]|H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('<g stroke-width="0.3">');
     });
 
@@ -227,7 +227,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]|H//[stroke-width=0.5]|C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.5"');
     });
@@ -236,7 +236,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]H;E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('<g stroke-width="0.3">');
     });
 
@@ -244,7 +244,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]H/[stroke-width=0.5]C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.5"');
     });
@@ -253,7 +253,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]>H;E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('<g stroke-width="0.3">');
     });
 
@@ -261,7 +261,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]>H;[stroke-width=0.5]>E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.5"');
     });
@@ -345,7 +345,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]|[stroke-width=0.4]H;E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.4"');
     });
@@ -354,7 +354,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]|[stroke-width=0.4]H/C8');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.4"');
     });
@@ -363,7 +363,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3]|[stroke-width=0.4]>H;E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.4"');
     });
@@ -372,7 +372,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.3][stroke-width=0.4]>H;E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.4"');
     });
@@ -390,7 +390,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.2]|[stroke-width=0.3][stroke-width=0.4]>H;E');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.2"');
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.4"');
@@ -400,7 +400,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.2]|[stroke-width=0.3]H;[stroke-width=0.4]>E/C8//[stroke-width=0.5]|HL2');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('stroke-width="0.2"');
       expect(svg).toContain('stroke-width="0.3"');
       expect(svg).toContain('stroke-width="0.4"');
@@ -591,7 +591,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       expect(svg).toContain('stroke="blue"');
       expect(svg).toContain('stroke="red"');
       expect(svg).toContain('<svg');
-      expect(svg).toMatch(/<g class="bliss-content"[^>]+stroke="blue"/);
+      expect(svg).toMatch(/<svg[^>]+stroke="blue"/);
       expect(svg).toContain('<g stroke="red">');
 
       const pathMatches = svg.match(/<path d="[^"]+"\/>/g);
@@ -638,8 +638,8 @@ describe('BlissSVGBuilder hierarchical options', () => {
 
       expect(svg).toContain('fill="red"');
       expect(svg).toContain('opacity="0.5"');
-      // class merges with the structural bliss-content class (#28), not a second attribute
-      expect(svg).toContain('class="bliss-content test"');
+      // a global class lands on the root, like every other global attribute
+      expect(svg.match(/<svg[^>]*>/)[0]).toContain('class="test"');
     });
   });
 
@@ -696,7 +696,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
 
       expect(svg).toContain('bliss-grid-line');
       expect(svg).toContain('viewBox="-2 -2 12 24"');
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="1"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="1"/);
     });
 
     it('falls back to the default stroke-width when the option value is non-numeric', () => {
@@ -704,7 +704,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const svg = builder.svgCode;
 
       expect(svg).toContain('<svg');
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.5"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.5"/);
     });
 
     it('falls back to a default when an option value is empty', () => {
@@ -719,7 +719,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
       const builder = new BlissSVGBuilder('[color=red]||B313/[color=blue]B291');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke="red"/);
+      expect(svg).toMatch(/<svg[^>]*stroke="red"/);
       expect(svg).toContain('<g stroke="blue">');
     });
 
@@ -735,7 +735,7 @@ describe('BlissSVGBuilder hierarchical options', () => {
 
       expect(comp.children.length).toBe(3);
 
-      expect(svg).toMatch(/<g class="bliss-content"[^>]*stroke-width="0.8"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="0.8"/);
       expect(svg).toContain('<g stroke="blue">');
 
       const viewBoxMatch = svg.match(/viewBox="([^"]+)"/);

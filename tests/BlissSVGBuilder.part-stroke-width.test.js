@@ -23,7 +23,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `{ flattenIndicators: true }` and `applyIndicators(code, { flatten:
  *   true })` (Chunk 4 external review F1/F2 — distinct bake branches the
  *   default-overlay pins above do not reach).
- * - The global `[stroke-width=1.2]||` path unchanged (content group).
+ * - The global `[stroke-width=1.2]||` path unchanged (root `<svg>`).
  * - Dot glyphs: the dot ink tracks a part-level stroke-width linearly
  *   via the dot-sizing formula ((stroke-width + extra) / 2 on an inner
  *   <g>), not as a literal stroke-width on the dot path.
@@ -120,10 +120,10 @@ describe('BlissSVGBuilder part-level stroke-width', () => {
   });
 
   describe('when stroke-width is set globally', () => {
-    it('renders the value on the content group and round-trips', () => {
+    it('renders the value on the root and round-trips', () => {
       const b = new BlissSVGBuilder('[stroke-width=1.2]||H');
       expect(b.warnings).toEqual([]);
-      expect(b.svgCode).toMatch(/<g class="bliss-content"[^>]*stroke-width="1\.2"/);
+      expect(b.svgCode).toMatch(/<svg[^>]*stroke-width="1\.2"/);
       expect(b.toString()).toBe('[stroke-width=1.2]||H');
       expect(roundTripSvg(b)).toBe(b.svgCode);
       expect(roundTripJsonSvg(b)).toBe(b.svgCode);
