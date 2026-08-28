@@ -89,6 +89,15 @@ const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang',
 const formatAttributes = (attrs) =>
   Object.entries(attrs).map(([name, value]) => `${name}="${value}"`).join(' ');
 
+// A layer's structural class is the library's identifier for that layer, so an
+// authored class is APPENDED to it and never replaces it: replacing would break
+// the embedded <style> block, every consumer selector, and the layer lookups
+// downstream apps do by class. Bounded to `class` deliberately, since it is the
+// only identity-bearing attribute a layer carries; every other authored value
+// is free to replace what the library computed.
+const mergeStructuralClass = (structural, authored) =>
+  authored ? `${structural} ${authored}` : structural;
+
 // Resolves which glyph carries a word-level (`;;`) overlay. A stored
 // designation wins; the fallback resolves among content-bearing glyphs only,
 // because serialization omits a bare empty-parts glyph, so a reparse of
@@ -4011,9 +4020,13 @@ class BlissSVGBuilder {
       width: round(svgWidth),
       height: round(svgHeight),
       viewBox: `${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}`,
+      class: 'bliss-root',
       ...paintDefaults,
       ...this.globalSvgAttributes,
     };
+    // The spread above let an authored `class` overwrite the structural name;
+    // put it back in front, keeping the position the literal established.
+    rootAttrs.class = mergeStructuralClass('bliss-root', this.globalSvgAttributes['class']);
 
     // Link attributes belong to the level-0 anchor wrap, never to a layer.
     for (const name of ANCHOR_ATTRIBUTE_NAMES) delete rootAttrs[name];

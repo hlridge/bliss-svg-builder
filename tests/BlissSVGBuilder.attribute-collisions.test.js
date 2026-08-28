@@ -3,13 +3,14 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
  * Pins that option collisions never emit the same SVG attribute name twice on
- * one element: the explicitly-named attribute wins over an alias, and a global
+ * one element: the explicitly-named attribute wins over an alias, a global
  * value that collides with one the library computes replaces it rather than
- * appending a second attribute.
+ * appending a second attribute, and a global `class` merges with the
+ * structural `bliss-root` class instead of replacing it.
  *
  * Covers:
- * - A global `class` landing on the root as a single attribute (DSL `||` form
- *   and the constructor object-options form).
+ * - Global `class` merging into a single `class="bliss-root <value>"` on the
+ *   root (DSL `||` form and the constructor object-options form).
  * - Element-scope `color` (alias for `stroke`) and an explicit `stroke` collapse
  *   to one `stroke` attribute; the explicit value wins, order-independently
  *   (DSL `[...]` form and the `addGlyph` object-options form).
@@ -36,19 +37,20 @@ const countAttr = (tag, name) => (tag.match(new RegExp(`${name}="`, 'g')) || [])
 
 describe('BlissSVGBuilder attribute collisions', () => {
 
-  describe('when a global class option is written', () => {
-    it('lands on the root as a single class attribute', () => {
+  describe('when a global class option collides with the structural bliss-root class', () => {
+    it('merges the option class with bliss-root into a single class attribute', () => {
       const svg = new BlissSVGBuilder('[class=my-class]||B313').svgCode;
 
-      expect(rootTag(svg)).toContain('class="my-class"');
+      // regression: #28 - the structural name must lead, the option class is appended
+      expect(rootTag(svg)).toContain('class="bliss-root my-class"');
       expect(countAttr(rootTag(svg), 'class')).toBe(1);
       expect(contentGroupTag(svg)).toContain('class="bliss-content"');
     });
 
-    it('lands on the root via the constructor object-options form identically', () => {
+    it('merges the class via the constructor object-options form identically', () => {
       const tag = rootTag(new BlissSVGBuilder('B313', { class: 'my-class' }).svgCode);
 
-      expect(tag).toContain('class="my-class"');
+      expect(tag).toContain('class="bliss-root my-class"');
       expect(countAttr(tag, 'class')).toBe(1);
     });
   });

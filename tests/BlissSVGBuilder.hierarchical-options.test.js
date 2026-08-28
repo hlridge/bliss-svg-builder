@@ -638,8 +638,8 @@ describe('BlissSVGBuilder hierarchical options', () => {
 
       expect(svg).toContain('fill="red"');
       expect(svg).toContain('opacity="0.5"');
-      // a global class lands on the root, like every other global attribute
-      expect(svg.match(/<svg[^>]*>/)[0]).toContain('class="test"');
+      // class merges with the structural bliss-root class (#28), not a second attribute
+      expect(svg.match(/<svg[^>]*>/)[0]).toContain('class="bliss-root test"');
     });
   });
 
