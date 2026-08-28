@@ -51,6 +51,29 @@ export const escapeHtml = (str) => String(str)
  */
 export const camelToKebab = (str) => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
 
+// The long-form kerning options are curated vocabulary too, but they are absent
+// from KNOWN_OPTION_KEYS because that set lists what #processOptions dispatches
+// on, and kerning is promoted by the parser instead. Their canonical spelling is
+// the kebab one a bracket carries, so the API's camelCase form has to translate
+// like every other named option. (INTERNAL_OPTIONS lists all four spellings for
+// a different reason: keeping them out of the emitted markup.)
+const KERNING_OPTION_SPELLINGS = new Set(['relative-kerning', 'absolute-kerning']);
+
+/**
+ * True when a key belongs to the curated option vocabulary, in either spelling.
+ *
+ * Only these keys are translated between camelCase and kebab-case. An attribute
+ * name is emitted exactly as written, because hyphenating an arbitrary name is a
+ * guess: it is right for our own vocabulary, where we own both spellings, and
+ * wrong for every camelCase SVG attribute (preserveAspectRatio, viewBox,
+ * gradientUnits) and every camelCase data attribute.
+ */
+export const isNamedOptionKey = (key) => {
+  if (KNOWN_OPTION_KEYS.has(key)) return true;
+  const kebab = camelToKebab(key);
+  return KNOWN_OPTION_KEYS.has(kebab) || KERNING_OPTION_SPELLINGS.has(kebab);
+};
+
 /**
  * Serializes one option VALUE for DSL emission (`[key=value]` brackets).
  * A value carrying characters the DSL grammar would otherwise claim (`;`

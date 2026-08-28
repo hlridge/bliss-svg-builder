@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -613,7 +613,7 @@ class BlissSVGBuilder {
     for (const [key, value] of Object.entries(obj)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;
-      const kebabKey = camelToKebab(key);
+      const kebabKey = isNamedOptionKey(key) ? camelToKebab(key) : key;
       if (typeof value === 'boolean') {
         raw[kebabKey] = value;
       } else {
@@ -1247,7 +1247,8 @@ class BlissSVGBuilder {
     this.globalSvgAttributes = {};
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (!INTERNAL_OPTIONS.has(key) && isSafeAttributeName(key)) {
-        this.globalSvgAttributes[attrMap[key] || camelToKebab(key)] = value;
+        const attrName = attrMap[key] ?? (isNamedOptionKey(key) ? camelToKebab(key) : key);
+        this.globalSvgAttributes[attrName] = value;
       }
     }
 
