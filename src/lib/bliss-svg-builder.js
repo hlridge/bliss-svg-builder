@@ -4009,8 +4009,24 @@ class BlissSVGBuilder {
 
     const generator = LIB_VERSION ? `bliss-svg-builder/${LIB_VERSION}` : 'bliss-svg-builder';
 
+    // The root's attributes are a MERGE, not a fixed string, so a user value can
+    // replace a computed one rather than appending a duplicate (two width
+    // attributes is invalid XML). Order matters: computed values first, then
+    // anything the author supplied, then the guard for the two names the library
+    // owns.
+    const rootAttrs = {
+      xmlns: 'http://www.w3.org/2000/svg',
+      'data-generator': generator,
+      width: round(svgWidth),
+      height: round(svgHeight),
+      viewBox: `${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}`,
+    };
+    const rootAttrsStr = Object.entries(rootAttrs)
+      .map(([name, value]) => `${name}="${value}"`)
+      .join(' ');
+
     let svgStr = [
-      `<svg xmlns="http://www.w3.org/2000/svg" data-generator="${generator}" width="${round(svgWidth)}" height="${round(svgHeight)}" viewBox="${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}">`,
+      `<svg ${rootAttrsStr}>`,
       title,
       desc,
       backgroundContent,
