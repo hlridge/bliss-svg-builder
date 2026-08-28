@@ -3261,6 +3261,11 @@ class BlissSVGBuilder {
       if (GLOBAL_ONLY_OPTION_KEYS.has(normalized) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(normalized))) {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include the global-only option "${key}"; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
+      // Same reasoning one step along: a layer key targets a layer of the whole
+      // SVG, so it is inert wherever a definition's defaults attach.
+      if (isLayerAttributeKey(normalized)) {
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include the layer option "${key}"; it targets a layer of the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
+      }
     }
   }
 

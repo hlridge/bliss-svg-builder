@@ -390,6 +390,27 @@ describe('BlissParser global option scope', () => {
       }
     });
 
+    it('rejects a layer-targeting key', () => {
+      // a layer key names a layer of the whole SVG, so it is inert on a
+      // definition for the same reason a global-only key is, and a ;; overlay
+      // stores the definition NAME, so it never reaches a boundary that warns
+      for (const key of ['grid--opacity', 'content--color', 'foo--x']) {
+        const result = BlissSVGBuilder.define({
+          GOPT_DEFLAYER: { codeString: 'B291', defaultOptions: { [key]: 'red' } },
+        });
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0]).toContain('layer');
+        expect(BlissSVGBuilder.isDefined('GOPT_DEFLAYER')).toBe(false);
+      }
+    });
+
+    it('rejects patchDefinition() adding a layer key', () => {
+      BlissSVGBuilder.define({ GOPT_DEFLPATCH: { codeString: 'B291' } });
+      expect(() => BlissSVGBuilder.patchDefinition('GOPT_DEFLPATCH', { defaultOptions: { 'grid--opacity': 0.3 } }))
+        .toThrow(/grid--opacity/);
+      BlissSVGBuilder.removeDefinition('GOPT_DEFLPATCH');
+    });
+
     it('validates the exact snapshot it stores', () => {
       // regression: round-4 review F1 — a Proxy whose ownKeys flip-flops
       // between enumerations showed safe keys to validation and a global-only
