@@ -247,7 +247,7 @@ export const KERNING_OPTION_KEYS = Object.freeze({
 // warning.
 export function kerningOptionEntries(options) {
   return Object.entries(options ?? {})
-    .filter(([key]) => KERNING_OPTION_KEYS[key] !== undefined)
+    .filter(([key]) => Object.hasOwn(KERNING_OPTION_KEYS, key))
     .map(([key, value]) => ({
       key: KERNING_OPTION_KEYS[key],
       writtenKey: key,
@@ -589,7 +589,7 @@ export class BlissParser {
       },
       {
         home: 'character',
-        has: (key) => KERNING_OPTION_KEYS[key] !== undefined,
+        has: (key) => Object.hasOwn(KERNING_OPTION_KEYS, key),
         code: WARNING_CODES.MISPLACED_KERNING_OPTION,
         message: (written, levelName) =>
           `Kerning option (${written}) ignored at ${levelName} level: kerning is the gap before a character. Write it on the character, or use the RK:/AK: marker before it.`,

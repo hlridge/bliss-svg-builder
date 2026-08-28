@@ -387,10 +387,23 @@ Invalid *codes* passed to `applyIndicators()` are a different case: each one war
 
 An attribute name that can never be emitted: an `on*` event handler, or a name containing anything outside letters, digits and dashes. Such a name is skipped at render wherever it appears, so nothing can execute; this warning exists because the skip used to be silent, leaving an author with a key they had every reason to think was working.
 
+It is reported at every scope, and for the layer form the name after the `--` is what is judged:
+
+```
+[onclick=alert(1)]||B291         →  warns, nothing emitted
+[onclick=alert(1)]|B291          →  same at word scope
+[onclick=alert(1)]B291           →  same at character scope
+[onclick=alert(1)]>B291          →  same at part scope
+[content--onclick=alert(1)]||    →  same, judged on "onclick"
+[__proto__=x]||B291              →  warns: the name must start with a letter
+```
+
 ```js
 builder.part(0).setTransientOptions({ 'on-click': 'x' });
 // warns, and nothing is emitted; other keys in the same call are kept
 ```
+
+Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace.
 
 ## Misplaced Channel
 

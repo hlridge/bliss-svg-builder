@@ -44,6 +44,48 @@ describe('BlissSVGBuilder option hardening', () => {
     it('constructor key does not cause errors', () => {
       expect(() => new BlissSVGBuilder('[constructor=test]||H')).not.toThrow();
     });
+
+    it.each([
+      ['global', '[constructor=x]||B291'],
+      ['word', '[constructor=x]|B291'],
+      ['character', '[constructor=x]B291'],
+      ['part', '[constructor=x]>B291'],
+    ])('emits a name inherited from Object.prototype as itself at %s scope', (_scope, input) => {
+      // the lookup tables are plain objects, so asking them for 'constructor'
+      // (or toString/valueOf) used to answer with the inherited function and
+      // stringify it straight into the markup
+      const svg = new BlissSVGBuilder(input).svgCode;
+
+      expect(svg).not.toContain('native code');
+      expect(svg).toContain('constructor="x"');
+    });
+
+    it('emits an inherited name as itself through object input too', () => {
+      const svg = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }], options: { toString: 'x' } }] }],
+      }).svgCode;
+
+      expect(svg).not.toContain('native code');
+      expect(svg).toContain('toString="x"');
+    });
+
+    it('does not mistake an inherited name for a kerning option', () => {
+      const builder = new BlissSVGBuilder('[constructor=x]||B291');
+
+      expect(builder.warnings).toHaveLength(0);
+      expect(builder.toString()).toBe('[constructor=x]||B291');
+    });
+
+    it('does not let an inherited name clear a kerning value already set', () => {
+      // setOptions clears the kerning channel when the incoming object names a
+      // kerning key; an inherited name must not read as one, or writing any
+      // unrelated option would silently wipe the kerning beside it
+      const builder = new BlissSVGBuilder('B291/B99');
+      builder.glyph(1).setOptions({ relativeKerning: 3 });
+      builder.glyph(1).setOptions({ constructor: 'x' });
+
+      expect(builder.toString()).toContain('RK:3');
+    });
   });
 
   describe('when an option value is non-numeric or empty', () => {

@@ -84,6 +84,13 @@ function serializeOptions(opts, skipKeys) {
 // allowlist-rejected href would resurface verbatim.
 const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
+// The half of an option key that becomes an attribute name. For a layer key
+// that is the part after the `--`, since the prefix is routing rather than
+// markup: `content--onclick` must be judged on `onclick`. A key naming a layer
+// we do not emit falls back to the whole key, so it is reported as an unknown
+// layer rather than as an unsafe name.
+const attributeNameOf = (key) => parseLayerAttributeKey(key)?.attribute ?? key;
+
 // Renders one layer's attribute map as markup. An empty map yields an empty
 // string, so a tag built from it closes without a stray space.
 const formatAttributes = (attrs) =>
@@ -488,6 +495,23 @@ class BlissSVGBuilder {
           if (isLayerAttributeKey(key)) delete obj.options[key];
         }
       }
+      // A name the safety gate refuses is skipped by every emitter, so the
+      // attribute simply never appears. Reporting it HERE is what makes that
+      // visible: this pass runs once per rebuild and reaches every scope,
+      // where the emitters run per render and are spread across two files.
+      // The key is left in place, so it still round-trips and re-warns on
+      // reparse rather than vanishing from a stored composition. The transient
+      // channel is already reported by #normalizeTransientInvariant, which runs
+      // earlier and has removed its own offenders by now, so nothing is
+      // reported twice.
+      for (const [key, value] of Object.entries(obj.options)) {
+        if (isSafeAttributeName(attributeNameOf(key))) continue;
+        this.#warnings.push({
+          code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
+          message: `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`,
+          source: value === true ? key : `${key}=${value}`,
+        });
+      }
       obj.options = this.#processOptions(obj.options, isTopLevel);
     }
     if (obj.groups) {
@@ -638,7 +662,7 @@ class BlissSVGBuilder {
     for (const axis of ['x', 'y']) {
       if (keys.includes(axis)) delete node[axis];
     }
-    if (node.options && keys.some(key => KERNING_OPTION_KEYS[key] !== undefined)) {
+    if (node.options && keys.some(key => Object.hasOwn(KERNING_OPTION_KEYS, key))) {
       for (const key of Object.keys(KERNING_OPTION_KEYS)) delete node.options[key];
     }
   }
@@ -1314,7 +1338,12 @@ class BlissSVGBuilder {
         continue;
       }
       if (!isSafeAttributeName(key)) continue;
-      const attrName = attrMap[key] ?? (isNamedOptionKey(key) ? camelToKebab(key) : key);
+      // Own-key test, not a plain lookup: attrMap is an object literal, so
+      // asking it for an inherited name (constructor, toString, valueOf)
+      // answers with the function and stringifies it into the markup.
+      const attrName = Object.hasOwn(attrMap, key)
+        ? attrMap[key]
+        : (isNamedOptionKey(key) ? camelToKebab(key) : key);
       if (LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
         this.#warnings.push({
           code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,

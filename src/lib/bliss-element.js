@@ -150,7 +150,10 @@ export class BlissElement {
         }
         anchorAttrs.push(`${key}="${value}"`);
       } else {
-        const attrName = attrMap[key] || key;
+        // Own-key test, not a plain lookup: attrMap is an object literal, so
+        // asking it for an inherited name (constructor, toString, valueOf)
+        // answers with the function and stringifies it into the markup.
+        const attrName = Object.hasOwn(attrMap, key) ? attrMap[key] : key;
         // vector-effect is non-inherited; capture it for relocation onto paths
         if (attrName === 'vector-effect') { vectorEffect = value; continue; }
         if (key === 'pointer-events') hasPointerEvents = true;
