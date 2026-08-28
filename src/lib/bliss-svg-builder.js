@@ -145,15 +145,13 @@ class BlissSVGBuilder {
   #processOptions(rawOptions = {}, addBuilderDefaults = false) {
     const options = {};
 
-    // stroke-width: Number, clamped 0.1-1.5
+    // stroke-width: Number, taken as written. The old 0.1-1.5 clamp was what
+    // made the raw value unreachable: a name the library curates was also the
+    // only spelling of it, so an author who wanted a heavier stroke had no
+    // second channel to ask through. Non-numeric input still falls through to
+    // the default rather than poisoning the layout with NaN.
     if ('stroke-width' in rawOptions && !isNaN(rawOptions['stroke-width'])) {
-      let strokeWidth = Number(rawOptions['stroke-width']);
-      if (strokeWidth < 0.1) {
-        strokeWidth = 0.1;
-      } else if (strokeWidth > 1.5) {
-        strokeWidth = 1.5;
-      }
-      options.strokeWidth = strokeWidth;
+      options.strokeWidth = Number(rawOptions['stroke-width']);
     }
 
     // dot-extra-width: Number, clamped 0-1

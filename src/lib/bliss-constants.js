@@ -296,9 +296,10 @@ export const TRANSIENT_REFUSED_OPTION_KEYS = new Set([
 
 /**
  * Upper bound for the absolute `dot-width` / `sdot-width` options (a rendered
- * dot diameter in glyph units). Mirrors the `stroke-width` ceiling so an
- * absolute dot cannot exceed what the relative `dot-extra-width` knob can
- * already reach. The lower bound is 0 (an invisible dot; no crash).
+ * dot diameter in glyph units), so an absolute dot cannot exceed what the
+ * relative `dot-extra-width` knob can already reach. The lower bound is 0 (an
+ * invisible dot; no crash). This ceiling once mirrored `stroke-width`'s, which
+ * has since been retired; the dot family keeps its own.
  */
 export const DOT_WIDTH_MAX = 1.5;
 

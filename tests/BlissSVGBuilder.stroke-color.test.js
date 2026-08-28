@@ -10,13 +10,14 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * stroke-bearing-output well-formedness checks.
  *
  * Covers:
- * - `stroke-width=N` at global level (on the root, clamped to
- *   max 1.5) and at element level (on the inner `<g>` wrapper).
+ * - `stroke-width=N` at global level (on the root, taken as written: the
+ *   0.1-1.5 clamp is retired) and at element level (on the inner `<g>`
+ *   wrapper).
  * - `stroke-width` multi-level semantics: option appears at global AND
  *   element levels (not in internalOptions).
  * - DOT and COMMA element stroke-width formula:
  *   dotStrokeWidth = (baseStrokeWidth + extraDotWidth) / 2 with
- *   stroke-width clamped to max 1.5 and dot-extra-width clamped to
+ *   stroke-width taken as written and dot-extra-width clamped to
  *   max 1; COMMA tail stroke-width = dot stroke-width * 2/3.
  * - Empty `<path d=""/>` cleanup for DOT, COMMA, external glyphs,
  *   and element-level wrappers; valid path data preserved.
@@ -82,11 +83,24 @@ describe('BlissSVGBuilder stroke and color', () => {
       expect(svg).toMatch(/<svg[^>]*stroke-width="1"/);
     });
 
-    it('clamps stroke-width on the root to max 1.5', () => {
+    it('takes a value above the retired 1.5 ceiling unchanged', () => {
       const builder = new BlissSVGBuilder('[stroke-width=2]||H');
       const svg = builder.svgCode;
 
-      expect(svg).toMatch(/<svg[^>]*stroke-width="1.5"/);
+      expect(svg).toMatch(/<svg[^>]*stroke-width="2"/);
+      expect(svg).not.toContain('stroke-width="1.5"');
+    });
+
+    it('takes a value below the retired 0.1 floor unchanged', () => {
+      const builder = new BlissSVGBuilder('[stroke-width=0.01]||H');
+
+      expect(builder.svgCode).toMatch(/<svg[^>]*stroke-width="0.01"/);
+    });
+
+    it('still falls back to the default when the value is not a number', () => {
+      const builder = new BlissSVGBuilder('[stroke-width=abc]||H');
+
+      expect(builder.svgCode).toMatch(/<svg[^>]*stroke-width="0.5"/);
     });
 
     it('applies stroke-width at element level (on <g> wrapper only)', () => {
@@ -192,12 +206,13 @@ describe('BlissSVGBuilder stroke and color', () => {
       expect(svg).toContain('stroke-width="0.4443333333333333"');
     });
 
-    it('clamps stroke-width before applying to DOT (max 1.5)', () => {
+    it('feeds the written stroke-width into the DOT formula unclamped', () => {
       const builder = new BlissSVGBuilder('[stroke-width=2]||DOT');
       const svg = builder.svgCode;
 
-      // stroke-width clamped to 1.5 before the formula: (1.5 + 0.333) / 2 ≈ 0.9165
-      expect(svg).toContain('stroke-width="0.9165"');
+      // no ceiling on stroke-width any more: (2 + 0.333) / 2 = 1.1665
+      expect(svg).toContain('stroke-width="1.1665"');
+      expect(svg).not.toContain('stroke-width="0.9165"');
     });
 
     it('clamps dot-extra-width before applying to DOT (max 1)', () => {

@@ -171,9 +171,11 @@ describe('BlissSVGBuilder object options', () => {
       expect(builder.svgCode).toContain('stroke-width="0.8"');
     });
 
-    it('clamps numeric values the same way as string options (strokeWidth=5 → 1.5)', () => {
+    it('treats a numeric value exactly as the string option form does', () => {
       const builder = new BlissSVGBuilder('H', { overrides: { strokeWidth: 5 } });
-      expect(builder.svgCode).toContain('stroke-width="1.5"');
+
+      expect(builder.svgCode).toContain('stroke-width="5"');
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('[stroke-width=5]||H').svgCode);
     });
 
     it('HTML-escapes string values to prevent injection', () => {
