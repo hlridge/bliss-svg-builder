@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -1261,6 +1261,12 @@ class BlissSVGBuilder {
       }
     }
 
+    // Captured BEFORE the options pass, which expands the bulk spellings
+    // (`margin` becomes four keys) and so can no longer name what was written.
+    const writtenGeometryOptions = Object.keys({
+      ...(blissObj.options ?? {}), ...(blissObj.transientOptions ?? {}),
+    }).filter(key => GEOMETRY_OPTION_KEYS.has(camelToKebab(key)));
+
     this.#processAllOptions(blissObj, true);
 
     const { charSpace, wordSpace, externalGlyphSpace, errorPlaceholder, ...remainingOptions } = blissObj.options ?? {};
@@ -1294,13 +1300,42 @@ class BlissSVGBuilder {
         // attribute reachable whose name a named option has taken (`color`),
         // and what makes a camelCase SVG attribute expressible.
         const target = parseLayerAttributeKey(key);
-        if (!target || !isSafeAttributeName(target.attribute)) continue;
+        if (!target) {
+          // Kept in the options bag so it round-trips, on the UNKNOWN_ family's
+          // logic: `foo` may become a layer later, exactly as an unknown code
+          // may be define()d afterwards. Reported so it is never silently inert.
+          this.#warnings.push({
+            code: WARNING_CODES.UNKNOWN_LAYER,
+            message: `"${key}" names no layer that is drawn, so nothing was emitted for it. The layers are ${[...LAYER_TARGETS].join(', ')}; write the attribute without a prefix to put it on the root.`,
+            source: key,
+          });
+          continue;
+        }
+        if (!isSafeAttributeName(target.attribute)) continue;
         (this.#layerAttributes[target.layer] ??= {})[target.attribute] = value;
         continue;
       }
       if (!isSafeAttributeName(key)) continue;
       const attrName = attrMap[key] ?? (isNamedOptionKey(key) ? camelToKebab(key) : key);
+      if (LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
+        this.#warnings.push({
+          code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
+          message: `"${attrName}" is the library's own attribute and cannot be overridden: it states the file's format and provenance rather than anything about the picture, and a written value would only make the output unreadable. The library's value is kept.`,
+          source: attrName,
+        });
+        continue;
+      }
       this.globalSvgAttributes[attrName] = value;
+    }
+
+    // A written viewBox states the value the geometry options exist to compute,
+    // so it wins and they are named rather than left looking effective.
+    if (this.globalSvgAttributes['viewBox'] && writtenGeometryOptions.length > 0) {
+      this.#warnings.push({
+        code: WARNING_CODES.MULTIPLE_GEOMETRY_VALUES,
+        message: `The viewBox was written directly, so "${writtenGeometryOptions.join('", "')}" no longer shapes it. Remove the viewBox to size the picture with the options, or remove the options to size it by hand.`,
+        source: writtenGeometryOptions.join(', '),
+      });
     }
 
     this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });

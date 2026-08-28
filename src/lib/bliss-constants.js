@@ -34,6 +34,29 @@ export const KNOWN_OPTION_KEYS = new Set([
  */
 export const LAYER_TARGETS = new Set(['background', 'grid', 'content']);
 
+/**
+ * The two root attributes the library owns outright, on the rule that the user
+ * owns statements about the PICTURE and the library owns statements about the
+ * FORMAT and about ITSELF. `xmlns` has exactly one legal value: overriding it
+ * does not make a different picture, it makes a file that is not SVG, which no
+ * browser renders and our own `svgElement` getter cannot parse.
+ * `data-generator` is the library's provenance stamp about itself, and a stamp
+ * anyone can overwrite is worth nothing to whoever reads it. A consumer
+ * recording their own pipeline adds a name of their own instead.
+ */
+export const LIBRARY_OWNED_ROOT_ATTRIBUTES = new Set(['xmlns', 'data-generator']);
+
+/**
+ * The written options whose whole job is to compute the root's `viewBox`. When
+ * an author writes the `viewBox` directly, the value these produced is replaced,
+ * so they are reported as displaced rather than left to look effective.
+ */
+export const GEOMETRY_OPTION_KEYS = new Set([
+  'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+  'crop', 'crop-top', 'crop-bottom', 'crop-left', 'crop-right',
+  'min-width', 'center',
+]);
+
 /** True for a key written in the `<layer>--<attribute>` form, valid or not. */
 export const isLayerAttributeKey = (key) => key.includes('--');
 
@@ -297,6 +320,7 @@ export const DOT_WIDTH_MAX = 1.5;
  *   UNSUPPORTED_ valid, but not implemented yet
  *   NOOP_        a mutation call had no effect
  *   UNSAFE_      refused by a safety gate rather than by the grammar
+ *   RESERVED_    refused because the NAME is the library's own
  *   …_AS_PART    an illegal operand in a ;-part slot
  *
  * Structural attachment points use group/glyph/part (matches `toJSON()`); the
@@ -366,6 +390,11 @@ export const WARNING_CODES = Object.freeze({
   // every displaced value is named. A definition default that a written value
   // overrides is not a conflict and stays silent.
   MULTIPLE_KERNING_VALUES: 'MULTIPLE_KERNING_VALUES',
+  // one viewBox written two ways: a global `viewBox` attribute states the value
+  // that margin/crop/min-width/center exist to compute, so the written value
+  // wins and the options it displaced are named. Writing either one alone is
+  // not a conflict and stays silent.
+  MULTIPLE_GEOMETRY_VALUES: 'MULTIPLE_GEOMETRY_VALUES',
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',
@@ -386,6 +415,13 @@ export const WARNING_CODES = Object.freeze({
   // wherever it appears, so nothing can execute; the warning closes the
   // VISIBILITY gap, telling the author their key will never be emitted.
   UNSAFE_ATTRIBUTE_NAME: 'UNSAFE_ATTRIBUTE_NAME',
+  // a root attribute whose name belongs to the library rather than to the
+  // author (see LIBRARY_OWNED_ROOT_ATTRIBUTES). The written value is dropped and
+  // the library's own is kept, because overriding it would break the file
+  // format or forge the library's provenance stamp rather than change the
+  // picture. A new verb: refused because the NAME is ours, not because the
+  // value is unsafe or the position is wrong.
+  RESERVED_ATTRIBUTE_NAME: 'RESERVED_ATTRIBUTE_NAME',
   // an option key that cannot travel in the transient channel because the
   // library consumes it while building the composition rather than while
   // drawing it (position, kerning, the runtime key). A transient spelling

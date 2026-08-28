@@ -25,6 +25,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  */
 
 const rootTag = (svg) => svg.match(/<svg[^>]*>/)[0];
+// Leading-space anchored, so counting `width` does not also count `stroke-width`.
+const countAttr = (tag, name) => (tag.match(new RegExp(`\\s${name}="`, 'g')) || []).length;
 // Class-prefix matched, not exact: a `<layer>--class` appends to the
 // structural name, so the opening tag stays findable after a merge.
 const contentTag = (svg) => svg.match(/<g class="bliss-content[^"]*"[^>]*>/)[0];
@@ -151,6 +153,101 @@ describe('BlissSVGBuilder layer attributes', () => {
 
       expect(builder.svgCode).toContain('stroke-dasharray="1"');
       expect(builder.warnings).toHaveLength(0);
+    });
+  });
+
+  describe('when a root attribute the library computes is overridden', () => {
+    it('replaces the computed viewBox and carries exactly one', () => {
+      const tag = rootTag(new BlissSVGBuilder('[viewBox="0 0 10 10"]||B291').svgCode);
+
+      expect(tag).toContain('viewBox="0 0 10 10"');
+      expect(countAttr(tag, 'viewBox')).toBe(1);
+    });
+
+    it('replaces the computed width and height, carrying exactly one of each', () => {
+      const tag = rootTag(new BlissSVGBuilder('[width=99;height=77]||B291').svgCode);
+
+      expect(tag).toContain('width="99"');
+      expect(tag).toContain('height="77"');
+      expect(countAttr(tag, 'width')).toBe(1);
+      expect(countAttr(tag, 'height')).toBe(1);
+    });
+  });
+
+  describe('when a root attribute the library owns is overridden', () => {
+    it('keeps the library xmlns and warns RESERVED_ATTRIBUTE_NAME', () => {
+      const builder = new BlissSVGBuilder('[xmlns="http://example.com"]||B291');
+      const tag = rootTag(builder.svgCode);
+
+      // the guard exists so the output stays parseable: a non-SVG namespace is
+      // what `svgElement` hands to DOMParser, and it is the one value that
+      // cannot be a matter of taste.
+      expect(tag).toContain('xmlns="http://www.w3.org/2000/svg"');
+      expect(countAttr(tag, 'xmlns')).toBe(1);
+      expect(builder.warnings.some(w => w.code === 'RESERVED_ATTRIBUTE_NAME')).toBe(true);
+    });
+
+    it('keeps the library data-generator and warns RESERVED_ATTRIBUTE_NAME', () => {
+      const builder = new BlissSVGBuilder('[data-generator=me]||B291');
+
+      expect(rootTag(builder.svgCode)).toMatch(/data-generator="bliss-svg-builder/);
+      expect(builder.svgCode).not.toContain('data-generator="me"');
+      expect(builder.warnings.some(w => w.code === 'RESERVED_ATTRIBUTE_NAME')).toBe(true);
+    });
+
+    it('names the refused attribute in the warning', () => {
+      const builder = new BlissSVGBuilder('[xmlns=x]||B291');
+      const warning = builder.warnings.find(w => w.code === 'RESERVED_ATTRIBUTE_NAME');
+
+      expect(warning.source).toContain('xmlns');
+    });
+  });
+
+  describe('when a written geometry option is displaced by a written viewBox', () => {
+    it('warns MULTIPLE_GEOMETRY_VALUES and names the displaced option', () => {
+      const builder = new BlissSVGBuilder('[margin=2;viewBox="0 0 10 10"]||B291');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_GEOMETRY_VALUES');
+
+      expect(warning).toBeDefined();
+      expect(warning.source).toContain('margin');
+      expect(rootTag(builder.svgCode)).toContain('viewBox="0 0 10 10"');
+    });
+
+    it('stays silent when only the override is written', () => {
+      const builder = new BlissSVGBuilder('[viewBox="0 0 10 10"]||B291');
+
+      expect(builder.warnings.some(w => w.code === 'MULTIPLE_GEOMETRY_VALUES')).toBe(false);
+    });
+
+    it('stays silent when only the geometry option is written', () => {
+      const builder = new BlissSVGBuilder('[margin=2]||B291');
+
+      expect(builder.warnings.some(w => w.code === 'MULTIPLE_GEOMETRY_VALUES')).toBe(false);
+    });
+  });
+
+  describe('when a global key names a layer that is not emitted', () => {
+    it.each([
+      ['an unknown layer', '[foo--x=1]||B291', 'foo--x=1'],
+      ['an empty layer name', '[--x=1]||B291', '--x=1'],
+      ['no attribute at all', '[content--=oops]||B291', 'content--=oops'],
+    ])('warns UNKNOWN_LAYER for %s, emits nothing, and round-trips', (_case, input, written) => {
+      const builder = new BlissSVGBuilder(input);
+
+      expect(builder.warnings.some(w => w.code === 'UNKNOWN_LAYER')).toBe(true);
+      expect(builder.svgCode).not.toContain('foo--x');
+      expect(builder.svgCode).not.toContain('="oops"');
+      expect(builder.svgCode).not.toMatch(/\s="/);
+      expect(builder.toString()).toContain(written);
+    });
+  });
+
+  describe('when a layer attribute name is refused by the safety gate', () => {
+    it('keeps an event handler out of the markup', () => {
+      const svg = new BlissSVGBuilder('[content--onclick=alert(1)]||B291').svgCode;
+
+      expect(svg).not.toContain('onclick');
+      expect(svg).not.toContain('alert(1)');
     });
   });
 
