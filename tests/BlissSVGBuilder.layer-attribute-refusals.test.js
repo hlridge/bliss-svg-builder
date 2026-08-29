@@ -23,6 +23,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - A layer attribute name refused by the safety gate.
  *
  * Does NOT cover:
+ * - `xmlns` at the scopes that are not layers (word, character, part, object
+ *   input, the transient channel), where the same refusal reaches, see
+ *   `BlissSVGBuilder.document-namespace.test.js`.
  * - The channel working: which element each prefix lands on, and the raw name
  *   emission, see `BlissSVGBuilder.layer-attributes.test.js`.
  * - A layer key written below global scope, see the same file.

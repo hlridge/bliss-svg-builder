@@ -364,16 +364,17 @@ Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a la
 An option naming one of the two attributes the library owns: `xmlns` and `data-generator`. The written value is dropped and the library's own is kept.
 
 ```
-[xmlns=http://example.com]||B291         →  warns, the SVG namespace is kept
-[data-generator=me]||B291                →  warns, the library's stamp is kept
+[xmlns=http://example.com]||B291          →  warns, the SVG namespace is kept
+[data-generator=me]||B291                 →  warns, the library's stamp is kept
 [content--xmlns=http://example.com]||B291 →  warns: xmlns is refused on a layer too
+[xmlns=http://example.com]B291            →  warns: and on a single character too
 ```
 
 The two are guarded at different reaches, because they are refused for different reasons.
 
-`xmlns` has exactly one legal value, and it is refused **on every layer**, not only on the root: a second namespace declaration moves that whole subtree out of SVG, so browsers will not render it and this library's own `svgElement` cannot parse it. A bad value is one thing; a document that is no longer SVG is something else.
+`xmlns` has exactly one legal value, and it is refused **wherever you write it**: on the root, on any layer, and at word, character or part scope. A second namespace declaration moves that element and everything under it out of SVG, so browsers will not render it and this library's own `svgElement` cannot parse it, and that is true at any depth. A bad value is one thing; a document that is no longer SVG is something else.
 
-`data-generator` is refused **on the root only**. It records what produced the file, and a stamp anyone can overwrite tells a reader nothing. On an inner layer the same name collides with nothing, so `[content--data-generator=me]||` is an ordinary data attribute and is emitted. To record your own pipeline on the root, add a `data-` attribute of your own.
+`data-generator` is refused **on the root only**. It records what produced the file, and a stamp anyone can overwrite tells a reader nothing. Anywhere below the root the same name collides with nothing, so `[content--data-generator=me]||` and `[data-generator=me]B291` are ordinary data attributes and are emitted. To record your own pipeline on the root, add a `data-` attribute of your own.
 
 Every other root attribute is yours, including `width`, `height` and `viewBox`, which replace the computed values when you write them.
 

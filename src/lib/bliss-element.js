@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, DOCUMENT_DEFINING_ATTRIBUTES, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -154,6 +154,13 @@ export class BlissElement {
         // asking it for an inherited name (constructor, toString, valueOf)
         // answers with the function and stringifies it into the markup.
         const attrName = Object.hasOwn(attrMap, key) ? attrMap[key] : key;
+        // A name that declares what the document IS is refused wherever it is
+        // written, not only on the root: a second namespace declaration
+        // re-binds the default namespace for this group and everything under
+        // it, so those paths stop being SVG and nothing draws them. The
+        // builder reports it once per rebuild; here it is only kept out of the
+        // markup.
+        if (DOCUMENT_DEFINING_ATTRIBUTES.has(attrName)) continue;
         // vector-effect is non-inherited; capture it for relocation onto paths
         if (attrName === 'vector-effect') { vectorEffect = value; continue; }
         if (key === 'pointer-events') hasPointerEvents = true;

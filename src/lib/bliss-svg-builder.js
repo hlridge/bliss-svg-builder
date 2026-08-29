@@ -539,8 +539,8 @@ class BlissSVGBuilder {
           if (isLayerAttributeKey(key)) delete obj.options[key];
         }
       }
-      // A name the safety gate refuses is skipped by every emitter, so the
-      // attribute simply never appears. Reporting it HERE is what makes that
+      // Two guards judge a NAME, and an emitter that honours either one simply
+      // never writes the attribute. Reporting them HERE is what makes that
       // visible: this pass runs once per rebuild and reaches every scope,
       // where the emitters run per render and are spread across two files.
       // The key is left in place, so it still round-trips and re-warns on
@@ -556,12 +556,26 @@ class BlissSVGBuilder {
         // defect on top of the UNKNOWN_LAYER the split loop already raises.
         const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
         if (isLayerAttributeKey(key) && !target) continue;
-        if (isSafeAttributeName(target ? target.attribute : key)) continue;
-        this.#warnings.push({
-          code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
-          message: `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`,
-          source: value === true ? key : `${key}=${value}`,
-        });
+        const name = target ? target.attribute : key;
+        if (!isSafeAttributeName(name)) {
+          this.#warnings.push({
+            code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
+            message: `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`,
+            source: value === true ? key : `${key}=${value}`,
+          });
+          continue;
+        }
+        // A name that declares what the document IS breaks the file wherever
+        // it lands, so the guard reaches every scope rather than the root
+        // alone. Global scope is judged in the split loop below instead, on
+        // the name actually emitted, since an alias there can rename the key.
+        if (!isTopLevel && DOCUMENT_DEFINING_ATTRIBUTES.has(name)) {
+          this.#warnings.push({
+            code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
+            message: reservedAttributeMessage(name),
+            source: key,
+          });
+        }
       }
       obj.options = this.#processOptions(obj.options, isTopLevel);
     }
