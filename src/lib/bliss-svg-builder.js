@@ -157,8 +157,31 @@ class BlissSVGBuilder {
     // only spelling of it, so an author who wanted a heavier stroke had no
     // second channel to ask through. Non-numeric input still falls through to
     // the default rather than poisoning the layout with NaN.
+    //
+    // Retiring the ceiling retired the floor with it, and the two are not the
+    // same thing: an unusual width is the author's business, a width nothing
+    // can draw is not. The value also feeds path geometry (a dot's radius is
+    // derived from it), so a negative one reaches the path data as a negative
+    // arc radius and conformant renderers drop the whole glyph.
     if ('stroke-width' in rawOptions && !isNaN(rawOptions['stroke-width'])) {
-      options.strokeWidth = Number(rawOptions['stroke-width']);
+      const written = Number(rawOptions['stroke-width']);
+      const source = `stroke-width=${rawOptions['stroke-width']}`;
+      if (!Number.isFinite(written)) {
+        this.#warnings.push({
+          code: WARNING_CODES.OUT_OF_RANGE_STROKE_WIDTH,
+          message: `A stroke-width of ${written} is not a length the SVG format can carry, so it was ignored and the default width is drawn instead.`,
+          source,
+        });
+      } else if (written < 0) {
+        this.#warnings.push({
+          code: WARNING_CODES.OUT_OF_RANGE_STROKE_WIDTH,
+          message: `A stroke-width of ${written} cannot be drawn, and a negative width is an error in the path data it feeds, so 0 was used instead. That is a legal width and draws an invisible stroke.`,
+          source,
+        });
+        options.strokeWidth = 0;
+      } else {
+        options.strokeWidth = written;
+      }
     }
 
     // dot-extra-width: Number, clamped 0-1

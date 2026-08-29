@@ -309,8 +309,10 @@ export const DOT_WIDTH_MAX = 1.5;
  * literal, so the set is typo-proof and discoverable in one place.
  *
  * Verb convention (see `.claude/plans/2026-06-24-warning-code-vocabulary-design.md`):
- *   MALFORMED_   input did not parse in the required shape (a FORMAT failure;
- *                INVALID_/OUT_OF_RANGE are reserved for future VALUE/range checks)
+ *   MALFORMED_   input did not parse in the required shape (a FORMAT failure)
+ *   OUT_OF_RANGE_ a well-formed number outside what the attribute can carry (a
+ *                VALUE failure; INVALID_ stays reserved for a value that is not
+ *                a number at all)
  *   MISPLACED_   a well-formed token in the wrong position
  *   MULTIPLE_    more than one where one is allowed (resolved by a stated rule:
  *                the first for repeated option brackets and head markers, the
@@ -335,6 +337,14 @@ export const WARNING_CODES = Object.freeze({
   MALFORMED_WORD_INDICATOR: 'MALFORMED_WORD_INDICATOR',
   MALFORMED_COORDINATES: 'MALFORMED_COORDINATES',
   MALFORMED_KERNING_VALUE: 'MALFORMED_KERNING_VALUE',
+  // out-of-range: a stroke width that parses as a number but that nothing can
+  // draw with. The width also feeds path geometry (a dot's radius is derived
+  // from it), so a negative one reaches the path data as a negative arc radius
+  // and conformant renderers drop the whole path. Negative is floored to 0, an
+  // invisible but legal stroke; non-finite is refused and the default stands.
+  // A width that is not a number at all still falls back to the default in
+  // silence, which is why INVALID_ stays reserved.
+  OUT_OF_RANGE_STROKE_WIDTH: 'OUT_OF_RANGE_STROKE_WIDTH',
   // misplaced: a well-formed token in the wrong position
   MISPLACED_HEAD_MARKER: 'MISPLACED_HEAD_MARKER',
   MISPLACED_CHARACTER_INDICATOR: 'MISPLACED_CHARACTER_INDICATOR',

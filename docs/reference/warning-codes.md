@@ -27,6 +27,7 @@ The prefix tells you what kind of problem occurred:
 | Prefix | Meaning |
 |--------|---------|
 | `MALFORMED_` | Input did not parse in the required shape |
+| `OUT_OF_RANGE_` | A well-formed number outside what the attribute can carry |
 | `MISPLACED_` | A well-formed token in the wrong position |
 | `MULTIPLE_` | More than one where only one is allowed (the first wins) |
 | `DUPLICATE_` | The same identifier used twice |
@@ -97,6 +98,21 @@ An `RK:`/`AK:` kerning marker with a non-numeric value. The marker is ignored; t
 ```
 B313/RK:x/B431         →  renders both characters, default spacing
 ```
+
+## Values Out of Range
+
+### `OUT_OF_RANGE_STROKE_WIDTH`
+
+A `stroke-width` that parses as a number but that nothing can draw with. Any width you can draw is yours, at any scope, including a very heavy one; these two are refused because the width also sizes dot glyphs, where it becomes a radius, so an undrawable width can drop a whole glyph rather than just thicken a line.
+
+```
+[stroke-width=-2]||B291         →  warns, 0 is drawn (a legal, invisible stroke)
+[stroke-width=Infinity]||B291   →  warns, the default 0.5 is drawn
+```
+
+A negative width is floored to `0`; a non-finite one is ignored and the default stands. A width that is not a number at all (`[stroke-width=abc]`) is not covered by this code: it falls back to the default in silence, as it always has.
+
+The written value is kept in the composition, so it survives `toString()` and reports again when the composition is parsed back.
 
 ## Misplaced Tokens
 

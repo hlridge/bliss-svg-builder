@@ -16,7 +16,7 @@ This is useful in teaching materials where you want to focus on a particular wor
 
 ## Stroke Width
 
-Control line thickness with `stroke-width` (default `0.5`). Any number is accepted; roughly 0.1 to 1.5 is the range that reads as Blissymbolics, and values outside it are yours to use if you want them:
+Control line thickness with `stroke-width` (default `0.5`). Any width a renderer can draw is accepted; roughly 0.1 to 1.5 is the range that reads as Blissymbolics, and values outside it are yours to use if you want them:
 
 <Demo code="[stroke-width=0.3]||B313" title="Thin: 0.3" />
 
@@ -27,6 +27,8 @@ Control line thickness with `stroke-width` (default `0.5`). Any number is accept
 Thicker strokes improve visibility at small sizes or on low-contrast displays. Thinner strokes feel lighter and work well at larger sizes. The default 0.5 is a balance for typical use.
 
 For AAC communication boards viewed at arm's length, consider `stroke-width=0.8` or higher. For decorative or large-format display, `0.3` may be enough.
+
+Two widths are refused, because nothing can draw with them and the value also sizes dot glyphs, where it becomes a radius. A negative width is floored to `0`, which is legal and draws an invisible stroke; a non-finite one (`Infinity`) is ignored and the default is drawn. Both report [`OUT_OF_RANGE_STROKE_WIDTH`](/reference/warning-codes#out-of-range-stroke-width).
 
 ## Dot Sizing
 

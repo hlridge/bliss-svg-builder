@@ -127,7 +127,7 @@ Options use **camelCase** keys with native JavaScript types, not the kebab-case 
 | `relativeKerning` | `relative-kerning` | number | `-1` |
 | `absoluteKerning` | `absolute-kerning` | number | `4` |
 
-All options from the [Options Quick Reference](/reference/options-quick-reference) are supported, with the same validation and clamping as the DSL form (the dot-sizing options are clamped; `strokeWidth` is not).
+All options from the [Options Quick Reference](/reference/options-quick-reference) are supported, with the same validation and clamping as the DSL form (the dot-sizing options are clamped to their range; `strokeWidth` takes any width a renderer can draw, and refuses the two it cannot).
 
 **The camelCase-to-kebab conversion applies to these named options and to nothing else.** An [SVG pass-through attribute](/handbook/syntax-options/svg-pass-through) is emitted under exactly the name you write, so write it the way SVG spells it, in quotes when it contains a dash:
 
