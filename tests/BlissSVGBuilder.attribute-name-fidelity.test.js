@@ -18,8 +18,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Which element the attribute lands on, see
  *   `BlissSVGBuilder.layer-attributes.test.js`.
  * - The unsafe-name gate (`onclick`), see
- *   `BlissSVGBuilder.transient-options.test.js`.
- * - Element-scope pass-through, see `BlissSVGBuilder.svg-attributes.test.js`.
+ *   `BlissSVGBuilder.unsafe-attribute-names.test.js`.
+ * - Element-scope pass-through, see
+ *   `BlissSVGBuilder.hierarchical-options.test.js` for the cascade and
+ *   `BlissSVGBuilder.attribute-collisions.test.js` for one name per element.
  */
 describe('BlissSVGBuilder attribute name fidelity', () => {
   describe('when a camelCase SVG attribute is written', () => {

@@ -33,8 +33,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   out of R16 scope).
  */
 describe('BlissSVGBuilder dot sizing', () => {
-  // A bare dot's emitted stroke-width is the inked disc width; the outer
-  // content group separately carries the default stroke-width 0.5.
+  // A bare dot's emitted stroke-width is the inked disc width; the root <svg>
+  // separately carries the default stroke-width 0.5 that the disc is sized from.
   describe('when SDOT renders by default', () => {
     it('renders the small dot at half of DOT extra (0.1665)', () => {
       // (0.5 + 0.1665) / 2 = 0.33325

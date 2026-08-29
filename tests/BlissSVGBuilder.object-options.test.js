@@ -14,9 +14,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Overrides win over both defaults and string options.
  * - Three-layer combinations resolve per the precedence rule, including
  *   same-key and different-key cases.
- * - camelCase keys map to kebab-case SVG attributes; numeric values are
- *   clamped the same way as string options; string values are
- *   HTML-escaped.
+ * - camelCase keys for the curated option vocabulary map to their kebab
+ *   spelling; numeric values are validated exactly as the string form
+ *   validates them, which for `stroke-width` means any drawable width
+ *   passes through unchanged; string values are HTML-escaped.
  * - Bulk options (margin) and boolean options (grid) work through the
  *   object form, including a `grid: false` override disabling a grid set
  *   in the string.

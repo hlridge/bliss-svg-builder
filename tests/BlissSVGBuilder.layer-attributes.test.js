@@ -16,6 +16,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The structural class of each layer surviving a `<layer>--class`.
  * - Cross-surface parity: DSL, constructor options and the transient channel
  *   produce identical SVG for the same key.
+ * - The key surviving both serializers verbatim, and rendering identically
+ *   after a round trip through either of them.
  *
  * Does NOT cover:
  * - What the channel refuses (`xmlns`, the link attributes, an unknown layer,
@@ -225,6 +227,29 @@ describe('BlissSVGBuilder layer attributes', () => {
       const builder = new BlissSVGBuilder('[margin=2]||B291');
 
       expect(builder.warnings.some(w => w.code === 'MULTIPLE_GEOMETRY_VALUES')).toBe(false);
+    });
+  });
+
+  describe('when a valid layer key is serialized', () => {
+    it('comes back from toString() exactly as written', () => {
+      const builder = new BlissSVGBuilder('[grid;grid--opacity=0.3]||B291');
+
+      expect(builder.toString()).toBe('[grid;grid--opacity=0.3]||B291');
+    });
+
+    it('keeps the key verbatim in toJSON(), with no re-hyphenation', () => {
+      // the prefixed channel bypasses the pipeline's kebab-casing, so a
+      // serializer that put it back would ship content--preserve-aspect-ratio
+      const builder = new BlissSVGBuilder('[content--preserveAspectRatio=xMidYMid]||B291');
+
+      expect(builder.toJSON().options['content--preserveAspectRatio']).toBe('xMidYMid');
+    });
+
+    it('renders identically after a round trip through either serializer', () => {
+      const builder = new BlissSVGBuilder('[grid;grid--opacity=0.3]||B291');
+
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
     });
   });
 

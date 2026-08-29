@@ -9,9 +9,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * audit (fixed as a side effect of the ;;-overlay option fix, 0f11d11);
  * this file locks it against regression.
  *
- * Every pin uses the below-clamp value 1.2: stroke-width clamps to max
- * 1.5 at EVERY level, so a value >= 1.5 could pass even on a broken
- * per-part path by inheriting another level's clamped value.
+ * Every pin uses 1.2, which is the value the file was written with when
+ * stroke-width still clamped to 1.5 at every level and a heavier value
+ * could therefore pass on a broken per-part path by inheriting another
+ * level's clamped one. The clamp is retired and any drawable width is
+ * accepted now, so 1.2 is no longer load-bearing; it is kept because the
+ * dot-sizing arithmetic below is written around it.
  *
  * Covers:
  * - Render + toString + svg round-trip stability (through both the
@@ -32,6 +35,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   filled-shape property, not a per-part defect).
  *
  * Does NOT cover:
+ * - Which widths are refused (negative, non-finite), see
+ *   `BlissSVGBuilder.stroke-width-range.test.js`.
  * - The 4-level cascade/override matrix, see
  *   `BlissSVGBuilder.hierarchical-options.test.js`.
  * - The DOT/COMMA formula constants and clamping, see

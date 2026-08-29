@@ -24,7 +24,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - General `setOptions`/`removeOptions` behaviour, see
  *   `BlissSVGBuilder.mutation-api.test.js`.
  * - The attribute-name safety gate itself as applied to ordinary options, see
- *   the option pass-through coverage in `BlissSVGBuilder.attribute-collisions.test.js`.
+ *   `BlissSVGBuilder.unsafe-attribute-names.test.js`.
  * - Any DSL spelling: there is none by construction, since the DSL is the
  *   serialized form. The standing DSL/API parity rule deliberately does not
  *   apply to this feature.

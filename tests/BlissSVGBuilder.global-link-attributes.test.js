@@ -2,11 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins that global-scope link attributes (the anchor family: href, target,
- * rel, download, hreflang, type, referrerpolicy) flow only through the
- * level-0 anchor wrap (`<a>` around the content) and never land on a layer:
+ * Pins that a BARE global link attribute (the anchor family: href, target,
+ * rel, download, hreflang, type, referrerpolicy) flows only through the
+ * level-0 anchor wrap (`<a>` around the content) and never lands on a layer:
  * not on the root `<svg>`, where every other global attribute now goes, and
  * not on the content wrapper `<g class="bliss-content">`.
+ *
+ * The `<layer>--` spelling of the same names is a separate route with a
+ * separate rule (dropped with a report, since no layer is an `<a>`); it is
+ * pinned in `BlissSVGBuilder.layer-attribute-refusals.test.js`.
  *
  * Covers:
  * - Global `[href=...]||`: the `<a>` carries the href, neither the root nor
@@ -25,6 +29,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Element-scope anchor mechanics (`<a>` wrapping, protocol allowlist,
  *   anchor/group attribute separation, hierarchical href levels), see
  *   `BlissSVGBuilder.clickable-links.test.js`.
+ * - The `<layer>--` spelling of an anchor name, see
+ *   `BlissSVGBuilder.layer-attribute-refusals.test.js`.
  */
 
 // The root <svg ...> open tag, which carries every global attribute that is
