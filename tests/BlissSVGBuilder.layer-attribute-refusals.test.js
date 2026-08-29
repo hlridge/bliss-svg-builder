@@ -190,6 +190,37 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       expect(warning.message).toContain('no attribute');
       expect(warning.message).not.toMatch(/no layer/);
     });
+
+    it.each([
+      ['content', '[content--=oops]||B291'],
+      ['grid', '[grid--=oops]||B291'],
+      ['background', '[background--=oops]||B291'],
+    ])('names the %s layer it did resolve', (layer, input) => {
+      const warning = new BlissSVGBuilder(input).warnings[0];
+
+      // two layers, because a message that hardcoded one name, or dropped the
+      // name entirely, would still read correctly against a single case
+      expect(warning.message).toContain(`names the ${layer} layer`);
+    });
+  });
+
+  describe('when a refused layer key is stored and read back', () => {
+    it.each([
+      ['a reserved name', '[content--xmlns=x]||B291', 'RESERVED_ATTRIBUTE_NAME'],
+      ['a link attribute', '[content--href=https://example.com]||B291', 'MISPLACED_LINK_ATTRIBUTE'],
+      ['an unsafe name', '[content--onclick=alert(1)]||B291', 'UNSAFE_ATTRIBUTE_NAME'],
+      ['an unknown layer', '[foo--x=1]||B291', 'UNKNOWN_LAYER'],
+      ['an empty layer name', '[--x=1]||B291', 'UNKNOWN_LAYER'],
+      ['an empty attribute name', '[content--=oops]||B291', 'UNKNOWN_LAYER'],
+    ])('reports %s again after a round trip', (_case, input, code) => {
+      const written = new BlissSVGBuilder(input).toString();
+
+      // the key is kept rather than deleted so a stored composition keeps
+      // telling its author what is wrong with it; keeping it and then going
+      // quiet on reparse would be the worst of both
+      expect(written).toBe(input);
+      expect(codes(new BlissSVGBuilder(written))).toContain(code);
+    });
   });
 
   describe('when a layer key names a layer that is known but not drawn', () => {

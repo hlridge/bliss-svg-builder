@@ -64,11 +64,14 @@ describe('BlissSVGBuilder document namespace', () => {
       expect(codes(builder).filter(c => c === 'RESERVED_ATTRIBUTE_NAME')).toHaveLength(1);
     });
 
-    it('names the key that was written', () => {
+    it('names the key that was written and why the name is refused', () => {
       const warning = new BlissSVGBuilder('[xmlns=http://example.com]B291').warnings
         .find(w => w.code === 'RESERVED_ATTRIBUTE_NAME');
 
       expect(warning.source).toBe('xmlns');
+      // the reason is the only thing carrying WHY, since one code covers both
+      // reserved names and they are refused for unrelated reasons
+      expect(warning.message).toContain('declares what the file is');
       expect(warning.message).toContain('out of SVG');
     });
 
@@ -114,6 +117,20 @@ describe('BlissSVGBuilder document namespace', () => {
 
       expect(builder.svgCode).not.toContain('data-generator="me"');
       expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
+    });
+
+    it('gives its own reason, not the namespace one', () => {
+      const stamp = new BlissSVGBuilder('[data-generator=me]||B291').warnings
+        .find(w => w.code === 'RESERVED_ATTRIBUTE_NAME');
+      const namespace = new BlissSVGBuilder('[xmlns=x]||B291').warnings
+        .find(w => w.code === 'RESERVED_ATTRIBUTE_NAME');
+
+      // the two reserved sets were split apart precisely because one sentence
+      // covering both would be true of neither, and nothing else checks that
+      expect(stamp.message).toContain("the library's own stamp");
+      expect(stamp.message).toContain('tells its reader nothing');
+      expect(stamp.message).not.toContain('out of SVG');
+      expect(namespace.message).not.toContain('stamp');
     });
   });
 });
