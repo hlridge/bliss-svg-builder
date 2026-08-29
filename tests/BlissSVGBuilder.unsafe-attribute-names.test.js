@@ -46,10 +46,15 @@ describe('BlissSVGBuilder unsafe attribute names', () => {
       expect(builder.svgCode).toContain('<path');
     });
 
-    it('names the refused key in the warning', () => {
-      const [warning] = unsafeWarnings(new BlissSVGBuilder('[onclick=alert(1)]||B291'));
+    it.each([
+      ['a bare global key', '[onclick=alert(1)]||B291', 'onclick'],
+      ['a layer key', '[content--onclick=alert(1)]||B291', 'content--onclick'],
+    ])('names %s alone, without the value that came with it', (_case, input, expected) => {
+      const [warning] = unsafeWarnings(new BlissSVGBuilder(input));
 
-      expect(warning.source).toContain('onclick');
+      // the name is what was refused, so the name is the whole fragment that
+      // triggered the warning; the value triggered nothing
+      expect(warning.source).toBe(expected);
     });
 
     it('keeps the other options written in the same bracket', () => {

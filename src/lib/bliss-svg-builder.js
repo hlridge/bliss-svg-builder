@@ -101,6 +101,14 @@ const unresolvedLayerKeyMessage = (key) => {
   return `"${key}" names the ${layer} layer but no attribute after the "--", so there was nothing to emit.`;
 };
 
+// What `source` carries, one rule for every refusal: THE WHOLE KEY when the
+// NAME is what was refused, `key=value` when the VALUE is what was refused.
+// `source` is documented as the fragment that triggered the warning, so it has
+// to be a fragment the author can find in their own input and it has to name
+// the thing that actually offended. `xmlns` is not a fragment of
+// `[content--xmlns=x]`, and two refusals in one bracket that report the same
+// string cannot be told apart; a value that was never looked at is noise.
+//
 // Why a reserved name is refused, one reason per name: the two reserved sets
 // are guarded for different reasons and a single sentence covering both would
 // be true of neither. A Map rather than an object literal, so an inherited
@@ -561,7 +569,7 @@ class BlissSVGBuilder {
           this.#warnings.push({
             code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
             message: `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`,
-            source: value === true ? key : `${key}=${value}`,
+            source: key,
           });
           continue;
         }
@@ -1409,7 +1417,7 @@ class BlissSVGBuilder {
           this.#warnings.push({
             code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
             message: reservedAttributeMessage(target.attribute),
-            source: target.attribute,
+            source: key,
           });
           continue;
         }
@@ -1435,7 +1443,7 @@ class BlissSVGBuilder {
         this.#warnings.push({
           code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
           message: reservedAttributeMessage(attrName),
-          source: attrName,
+          source: key,
         });
         continue;
       }

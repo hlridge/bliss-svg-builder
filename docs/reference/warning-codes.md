@@ -16,7 +16,7 @@ builder.warnings;
 
 - `code` — a stable identifier from the list below (the `WarningCode` type in TypeScript)
 - `message` — a human-readable description, including how to fix the input
-- `source` — the DSL fragment that triggered the warning
+- `source` — the fragment of your input that triggered the warning, always a string you can search your own input for. When the library refused an attribute **name**, it is the key on its own, prefix included (`content--xmlns`), so two refusals in one bracket can be told apart; when the **value** is what went wrong, it is the option as written (`stroke-width=-2`)
 
 Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully.
 

@@ -53,11 +53,22 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
     });
 
-    it('names the refused attribute rather than the whole key', () => {
+    it('names the whole key that was written', () => {
       const warning = new BlissSVGBuilder('[content--xmlns=x]||B291').warnings
         .find(w => w.code === 'RESERVED_ATTRIBUTE_NAME');
 
-      expect(warning.source).toBe('xmlns');
+      // `source` is the fragment the author can search their own input for,
+      // and `xmlns` is not a fragment of `content--xmlns`; the prefix is what
+      // tells this refusal apart from the bare one
+      expect(warning.source).toBe('content--xmlns');
+    });
+
+    it('tells two refusals in one bracket apart', () => {
+      const sources = new BlissSVGBuilder('[xmlns=a;grid--xmlns=b]||B291').warnings
+        .filter(w => w.code === 'RESERVED_ATTRIBUTE_NAME')
+        .map(w => w.source);
+
+      expect(sources).toEqual(['xmlns', 'grid--xmlns']);
     });
 
     it('keeps the root parseable as SVG', () => {

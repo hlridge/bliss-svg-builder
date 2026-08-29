@@ -798,7 +798,12 @@ export interface Warning {
   readonly code: WarningCode;
   /** Human-readable description of the issue. */
   readonly message: string;
-  /** The problematic DSL code that triggered the warning. */
+  /**
+   * The problematic fragment of the input that triggered the warning. When an
+   * attribute NAME was refused it is the key on its own, prefix included
+   * (`content--xmlns`); when the VALUE is what went wrong it is the option as
+   * written (`stroke-width=-2`).
+   */
   readonly source: string;
 }
 
