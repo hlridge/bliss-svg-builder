@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins that DSL bracket-option keys with prototype-polluting or
- * reserved names cannot mutate global Object state or trigger errors
- * inside the parser → element → SVG pipeline.
+ * Pins that a name inherited from `Object.prototype` cannot mutate global
+ * Object state, trigger errors, or be mistaken for a real entry anywhere in
+ * the parser → element → SVG pipeline. The library looks names up in plain
+ * object literals, which answer for `constructor`, `toString`, `valueOf` and
+ * `hasOwnProperty` even though nobody put them there.
  *
  * Covers:
  * - `[__proto__=VALUE]` does not pollute `Object.prototype` (the
@@ -12,6 +14,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   visible on plain objects).
  * - `[constructor=VALUE]` does not throw when used as a bracket
  *   option key.
+ * - An inherited name used as a glyph's `codeName` does not answer the
+ *   preceding glyph's kerning table, which poisoned the layout with `NaN`.
  * - Invalid numeric option values for recognized keys: `NaN` and
  *   non-numeric strings for `stroke-width` are accepted without
  *   throwing, and the builder still produces a complete `<svg>` /
@@ -85,6 +89,43 @@ describe('BlissSVGBuilder option hardening', () => {
       builder.glyph(1).setOptions({ constructor: 'x' });
 
       expect(builder.toString()).toContain('RK:3');
+    });
+  });
+
+  describe('when a glyph is named after an Object.prototype member', () => {
+    // reachable through object input only: the parser omits a glyph-level
+    // codeName for a token it does not recognize, so the DSL never gets here
+    const followerNamed = (codeName) => new BlissSVGBuilder({
+      groups: [{ glyphs: [
+        { parts: [{ codeName: 'B9' }] },
+        { codeName, parts: [{ codeName: 'B291' }] },
+      ] }],
+    });
+
+    it('does not read the inherited name as a kerning rule', () => {
+      // B9 carries the digit kerning table, so the follower's name is looked
+      // up in it; an inherited hit answered with the Object constructor and
+      // turned the advance into NaN, shipping width="NaN" and a NaN viewBox
+      const builder = followerNamed('constructor');
+
+      expect(builder.svgCode).not.toContain('NaN');
+      expect(builder.elements.children[0].children[1].x).toBe(4);
+    });
+
+    it.each(['toString', 'valueOf', 'hasOwnProperty'])(
+      'leaves the layout finite for a follower named %s',
+      (codeName) => {
+        expect(followerNamed(codeName).svgCode).not.toContain('NaN');
+      },
+    );
+
+    it('still applies a kerning rule the table really carries', () => {
+      // B9/B10 is a digit pair the table kerns by -1; B9/B291 is not in it
+      const kerned = new BlissSVGBuilder('B9/B10');
+      const unkerned = new BlissSVGBuilder('B9/B291');
+
+      expect(kerned.elements.children[0].children[1].x).toBe(3);
+      expect(unkerned.elements.children[0].children[1].x).toBe(4);
     });
   });
 

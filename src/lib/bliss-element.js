@@ -695,7 +695,12 @@ export class BlissElement {
 
           if (!this.#isEmptyGlyph && !this.isExternalGlyph && !this.#previousElement.isExternalGlyph &&
               this.#previousElement.kerningRules && this.codeName) {
-            const kerningAdjustment = this.#previousElement.kerningRules[this.codeName] ?? 0;
+            // Own-key test, not a plain lookup: a kerning table is an object
+            // literal, so asking it for an inherited name (constructor,
+            // toString) answers with the function, which is not nullish and
+            // turns the advance below into NaN for the rest of the layout.
+            const rules = this.#previousElement.kerningRules;
+            const kerningAdjustment = Object.hasOwn(rules, this.codeName) ? rules[this.codeName] : 0;
             if (kerningAdjustment !== 0) {
               this.#previousElement.#advanceX = this.#previousElement.width + this.#sharedOptions.charSpace + kerningAdjustment;
             }
