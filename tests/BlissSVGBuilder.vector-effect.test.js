@@ -8,7 +8,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * every option scope.
  *
  * Covers:
- * - Global scope: vector-effect lands on the glyph path, not the content <g>.
+ * - Global scope: vector-effect lands on the glyph path, and on neither the
+ *   root <svg> (where a global attribute goes) nor the content <g>. The root
+ *   is asserted explicitly: a group-only guard passes trivially for a value
+ *   left on the root, which is exactly the carrier a global option now uses.
  * - Character scope: vector-effect lands on the path, not a wrapping <g>.
  * - Word scope: same relocation for a word-level option.
  * - Combination: a co-located element option (opacity) stays on the <g> while
@@ -27,12 +30,22 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 describe('BlissSVGBuilder vector-effect', () => {
   const render = (dsl) => new BlissSVGBuilder(dsl).svgCode;
   const groupHasVectorEffect = (svg) => /<g[^>]*\bvector-effect=/.test(svg);
+  const rootHasVectorEffect = (svg) => /<svg[^>]*\bvector-effect=/.test(svg);
 
   describe('when set at global scope', () => {
-    it('relocates vector-effect from the content group onto the glyph path', () => {
+    it('relocates vector-effect from the root onto the glyph path', () => {
       const svg = render('[vector-effect=non-scaling-stroke]||B313');
       expect(svg).toMatch(/<path[^>]*\bvector-effect="non-scaling-stroke"/);
+      expect(rootHasVectorEffect(svg)).toBe(false);
       expect(groupHasVectorEffect(svg)).toBe(false);
+    });
+
+    it('leaves exactly one carrier of the value in the document', () => {
+      // the group guard alone passes trivially for a value left on the root,
+      // which is where a global attribute lands
+      const svg = render('[vector-effect=non-scaling-stroke]||B313');
+
+      expect((svg.match(/vector-effect=/g) || []).length).toBe(1);
     });
   });
 
@@ -66,6 +79,7 @@ describe('BlissSVGBuilder vector-effect', () => {
       const svg = render('[vector-effect=non-scaling-stroke]||[opacity=0.5;vector-effect=none]B313//B431');
       expect(svg).toMatch(/<path[^>]*\bvector-effect="none"/);
       expect(svg).toMatch(/<path[^>]*\bvector-effect="non-scaling-stroke"/);
+      expect(rootHasVectorEffect(svg)).toBe(false);
       expect(groupHasVectorEffect(svg)).toBe(false);
       // exact count guards against double-stamping: one value per path, no more
       expect((svg.match(/vector-effect=/g) || []).length).toBe(2);
@@ -97,10 +111,10 @@ describe('BlissSVGBuilder vector-effect', () => {
   });
 
   describe('when the value is empty', () => {
-    // an empty vector-effect is meaningless; it must not be left on the <g>
-    // (the dead-attribute-on-a-group case this feature removes), and global
-    // and character scope must agree
-    it('drops an empty global vector-effect instead of leaving it on the content group', () => {
+    // an empty vector-effect is meaningless; it must not be left behind on the
+    // element that would otherwise carry it (the dead-attribute case this
+    // feature removes), and global and character scope must agree
+    it('drops an empty global vector-effect instead of leaving it on the root', () => {
       expect(render('[vector-effect=]||B313')).not.toContain('vector-effect');
     });
 
