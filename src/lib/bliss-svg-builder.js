@@ -198,7 +198,12 @@ class BlissSVGBuilder {
       if (!Number.isFinite(written)) {
         this.#warnings.push({
           code: WARNING_CODES.OUT_OF_RANGE_STROKE_WIDTH,
-          message: `A stroke-width of ${written} is not a length the SVG format can carry, so it was ignored and the default width is drawn instead.`,
+          // Deliberately does not name the width that IS drawn. Nothing is
+          // written in place of a refused value, so at global scope the
+          // library default shows through and at every other scope whatever
+          // the element inherits does; naming the default would be false
+          // below the root.
+          message: `A stroke-width of ${written} is not a length the SVG format can carry, so it was ignored: the stroke keeps the width it would have had without it.`,
           source,
         });
       } else if (written < 0) {

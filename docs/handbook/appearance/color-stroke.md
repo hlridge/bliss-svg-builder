@@ -28,7 +28,7 @@ Thicker strokes improve visibility at small sizes or on low-contrast displays. T
 
 For AAC communication boards viewed at arm's length, consider `stroke-width=0.8` or higher. For decorative or large-format display, `0.3` may be enough.
 
-Two widths are refused, because nothing can draw with them and the value also sizes dot glyphs, where it becomes a radius. A negative width is floored to `0`, which is legal and draws an invisible stroke; a non-finite one (`Infinity`) is ignored and the default is drawn. Both report [`OUT_OF_RANGE_STROKE_WIDTH`](/reference/warning-codes#out-of-range-stroke-width).
+Two widths are refused, because nothing can draw with them and the value also sizes dot glyphs, where it becomes a radius. A negative width is floored to `0`, which is legal and draws an invisible stroke; a non-finite one (`Infinity`) is ignored, and with nothing written in its place the stroke keeps the width it would have had (the default at global scope, the inherited width below it). Both report [`OUT_OF_RANGE_STROKE_WIDTH`](/reference/warning-codes#out-of-range-stroke-width).
 
 ## Dot Sizing
 

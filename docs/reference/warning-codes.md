@@ -110,7 +110,7 @@ A `stroke-width` that parses as a number but that nothing can draw with. Any wid
 [stroke-width=Infinity]||B291   →  warns, the default 0.5 is drawn
 ```
 
-A negative width is floored to `0`; a non-finite one is ignored and the default stands. A width that is not a number at all (`[stroke-width=abc]`) is not covered by this code: it falls back to the default in silence, as it always has.
+A negative width is floored to `0`. A non-finite one is ignored and nothing is written in its place, so the stroke keeps the width it would have had: the library default at global scope, and whatever the element inherits below it. A width that is not a number at all (`[stroke-width=abc]`) is not covered by this code: it falls back to the default in silence, as it always has.
 
 The written value is kept in the composition, so it survives `toString()` and reports again when the composition is parsed back.
 
