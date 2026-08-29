@@ -425,11 +425,14 @@ export const WARNING_CODES = Object.freeze({
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',
-  // a global key in `<layer>--<attribute>` form naming a layer we do not emit
-  // (`foo--x`), or with an empty layer half (`--x`). Never emitted, but KEPT in
-  // the options bag so it round-trips, on the UNKNOWN_ family's own logic: the
-  // reference may become valid later, exactly as UNKNOWN_CODE keeps a code you
-  // might define() afterwards.
+  // a global key in `<layer>--<attribute>` form that does not resolve to a
+  // layer and an attribute: a layer we do not KNOW (`foo--x`), an empty layer
+  // half (`--x`), or an empty attribute half (`content--`). The test is
+  // LAYER_TARGETS membership and not whether the layer is currently drawn, so
+  // `grid--opacity` with the grid off is silent, matching the named grid
+  // options. Never emitted, but KEPT in the options bag so it round-trips, on
+  // the UNKNOWN_ family's own logic: the reference may become valid later,
+  // exactly as UNKNOWN_CODE keeps a code you might define() afterwards.
   UNKNOWN_LAYER: 'UNKNOWN_LAYER',
   // discarded
   DROPPED_WORD_INDICATOR: 'DROPPED_WORD_INDICATOR',

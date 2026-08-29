@@ -84,12 +84,22 @@ function serializeOptions(opts, skipKeys) {
 // allowlist-rejected href would resurface verbatim.
 const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
-// The half of an option key that becomes an attribute name. For a layer key
-// that is the part after the `--`, since the prefix is routing rather than
-// markup: `content--onclick` must be judged on `onclick`. A key naming a layer
-// we do not emit falls back to the whole key, so it is reported as an unknown
-// layer rather than as an unsafe name.
-const attributeNameOf = (key) => parseLayerAttributeKey(key)?.attribute ?? key;
+// Why a layer key emitted nothing. All three shapes fail the same way, so they
+// share a code, but each fails for its own reason and a message covering all
+// three describes none of them: `content--` names a layer we know perfectly
+// well, and `--x` names none at all.
+const unresolvedLayerKeyMessage = (key) => {
+  // The same split parseLayerAttributeKey makes, so the reason reported is the
+  // reason the key was actually rejected.
+  const layer = key.slice(0, key.indexOf('--'));
+  const layers = `The layers are ${[...LAYER_TARGETS].join(', ')}; write the attribute without a prefix to put it on the root.`;
+  if (!LAYER_TARGETS.has(layer)) {
+    return layer === ''
+      ? `"${key}" has no layer name before the "--", so there is nothing for it to target and nothing was emitted. ${layers}`
+      : `"${key}" names no layer the library knows, so nothing was emitted for it. ${layers}`;
+  }
+  return `"${key}" names the ${layer} layer but no attribute after the "--", so there was nothing to emit.`;
+};
 
 // Why a reserved name is refused, one reason per name: the two reserved sets
 // are guarded for different reasons and a single sentence covering both would
@@ -539,7 +549,14 @@ class BlissSVGBuilder {
       // earlier and has removed its own offenders by now, so nothing is
       // reported twice.
       for (const [key, value] of Object.entries(obj.options)) {
-        if (isSafeAttributeName(attributeNameOf(key))) continue;
+        // A layer key is judged on the half after the `--`, since the prefix is
+        // routing rather than markup: `content--onclick` must be judged on
+        // `onclick`. When the prefix names no layer, the whole key is not an
+        // attribute name either, so judging it here would report the wrong
+        // defect on top of the UNKNOWN_LAYER the split loop already raises.
+        const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
+        if (isLayerAttributeKey(key) && !target) continue;
+        if (isSafeAttributeName(target ? target.attribute : key)) continue;
         this.#warnings.push({
           code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
           message: `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`,
@@ -1362,7 +1379,7 @@ class BlissSVGBuilder {
           // may be define()d afterwards. Reported so it is never silently inert.
           this.#warnings.push({
             code: WARNING_CODES.UNKNOWN_LAYER,
-            message: `"${key}" names no layer that is drawn, so nothing was emitted for it. The layers are ${[...LAYER_TARGETS].join(', ')}; write the attribute without a prefix to put it on the root.`,
+            message: unresolvedLayerKeyMessage(key),
             source: key,
           });
           continue;

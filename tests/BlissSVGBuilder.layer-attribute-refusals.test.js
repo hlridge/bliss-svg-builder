@@ -16,7 +16,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The link attributes dropped from every layer with a report, since a link
  *   is an `<a>` element and no layer is one.
  * - A key naming a layer that does not exist, an empty layer half and an empty
- *   attribute half, each reported once and each round-tripping.
+ *   attribute half, each reported once, each with its own reason, and each
+ *   round-tripping.
+ * - A known layer that is not currently drawn staying silent, since the
+ *   criterion is a layer the library knows and not one it is emitting.
  * - A layer attribute name refused by the safety gate.
  *
  * Does NOT cover:
@@ -133,7 +136,7 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
     });
   });
 
-  describe('when a global key names a layer that is not emitted', () => {
+  describe('when a layer key does not resolve to a layer and an attribute', () => {
     it.each([
       ['an unknown layer', '[foo--x=1]||B291', 'foo--x=1'],
       ['an empty layer name', '[--x=1]||B291', '--x=1'],
@@ -146,6 +149,50 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       expect(builder.svgCode).not.toContain('="oops"');
       expect(builder.svgCode).not.toMatch(/\s="/);
       expect(builder.toString()).toContain(written);
+    });
+
+    it.each([
+      ['an unknown layer', '[foo--x=1]||B291'],
+      ['an empty layer name', '[--x=1]||B291'],
+      ['no attribute at all', '[content--=oops]||B291'],
+    ])('reports %s exactly once', (_case, input) => {
+      // `--x` used to draw UNSAFE_ATTRIBUTE_NAME as well, because the whole key
+      // was judged as the attribute name when the layer half did not resolve
+      expect(new BlissSVGBuilder(input).warnings).toHaveLength(1);
+    });
+
+    it('tells an unknown layer name from an empty one', () => {
+      const unknown = new BlissSVGBuilder('[foo--x=1]||B291').warnings[0];
+      const empty = new BlissSVGBuilder('[--x=1]||B291').warnings[0];
+
+      expect(unknown.message).toContain('background, grid, content');
+      expect(empty.message).toContain('no layer');
+      expect(empty.message).not.toContain('names no layer the library knows');
+    });
+
+    it('does not call the content layer unknown when only the attribute is missing', () => {
+      const warning = new BlissSVGBuilder('[content--=oops]||B291').warnings[0];
+
+      expect(warning.message).toContain('no attribute');
+      expect(warning.message).not.toMatch(/no layer/);
+    });
+  });
+
+  describe('when a layer key names a layer that is known but not drawn', () => {
+    it('emits nothing and stays silent, matching the named grid options', () => {
+      const builder = new BlissSVGBuilder('[grid--opacity=0.3]||B291');
+
+      // the criterion is a layer the library KNOWS, not one it happens to be
+      // drawing; `[grid-color=red]` with the grid off is silent the same way
+      expect(builder.svgCode).not.toContain('opacity');
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it('emits it as soon as that layer is switched on', () => {
+      const builder = new BlissSVGBuilder('[grid;grid--opacity=0.3]||B291');
+
+      expect(builder.svgCode).toContain('opacity="0.3"');
+      expect(builder.warnings).toEqual([]);
     });
   });
 

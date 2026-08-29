@@ -345,13 +345,15 @@ A token that is not even a valid code shape (for example `!B81`) cannot be repre
 
 ### `UNKNOWN_LAYER`
 
-A global option whose key names a layer that is not drawn, or that names no attribute at all. The layers are `background`, `grid` and `content`; anything else has nothing to target, so nothing is emitted for it.
+A global option written in `<layer>--<attribute>` form that does not resolve to a layer and an attribute. The layers are `background`, `grid` and `content`; the three ways a key can miss share one code and each says which one it is:
 
 ```
-[foo--x=1]||B291       →  warns, nothing emitted, toString() still returns it
-[--x=1]||B291          →  warns: no layer named
-[content--=red]||B291  →  warns: no attribute named
+[foo--x=1]||B291       →  warns: names no layer the library knows
+[--x=1]||B291          →  warns: no layer name before the "--"
+[content--=red]||B291  →  warns: names the content layer but no attribute
 ```
+
+The test is a layer this library **knows**, not one it happens to be drawing. `[grid--opacity=0.3]||` with the grid switched off is silent and emits nothing, exactly as the named `[grid-color=red]` is silent there.
 
 Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a layer this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix.
 
