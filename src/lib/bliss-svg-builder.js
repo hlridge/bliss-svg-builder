@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -90,6 +90,17 @@ const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang',
 // we do not emit falls back to the whole key, so it is reported as an unknown
 // layer rather than as an unsafe name.
 const attributeNameOf = (key) => parseLayerAttributeKey(key)?.attribute ?? key;
+
+// Why a reserved name is refused, one reason per name: the two reserved sets
+// are guarded for different reasons and a single sentence covering both would
+// be true of neither. A Map rather than an object literal, so an inherited
+// name can never answer for a real one.
+const RESERVED_ATTRIBUTE_REASONS = new Map([
+  ['xmlns', 'declares what the file is rather than anything about the picture, and a second declaration moves everything under it out of SVG, where no renderer draws it'],
+  ['data-generator', "is the library's own stamp recording what produced the file, and a stamp anyone can overwrite tells its reader nothing; record your own pipeline under a name of your own"],
+]);
+const reservedAttributeMessage = (name) =>
+  `"${name}" ${RESERVED_ATTRIBUTE_REASONS.get(name)}, so the written value was refused.`;
 
 // Renders one layer's attribute map as markup. An empty map yields an empty
 // string, so a tag built from it closes without a stray space.
@@ -1357,6 +1368,28 @@ class BlissSVGBuilder {
           continue;
         }
         if (!isSafeAttributeName(target.attribute)) continue;
+        // RAW means we do not rename or reinterpret the attribute. It does not
+        // mean we will help write a file that cannot be parsed, so the two
+        // guards that judge a NAME apply here as well as on the root. The
+        // reaches differ: a name that declares the document breaks it wherever
+        // it lands, where the library's own root stamp collides with nothing
+        // one level down and is left alone.
+        if (DOCUMENT_DEFINING_ATTRIBUTES.has(target.attribute)) {
+          this.#warnings.push({
+            code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
+            message: reservedAttributeMessage(target.attribute),
+            source: target.attribute,
+          });
+          continue;
+        }
+        if (ANCHOR_ATTRIBUTE_NAMES.includes(target.attribute)) {
+          this.#warnings.push({
+            code: WARNING_CODES.MISPLACED_LINK_ATTRIBUTE,
+            message: `"${target.attribute}" only does anything on an <a> element, and the ${target.layer} layer is not one, so it was dropped instead of being emitted as markup that looks like a working link.`,
+            source: key,
+          });
+          continue;
+        }
         (this.#layerAttributes[target.layer] ??= {})[target.attribute] = value;
         continue;
       }
@@ -1367,10 +1400,10 @@ class BlissSVGBuilder {
       const attrName = Object.hasOwn(attrMap, key)
         ? attrMap[key]
         : (isNamedOptionKey(key) ? camelToKebab(key) : key);
-      if (LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
+      if (DOCUMENT_DEFINING_ATTRIBUTES.has(attrName) || LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
         this.#warnings.push({
           code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
-          message: `"${attrName}" is the library's own attribute and cannot be overridden: it states the file's format and provenance rather than anything about the picture, and a written value would only make the output unreadable. The library's value is kept.`,
+          message: reservedAttributeMessage(attrName),
           source: attrName,
         });
         continue;

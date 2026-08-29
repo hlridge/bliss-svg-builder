@@ -6,7 +6,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 
 **Scope:** the [Rendering](#rendering) and [Dots](#dots) options (plus [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through)) cascade at every scope: global `[opts]||`, word `[opts]|`, character `[opts]`, part `[opts]>`. Everything else on this page is canvas-wide and takes effect only at global scope; at any other scope the key is dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning.
 
-**Where a pass-through attribute lands:** at global scope it goes on the root `<svg>`, so it applies to the whole picture. Prefix it with `background--`, `grid--` or `content--` to target one layer instead. At any other scope it goes on the `<g>` wrapping that element, and a layer prefix there is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning. See [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through).
+**Where a pass-through attribute lands:** at global scope it goes on the root `<svg>`, so it applies to the whole picture. Prefix it with `background--`, `grid--` or `content--` to target one layer instead. At any other scope it goes on the `<g>` wrapping that element, and a layer prefix there is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning. Two names are refused behind a layer prefix: `xmlns`, which would move the subtree out of SVG, and the link attributes, which need an `<a>` element. See [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through).
 
 ---
 
@@ -15,7 +15,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | Option | Default | Range | Description |
 |--------|---------|-------|-------------|
 | `color` | `#000000` | Any color | Stroke color. This name is taken, so the raw `color` attribute is written `content--color` (see [layer targeting](/handbook/syntax-options/svg-pass-through#targeting-one-layer)) |
-| `stroke-width` | `0.5` | Any number | Line thickness |
+| `stroke-width` | `0.5` | Any drawable width | Line thickness. A negative width is floored to `0` and a non-finite one is ignored, both reported with [`OUT_OF_RANGE_STROKE_WIDTH`](/reference/warning-codes#out-of-range-stroke-width) |
 | `fill` | `none` | Any color | Fill color |
 | `opacity` | `1` | 0-1 | Transparency |
 

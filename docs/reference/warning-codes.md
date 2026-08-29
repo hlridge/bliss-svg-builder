@@ -218,6 +218,17 @@ Any other option in the same bracket is kept, so `[grid--opacity=0.3;fill=red]|B
 
 Dropping it is what keeps it out of the drawing. An unrecognized key is passed through to the SVG as an attribute, so leaving the layer key in place would put `grid--opacity="0.3"` into the output, where it means nothing to any renderer. To style just that element, write the attribute without a prefix.
 
+### `MISPLACED_LINK_ATTRIBUTE`
+
+A link attribute written for a layer: `href`, `target`, `rel`, `download`, `hreflang`, `type` or `referrerpolicy` behind a `background--`, `grid--` or `content--` prefix. A link is an `<a>` element wrapping the content it links, and no layer is one, so the attribute is dropped.
+
+```
+[content--href=https://example.com]||B291   →  warns, no attribute emitted
+[background=beige;background--href=…]||B291 →  warns, no attribute emitted
+```
+
+The layer channel emits an attribute name exactly as written, and this is one of the few places it refuses instead. Emitted, these attributes sit on a plain `<g>` or `<rect>`, where every engine ignores them, so the markup would read as a link that had simply stopped working. The written key survives `toString()`, so it re-reports rather than disappearing from a stored composition.
+
 ### `MISPLACED_SPACE_DECORATION`
 
 A coordinate (`:x,y`) or a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
@@ -348,14 +359,19 @@ Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a la
 
 ### `RESERVED_ATTRIBUTE_NAME`
 
-A global option naming one of the two root attributes the library owns: `xmlns` and `data-generator`. The written value is dropped and the library's own is kept.
+An option naming one of the two attributes the library owns: `xmlns` and `data-generator`. The written value is dropped and the library's own is kept.
 
 ```
-[xmlns=http://example.com]||B291  →  warns, the SVG namespace is kept
-[data-generator=me]||B291         →  warns, the library's stamp is kept
+[xmlns=http://example.com]||B291         →  warns, the SVG namespace is kept
+[data-generator=me]||B291                →  warns, the library's stamp is kept
+[content--xmlns=http://example.com]||B291 →  warns: xmlns is refused on a layer too
 ```
 
-`xmlns` has exactly one legal value; changing it does not make a different picture, it makes a file that browsers will not render and that this library's own `svgElement` cannot parse. `data-generator` records what produced the file, and a stamp anyone can overwrite tells a reader nothing. To record your own pipeline, add a `data-` attribute of your own.
+The two are guarded at different reaches, because they are refused for different reasons.
+
+`xmlns` has exactly one legal value, and it is refused **on every layer**, not only on the root: a second namespace declaration moves that whole subtree out of SVG, so browsers will not render it and this library's own `svgElement` cannot parse it. A bad value is one thing; a document that is no longer SVG is something else.
+
+`data-generator` is refused **on the root only**. It records what produced the file, and a stamp anyone can overwrite tells a reader nothing. On an inner layer the same name collides with nothing, so `[content--data-generator=me]||` is an ordinary data attribute and is emitted. To record your own pipeline on the root, add a `data-` attribute of your own.
 
 Every other root attribute is yours, including `width`, `height` and `viewBox`, which replace the computed values when you write them.
 

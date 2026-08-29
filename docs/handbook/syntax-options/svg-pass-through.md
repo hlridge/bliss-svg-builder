@@ -41,6 +41,13 @@ The prefixed form is a raw channel: the attribute name is emitted exactly as wri
 
 A layer prefix only means something at global scope, since the layers belong to the document as a whole. Written on a word, character or part it is reported and dropped. A prefix naming a layer that does not exist, such as `foo--x`, is reported too, and nothing is emitted for it.
 
+Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, so two names are refused here as well as on the root, each reported:
+
+- `xmlns`, on any layer. A second namespace declaration moves that whole subtree out of SVG, and nothing renders it. See [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name).
+- The link attributes (`href`, `target`, `rel`, `download`, `hreflang`, `type`, `referrerpolicy`), on any layer. A link is an `<a>` element wrapping the content it links, and a layer is a plain group or rectangle, so the attribute would sit where every engine ignores it. See [`MISPLACED_LINK_ATTRIBUTE`](/reference/warning-codes#misplaced-link-attribute).
+
+`data-generator` is not in that list: the library owns it on the root, where it stamps what produced the file, but `[content--data-generator=mine]||` collides with nothing and is emitted like any other data attribute.
+
 ```
 [stroke-dasharray=2,1]||B313
 ```

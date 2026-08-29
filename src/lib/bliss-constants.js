@@ -35,16 +35,26 @@ export const KNOWN_OPTION_KEYS = new Set([
 export const LAYER_TARGETS = new Set(['background', 'grid', 'content']);
 
 /**
- * The two root attributes the library owns outright, on the rule that the user
- * owns statements about the PICTURE and the library owns statements about the
- * FORMAT and about ITSELF. `xmlns` has exactly one legal value: overriding it
- * does not make a different picture, it makes a file that is not SVG, which no
- * browser renders and our own `svgElement` getter cannot parse.
- * `data-generator` is the library's provenance stamp about itself, and a stamp
- * anyone can overwrite is worth nothing to whoever reads it. A consumer
- * recording their own pipeline adds a name of their own instead.
+ * Attribute names that state what the FILE is rather than anything about the
+ * picture, so they are refused wherever they are written. `xmlns` has exactly
+ * one legal value here: a second declaration, at any depth, moves that subtree
+ * out of the SVG namespace, which makes a file no browser renders and our own
+ * `svgElement` getter cannot parse. A bad value is one thing; producing a
+ * document that is not SVG is something else, and that is why this set is not
+ * scoped to the root the way the one below is.
  */
-export const LIBRARY_OWNED_ROOT_ATTRIBUTES = new Set(['xmlns', 'data-generator']);
+export const DOCUMENT_DEFINING_ATTRIBUTES = new Set(['xmlns']);
+
+/**
+ * Names the library owns ON THE ROOT and nowhere else, on the rule that the
+ * user owns statements about the PICTURE and the library owns statements about
+ * ITSELF. `data-generator` is the provenance stamp, and a stamp anyone can
+ * overwrite is worth nothing to whoever reads it; a consumer recording their
+ * own pipeline adds a name of their own instead. The same name on an inner
+ * layer collides with nothing and is an ordinary data attribute the author set,
+ * so it is left alone there.
+ */
+export const LIBRARY_OWNED_ROOT_ATTRIBUTES = new Set(['data-generator']);
 
 /**
  * The written options whose whole job is to compute the root's `viewBox`. When
@@ -367,6 +377,12 @@ export const WARNING_CODES = Object.freeze({
   // target inside a group, character or part. Dropped there rather than passing
   // through to the markup as a `<g layer--attr="...">` nothing can use.
   MISPLACED_LAYER_OPTION: 'MISPLACED_LAYER_OPTION',
+  // a link attribute (href, target, rel, download, hreflang, type,
+  // referrerpolicy) written for a LAYER. A link is an <a> element wrapping the
+  // content it links; a layer is a plain group or rect and is not one, so the
+  // attribute has nothing to act on and is dropped rather than shipped as
+  // markup that looks like a working link and is not one.
+  MISPLACED_LINK_ATTRIBUTE: 'MISPLACED_LINK_ATTRIBUTE',
   // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
   // space: a space is a pure word-separator with no ink to position or style,
   // so the decoration is dropped and the space keeps its identity (ZSA is
@@ -426,12 +442,15 @@ export const WARNING_CODES = Object.freeze({
   // wherever it appears, so nothing can execute; the warning closes the
   // VISIBILITY gap, telling the author their key will never be emitted.
   UNSAFE_ATTRIBUTE_NAME: 'UNSAFE_ATTRIBUTE_NAME',
-  // a root attribute whose name belongs to the library rather than to the
-  // author (see LIBRARY_OWNED_ROOT_ATTRIBUTES). The written value is dropped and
-  // the library's own is kept, because overriding it would break the file
-  // format or forge the library's provenance stamp rather than change the
-  // picture. A new verb: refused because the NAME is ours, not because the
-  // value is unsafe or the position is wrong.
+  // an attribute whose name belongs to the library rather than to the author.
+  // The written value is dropped and the library's own is kept, because
+  // overriding it would break the file format or forge the library's
+  // provenance stamp rather than change the picture. A new verb: refused
+  // because the NAME is ours, not because the value is unsafe or the position
+  // is wrong. Two sets, guarded at different reaches: a name that declares the
+  // document (DOCUMENT_DEFINING_ATTRIBUTES) is refused at every layer, since it
+  // breaks the file wherever it lands; a name the library owns on the root
+  // (LIBRARY_OWNED_ROOT_ATTRIBUTES) is refused there only.
   RESERVED_ATTRIBUTE_NAME: 'RESERVED_ATTRIBUTE_NAME',
   // an option key that cannot travel in the transient channel because the
   // library consumes it while building the composition rather than while

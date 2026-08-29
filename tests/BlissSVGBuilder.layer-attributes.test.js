@@ -18,6 +18,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   produce identical SVG for the same key.
  *
  * Does NOT cover:
+ * - What the channel refuses (`xmlns`, the link attributes, an unknown layer,
+ *   an unsafe name), see `BlissSVGBuilder.layer-attribute-refusals.test.js`.
  * - Bare global attributes, which target the root, see
  *   `BlissSVGBuilder.svg-structure.test.js`.
  * - Verbatim attribute-name emission, see
@@ -223,31 +225,6 @@ describe('BlissSVGBuilder layer attributes', () => {
       const builder = new BlissSVGBuilder('[margin=2]||B291');
 
       expect(builder.warnings.some(w => w.code === 'MULTIPLE_GEOMETRY_VALUES')).toBe(false);
-    });
-  });
-
-  describe('when a global key names a layer that is not emitted', () => {
-    it.each([
-      ['an unknown layer', '[foo--x=1]||B291', 'foo--x=1'],
-      ['an empty layer name', '[--x=1]||B291', '--x=1'],
-      ['no attribute at all', '[content--=oops]||B291', 'content--=oops'],
-    ])('warns UNKNOWN_LAYER for %s, emits nothing, and round-trips', (_case, input, written) => {
-      const builder = new BlissSVGBuilder(input);
-
-      expect(builder.warnings.some(w => w.code === 'UNKNOWN_LAYER')).toBe(true);
-      expect(builder.svgCode).not.toContain('foo--x');
-      expect(builder.svgCode).not.toContain('="oops"');
-      expect(builder.svgCode).not.toMatch(/\s="/);
-      expect(builder.toString()).toContain(written);
-    });
-  });
-
-  describe('when a layer attribute name is refused by the safety gate', () => {
-    it('keeps an event handler out of the markup', () => {
-      const svg = new BlissSVGBuilder('[content--onclick=alert(1)]||B291').svgCode;
-
-      expect(svg).not.toContain('onclick');
-      expect(svg).not.toContain('alert(1)');
     });
   });
 
