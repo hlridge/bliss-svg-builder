@@ -1413,11 +1413,15 @@ class BlissSVGBuilder {
         }
         if (!isSafeAttributeName(target.attribute)) continue;
         // RAW means we do not rename or reinterpret the attribute. It does not
-        // mean we will help write a file that cannot be parsed, so the two
-        // guards that judge a NAME apply here as well as on the root. The
-        // reaches differ: a name that declares the document breaks it wherever
-        // it lands, where the library's own root stamp collides with nothing
-        // one level down and is left alone.
+        // mean we will help write a file that cannot be parsed, or markup that
+        // reads as a working link and is not one, so two guards judge the NAME
+        // here. NEITHER of them matches what the root does, for opposite
+        // reasons: a name that declares the document breaks it wherever it
+        // lands, so that guard reaches further than the root; the anchor family
+        // has a real destination at the root (the <a> wrap) and none on a
+        // layer, so that guard exists here and nowhere else. The library's own
+        // root stamp is the third case, and collides with nothing one level
+        // down, so it is left alone here.
         if (DOCUMENT_DEFINING_ATTRIBUTES.has(target.attribute)) {
           this.#warnings.push({
             code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
