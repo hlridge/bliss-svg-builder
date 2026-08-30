@@ -565,11 +565,11 @@ class BlissSVGBuilder {
       // earlier and has removed its own offenders by now, so nothing is
       // reported twice.
       for (const [key, value] of Object.entries(obj.options)) {
-        // A layer key is judged on the half after the `--`, since the prefix is
-        // routing rather than markup: `content--onclick` must be judged on
-        // `onclick`. When the prefix names no layer, the whole key is not an
-        // attribute name either, so judging it here would report the wrong
-        // defect on top of the UNKNOWN_LAYER the split loop already raises.
+        // A target key is judged on the half after the LAST `--`, since the
+        // prefix is routing rather than markup: `grid-line--sky--onclick` must
+        // be judged on `onclick`. When the prefix names no target, the whole key
+        // is not an attribute name either, so judging it here would report the
+        // wrong defect on top of the UNKNOWN_LAYER the split loop already raises.
         const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
         if (isLayerAttributeKey(key) && !target) continue;
         const name = target ? target.attribute : key;
