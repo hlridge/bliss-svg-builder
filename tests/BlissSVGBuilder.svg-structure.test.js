@@ -244,7 +244,11 @@ describe('BlissSVGBuilder svg structure', () => {
   describe('when bulk background is used alone without per-zone options', () => {
     it('renders a single full-height paper rect with no per-zone classes', () => {
       const svg = new BlissSVGBuilder('[background=lightblue]||H').svgCode;
+      // the first is a tripwire against the retired spelling returning; the
+      // second is what actually discriminates a per-zone class on the paper,
+      // since `bliss-background-zone--top` does not contain `bliss-background--`
       expect(svg).not.toContain('bliss-background--');
+      expect(svg).not.toContain('bliss-background-zone--');
       expect(svg).toContain('bliss-background');
       expect(svg).toContain('fill="lightblue"');
     });
@@ -262,10 +266,6 @@ describe('BlissSVGBuilder svg structure', () => {
     it('omits the bliss-background group entirely', () => {
       const svg = new BlissSVGBuilder('H').svgCode;
       expect(svg).not.toContain('bliss-background');
-    });
-
-    it('emits no background group when the background is not drawn', () => {
-      expect(new BlissSVGBuilder('H').svgCode).not.toContain('<g class="bliss-background">');
     });
   });
 
