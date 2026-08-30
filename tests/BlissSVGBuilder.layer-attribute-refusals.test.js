@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins what the `<layer>--<attribute>` channel refuses. The channel is RAW,
+ * Pins what the `<target>--<attribute>` channel refuses. The channel is RAW,
  * which means the library does not rename or reinterpret an attribute; it does
  * not mean the library will help write a file that cannot be parsed, or ship
  * an attribute that looks like a working link and is not one. Three refusals,
@@ -15,11 +15,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   and still guarded on the root, where it is the library's own stamp.
  * - The link attributes dropped from every layer with a report, since a link
  *   is an `<a>` element and no layer is one.
- * - A key naming a layer that does not exist, an empty layer half and an empty
- *   attribute half, each reported once, each with its own reason, and each
- *   round-tripping.
+ * - A key naming a target that does not exist, an empty target half and an
+ *   empty attribute half, each reported once, each with its own reason, and
+ *   each round-tripping.
  * - A known layer that is not currently drawn staying silent, since the
- *   criterion is a layer the library knows and not one it is emitting.
+ *   criterion is a target the library knows and not one it is emitting.
  * - A layer attribute name refused by the safety gate.
  *
  * Does NOT cover:
@@ -175,32 +175,35 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       expect(new BlissSVGBuilder(input).warnings).toHaveLength(1);
     });
 
-    it('tells an unknown layer name from an empty one', () => {
+    it('tells an unknown target name from an empty one', () => {
       const unknown = new BlissSVGBuilder('[foo--x=1]||B291').warnings[0];
       const empty = new BlissSVGBuilder('[--x=1]||B291').warnings[0];
 
-      expect(unknown.message).toContain('background, grid, content');
-      expect(empty.message).toContain('no layer');
-      expect(empty.message).not.toContain('names no layer the library knows');
+      expect(unknown.message).toContain('names no target the library knows');
+      expect(unknown.message).toContain('grid-line--sky');
+      expect(empty.message).toContain('no target name');
+      expect(empty.message).not.toContain('names no target the library knows');
     });
 
-    it('does not call the content layer unknown when only the attribute is missing', () => {
+    it('does not call the content target unknown when only the attribute is missing', () => {
       const warning = new BlissSVGBuilder('[content--=oops]||B291').warnings[0];
 
       expect(warning.message).toContain('no attribute');
-      expect(warning.message).not.toMatch(/no layer/);
+      expect(warning.message).not.toMatch(/no target/);
     });
 
     it.each([
       ['content', '[content--=oops]||B291'],
       ['grid', '[grid--=oops]||B291'],
       ['background', '[background--=oops]||B291'],
-    ])('names the %s layer it did resolve', (layer, input) => {
+      ['grid-line--sky', '[grid-line--sky--=oops]||B291'],
+    ])('names the %s target it did resolve', (target, input) => {
       const warning = new BlissSVGBuilder(input).warnings[0];
 
-      // two layers, because a message that hardcoded one name, or dropped the
-      // name entirely, would still read correctly against a single case
-      expect(warning.message).toContain(`names the ${layer} layer`);
+      // several targets, because a message that hardcoded one name, or dropped
+      // the name entirely, would still read correctly against a single case; the
+      // last row is a compound target, which the split must read whole
+      expect(warning.message).toContain(`names the ${target} target`);
     });
   });
 

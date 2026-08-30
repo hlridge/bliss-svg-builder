@@ -10,8 +10,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Covers:
  * - `grid--`, `content--` and `background--` each landing on their own element
  *   and on no other layer.
- * - `background--` landing on EACH zone rect when zones are on, never on the
- *   wrapper group.
+ * - `background--` landing on the wrapper group, which is the background's
+ *   single node; the rects that paint are reached with `background-zone--`.
  * - A layer attribute replacing a value the library computed for that layer.
  * - The structural class of each layer surviving a `<layer>--class`.
  * - Cross-surface parity: DSL, constructor options and the transient channel
@@ -87,27 +87,29 @@ describe('BlissSVGBuilder layer attributes', () => {
     });
   });
 
-  describe('when an attribute names the background layer', () => {
-    it('puts it on the single background rect', () => {
-      const svg = new BlissSVGBuilder('[background=beige;background--rx=2]||B291').svgCode;
+  describe('when an attribute names the background group', () => {
+    it('puts it on the wrapper and not on the paper', () => {
+      const svg = new BlissSVGBuilder('[background=beige;background--opacity=0.5]||B291').svgCode;
 
-      expect(svg).toMatch(/<rect class="bliss-background-zone"[^>]*rx="2"/);
-      expect(rootTag(svg)).not.toContain('rx=');
-      expect(svg).not.toContain('background--rx');
+      expect(svg).toContain('<g class="bliss-background" opacity="0.5">');
+      expect(svg).not.toMatch(/<rect[^>]*opacity="0.5"/);
     });
 
-    it('puts it on each zone rect and never on the wrapper group', () => {
-      const svg = new BlissSVGBuilder(
-        '[background-top=red;background-mid=green;background-bottom=blue;background--rx=2]||B291'
-      ).svgCode;
+    it('goes silently dead for an attribute a group cannot carry', () => {
+      // rx is meaningless on a <g>; warning about it would need a table of SVG
+      // semantics, which is the open-ended thing this library refuses to build.
+      // background-zone--rx is the spelling that paints.
+      const builder = new BlissSVGBuilder('[background=beige;background--rx=2]||B291');
 
-      expect(svg.match(/<rect [^>]*rx="2"/g)).toHaveLength(3);
-      expect(svg.match(/<g class="bliss-background"[^>]*>/)[0]).toBe('<g class="bliss-background">');
+      expect(builder.svgCode).toContain('<g class="bliss-background" rx="2">');
+      expect(builder.svgCode).not.toMatch(/<rect[^>]*rx="2"/);
+      expect(new BlissSVGBuilder('[background=beige;background-zone--rx=2]||B291').svgCode)
+        .toMatch(/<rect class="bliss-background-zone"[^>]*rx="2"/);
     });
 
-    it('keeps each zone rect its own structural class', () => {
+    it('keeps each zone rect its own structural classes', () => {
       const svg = new BlissSVGBuilder(
-        '[background-top=red;background-mid=green;background-bottom=blue;background--class=mine]||B291'
+        '[background-top=red;background-mid=green;background-bottom=blue;background-zone--class=mine]||B291'
       ).svgCode;
 
       expect(svg).toContain('class="bliss-background-zone bliss-background-zone--top mine"');

@@ -84,21 +84,21 @@ function serializeOptions(opts, skipKeys) {
 // allowlist-rejected href would resurface verbatim.
 const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
-// Why a layer key emitted nothing. All three shapes fail the same way, so they
+// Why a target key emitted nothing. All three shapes fail the same way, so they
 // share a code, but each fails for its own reason and a message covering all
-// three describes none of them: `content--` names a layer we know perfectly
+// three describes none of them: `content--` names a target we know perfectly
 // well, and `--x` names none at all.
 const unresolvedLayerKeyMessage = (key) => {
   // The same split parseLayerAttributeKey makes, so the reason reported is the
   // reason the key was actually rejected.
-  const layer = key.slice(0, key.indexOf('--'));
-  const layers = `The layers are ${[...LAYER_TARGETS].join(', ')}; write the attribute without a prefix to put it on the root.`;
+  const layer = key.slice(0, key.lastIndexOf('--'));
+  const targets = `A target is a class the library writes, without the "bliss-" prefix, and the attribute follows the LAST "--": ${[...LAYER_TARGETS].join(', ')}. Write the attribute with no prefix to put it on the root.`;
   if (!LAYER_TARGETS.has(layer)) {
     return layer === ''
-      ? `"${key}" has no layer name before the "--", so there is nothing for it to target and nothing was emitted. ${layers}`
-      : `"${key}" names no layer the library knows, so nothing was emitted for it. ${layers}`;
+      ? `"${key}" has no target name before the "--", so there is nothing for it to target and nothing was emitted. ${targets}`
+      : `"${key}" names no target the library knows, so nothing was emitted for it. ${targets}`;
   }
-  return `"${key}" names the ${layer} layer but no attribute after the "--", so there was nothing to emit.`;
+  return `"${key}" names the ${layer} target but no attribute after the "--", so there was nothing to emit.`;
 };
 
 // What `source` carries, one rule for every refusal: THE WHOLE KEY when the
@@ -4109,11 +4109,18 @@ class BlissSVGBuilder {
     // sits outside the content group and inherits `fill="none"` from the root.
     let svgText = "";
 
-    // A `background--` attribute belongs to the paper itself, so it lands on
-    // the rect that paints it, or on EACH zone rect when zones are on. The
-    // wrapper group below paints nothing and carries no authored attribute yet.
-    const backgroundAttrs = this.#layerAttributes.background;
-    const backgroundWrapper = `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.background, {}))}>`;
+    // The authored attributes for one element: every class it carries, applied
+    // general to specific, so the more specific class wins. That is the order the
+    // classes are written in, which is what makes the precedence readable in the
+    // markup rather than a rule to look up. Every key looked up here comes from
+    // ELEMENT_CLASSES and never from input, so an inherited name cannot reach it.
+    const authoredFor = (classes) =>
+      Object.assign({}, ...classes.map(c => this.#layerAttributes[targetOfClass(c)] ?? {}));
+
+    // `background--` names the group, which is the background's single node; the
+    // rects that paint are reached with `background-zone--`.
+    const backgroundWrapper = `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.background,
+      {}, authoredFor(ELEMENT_CLASSES.background)))}>`;
 
     let backgroundContent = '';
     if (hasZones) {
@@ -4132,7 +4139,8 @@ class BlissSVGBuilder {
 
       const zoneRect = (classes, y, height, fill) =>
         `    <rect ${formatAttributes(layerAttributes(classes,
-          { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill }, backgroundAttrs))}/>`;
+          { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill },
+          authoredFor(classes)))}/>`;
 
       const zoneRects = [
         topColor ? zoneRect(ELEMENT_CLASSES.zoneTop, topY, topHeight, topColor) : '',
@@ -4143,7 +4151,8 @@ class BlissSVGBuilder {
       backgroundContent = `${backgroundWrapper}\n${zoneRects}\n  </g>`;
     } else if (background !== "") {
       const paper = `    <rect ${formatAttributes(layerAttributes(ELEMENT_CLASSES.backgroundZone,
-        { x: viewBoxX, y: viewBoxY, width: '100%', height: '100%', stroke: 'none', fill: background }, backgroundAttrs))}/>`;
+        { x: viewBoxX, y: viewBoxY, width: '100%', height: '100%', stroke: 'none', fill: background },
+        authoredFor(ELEMENT_CLASSES.backgroundZone)))}/>`;
       backgroundContent = `${backgroundWrapper}\n${paper}\n  </g>`;
     }
 
@@ -4202,7 +4211,7 @@ class BlissSVGBuilder {
       const gridLine = (classes, strokeWidth, stroke, d) =>
         `    <path ${formatAttributes(layerAttributes(classes,
           { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square',
-            'stroke-linejoin': 'miter', d }))}/>`;
+            'stroke-linejoin': 'miter', d }, authoredFor(classes)))}/>`;
 
       const gridLines = [
         minorD  ? gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD)  : '',
@@ -4221,7 +4230,7 @@ class BlissSVGBuilder {
         '    }',
         '  </style>',
         `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.grid,
-          { 'shape-rendering': 'crispEdges' }, this.#layerAttributes.grid))}>`,
+          { 'shape-rendering': 'crispEdges' }, authoredFor(ELEMENT_CLASSES.grid)))}>`,
         gridLines,
         '  </g>',
       ].join('\n');
@@ -4274,7 +4283,7 @@ class BlissSVGBuilder {
       if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
     }
 
-    const contentAttrs = layerAttributes(ELEMENT_CLASSES.content, {}, this.#layerAttributes.content);
+    const contentAttrs = layerAttributes(ELEMENT_CLASSES.content, {}, authoredFor(ELEMENT_CLASSES.content));
 
     let svgStr = [
       `<svg ${formatAttributes(rootAttrs)}>`,

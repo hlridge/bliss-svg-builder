@@ -58,11 +58,23 @@ export const CLASS_PREFIX = 'bliss-';
 export const targetOfClass = (className) => className.slice(CLASS_PREFIX.length);
 
 /**
- * The layers a global attribute can name with a `<layer>--<attribute>` key.
- * A bare key targets the root, so there is deliberately no `svg--`: a second
- * spelling for one target is a duplicate.
+ * The targets a `<target>--<attribute>` key can name: every class the library
+ * writes, minus the prefix. Derived from ELEMENT_CLASSES rather than listed, so
+ * the vocabulary and the markup cannot drift apart. Membership decides only
+ * whether an unmatched target is SILENT or reported: resolution itself is class
+ * membership at the emitters, so a target is silent when its class exists and
+ * nothing drew it, and reported when no element could ever carry it.
+ *
+ * `root` is in here even though a bare key already reaches the root. C8 dropped
+ * `svg--` on the rule that a second spelling for one target is a duplicate;
+ * that rule is knowingly outweighed, because "every class you see works" is the
+ * value of this vocabulary and an exception for the outermost element is the
+ * one a reader would trip on. The collision it creates is resolved where the
+ * root's attributes are built, and reported.
  */
-export const LAYER_TARGETS = new Set(['background', 'grid', 'content']);
+export const LAYER_TARGETS = new Set(
+  Object.values(ELEMENT_CLASSES).flat().map(targetOfClass)
+);
 
 /**
  * Attribute names that state what the FILE is rather than anything about the
@@ -101,12 +113,16 @@ export const GEOMETRY_OPTION_KEYS = new Set([
 export const isLayerAttributeKey = (key) => key.includes('--');
 
 /**
- * Splits `grid--opacity` into its layer and its attribute. Returns null when
- * the layer is not one we emit or the attribute half is empty, so the caller
- * can report an unknown layer rather than emit a key nothing can use.
+ * Splits `grid-line--sky--stroke-dasharray` into its target and its attribute,
+ * at the LAST `--`. The boundary we need is between the class and the attribute,
+ * and every `--` inside a class name sits to the left of it, so a compound class
+ * can carry any number of them. Returns null when the target names no class we
+ * write or the attribute half is empty, so the caller reports rather than emits
+ * a key nothing can use. The cost is that `data--foo` is unreachable as an
+ * attribute NAME behind a prefix; that was weighed and accepted.
  */
 export const parseLayerAttributeKey = (key) => {
-  const at = key.indexOf('--');
+  const at = key.lastIndexOf('--');
   const layer = key.slice(0, at);
   const attribute = key.slice(at + 2);
   if (!LAYER_TARGETS.has(layer) || !attribute) return null;
@@ -455,12 +471,13 @@ export const WARNING_CODES = Object.freeze({
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',
-  // a global key in `<layer>--<attribute>` form that does not resolve to a
-  // layer and an attribute: a layer we do not KNOW (`foo--x`), an empty layer
+  // a global key in `<target>--<attribute>` form that does not resolve to a
+  // target and an attribute: a target we do not KNOW (`foo--x`), an empty target
   // half (`--x`), or an empty attribute half (`content--`). The test is
-  // LAYER_TARGETS membership and not whether the layer is currently drawn, so
-  // `grid--opacity` with the grid off is silent, matching the named grid
-  // options. Never emitted, but KEPT in the options bag so it round-trips, on
+  // LAYER_TARGETS membership and not whether the element is currently drawn, so
+  // `grid--opacity` with the grid off is silent, and so is a sub-element a crop
+  // removed, matching the named grid options. Never emitted, but KEPT in the
+  // options bag so it round-trips, on
   // the UNKNOWN_ family's own logic: the reference may become valid later,
   // exactly as UNKNOWN_CODE keeps a code you might define() afterwards.
   UNKNOWN_LAYER: 'UNKNOWN_LAYER',
