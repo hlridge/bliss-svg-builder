@@ -168,6 +168,9 @@ class BlissSVGBuilder {
   // Global `<layer>--<attribute>` values, grouped by the layer they name, and
   // applied at that layer's emission point. Rebuilt with globalSvgAttributes.
   #layerAttributes = {};
+  // Root attribute names that arrived as `root--`, so the render pass can tell
+  // a destination the author named from one the library resolved to.
+  #rootPrefixedNames = new Set();
   #sharedOptions;
   #mutationCtx;
   #warnings = [];
@@ -1395,6 +1398,34 @@ class BlissSVGBuilder {
     const attrMap = { 'color': 'stroke' };
     this.globalSvgAttributes = {};
     this.#layerAttributes = {};
+    // Which key wrote each root attribute, and whether it named the root
+    // explicitly. Explicit beats resolved in EITHER order, so this is an
+    // invariant rather than an artifact of the iteration order, the same way
+    // the element emitter resolves an explicit `stroke` against a `color`.
+    const rootAttributeSource = new Map();
+    // Names that arrived as `root--`. The vector-effect relocation reads this:
+    // it repairs the library's own default destination, so it belongs to the
+    // bare channel and never to a key that named the root deliberately.
+    this.#rootPrefixedNames = new Set();
+    const setRootAttribute = (name, key, explicit, value) => {
+      const prior = rootAttributeSource.get(name);
+      // Two bare keys are one channel and keep the last-wins silence they have
+      // always had. The report exists for the collision this feature creates,
+      // between a bare key and the `root--` spelling of the same attribute.
+      if (prior && (explicit || prior.explicit)) {
+        const winner = explicit ? key : prior.key;
+        const loser = explicit ? prior.key : key;
+        this.#warnings.push({
+          code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
+          message: `"${winner}" and "${loser}" both set "${name}" on the root, and only one value can be written there, so "${winner}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
+          source: loser,
+        });
+        if (!explicit) return;
+      }
+      rootAttributeSource.set(name, { key, explicit });
+      if (explicit) this.#rootPrefixedNames.add(name);
+      this.globalSvgAttributes[name] = value;
+    };
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (INTERNAL_OPTIONS.has(key)) continue;
       if (isLayerAttributeKey(key)) {
@@ -1436,9 +1467,29 @@ class BlissSVGBuilder {
         if (ANCHOR_ATTRIBUTE_NAMES.includes(target.attribute)) {
           this.#warnings.push({
             code: WARNING_CODES.MISPLACED_LINK_ATTRIBUTE,
-            message: `"${target.attribute}" only does anything on an <a> element, and the ${target.layer} layer is not one, so it was dropped instead of being emitted as markup that looks like a working link.`,
+            // "target", not "layer": the guard covers every class the library
+            // writes, so calling `grid-line--sky` a layer names it as something
+            // it is not. The root is the one target with a name of its own.
+            message: `"${target.attribute}" only does anything on an <a> element, and ${target.layer === 'root' ? 'the root <svg>' : `the ${target.layer} target`} is not one, so it was dropped instead of being emitted as markup that looks like a working link.`,
             source: key,
           });
+          continue;
+        }
+        if (target.layer === 'root') {
+          // The prefix suspends name RESOLUTION, never name GUARDS, so a
+          // prefixed root key faces every guard the bare branch faces. It goes
+          // into the same set the bare keys build, which is what lets the
+          // geometry displacement report and the root's attribute merge see it
+          // without knowing it arrived prefixed.
+          if (LIBRARY_OWNED_ROOT_ATTRIBUTES.has(target.attribute)) {
+            this.#warnings.push({
+              code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
+              message: reservedAttributeMessage(target.attribute),
+              source: key,
+            });
+            continue;
+          }
+          setRootAttribute(target.attribute, key, true, value);
           continue;
         }
         (this.#layerAttributes[target.layer] ??= {})[target.attribute] = value;
@@ -1459,7 +1510,9 @@ class BlissSVGBuilder {
         });
         continue;
       }
-      this.globalSvgAttributes[attrName] = value;
+      // The canonical kebab spelling a bracket carries, so a warning names what
+      // the author could have written and not the pipeline's internal name.
+      setRootAttribute(attrName, isNamedOptionKey(key) ? camelToKebab(key) : key, false, value);
     }
 
     // A written viewBox states the value the geometry options exist to compute,
@@ -4276,8 +4329,12 @@ class BlissSVGBuilder {
     // attribute; relocate it onto the glyph paths, where it takes effect.
     // Always remove it (even an empty value); only stamp the paths when there
     // is a value, matching the element-scope handling in BlissElement.
+    // Relocation repairs the library's OWN default destination, so it belongs
+    // to the bare channel alone. `root--vector-effect` names the root
+    // deliberately and is emitted there verbatim, dead, exactly as
+    // `content--vector-effect` is.
     let contentInner = content;
-    if ('vector-effect' in rootAttrs) {
+    if ('vector-effect' in rootAttrs && !this.#rootPrefixedNames.has('vector-effect')) {
       const vectorEffect = rootAttrs['vector-effect'];
       delete rootAttrs['vector-effect'];
       if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);

@@ -269,5 +269,17 @@ describe('BlissSVGBuilder layer attributes', () => {
       expect(api).toBe(dsl);
       expect(transient).toBe(dsl);
     });
+
+    it('renders a sub-element target identically from every surface', () => {
+      const key = 'grid-line--sky--stroke-dasharray';
+      const dsl = new BlissSVGBuilder(`[grid;${key}=2]||B291`).svgCode;
+      const api = new BlissSVGBuilder('B291', { grid: true, [key]: 2 }).svgCode;
+      const object = new BlissSVGBuilder(new BlissSVGBuilder(`[grid;${key}=2]||B291`).toJSON()).svgCode;
+      const transient = new BlissSVGBuilder('[grid]||B291').setTransientOptions({ [key]: 2 }).svgCode;
+
+      expect(api).toBe(dsl);
+      expect(object).toBe(dsl);
+      expect(transient).toBe(dsl);
+    });
   });
 });

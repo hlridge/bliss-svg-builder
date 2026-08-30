@@ -14,7 +14,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - `data-generator` left alone on a layer, where it collides with nothing,
  *   and still guarded on the root, where it is the library's own stamp.
  * - The link attributes dropped from every layer with a report, since a link
- *   is an `<a>` element and no layer is one.
+ *   is an `<a>` element and no layer is one, and the report naming what it
+ *   refused: a target for anything inside the picture, the root `<svg>` for the
+ *   outermost element.
  * - A key naming a target that does not exist, an empty target half and an
  *   empty attribute half, each reported once, each with its own reason, and
  *   each round-tripping.
@@ -128,6 +130,18 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       expect(warning.source).toBe('content--href');
       expect(warning.message).toContain('href');
       expect(warning.message).toContain('content');
+    });
+
+    it('calls a sub-element a target and the root an element', () => {
+      // the guard covers all fourteen targets, so "the grid-line--sky layer"
+      // would name a path as something it is not
+      const messageFor = (input) => new BlissSVGBuilder(input).warnings
+        .find(w => w.code === 'MISPLACED_LINK_ATTRIBUTE').message;
+
+      expect(messageFor('[grid;grid-line--sky--href=https://example.com]||B291'))
+        .toContain('the grid-line--sky target is not one');
+      expect(messageFor('[root--href=https://example.com]||B291'))
+        .toContain('the root <svg> is not one');
     });
 
     it('reports the layer spelling even when the layer is not drawn', () => {

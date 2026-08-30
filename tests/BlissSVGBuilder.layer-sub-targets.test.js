@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins the `<target>--<attribute>` channel below layer level: any class the
+ * Pins the `<target>--<attribute>` channel past layer level: any class the
  * library writes into the markup is a target, spelled without the `bliss-`
- * prefix, and the key splits at the LAST `--`.
+ * prefix, and the key splits at the LAST `--`. That reaches the parts inside a
+ * layer and the root `<svg>` alike, the root being the one target a bare global
+ * key already reaches under another spelling.
  *
  * Covers:
  * - A key naming one grid-line family landing on that family alone, and a key
@@ -12,6 +14,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   raw channel reproduces the curated `grid-major-color` cascade.
  * - Class-order precedence: the more specific class wins where both are written.
  * - Background parts: the paper rect, and one zone by name.
+ * - `root--` naming the outermost element: it beats the bare spelling of the
+ *   same attribute in either order and reports `MULTIPLE_ATTRIBUTE_VALUES`, it
+ *   faces every guard the bare spelling faces, and it is left out of the
+ *   `vector-effect` relocation the bare channel gets.
  * - `UNKNOWN_LAYER` for a target no class the library writes can supply,
  *   including an author-supplied class, a spelling that keeps the prefix, wrong
  *   case, a stray third dash, and an attribute name holding its own `--`.
@@ -85,6 +91,88 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
       expect(rounded).toHaveLength(1);
       expect(classesOf(rounded[0]).has('bliss-background-zone--mid')).toBe(true);
+    });
+  });
+
+  describe('when a key names the root', () => {
+    it('paints the root and not the content group', () => {
+      const svg = new BlissSVGBuilder('[root--fill=red]||B291').svgCode;
+
+      expect(svg.split('\n')[0]).toContain('fill="red"');
+      expect(svg).toContain('<g class="bliss-content">');
+    });
+
+    it.each([
+      ['the curated alias', '[color=red;root--stroke=blue]||B291', 'stroke="blue"', 'color'],
+      ['the reverse order',  '[root--stroke=blue;color=red]||B291', 'stroke="blue"', 'color'],
+      ['two explicit widths', '[stroke-width=2;root--stroke-width=3]||B291', 'stroke-width="3"', 'stroke-width'],
+    ])('lets the named target beat %s and reports the loser', (_case, input, expected, loser) => {
+      const builder = new BlissSVGBuilder(input);
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(builder.svgCode.split('\n')[0]).toContain(expected);
+      expect(warning).toBeDefined();
+      // the spelling the author could have written, never the internal camelCase
+      expect(warning.source).toBe(loser);
+      expect(warning.message).not.toContain('strokeWidth');
+    });
+
+    it.each([
+      ['ahead of it', '[root--fill=red;fill=blue]||B291'],
+      ['behind it', '[fill=blue;root--fill=red]||B291'],
+    ])('wins and names the bare key with that key %s', (_case, input) => {
+      // the curated spellings above cannot show this: the options pass hands
+      // every curated key to the split loop BEFORE any raw key, whatever order
+      // they were written in, so `color` and `stroke-width` only ever arrive
+      // bare-first. `fill` is not curated and keeps its written position, which
+      // is the only way to run the loop the other way round
+      const builder = new BlissSVGBuilder(input);
+
+      expect(builder.svgCode.split('\n')[0]).toContain('fill="red"');
+      expect(builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES').source).toBe('fill');
+    });
+
+    it('reports a duplicate even when the two values are equal', () => {
+      // MULTIPLE_ reports more-than-one, not value-lost
+      const builder = new BlissSVGBuilder('[fill=red;root--fill=red]||B291');
+
+      expect(builder.warnings.map(w => w.code)).toContain('MULTIPLE_ATTRIBUTE_VALUES');
+    });
+
+    it('leaves two bare keys alone', () => {
+      // one channel, unchanged: last-wins and silent, exactly as before
+      expect(new BlissSVGBuilder('[color=red;stroke=blue]||B291').warnings).toHaveLength(0);
+    });
+
+    it('reports the geometry it displaced', () => {
+      const builder = new BlissSVGBuilder('[margin=2;root--viewBox=0 0 10 10]||B291');
+
+      expect(builder.warnings.map(w => w.code)).toContain('MULTIPLE_GEOMETRY_VALUES');
+      expect(builder.svgCode).toContain('viewBox="0 0 10 10"');
+    });
+
+    it.each([
+      ['the provenance stamp', '[root--data-generator=mine]||B291', 'RESERVED_ATTRIBUTE_NAME', 'mine'],
+      ['the namespace',        '[root--xmlns=x]||B291',             'RESERVED_ATTRIBUTE_NAME', 'xmlns="x"'],
+      ['a link attribute',     '[root--href=https://example.com]||B291', 'MISPLACED_LINK_ATTRIBUTE', 'example.com'],
+    ])('refuses %s', (_case, input, code, absent) => {
+      const builder = new BlissSVGBuilder(input);
+
+      expect(builder.warnings.map(w => w.code)).toContain(code);
+      expect(builder.svgCode).toContain('data-generator="bliss-svg-builder');
+      expect(builder.svgCode).not.toContain(absent);
+    });
+
+    it('does not relocate a vector-effect that names the root', () => {
+      // the relocation repairs OUR default destination, so it belongs to the bare
+      // channel; a prefixed key names a destination the author chose
+      const prefixed = new BlissSVGBuilder('[root--vector-effect=non-scaling-stroke]||B291').svgCode;
+      const bare = new BlissSVGBuilder('[vector-effect=non-scaling-stroke]||B291').svgCode;
+
+      expect(prefixed.split('\n')[0]).toContain('vector-effect="non-scaling-stroke"');
+      expect(prefixed).not.toMatch(/<path[^>]*vector-effect/);
+      expect(bare.split('\n')[0]).not.toContain('vector-effect');
+      expect(bare).toMatch(/<path[^>]*vector-effect/);
     });
   });
 

@@ -468,6 +468,15 @@ export const WARNING_CODES = Object.freeze({
   // wins and the options it displaced are named. Writing either one alone is
   // not a conflict and stays silent.
   MULTIPLE_GEOMETRY_VALUES: 'MULTIPLE_GEOMETRY_VALUES',
+  // one attribute written twice for one element: a bare global key and the
+  // `root--` spelling of the same attribute, or a curated option and a raw key
+  // that reach the same attribute on the same element. The key that NAMES its
+  // target wins, because it states a destination where the other has to be
+  // resolved to one, and the displaced key is named. It reports more-than-one
+  // rather than value-lost, so two equal values still raise it. Silent when the
+  // layer that would carry them is switched off, matching every other statement
+  // about an absent layer.
+  MULTIPLE_ATTRIBUTE_VALUES: 'MULTIPLE_ATTRIBUTE_VALUES',
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
   UNKNOWN_CODE: 'UNKNOWN_CODE',
