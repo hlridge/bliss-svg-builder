@@ -4107,11 +4107,11 @@ class BlissSVGBuilder {
     let svgText = "";
 
     // A `background--` attribute belongs to the paper itself, so it lands on
-    // the rect that paints it, or on EACH zone rect when zones are on, never on
-    // the wrapper group, which paints nothing.
+    // the rect that paints it, or on EACH zone rect when zones are on. The
+    // wrapper group below paints nothing and carries no authored attribute yet.
     const backgroundAttrs = this.#layerAttributes.background;
 
-    let backgroundContent;
+    let backgroundContent = '';
     if (hasZones) {
       const bulkBg = background;
       const topColor = backgroundTop || bulkBg;
@@ -4127,19 +4127,20 @@ class BlissSVGBuilder {
       const bottomHeight = round(Math.max(0, viewBoxY + viewBoxHeight - 16));
 
       const zoneRect = (structuralClass, y, height, fill) =>
-        `    <rect ${formatAttributes(layerAttributes(structuralClass,
+        `    <rect ${formatAttributes(layerAttributes(`bliss-background-zone ${structuralClass}`,
           { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill }, backgroundAttrs))}/>`;
 
       const zoneRects = [
-        topColor ? zoneRect('bliss-background--top', topY, topHeight, topColor) : '',
-        midColor ? zoneRect('bliss-background--mid', 8, 8, midColor) : '',
-        bottomColor ? zoneRect('bliss-background--bottom', 16, bottomHeight, bottomColor) : '',
+        topColor ? zoneRect('bliss-background-zone--top', topY, topHeight, topColor) : '',
+        midColor ? zoneRect('bliss-background-zone--mid', 8, 8, midColor) : '',
+        bottomColor ? zoneRect('bliss-background-zone--bottom', 16, bottomHeight, bottomColor) : '',
       ].filter(Boolean).join('\n');
 
       backgroundContent = `  <g class="bliss-background">\n${zoneRects}\n  </g>`;
-    } else {
-      backgroundContent = background === "" ? "" : `  <rect ${formatAttributes(layerAttributes('bliss-background',
+    } else if (background !== "") {
+      const paper = `    <rect ${formatAttributes(layerAttributes('bliss-background-zone',
         { x: viewBoxX, y: viewBoxY, width: '100%', height: '100%', stroke: 'none', fill: background }, backgroundAttrs))}/>`;
+      backgroundContent = `  <g class="bliss-background">\n${paper}\n  </g>`;
     }
 
     // Grid boundaries adjusted for cropping

@@ -42,7 +42,8 @@ function render(input, opts) {
 
 // Extract the height attribute of one background-zone rect (top/mid/bottom).
 const zoneHeight = (svg, zone) =>
-  svg.match(new RegExp(`<rect class="bliss-background--${zone}"[^>]*height="([^"]+)"`))[1];
+  svg.match(new RegExp(
+    `<rect class="bliss-background-zone bliss-background-zone--${zone}"[^>]*height="([^"]+)"`))[1];
 
 const ZONES = { 'background-top': 'red', 'background-mid': 'green', 'background-bottom': 'blue' };
 
@@ -135,7 +136,7 @@ describe('BlissSVGBuilder crop dimension clamp', () => {
       // above the earth line (16), so the raw bottom-zone height is -1.25
       const svg = new BlissSVGBuilder('[background-top=red;background-mid=green;background-bottom=blue;crop-bottom=6]||B313').svgCode;
       // pins the zone-height floor; unclamped this emits height="-1.25" (invalid SVG)
-      expect(svg).toContain('<rect class="bliss-background--bottom" x="-0.75" y="16" width="9.5" height="0" stroke="none" fill="blue"/>');
+      expect(svg).toContain('<rect class="bliss-background-zone bliss-background-zone--bottom" x="-0.75" y="16" width="9.5" height="0" stroke="none" fill="blue"/>');
       expect(svg).not.toContain('height="-');
     });
 

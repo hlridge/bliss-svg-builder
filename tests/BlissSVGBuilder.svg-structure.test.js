@@ -21,9 +21,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - bliss-grid-line CSS class names (--minor / --medium / --major /
  *   --major--sky / --major--earth) and absence of unprefixed grid-line
  *   classes.
- * - bliss-background group per-zone rendering (--top / --mid / --bottom);
- *   bulk background as zone default; single bliss-background rect when
- *   background is set without zones; absence when no background option.
+ * - bliss-background group per-zone rendering (bliss-background-zone--top /
+ *   --mid / --bottom); bulk background as zone default; a single
+ *   bliss-background-zone rect inside the bliss-background group when
+ *   background is set without zones; absence of both when no background
+ *   option.
  * - Background zone Y coordinates under default margin (top extends into
  *   top margin to y=-0.75; mid covers y=8..16; bottom extends into bottom
  *   margin to y+height=20.75).
@@ -205,46 +207,54 @@ describe('BlissSVGBuilder svg structure', () => {
   describe('when individual background zone options are set', () => {
     it('renders the top zone rect when background-top is set', () => {
       const svg = new BlissSVGBuilder('[background-top=pink]||H').svgCode;
-      expect(svg).toContain('class="bliss-background--top"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--top"');
       expect(svg).toContain('fill="pink"');
       expect(svg).toContain('<g class="bliss-background">');
     });
 
     it('renders the mid zone rect when background-mid is set', () => {
       const svg = new BlissSVGBuilder('[background-mid=lightgreen]||H').svgCode;
-      expect(svg).toContain('class="bliss-background--mid"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--mid"');
       expect(svg).toContain('fill="lightgreen"');
     });
 
     it('renders the bottom zone rect when background-bottom is set', () => {
       const svg = new BlissSVGBuilder('[background-bottom=lightblue]||H').svgCode;
-      expect(svg).toContain('class="bliss-background--bottom"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--bottom"');
       expect(svg).toContain('fill="lightblue"');
     });
 
     it('renders all three zone rects when top, mid, and bottom are all set', () => {
       const svg = new BlissSVGBuilder('[background-top=red;background-mid=green;background-bottom=blue]||H').svgCode;
-      expect(svg).toContain('bliss-background--top');
-      expect(svg).toContain('bliss-background--mid');
-      expect(svg).toContain('bliss-background--bottom');
+      expect(svg).toContain('bliss-background-zone--top');
+      expect(svg).toContain('bliss-background-zone--mid');
+      expect(svg).toContain('bliss-background-zone--bottom');
     });
   });
 
   describe('when bulk background interacts with per-zone overrides', () => {
     it('uses the bulk value as the default fill for zones the per-zone option did not override', () => {
       const svg = new BlissSVGBuilder('[background=gray;background-top=pink]||H').svgCode;
-      expect(svg).toMatch(/bliss-background--top[^>]*fill="pink"/);
-      expect(svg).toMatch(/bliss-background--mid[^>]*fill="gray"/);
-      expect(svg).toMatch(/bliss-background--bottom[^>]*fill="gray"/);
+      expect(svg).toMatch(/bliss-background-zone--top[^>]*fill="pink"/);
+      expect(svg).toMatch(/bliss-background-zone--mid[^>]*fill="gray"/);
+      expect(svg).toMatch(/bliss-background-zone--bottom[^>]*fill="gray"/);
     });
   });
 
   describe('when bulk background is used alone without per-zone options', () => {
-    it('renders a single full-height bliss-background rect with no per-zone classes', () => {
+    it('renders a single full-height paper rect with no per-zone classes', () => {
       const svg = new BlissSVGBuilder('[background=lightblue]||H').svgCode;
       expect(svg).not.toContain('bliss-background--');
       expect(svg).toContain('bliss-background');
       expect(svg).toContain('fill="lightblue"');
+    });
+
+    it('wraps the single paper rect in a bliss-background group', () => {
+      const svg = new BlissSVGBuilder('[background=lightblue]||H').svgCode;
+      expect(svg).toContain('<g class="bliss-background">');
+      expect(svg).toContain('<rect class="bliss-background-zone"');
+      // the wrapper paints nothing, so the fill must be on the rect and not on it
+      expect(svg).toMatch(/<rect class="bliss-background-zone"[^>]*fill="lightblue"/);
     });
   });
 
@@ -253,27 +263,31 @@ describe('BlissSVGBuilder svg structure', () => {
       const svg = new BlissSVGBuilder('H').svgCode;
       expect(svg).not.toContain('bliss-background');
     });
+
+    it('emits no background group when the background is not drawn', () => {
+      expect(new BlissSVGBuilder('H').svgCode).not.toContain('<g class="bliss-background">');
+    });
   });
 
   describe('when computing background zone Y coordinates with default margin', () => {
     // Default margin=0.75; top zone extends into the top margin (y starts at -0.75).
     it('extends the top zone into the top margin from y=-0.75 to y=8', () => {
       const svg = new BlissSVGBuilder('[background-top=pink]||H').svgCode;
-      expect(svg).toMatch(/bliss-background--top[^>]*y="-0.75"/);
-      expect(svg).toMatch(/bliss-background--top[^>]*height="8.75"/);
+      expect(svg).toMatch(/bliss-background-zone--top[^>]*y="-0.75"/);
+      expect(svg).toMatch(/bliss-background-zone--top[^>]*height="8.75"/);
     });
 
     it('covers y=8 to y=16 for the mid zone', () => {
       const svg = new BlissSVGBuilder('[background-mid=pink]||H').svgCode;
-      expect(svg).toMatch(/bliss-background--mid[^>]*y="8"/);
-      expect(svg).toMatch(/bliss-background--mid[^>]*height="8"/);
+      expect(svg).toMatch(/bliss-background-zone--mid[^>]*y="8"/);
+      expect(svg).toMatch(/bliss-background-zone--mid[^>]*height="8"/);
     });
 
     // Default margin=0.75; bottom zone extends to viewBoxY + viewBoxHeight = 20.75.
     it('extends the bottom zone from y=16 into the bottom margin to y+height=20.75', () => {
       const svg = new BlissSVGBuilder('[background-bottom=pink]||H').svgCode;
-      expect(svg).toMatch(/bliss-background--bottom[^>]*y="16"/);
-      expect(svg).toMatch(/bliss-background--bottom[^>]*height="4.75"/);
+      expect(svg).toMatch(/bliss-background-zone--bottom[^>]*y="16"/);
+      expect(svg).toMatch(/bliss-background-zone--bottom[^>]*height="4.75"/);
     });
   });
 
@@ -364,12 +378,21 @@ describe('BlissSVGBuilder svg structure', () => {
     it('indents direct children of <svg> by 2 spaces', () => {
       const svg = new BlissSVGBuilder('[svg-title=t;svg-desc=d;background=#eee;grid]||H').svgCode;
       const childTags = lines(svg).filter(l =>
-        /^\s+<(title|desc|rect|style|g\s)/.test(l)
+        /^\s+<(title|desc|style|g\s)/.test(l)
       );
       expect(childTags.length).toBeGreaterThan(0);
       for (const line of childTags) {
         expect(line).toMatch(/^  </, `Expected 2-space indent: "${line}"`);
         expect(line).not.toMatch(/^    </, `Expected exactly 2 spaces, not 4: "${line}"`);
+      }
+    });
+
+    it('indents the paper rect as a grandchild by 4 spaces', () => {
+      const svg = new BlissSVGBuilder('[svg-title=t;svg-desc=d;background=#eee;grid]||H').svgCode;
+      const rectLines = lines(svg).filter(l => /^\s+<rect /.test(l));
+      expect(rectLines.length).toBeGreaterThan(0);
+      for (const line of rectLines) {
+        expect(line).toMatch(/^    <rect /, `Expected 4-space indent: "${line}"`);
       }
     });
 
@@ -442,7 +465,9 @@ describe('BlissSVGBuilder svg structure', () => {
       const svg = new BlissSVGBuilder('[svg-title=t;background=#fff]||H').svgCode;
       const svgLines = lines(svg);
       const bgIdx = svgLines.findIndex(l => l.includes('bliss-background'));
-      expect(svgLines[bgIdx + 1]).toMatch(/^  </);
+      // the background is a group now, so the next sibling follows its close
+      const bgCloseIdx = svgLines.indexOf('  </g>', bgIdx);
+      expect(svgLines[bgCloseIdx + 1]).toMatch(/^  </);
     });
   });
 

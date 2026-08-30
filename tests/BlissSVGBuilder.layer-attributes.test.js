@@ -91,7 +91,7 @@ describe('BlissSVGBuilder layer attributes', () => {
     it('puts it on the single background rect', () => {
       const svg = new BlissSVGBuilder('[background=beige;background--rx=2]||B291').svgCode;
 
-      expect(svg).toMatch(/<rect class="bliss-background"[^>]*rx="2"/);
+      expect(svg).toMatch(/<rect class="bliss-background-zone"[^>]*rx="2"/);
       expect(rootTag(svg)).not.toContain('rx=');
       expect(svg).not.toContain('background--rx');
     });
@@ -110,9 +110,9 @@ describe('BlissSVGBuilder layer attributes', () => {
         '[background-top=red;background-mid=green;background-bottom=blue;background--class=mine]||B291'
       ).svgCode;
 
-      expect(svg).toContain('class="bliss-background--top mine"');
-      expect(svg).toContain('class="bliss-background--mid mine"');
-      expect(svg).toContain('class="bliss-background--bottom mine"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--top mine"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--mid mine"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--bottom mine"');
     });
   });
 

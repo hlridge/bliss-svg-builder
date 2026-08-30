@@ -30,9 +30,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   not double-escaped.
  * - `text=...` option is accepted by the parser but does not currently render
  *   a `<text>` element (placeholder; future feature).
- * - `background=COLOR` renders a `<rect class="bliss-background" ... fill="…"/>`
- *   that covers the full viewBox via `width="100%" height="100%"` and is
- *   positioned at the viewBox origin (margin- and crop-aware).
+ * - `background=COLOR` renders a `<rect class="bliss-background-zone" ...
+ *   fill="…"/>`, inside a `<g class="bliss-background">` wrapper, that covers
+ *   the full viewBox via `width="100%" height="100%"` and is positioned at the
+ *   viewBox origin (margin- and crop-aware).
  * - Default background is transparent (no `<rect>` emitted); empty-string
  *   value is treated as no background.
  * - Background color value formats: named colors, hex (`#rrggbb`), hsl(),
@@ -295,7 +296,7 @@ describe('BlissSVGBuilder svg metadata', () => {
       const svg = builder.svgCode;
 
       // H with margin=0 → viewBox="0 0 8 20"; rect covers full viewBox
-      expect(svg).toContain('<rect class="bliss-background" x="0" y="0" width="100%" height="100%" stroke="none" fill="red"/>');
+      expect(svg).toContain('<rect class="bliss-background-zone" x="0" y="0" width="100%" height="100%" stroke="none" fill="red"/>');
     });
 
     it('has transparent background by default (no rect)', () => {
@@ -349,7 +350,7 @@ describe('BlissSVGBuilder svg metadata', () => {
       const svg = builder.svgCode;
 
       // H with margin=2 → viewBox="-2 -2 12 24"
-      expect(svg).toContain('<rect class="bliss-background" x="-2" y="-2" width="100%" height="100%" stroke="none" fill="yellow"/>');
+      expect(svg).toContain('<rect class="bliss-background-zone" x="-2" y="-2" width="100%" height="100%" stroke="none" fill="yellow"/>');
     });
 
     it('positions rect correctly with crop', () => {
@@ -357,7 +358,7 @@ describe('BlissSVGBuilder svg metadata', () => {
       const svg = builder.svgCode;
 
       // H with margin=0, crop=1 → viewBox="1 1 6 18"
-      expect(svg).toContain('<rect class="bliss-background" x="1" y="1" width="100%" height="100%" stroke="none" fill="green"/>');
+      expect(svg).toContain('<rect class="bliss-background-zone" x="1" y="1" width="100%" height="100%" stroke="none" fill="green"/>');
     });
 
     it('background rect comes before content (z-order)', () => {
