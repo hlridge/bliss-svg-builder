@@ -14,6 +14,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   raw channel reproduces the curated `grid-major-color` cascade.
  * - Class-order precedence: the more specific class wins where both are written.
  * - Background parts: the paper rect, and one zone by name.
+ * - A raw key beating a WRITTEN curated option: the raw value paints, the curated
+ *   option is named once and the elements it lost are listed, and nothing is said
+ *   where only a library default was displaced or the layer is switched off.
  * - `root--` naming the outermost element: it beats the bare spelling of the
  *   same attribute in either order and reports `MULTIPLE_ATTRIBUTE_VALUES`, it
  *   faces every guard the bare spelling faces, and it is left out of the
@@ -224,6 +227,97 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
       expect(linesWithClass(svg, 'bliss-background-zone--top')[0]).toContain('rx="9"');
       expect(linesWithClass(svg, 'bliss-background-zone--mid')[0]).toContain('rx="1"');
+    });
+  });
+
+  describe('when a raw key displaces a curated one', () => {
+    it('paints the raw value and names the curated option', () => {
+      const builder = new BlissSVGBuilder('[grid;grid-sky-color=blue;grid-line--stroke=red]||B291');
+      const sky = linesWithClass(builder.svgCode, 'bliss-grid-line--sky')[0];
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(sky).toContain('stroke="red"');
+      expect(sky).not.toContain('stroke="blue"');
+      expect(warning.source).toBe('grid-sky-color');
+      expect(warning.message).toContain('grid-line--sky');
+      // pins the surviving key by name: "remove whichever you did not mean" is
+      // unusable if the message names the wrong one, and naming both keys
+      // without saying which won reads either way round
+      expect(warning.message).toContain('so "grid-line--stroke" was used');
+    });
+
+    it('says nothing when the raw key only displaces a default', () => {
+      // overriding what the library chose is not two statements from the author
+      expect(new BlissSVGBuilder('[grid;grid-line--stroke=red]||B291').warnings).toHaveLength(0);
+    });
+
+    it('says nothing when the layer is switched off', () => {
+      // a statement about what an attribute DOES is silent where nothing draws
+      expect(new BlissSVGBuilder('[grid-sky-color=blue;grid-line--stroke=red]||B291').warnings)
+        .toHaveLength(0);
+    });
+
+    it('names each displaced option once, listing every element it reached', () => {
+      const builder = new BlissSVGBuilder(
+        '[grid;grid-color=blue;grid-sky-color=green;grid-line--stroke=red]||B291');
+      const displaced = builder.warnings.filter(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(displaced.map(w => w.source)).toEqual(['grid-color', 'grid-sky-color']);
+      // grid-color still reaches four families; the sky one went to grid-sky-color
+      expect(displaced[0].message).toContain('grid-line--minor');
+      expect(displaced[0].message).toContain('grid-line--earth');
+      expect(displaced[0].message).not.toContain('grid-line--sky');
+    });
+
+    it('names the most specific raw key when several could displace', () => {
+      const builder = new BlissSVGBuilder(
+        '[grid;grid-sky-color=blue;grid-line--stroke=red;grid-line--sky--stroke=green]||B291');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning.message).toContain('grid-line--sky--stroke');
+      expect(warning.message).not.toContain('"grid-line--stroke"');
+    });
+
+    it('does not report a raw key that a more specific raw key overrides', () => {
+      // two targets naming overlapping sets is the point of the feature, not a
+      // collision, so class-order precedence is silent
+      expect(new BlissSVGBuilder(
+        '[grid;grid-line--stroke=red;grid-line--sky--stroke=blue]||B291').warnings).toHaveLength(0);
+    });
+
+    it('reports a displaced background colour', () => {
+      const builder = new BlissSVGBuilder('[background-top=red;background-zone--top--fill=blue]||B291');
+
+      expect(builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES').source)
+        .toBe('background-top');
+    });
+
+    it('names the paper rect alone when no zones are drawn', () => {
+      // which of the paper rect and the three zones draws is settled before the
+      // report runs, so naming a zone the author never asked for would name an
+      // element their output does not contain
+      const builder = new BlissSVGBuilder('[background=beige;background-zone--fill=blue]||B291');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(builder.svgCode).toMatch(/<rect class="bliss-background-zone"[^>]*fill="blue"/);
+      expect(warning.source).toBe('background');
+      expect(warning.message).toContain('background-zone');
+      expect(warning.message).not.toContain('--top');
+    });
+
+    it('names the kebab spelling of an option written in camelCase', () => {
+      // object input is the one surface that keeps a camelCase key (the DSL,
+      // the constructor and the transient channel all canonicalize on the way
+      // in), and the key still reaches the curated destination, so the report
+      // has to recognise it and name a spelling a bracket could carry
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }] }] }],
+        options: { grid: true, gridSkyColor: 'blue', 'grid-line--stroke': 'red' },
+      });
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning.source).toBe('grid-sky-color');
+      expect(warning.message).not.toContain('gridSkyColor');
     });
   });
 

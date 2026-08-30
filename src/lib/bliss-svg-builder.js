@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, targetOfClass, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, targetOfClass, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -1368,10 +1368,18 @@ class BlissSVGBuilder {
     }
 
     // Captured BEFORE the options pass, which expands the bulk spellings
-    // (`margin` becomes four keys) and so can no longer name what was written.
-    const writtenGeometryOptions = Object.keys({
+    // (`margin` becomes four keys, `grid-color` becomes five) and so can no
+    // longer name what was written.
+    const writtenKeys = Object.keys({
       ...(blissObj.options ?? {}), ...(blissObj.transientOptions ?? {}),
-    }).filter(key => GEOMETRY_OPTION_KEYS.has(camelToKebab(key)));
+    });
+    const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(camelToKebab(key)));
+    // Canonicalized to the kebab spelling a bracket carries. Object input is the
+    // one surface that keeps a camelCase key, the DSL, the constructor and the
+    // transient channel all canonicalizing on the way in, and the key still
+    // reaches the option it names. Only curated keys are canonicalized: an
+    // attribute name is emitted as written and hyphenating one is a guess.
+    const writtenOptions = new Set(writtenKeys.filter(isNamedOptionKey).map(camelToKebab));
 
     this.#processAllOptions(blissObj, true);
 
@@ -1513,6 +1521,70 @@ class BlissSVGBuilder {
       // The canonical kebab spelling a bracket carries, so a warning names what
       // the author could have written and not the pipeline's internal name.
       setRootAttribute(attrName, isNamedOptionKey(key) ? camelToKebab(key) : key, false, value);
+    }
+
+    // Whether the element a target names is painted at all, decided from the
+    // processed options exactly as the emitters decide it. A report about what an
+    // attribute DOES is silent where nothing draws; UNKNOWN_LAYER, which reports
+    // whether a target EXISTS, is deliberately not gated this way.
+    //
+    // Per element for the background, where the paper rect and the three zones
+    // are mutually exclusive and that choice is already settled here: naming a
+    // zone the author never asked for would name an element their output does
+    // not contain. Per LAYER for the grid, because which lines survive a crop is
+    // known only at render, where a warning would double on every repeated
+    // svgCode read. Anything else counts as drawn, so a painted element added
+    // later reports rather than falling silent.
+    const { grid, background, backgroundTop, backgroundMid, backgroundBottom } = this.#processedOptions;
+    const hasZones = Boolean(backgroundTop || backgroundMid || backgroundBottom);
+    const backgroundDraws = new Map([
+      ['backgroundZone', !hasZones && Boolean(background)],
+      ['zoneTop', hasZones && Boolean(backgroundTop || background)],
+      ['zoneMid', hasZones && Boolean(backgroundMid || background)],
+      ['zoneBottom', hasZones && Boolean(backgroundBottom || background)],
+    ]);
+    const elementIsDrawn = (element) => {
+      if (element.startsWith('grid')) return Boolean(grid);
+      if (backgroundDraws.has(element)) return backgroundDraws.get(element);
+      return true;
+    };
+
+    // A raw target displaces a written curated option when both reach the same
+    // attribute on the same painted element. Judged on the two WRITTEN keys:
+    // MULTIPLE_ reports that the input said a thing twice, which is why two
+    // equal values still raise it. A raw key that displaces only a library
+    // DEFAULT is silent, since one statement from the author is not two.
+    // Collected before it is reported, because one raw key reaching five line
+    // families is ONE statement about the input, and the reader still needs to
+    // know which elements it reached.
+    //
+    // Read from #layerAttributes and never from the options bag: a refused raw
+    // key (unsafe name, reserved name, link attribute) is still in the bag and
+    // reaches no markup, so the bag would report a displacement that never
+    // happened. The map is what the emitters actually consume.
+    const displaced = new Map();
+    for (const [element, attributes] of Object.entries(CURATED_ATTRIBUTE_SOURCES)) {
+      if (!elementIsDrawn(element)) continue;
+      const targets = ELEMENT_CLASSES[element].map(targetOfClass);
+      for (const [attribute, chain] of Object.entries(attributes)) {
+        // The most specific target the author wrote for this element wins, the
+        // same class-order rule the emitter applies.
+        const rawTarget = targets
+          .filter(t => Object.hasOwn(this.#layerAttributes[t] ?? {}, attribute)).at(-1);
+        const curatedKey = chain.find(k => writtenOptions.has(k));
+        if (!rawTarget || !curatedKey) continue;
+        const rawKey = `${rawTarget}--${attribute}`;
+        const id = `${rawKey} ${curatedKey}`;
+        if (!displaced.has(id)) displaced.set(id, { rawKey, curatedKey, attribute, elements: [] });
+        displaced.get(id).elements.push(targets.at(-1));
+      }
+    }
+    for (const { rawKey, curatedKey, attribute, elements } of displaced.values()) {
+      this.#warnings.push({
+        code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
+        message: `"${rawKey}" and "${curatedKey}" both set "${attribute}" on ${elements.join(', ')}, so "${rawKey}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
+        source: curatedKey,
+      });
     }
 
     // A written viewBox states the value the geometry options exist to compute,

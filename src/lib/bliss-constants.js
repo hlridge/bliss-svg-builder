@@ -51,6 +51,32 @@ export const ELEMENT_CLASSES = Object.freeze({
   content:        ['bliss-content'],
 });
 
+/**
+ * Which written option produced a computed attribute, most specific first,
+ * mirroring the order #processOptions resolves the curated cascade. Read only
+ * to NAME a written curated option that a raw key displaced; nothing resolves
+ * through it, and a key absent from it is simply never reported as displaced.
+ *
+ * Closed and ours: it lists names the library itself computes, not a table of
+ * SVG semantics. Keyed by ELEMENT_CLASSES entry.
+ */
+export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
+  gridMinor:  { stroke: ['grid-minor-color', 'grid-color'],
+                'stroke-width': ['grid-minor-stroke-width', 'grid-stroke-width'] },
+  gridMedium: { stroke: ['grid-medium-color', 'grid-color'],
+                'stroke-width': ['grid-medium-stroke-width', 'grid-stroke-width'] },
+  gridMajor:  { stroke: ['grid-major-color', 'grid-color'],
+                'stroke-width': ['grid-major-stroke-width', 'grid-stroke-width'] },
+  gridSky:    { stroke: ['grid-sky-color', 'grid-major-color', 'grid-color'],
+                'stroke-width': ['grid-sky-stroke-width', 'grid-major-stroke-width', 'grid-stroke-width'] },
+  gridEarth:  { stroke: ['grid-earth-color', 'grid-major-color', 'grid-color'],
+                'stroke-width': ['grid-earth-stroke-width', 'grid-major-stroke-width', 'grid-stroke-width'] },
+  backgroundZone: { fill: ['background'] },
+  zoneTop:    { fill: ['background-top', 'background'] },
+  zoneMid:    { fill: ['background-mid', 'background'] },
+  zoneBottom: { fill: ['background-bottom', 'background'] },
+});
+
 /** The `bliss-` prefix every structural class carries and no target repeats. */
 export const CLASS_PREFIX = 'bliss-';
 
