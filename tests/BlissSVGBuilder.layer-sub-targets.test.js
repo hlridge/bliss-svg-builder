@@ -105,9 +105,49 @@ describe('BlissSVGBuilder sub-element targets', () => {
     });
   });
 
+  describe('when two targets both reach one element', () => {
+    it('lets an authored class on the specific target replace the general one', () => {
+      // `class` follows class-order precedence like every other attribute, so
+      // the top rect carries `b` alone. Concatenating to `a b` would also have
+      // been defensible, which is why the choice is pinned here rather than
+      // left to be read off the merge order.
+      const svg = new BlissSVGBuilder(
+        '[background-top=red;background-mid=green;background-zone--class=a;background-zone--top--class=b]||B291'
+      ).svgCode;
+
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--top b"');
+      expect(svg).toContain('class="bliss-background-zone bliss-background-zone--mid a"');
+    });
+
+    it('lets the specific target win on an ordinary attribute too', () => {
+      // pins the general-to-specific order of the zone class lists; listing a
+      // zone's own class first would silently reverse this and nothing else
+      // would notice
+      const svg = new BlissSVGBuilder(
+        '[background-top=red;background-mid=green;background-zone--rx=1;background-zone--top--rx=9]||B291'
+      ).svgCode;
+
+      expect(linesWithClass(svg, 'bliss-background-zone--top')[0]).toContain('rx="9"');
+      expect(linesWithClass(svg, 'bliss-background-zone--mid')[0]).toContain('rx="1"');
+    });
+  });
+
+  describe('when a working target key is stored and read back', () => {
+    it('survives both serializers and renders identically', () => {
+      const builder = new BlissSVGBuilder('[grid;grid-line--sky--stroke-dasharray=2]||B291');
+
+      expect(builder.toString()).toBe('[grid;grid-line--sky--stroke-dasharray=2]||B291');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+  });
+
   describe('when a target names a real class that nothing drew', () => {
     it.each([
       ['the grid is off', '[grid-line--sky--stroke=red]||B291'],
+      // silence here is deliberate and not an oversight: what a crop draws is
+      // known only at render, where raising a warning would double it on every
+      // repeated svgCode read
       ['a crop removed the sky line', '[grid;crop-top=9;grid-line--sky--stroke=red]||B291'],
       ['the background is off', '[background-zone--rx=3]||B291'],
       ['only one zone is drawn', '[background-top=red;background-zone--bottom--rx=3]||B291'],

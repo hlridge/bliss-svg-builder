@@ -120,14 +120,18 @@ describe('BlissSVGBuilder layer attributes', () => {
 
   describe('when a layer key is written below global scope', () => {
     it.each([
-      ['word', '[grid--opacity=0.3]|B291'],
-      ['character', '[grid--opacity=0.3]B291'],
-      ['part', '[grid--opacity=0.3]>B291'],
-    ])('warns MISPLACED_LAYER_OPTION at %s scope and emits no attribute', (_scope, input) => {
+      ['word', '[grid--opacity=0.3]|B291', 'grid--opacity'],
+      ['character', '[grid--opacity=0.3]B291', 'grid--opacity'],
+      ['part', '[grid--opacity=0.3]>B291', 'grid--opacity'],
+      // a sub-element target is refused below global scope on the same rule; it
+      // is a separate row because the gate reads the key shape and not the
+      // vocabulary, so a compound target must be shown to reach it
+      ['character, for a sub-element target', '[grid-line--sky--stroke=red]B291', 'grid-line--sky--stroke'],
+    ])('warns MISPLACED_LAYER_OPTION at %s scope and emits no attribute', (_scope, input, key) => {
       const builder = new BlissSVGBuilder(input);
 
       expect(builder.warnings.some(w => w.code === 'MISPLACED_LAYER_OPTION')).toBe(true);
-      expect(builder.svgCode).not.toContain('grid--opacity');
+      expect(builder.svgCode).not.toContain(key);
       expect(builder.svgCode).toContain('<path');
     });
 
