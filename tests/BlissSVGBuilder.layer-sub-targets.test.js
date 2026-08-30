@@ -103,10 +103,10 @@ describe('BlissSVGBuilder sub-element targets', () => {
     });
 
     it.each([
-      ['the curated alias', '[color=red;root--stroke=blue]||B291', 'stroke="blue"', 'color'],
-      ['the reverse order',  '[root--stroke=blue;color=red]||B291', 'stroke="blue"', 'color'],
-      ['two explicit widths', '[stroke-width=2;root--stroke-width=3]||B291', 'stroke-width="3"', 'stroke-width'],
-    ])('lets the named target beat %s and reports the loser', (_case, input, expected, loser) => {
+      ['the curated alias', '[color=red;root--stroke=blue]||B291', 'stroke="blue"', 'color', 'root--stroke'],
+      ['the reverse written order', '[root--stroke=blue;color=red]||B291', 'stroke="blue"', 'color', 'root--stroke'],
+      ['two explicit widths', '[stroke-width=2;root--stroke-width=3]||B291', 'stroke-width="3"', 'stroke-width', 'root--stroke-width'],
+    ])('lets the named target beat %s and reports the loser', (_case, input, expected, loser, winner) => {
       const builder = new BlissSVGBuilder(input);
       const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
 
@@ -115,13 +115,20 @@ describe('BlissSVGBuilder sub-element targets', () => {
       // the spelling the author could have written, never the internal camelCase
       expect(warning.source).toBe(loser);
       expect(warning.message).not.toContain('strokeWidth');
+      // pins the surviving key by name; "remove whichever you did not mean" is
+      // unusable if the message names the wrong one, and a mutant that swapped
+      // the two survived the whole suite until this line existed
+      expect(warning.message).toContain(`so "${winner}" was used`);
     });
 
     it.each([
       ['ahead of it', '[root--fill=red;fill=blue]||B291'],
       ['behind it', '[fill=blue;root--fill=red]||B291'],
     ])('wins and names the bare key with that key %s', (_case, input) => {
-      // the curated spellings above cannot show this: the options pass hands
+      // pins explicit-beats-resolved in the loop order the rows above cannot
+      // reach; killed the two mutants that narrowed the collision guard to
+      // `prior && explicit` and dropped its `if (!explicit) return`.
+      // The curated spellings above cannot show this: the options pass hands
       // every curated key to the split loop BEFORE any raw key, whatever order
       // they were written in, so `color` and `stroke-width` only ever arrive
       // bare-first. `fill` is not curated and keeps its written position, which
