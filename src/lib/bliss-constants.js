@@ -67,10 +67,10 @@ export const targetOfClass = (className) => className.slice(CLASS_PREFIX.length)
  *
  * `root` is in here even though a bare key already reaches the root. C8 dropped
  * `svg--` on the rule that a second spelling for one target is a duplicate;
- * that rule is knowingly outweighed, because "every class you see works" is the
- * value of this vocabulary and an exception for the outermost element is the
- * one a reader would trip on. The collision it creates is resolved where the
- * root's attributes are built, and reported.
+ * that rule is knowingly outweighed, because the value of this vocabulary is
+ * that every class the library writes is addressable, and an exception for the
+ * outermost element is the one a reader would trip on. The collision it creates
+ * is resolved where the root's attributes are built, and reported.
  */
 export const LAYER_TARGETS = new Set(
   Object.values(ELEMENT_CLASSES).flat().map(targetOfClass)
