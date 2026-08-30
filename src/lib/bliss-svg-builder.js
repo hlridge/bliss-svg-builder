@@ -4197,8 +4197,8 @@ class BlissSVGBuilder {
       const skyD = 8 >= gridMinY && 8 <= gridMaxY ? hLine(8) : '';
       const earthD = 16 >= gridMinY && 16 <= gridMaxY ? hLine(16) : '';
 
-      // Attribute order here reproduces the five literals this replaced; a
-      // reordered attribute is a diff in every grid assertion in the suite.
+      // The computed key order below is load-bearing: a reordered attribute is a
+      // diff in every grid assertion in the suite.
       const gridLine = (classes, strokeWidth, stroke, d) =>
         `    <path ${formatAttributes(layerAttributes(classes,
           { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square',
