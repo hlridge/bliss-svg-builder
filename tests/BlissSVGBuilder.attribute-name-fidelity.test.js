@@ -11,8 +11,13 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   the DSL and from the object surface alike.
  * - A camelCase data attribute (`data-blissID`) keeping its case.
  * - A named option written in camelCase (`strokeWidth`, `gridSkyColor`) still
- *   translating to the kebab spelling the pipeline processes.
+ *   translating to the kebab spelling the pipeline processes, ON THE
+ *   PROGRAMMATIC surface, which is the only one that converts on the way in.
  * - An already-kebab attribute name passing through unchanged.
+ * - The ruled contract for a camelCase key written in a BRACKET, as `it.todo`
+ *   tripwires: that surface does not convert on the way in, so the key is
+ *   renamed at the emit boundary or swallowed into the library's own
+ *   processed-option bag instead. Ruled and scheduled, not built.
  *
  * Does NOT cover:
  * - Which element the attribute lands on, see
@@ -55,6 +60,27 @@ describe('BlissSVGBuilder attribute name fidelity', () => {
       expect(builder.svgCode).toContain('stroke="#123456"');
       expect(builder.svgCode).not.toContain('gridSkyColor');
     });
+  });
+
+  describe('when a named option is written in camelCase inside a bracket', () => {
+    // RULED, NOT BUILT. The describe above pins the PROGRAMMATIC surface, where
+    // the conversion happens on the way in and is correct. A bracket converts
+    // nothing on the way in, so the ruling is that a camelCase key there is not
+    // a curated option at all and must reach the markup verbatim, exactly as
+    // preserveAspectRatio does. Today it is renamed at the emit boundary
+    // instead, and where that kebab name has an internal camelCase twin (35 of
+    // the 38 multi-word options) the value is swallowed into the library's own
+    // processed-option bag and read as if it had already been validated.
+    // Measured 2026-08-30, full census on the backlog row "Option-value
+    // validation across the whole vocabulary (+ the camelCase namespace
+    // collision)": [marginTop=3] silently gives height="12184.5" by string
+    // concatenation, [svgHeight=200] throws out of the svgCode getter, and
+    // [gridMajorColor=red] paints the major lines only where the kebab spelling
+    // paints major, sky and earth. User ruling 2026-08-29: fix before the 1.1.0
+    // cut. These three rows are the tripwire that keeps it visible until then.
+    it.todo('emits [gridColor=blue] verbatim as gridColor="blue", never renamed to grid-color');
+    it.todo('keeps a bracket key out of the processed-option bag, so [marginTop=3] cannot resize the picture');
+    it.todo('renders [svgHeight=200] instead of throwing "num.toFixed is not a function"');
   });
 
   describe('when an attribute name is already kebab-case', () => {
