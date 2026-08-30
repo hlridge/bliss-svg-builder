@@ -28,6 +28,36 @@ export const KNOWN_OPTION_KEYS = new Set([
 ]);
 
 /**
+ * Every element the library paints, and the classes it carries, general to
+ * specific, exactly as the emitters write them. One declaration serves three
+ * readers: the emitter writes `class` from it, a `<target>--<attribute>` key
+ * resolves by membership in it, and the displacement report reads the curated
+ * options behind a computed attribute. Add a painted element here and it is
+ * targetable the moment its emitter carries the class.
+ */
+export const ELEMENT_CLASSES = Object.freeze({
+  root:           ['bliss-root'],
+  background:     ['bliss-background'],
+  backgroundZone: ['bliss-background-zone'],
+  zoneTop:        ['bliss-background-zone', 'bliss-background-zone--top'],
+  zoneMid:        ['bliss-background-zone', 'bliss-background-zone--mid'],
+  zoneBottom:     ['bliss-background-zone', 'bliss-background-zone--bottom'],
+  grid:           ['bliss-grid'],
+  gridMinor:      ['bliss-grid-line', 'bliss-grid-line--minor'],
+  gridMedium:     ['bliss-grid-line', 'bliss-grid-line--medium'],
+  gridMajor:      ['bliss-grid-line', 'bliss-grid-line--major'],
+  gridSky:        ['bliss-grid-line', 'bliss-grid-line--major', 'bliss-grid-line--sky'],
+  gridEarth:      ['bliss-grid-line', 'bliss-grid-line--major', 'bliss-grid-line--earth'],
+  content:        ['bliss-content'],
+});
+
+/** The `bliss-` prefix every structural class carries and no target repeats. */
+export const CLASS_PREFIX = 'bliss-';
+
+/** A class name as it is written in a key: the class minus the prefix. */
+export const targetOfClass = (className) => className.slice(CLASS_PREFIX.length);
+
+/**
  * The layers a global attribute can name with a `<layer>--<attribute>` key.
  * A bare key targets the root, so there is deliberately no `svg--`: a second
  * spelling for one target is a duplicate.

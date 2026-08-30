@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, targetOfClass, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -125,23 +125,26 @@ const reservedAttributeMessage = (name) =>
 const formatAttributes = (attrs) =>
   Object.entries(attrs).map(([name, value]) => `${name}="${value}"`).join(' ');
 
-// A layer's structural class is the library's identifier for that layer, so an
-// authored class is APPENDED to it and never replaces it: replacing would break
-// the embedded <style> block, every consumer selector, and the layer lookups
-// downstream apps do by class. Bounded to `class` deliberately, since it is the
-// only identity-bearing attribute a layer carries; every other authored value
-// is free to replace what the library computed.
+// A layer's structural classes are the library's identifier for that element,
+// so an authored class is APPENDED to them and never replaces them: replacing
+// would break the embedded <style> block, every consumer selector, and the layer
+// lookups downstream apps do by class. Bounded to `class` deliberately, since it
+// is the only identity-bearing attribute an element carries; every other
+// authored value is free to replace what the library computed.
 const mergeStructuralClass = (structural, authored) =>
   authored ? `${structural} ${authored}` : structural;
 
-// One layer's emitted attributes: its structural class, then what the library
-// computed for it, then the author's `<layer>--` values, which may replace a
+// One element's emitted attributes: its structural classes, then what the
+// library computed for it, then the author's raw values, which may replace a
 // computed one. The class is put back afterwards so the spread cannot drop the
-// structural name.
-const layerAttributes = (structuralClass, computed, authored = {}) => ({
-  ...{ class: structuralClass, ...computed, ...authored },
-  class: mergeStructuralClass(structuralClass, authored['class']),
-});
+// structural names.
+const layerAttributes = (structuralClasses, computed, authored = {}) => {
+  const structural = [structuralClasses].flat().join(' ');
+  return {
+    ...{ class: structural, ...computed, ...authored },
+    class: mergeStructuralClass(structural, authored['class']),
+  };
+};
 
 // Resolves which glyph carries a word-level (`;;`) overlay. A stored
 // designation wins; the fallback resolves among content-bearing glyphs only,
@@ -4110,6 +4113,7 @@ class BlissSVGBuilder {
     // the rect that paints it, or on EACH zone rect when zones are on. The
     // wrapper group below paints nothing and carries no authored attribute yet.
     const backgroundAttrs = this.#layerAttributes.background;
+    const backgroundWrapper = `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.background, {}))}>`;
 
     let backgroundContent = '';
     if (hasZones) {
@@ -4126,21 +4130,21 @@ class BlissSVGBuilder {
       const topHeight = round(Math.max(0, 8 - viewBoxY));
       const bottomHeight = round(Math.max(0, viewBoxY + viewBoxHeight - 16));
 
-      const zoneRect = (structuralClass, y, height, fill) =>
-        `    <rect ${formatAttributes(layerAttributes(`bliss-background-zone ${structuralClass}`,
+      const zoneRect = (classes, y, height, fill) =>
+        `    <rect ${formatAttributes(layerAttributes(classes,
           { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill }, backgroundAttrs))}/>`;
 
       const zoneRects = [
-        topColor ? zoneRect('bliss-background-zone--top', topY, topHeight, topColor) : '',
-        midColor ? zoneRect('bliss-background-zone--mid', 8, 8, midColor) : '',
-        bottomColor ? zoneRect('bliss-background-zone--bottom', 16, bottomHeight, bottomColor) : '',
+        topColor ? zoneRect(ELEMENT_CLASSES.zoneTop, topY, topHeight, topColor) : '',
+        midColor ? zoneRect(ELEMENT_CLASSES.zoneMid, 8, 8, midColor) : '',
+        bottomColor ? zoneRect(ELEMENT_CLASSES.zoneBottom, 16, bottomHeight, bottomColor) : '',
       ].filter(Boolean).join('\n');
 
-      backgroundContent = `  <g class="bliss-background">\n${zoneRects}\n  </g>`;
+      backgroundContent = `${backgroundWrapper}\n${zoneRects}\n  </g>`;
     } else if (background !== "") {
-      const paper = `    <rect ${formatAttributes(layerAttributes('bliss-background-zone',
+      const paper = `    <rect ${formatAttributes(layerAttributes(ELEMENT_CLASSES.backgroundZone,
         { x: viewBoxX, y: viewBoxY, width: '100%', height: '100%', stroke: 'none', fill: background }, backgroundAttrs))}/>`;
-      backgroundContent = `  <g class="bliss-background">\n${paper}\n  </g>`;
+      backgroundContent = `${backgroundWrapper}\n${paper}\n  </g>`;
     }
 
     // Grid boundaries adjusted for cropping
@@ -4193,21 +4197,30 @@ class BlissSVGBuilder {
       const skyD = 8 >= gridMinY && 8 <= gridMaxY ? hLine(8) : '';
       const earthD = 16 >= gridMinY && 16 <= gridMaxY ? hLine(16) : '';
 
+      // Attribute order here reproduces the five literals this replaced; a
+      // reordered attribute is a diff in every grid assertion in the suite.
+      const gridLine = (classes, strokeWidth, stroke, d) =>
+        `    <path ${formatAttributes(layerAttributes(classes,
+          { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square',
+            'stroke-linejoin': 'miter', d }))}/>`;
+
       const gridLines = [
-        minorD ? `    <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="${gridMinorStrokeWidth}" stroke="${gridMinorColor}" stroke-linecap="square" stroke-linejoin="miter" d="${minorD}"/>` : '',
-        mediumD ? `    <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="${gridMediumStrokeWidth}" stroke="${gridMediumColor}" stroke-linecap="square" stroke-linejoin="miter" d="${mediumD}"/>` : '',
-        majorD ? `    <path class="bliss-grid-line bliss-grid-line--major" stroke-width="${gridMajorStrokeWidth}" stroke="${gridMajorColor}" stroke-linecap="square" stroke-linejoin="miter" d="${majorD}"/>` : '',
-        skyD ? `    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="${gridSkyStrokeWidth}" stroke="${gridSkyColor}" stroke-linecap="square" stroke-linejoin="miter" d="${skyD}"/>` : '',
-        earthD ? `    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="${gridEarthStrokeWidth}" stroke="${gridEarthColor}" stroke-linecap="square" stroke-linejoin="miter" d="${earthD}"/>` : '',
+        minorD  ? gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD)  : '',
+        mediumD ? gridLine(ELEMENT_CLASSES.gridMedium, gridMediumStrokeWidth, gridMediumColor, mediumD) : '',
+        majorD  ? gridLine(ELEMENT_CLASSES.gridMajor,  gridMajorStrokeWidth,  gridMajorColor,  majorD)  : '',
+        skyD    ? gridLine(ELEMENT_CLASSES.gridSky,    gridSkyStrokeWidth,    gridSkyColor,    skyD)    : '',
+        earthD  ? gridLine(ELEMENT_CLASSES.gridEarth,  gridEarthStrokeWidth,  gridEarthColor,  earthD)  : '',
       ].filter(Boolean).join('\n');
 
       gridPath = [
         '  <style>',
         '    @supports (-webkit-hyphens: none) {',
-        '      .bliss-grid-line { shape-rendering: geometricPrecision; }',
+        // the shared class every grid line carries, read from the declaration so
+        // renaming it cannot leave this rule selecting nothing
+        `      .${ELEMENT_CLASSES.gridMinor[0]} { shape-rendering: geometricPrecision; }`,
         '    }',
         '  </style>',
-        `  <g ${formatAttributes(layerAttributes('bliss-grid',
+        `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.grid,
           { 'shape-rendering': 'crispEdges' }, this.#layerAttributes.grid))}>`,
         gridLines,
         '  </g>',
@@ -4240,13 +4253,13 @@ class BlissSVGBuilder {
       width: round(svgWidth),
       height: round(svgHeight),
       viewBox: `${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}`,
-      class: 'bliss-root',
+      class: ELEMENT_CLASSES.root.join(' '),
       ...paintDefaults,
       ...this.globalSvgAttributes,
     };
     // The spread above let an authored `class` overwrite the structural name;
     // put it back in front, keeping the position the literal established.
-    rootAttrs.class = mergeStructuralClass('bliss-root', this.globalSvgAttributes['class']);
+    rootAttrs.class = mergeStructuralClass(ELEMENT_CLASSES.root.join(' '), this.globalSvgAttributes['class']);
 
     // Link attributes belong to the level-0 anchor wrap, never to a layer.
     for (const name of ANCHOR_ATTRIBUTE_NAMES) delete rootAttrs[name];
@@ -4261,7 +4274,7 @@ class BlissSVGBuilder {
       if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
     }
 
-    const contentAttrs = layerAttributes('bliss-content', {}, this.#layerAttributes.content);
+    const contentAttrs = layerAttributes(ELEMENT_CLASSES.content, {}, this.#layerAttributes.content);
 
     let svgStr = [
       `<svg ${formatAttributes(rootAttrs)}>`,
