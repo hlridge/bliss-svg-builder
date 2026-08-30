@@ -1374,12 +1374,14 @@ class BlissSVGBuilder {
       ...(blissObj.options ?? {}), ...(blissObj.transientOptions ?? {}),
     });
     const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(camelToKebab(key)));
-    // Canonicalized to the kebab spelling a bracket carries. Object input is the
-    // one surface that keeps a camelCase key, the DSL, the constructor and the
-    // transient channel all canonicalizing on the way in, and the key still
-    // reaches the option it names. Only curated keys are canonicalized: an
-    // attribute name is emitted as written and hyphenating one is a guess.
-    const writtenOptions = new Set(writtenKeys.filter(isNamedOptionKey).map(camelToKebab));
+    // Taken as written, with no camelCase canonicalization, because this set
+    // answers "did the author's key produce this attribute" and the options pass
+    // recognises the kebab spelling alone. The constructor and the transient
+    // channel canonicalize on the way in (#toRaw), so their camelCase form is
+    // already kebab here; a bracket and a hand-written options object keep
+    // whatever was typed, and `[grid;gridColor=blue]` paints nothing, so naming
+    // it as displaced would report a collision that never happened.
+    const writtenOptions = new Set(writtenKeys);
 
     this.#processAllOptions(blissObj, true);
 

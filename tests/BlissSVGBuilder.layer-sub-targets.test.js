@@ -264,7 +264,7 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
       expect(displaced.map(w => w.source)).toEqual(['grid-color', 'grid-sky-color']);
       // grid-color still reaches four families; the sky one went to grid-sky-color
-      expect(displaced[0].message).toContain('grid-line--minor');
+      expect(displaced[0].message).toContain('grid-line--minor, grid-line--medium');
       expect(displaced[0].message).toContain('grid-line--earth');
       expect(displaced[0].message).not.toContain('grid-line--sky');
     });
@@ -305,19 +305,35 @@ describe('BlissSVGBuilder sub-element targets', () => {
       expect(warning.message).not.toContain('--top');
     });
 
-    it('names the kebab spelling of an option written in camelCase', () => {
-      // object input is the one surface that keeps a camelCase key (the DSL,
-      // the constructor and the transient channel all canonicalize on the way
-      // in), and the key still reaches the curated destination, so the report
-      // has to recognise it and name a spelling a bracket could carry
-      const builder = new BlissSVGBuilder({
-        groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }] }] }],
-        options: { grid: true, gridSkyColor: 'blue', 'grid-line--stroke': 'red' },
-      });
+    it('reports a displaced width as readily as a displaced colour', () => {
+      const builder = new BlissSVGBuilder(
+        '[grid;grid-sky-stroke-width=2;grid-line--sky--stroke-width=3]||B291');
       const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
 
-      expect(warning.source).toBe('grid-sky-color');
-      expect(warning.message).not.toContain('gridSkyColor');
+      expect(linesWithClass(builder.svgCode, 'bliss-grid-line--sky')[0])
+        .toContain('stroke-width="3"');
+      expect(warning.source).toBe('grid-sky-stroke-width');
+      expect(warning.message).toContain('so "grid-line--sky--stroke-width" was used');
+    });
+
+    it('names the specific option over the bulk one on the earth line', () => {
+      // pins this chain's order rather than the sky one's: a chain listed
+      // least-specific-first would name grid-color here and read as if the bulk
+      // option were the one the raw key beat
+      const builder = new BlissSVGBuilder(
+        '[grid;grid-color=blue;grid-earth-color=green;grid-line--earth--stroke=red]||B291');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning.source).toBe('grid-earth-color');
+    });
+
+    it('says nothing for a spelling the options pass does not read', () => {
+      // `[grid;gridColor=blue]` paints nothing (the grid stays grey and a dead
+      // grid-color lands on the root), so naming it as displaced would report a
+      // collision that never happened. Whether that spelling should curate at
+      // all belongs to the option-value work, and this row moves with it.
+      expect(new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291').warnings)
+        .toHaveLength(0);
     });
   });
 

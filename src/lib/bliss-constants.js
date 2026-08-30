@@ -501,7 +501,8 @@ export const WARNING_CODES = Object.freeze({
   // resolved to one, and the displaced key is named. It reports more-than-one
   // rather than value-lost, so two equal values still raise it. Silent when the
   // layer that would carry them is switched off, matching every other statement
-  // about an absent layer.
+  // about an absent layer, and silent for a single element the render does not
+  // paint where that is settled before the render (an undrawn background zone).
   MULTIPLE_ATTRIBUTE_VALUES: 'MULTIPLE_ATTRIBUTE_VALUES',
   DUPLICATE_KEY: 'DUPLICATE_KEY',
   // unrecognized reference
