@@ -802,10 +802,13 @@ export interface Warning {
   /** Human-readable description of the issue. */
   readonly message: string;
   /**
-   * The problematic fragment of the input that triggered the warning. When an
-   * attribute NAME was refused it is the key on its own, prefix included
-   * (`content--xmlns`); when the VALUE is what went wrong it is the option as
-   * written (`stroke-width=-2`).
+   * The problematic fragment of the input that triggered the warning. For an
+   * attribute it is the key on its own whenever the KEY is what the report is
+   * about, prefix included: a refused name (`content--xmlns`), a key whose
+   * value cannot take effect where it landed (`grid--stroke`), or the displaced
+   * half of a collision (`grid-sky-color`). It is the option as written when the
+   * VALUE is what went wrong (`stroke-width=-2`), and a comma-separated list of
+   * keys where one report names several (`margin, crop`).
    */
   readonly source: string;
 }
