@@ -351,6 +351,7 @@ describe('BlissSVGBuilder sub-element targets', () => {
       ['grid--stroke-width',    '[grid;grid--stroke-width=2]||B291',                'grid-line--stroke-width'],
       ['grid--stroke-linecap',  '[grid;grid--stroke-linecap=butt]||B291',           'grid-line--stroke-linecap'],
       ['grid--stroke-linejoin', '[grid;grid--stroke-linejoin=bevel]||B291',         'grid-line--stroke-linejoin'],
+      ['grid--d',               '[grid;grid--d=M0,0h8]||B291',                      'grid-line--d'],
       ['background--fill',      '[background=beige;background--fill=red]||B291',    'background-zone--fill'],
       ['background--stroke',    '[background=beige;background--stroke=red]||B291',  'background-zone--stroke'],
       ['background--x',         '[background=beige;background--x=1]||B291',         'background-zone--x'],
@@ -363,7 +364,19 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
       expect(warning).toBeDefined();
       expect(warning.source).toBe(key);
+      expect(warning.message).toContain(`on the ${key.split('--')[0]} group`);
       expect(warning.message).toContain(suggested);
+    });
+
+    it.each([
+      ['only zones are drawn',      '[background-top=red;background--fill=blue]||B291'],
+      ['a bulk and zones are drawn', '[background=beige;background-top=red;background--fill=blue]||B291'],
+    ])('reports the background when %s', (_case, input) => {
+      // the drawn-state gate reads every zone and not just the paper rect;
+      // narrowing it to the paper silences every zones-only background, and the
+      // rows above all draw the paper, so none of them would notice
+      expect(new BlissSVGBuilder(input).warnings.map(w => w.code))
+        .toContain('MISPLACED_CONTAINER_ATTRIBUTE');
     });
 
     it('still emits the value it was asked for', () => {

@@ -78,20 +78,38 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
 });
 
 /**
- * Per container, the attribute names its own children write on themselves, and
- * the target that reaches those children. STATIC, not computed from what was
- * actually drawn: a container whose children are all cropped away would have no
- * triggers, so the warning would fall silent in exactly the configuration where
- * it is most needed. Closed and ours, a list of names the library itself
- * stamps, not a table of SVG inheritance semantics, which is the open-ended
- * thing C8 refused to build for vector-effect. `class` is deliberately absent:
- * it merges onto the container and works, so reporting it would report a live
- * feature. `rx` is absent for the opposite reason: judging it would need that
- * table. A Map, not an object literal, so an inherited name can never answer
- * for a real target.
+ * Per container, the attribute names whose value cannot take effect there, and
+ * the target that reaches the children where it can. The membership rule is
+ * exactly "every name this container's own emitter stamps on its CHILDREN",
+ * which is checkable by eye against the emitters and needs no table of SVG
+ * semantics, the open-ended thing C8 refused to build for vector-effect. That
+ * is why `rx` and `opacity` are out (nothing stamps them, so we cannot say a
+ * child's value takes effect instead) and why `shape-rendering` is out (the
+ * grid group carries it itself, and a written one replaces it and works).
+ * `class` is the one carve-out from the rule: every child carries it, but the
+ * container carries it too and an authored value MERGES there, so reporting it
+ * would report a live feature.
+ *
+ * STATIC, not computed from what was actually drawn: a container whose children
+ * are all cropped away would have no triggers, so the warning would fall silent
+ * in exactly the configuration where it is most needed.
+ *
+ * Two kinds of name sit in one list because the remedy is identical for both.
+ * The paint names are inherited, and a child's own value beats what the parent
+ * passes down. `x`, `y`, `width`, `height` and `d` are geometry: a group
+ * carries none of them and passes none of them down, so the value is simply
+ * inert there. The message therefore states only what an author can observe,
+ * that the child's value is the one that takes effect, rather than naming the
+ * inheritance mechanism, which holds for one half of the list and is false for
+ * the other.
+ *
+ * A Map, not an object literal, so an inherited name can never answer for a
+ * real target. Adding a container here means adding an arm to `containerIsDrawn`
+ * in `bliss-svg-builder.js`; without one it reports whether or not anything was
+ * drawn.
  */
 export const CONTAINER_SHADOWED_ATTRIBUTES = new Map([
-  ['grid',       { names: ['stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+  ['grid',       { names: ['stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd'],
                    childTarget: 'grid-line' }],
   ['background', { names: ['x', 'y', 'width', 'height', 'stroke', 'fill'],
                    childTarget: 'background-zone' }],
@@ -475,12 +493,13 @@ export const WARNING_CODES = Object.freeze({
   // attribute has nothing to act on and is dropped rather than shipped as
   // markup that looks like a working link and is not one.
   MISPLACED_LINK_ATTRIBUTE: 'MISPLACED_LINK_ATTRIBUTE',
-  // an attribute that reached a container whose children write the same name on
-  // themselves, where a presentation attribute on the child beats the value
-  // inherited from the parent, so the written value cannot show. It is still
-  // emitted where it was asked for; the report names the target that works.
-  // Silent when the container is not drawn, since there is then no landing site
-  // to describe.
+  // an attribute that reached a container whose children each carry the same
+  // name, so the child's value is the one that takes effect and the written one
+  // cannot show. Two mechanisms, one remedy: an inherited paint value is beaten
+  // by the child's own, while geometry a group cannot carry is inert there. It
+  // is still emitted where it was asked for; the report names the target that
+  // works. Silent when the container is not drawn, since there is then no
+  // landing site to describe.
   MISPLACED_CONTAINER_ATTRIBUTE: 'MISPLACED_CONTAINER_ATTRIBUTE',
   // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
   // space: a space is a pure word-separator with no ink to position or style,

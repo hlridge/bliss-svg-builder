@@ -1466,11 +1466,14 @@ class BlissSVGBuilder {
     // elementIsDrawn, whose true-by-default answer is meant for a painted
     // element it has not been taught about: `background` is a wrapper rather
     // than one of the rects it knows, so that answer would be true with nothing
-    // drawn at all. Two containers, so the second arm IS the background; a third
-    // one would need an arm of its own here.
-    const containerIsDrawn = (layer) => layer === 'grid'
-      ? Boolean(grid)
-      : [...backgroundDraws.values()].some(Boolean);
+    // drawn at all. Each container is named, and one added later without an arm
+    // here reports whether or not it drew, which is loudly wrong rather than
+    // silently inheriting the background's answer.
+    const containerIsDrawn = (layer) => {
+      if (layer === 'grid') return Boolean(grid);
+      if (layer === 'background') return [...backgroundDraws.values()].some(Boolean);
+      return true;
+    };
 
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (INTERNAL_OPTIONS.has(key)) continue;
@@ -1528,7 +1531,12 @@ class BlissSVGBuilder {
         if (container?.names.includes(target.attribute) && containerIsDrawn(target.layer)) {
           this.#warnings.push({
             code: WARNING_CODES.MISPLACED_CONTAINER_ATTRIBUTE,
-            message: `"${key}" was emitted on the ${target.layer} group, but each of its children writes its own "${target.attribute}", and a value written on the child beats one inherited from the parent, so it never shows. Write "${container.childTarget}--${target.attribute}" to reach the children themselves.`,
+            // What an author can observe, and nothing about the mechanism: the
+            // paint names are inherited and the child's own value beats them,
+            // while `x`, `y`, `width`, `height` and `d` are geometry a group
+            // never carries, so naming inheritance would be false for half the
+            // list.
+            message: `"${key}" was emitted on the ${target.layer} group, but each of its children carries its own "${target.attribute}", and the child's value is the one that takes effect, so the one written on the group never shows. Write "${container.childTarget}--${target.attribute}" to reach the children themselves.`,
             source: key,
           });
         }
