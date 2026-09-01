@@ -19,7 +19,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   outermost element.
  * - A key naming a target that does not exist, an empty target half and an
  *   empty attribute half, each reported once, each with its own reason, and
- *   each round-tripping.
+ *   each round-tripping. The root faces the same two refusals behind its own
+ *   prefix: the provenance stamp, and an attribute name carrying its own `--`,
+ *   which the last-dash split reads as a target nothing carries.
  * - A known layer that is not currently drawn staying silent, since the
  *   criterion is a target the library knows and not one it is emitting.
  * - A layer attribute name refused by the safety gate.
@@ -229,6 +231,8 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       ['an unknown layer', '[foo--x=1]||B291', 'UNKNOWN_LAYER'],
       ['an empty layer name', '[--x=1]||B291', 'UNKNOWN_LAYER'],
       ['an empty attribute name', '[content--=oops]||B291', 'UNKNOWN_LAYER'],
+      ['a forged provenance stamp', '[root--data-generator=mine]||B291', 'RESERVED_ATTRIBUTE_NAME'],
+      ['an unreachable attribute name', '[content--data--foo=1]||B291', 'UNKNOWN_LAYER'],
     ])('reports %s again after a round trip', (_case, input, code) => {
       const written = new BlissSVGBuilder(input).toString();
 

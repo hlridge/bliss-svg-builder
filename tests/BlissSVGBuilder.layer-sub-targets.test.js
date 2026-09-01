@@ -417,6 +417,23 @@ describe('BlissSVGBuilder sub-element targets', () => {
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
     });
+
+    it.each([
+      ['a displaced curated option',    '[grid;grid-sky-color=blue;grid-line--stroke=red]||B291', 'MULTIPLE_ATTRIBUTE_VALUES'],
+      ['a duplicated root attribute',   '[fill=red;root--fill=red]||B291',                        'MULTIPLE_ATTRIBUTE_VALUES'],
+      ['a shadowed container attribute', '[grid;grid--stroke=red]||B291',                         'MISPLACED_CONTAINER_ATTRIBUTE'],
+    ])('reports %s again after a round trip', (_case, input, code) => {
+      // nothing is refused in these three: every key is emitted and the picture
+      // is unchanged by the round trip. What has to survive is the REPORT, since
+      // a stored composition that renders the same way and goes quiet would hide
+      // the very thing it was told about
+      const written = new BlissSVGBuilder(input).toString();
+      const reparsed = new BlissSVGBuilder(written);
+
+      expect(written).toBe(input);
+      expect(reparsed.warnings.map(w => w.code)).toContain(code);
+      expect(reparsed.svgCode).toBe(new BlissSVGBuilder(input).svgCode);
+    });
   });
 
   describe('when a target names a real class that nothing drew', () => {
