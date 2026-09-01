@@ -7,8 +7,8 @@ import { LAYER_TARGETS, CLASS_PREFIX } from '../src/lib/bliss-constants.js';
  * than an intention: every class the library writes into the markup is a target,
  * spelled without the `bliss-` prefix, and every target names a class some
  * render writes. Both directions are harvested from real renders, so a class
- * added to an emitter is covered the day it is emitted rather than the day
- * someone remembers to add a case here.
+ * added to an emitter is covered the day one of the configurations below emits
+ * it, rather than the day someone remembers to add a case here.
  *
  * Covers:
  * - Every class in the markup resolves as a target (catches a class added to an
@@ -26,6 +26,11 @@ import { LAYER_TARGETS, CLASS_PREFIX } from '../src/lib/bliss-constants.js';
  *   The `<text>` layer is the known case; under this rule it becomes targetable
  *   the day its emitter writes the class, and the second test below is what
  *   fails if the declaration lands first.
+ * - The mirror of that hole: a class written only by a render none of the
+ *   configurations makes. Every class today is written through the one helper
+ *   that reads the declaration, so a divergence needs an emitter that bypasses
+ *   it, but that bypass is exactly what this file guards. **Each new
+ *   option-gated emitter owes this file a configuration.**
  * - Refusals and precedence, see `BlissSVGBuilder.layer-attribute-refusals.test.js`.
  */
 
@@ -35,7 +40,7 @@ import { LAYER_TARGETS, CLASS_PREFIX } from '../src/lib/bliss-constants.js';
 const CONFIGURATIONS = [
   '[grid;background=beige]||B291',
   '[grid;background-top=red;background-mid=green;background-bottom=blue]||B291',
-  '[grid]||B291|H',
+  '[grid]||B291//H',
   'B291',
 ];
 
@@ -67,7 +72,7 @@ describe('BlissSVGBuilder target vocabulary', () => {
   describe('when a key names each class in turn', () => {
     it.each(
       emittedClasses().map(cls => [cls, targetOf(cls)])
-    )('lands a %s attribute on every element carrying it and no other', (cls, target) => {
+    )('lands an attribute keyed to %s on every element carrying it and no other', (cls, target) => {
       for (const input of CONFIGURATIONS) {
         const plain = new BlissSVGBuilder(input).svgCode;
         if (!classesIn(plain).includes(cls)) continue;
