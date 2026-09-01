@@ -17,6 +17,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - A raw key beating a WRITTEN curated option: the raw value paints, the curated
  *   option is named once and the elements it lost are listed, and nothing is said
  *   where only a library default was displaced or the layer is switched off.
+ * - A key that names a CONTAINER whose children write the same attribute on
+ *   themselves: every name in that list is reported, the sub-element spelling
+ *   that reaches the children is named, the value stays where it was asked for,
+ *   and nothing is said where the container is not drawn or the children write
+ *   no such attribute.
  * - `root--` naming the outermost element: it beats the bare spelling of the
  *   same attribute in either order and reports `MULTIPLE_ATTRIBUTE_VALUES`, it
  *   faces every guard the bare spelling faces, and it is left out of the
@@ -334,6 +339,60 @@ describe('BlissSVGBuilder sub-element targets', () => {
       // all belongs to the option-value work, and this row moves with it.
       expect(new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291').warnings)
         .toHaveLength(0);
+    });
+  });
+
+  describe('when an attribute lands on a container its children shadow', () => {
+    // one row per name in CONTAINER_SHADOWED_ATTRIBUTES: the list is closed and
+    // hand-written, so a name nothing exercises could be deleted from it and
+    // every other row would still pass
+    it.each([
+      ['grid--stroke',          '[grid;grid--stroke=red]||B291',                    'grid-line--stroke'],
+      ['grid--stroke-width',    '[grid;grid--stroke-width=2]||B291',                'grid-line--stroke-width'],
+      ['grid--stroke-linecap',  '[grid;grid--stroke-linecap=butt]||B291',           'grid-line--stroke-linecap'],
+      ['grid--stroke-linejoin', '[grid;grid--stroke-linejoin=bevel]||B291',         'grid-line--stroke-linejoin'],
+      ['background--fill',      '[background=beige;background--fill=red]||B291',    'background-zone--fill'],
+      ['background--stroke',    '[background=beige;background--stroke=red]||B291',  'background-zone--stroke'],
+      ['background--x',         '[background=beige;background--x=1]||B291',         'background-zone--x'],
+      ['background--y',         '[background=beige;background--y=1]||B291',         'background-zone--y'],
+      ['background--width',     '[background=beige;background--width=5]||B291',     'background-zone--width'],
+      ['background--height',    '[background=beige;background--height=5]||B291',    'background-zone--height'],
+    ])('reports %s and names the spelling that works', (key, input, suggested) => {
+      const builder = new BlissSVGBuilder(input);
+      const warning = builder.warnings.find(w => w.code === 'MISPLACED_CONTAINER_ATTRIBUTE');
+
+      expect(warning).toBeDefined();
+      expect(warning.source).toBe(key);
+      expect(warning.message).toContain(suggested);
+    });
+
+    it('still emits the value it was asked for', () => {
+      // the report says where the value landed, it does not take it away
+      expect(new BlissSVGBuilder('[grid;grid--stroke=red]||B291').svgCode)
+        .toMatch(/<g class="bliss-grid"[^>]*stroke="red"/);
+    });
+
+    it.each([
+      ['the grid is off',       '[grid--stroke=red]||B291'],
+      ['the background is off', '[background--fill=red]||B291'],
+    ])('stays silent when %s', (_case, input) => {
+      // nothing was drawn, so a message about where the value landed would
+      // describe an element the output does not contain
+      expect(new BlissSVGBuilder(input).warnings).toHaveLength(0);
+    });
+
+    it.each([
+      ['grid--class',       '[grid;grid--class=mine]||B291',                   'bliss-grid mine'],
+      ['background--class', '[background=beige;background--class=mine]||B291', 'bliss-background mine'],
+    ])('never reports %s, which merges and works', (_case, input, expected) => {
+      const builder = new BlissSVGBuilder(input);
+
+      expect(builder.warnings.map(w => w.code)).not.toContain('MISPLACED_CONTAINER_ATTRIBUTE');
+      expect(builder.svgCode).toContain(`class="${expected}"`);
+    });
+
+    it('says nothing for an attribute the children do not write', () => {
+      expect(new BlissSVGBuilder('[grid;grid--opacity=0.3]||B291').warnings).toHaveLength(0);
     });
   });
 

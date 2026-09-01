@@ -77,6 +77,26 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   zoneBottom: { fill: ['background-bottom', 'background'] },
 });
 
+/**
+ * Per container, the attribute names its own children write on themselves, and
+ * the target that reaches those children. STATIC, not computed from what was
+ * actually drawn: a container whose children are all cropped away would have no
+ * triggers, so the warning would fall silent in exactly the configuration where
+ * it is most needed. Closed and ours, a list of names the library itself
+ * stamps, not a table of SVG inheritance semantics, which is the open-ended
+ * thing C8 refused to build for vector-effect. `class` is deliberately absent:
+ * it merges onto the container and works, so reporting it would report a live
+ * feature. `rx` is absent for the opposite reason: judging it would need that
+ * table. A Map, not an object literal, so an inherited name can never answer
+ * for a real target.
+ */
+export const CONTAINER_SHADOWED_ATTRIBUTES = new Map([
+  ['grid',       { names: ['stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'],
+                   childTarget: 'grid-line' }],
+  ['background', { names: ['x', 'y', 'width', 'height', 'stroke', 'fill'],
+                   childTarget: 'background-zone' }],
+]);
+
 /** The `bliss-` prefix every structural class carries and no target repeats. */
 export const CLASS_PREFIX = 'bliss-';
 
@@ -455,6 +475,13 @@ export const WARNING_CODES = Object.freeze({
   // attribute has nothing to act on and is dropped rather than shipped as
   // markup that looks like a working link and is not one.
   MISPLACED_LINK_ATTRIBUTE: 'MISPLACED_LINK_ATTRIBUTE',
+  // an attribute that reached a container whose children write the same name on
+  // themselves, where a presentation attribute on the child beats the value
+  // inherited from the parent, so the written value cannot show. It is still
+  // emitted where it was asked for; the report names the target that works.
+  // Silent when the container is not drawn, since there is then no landing site
+  // to describe.
+  MISPLACED_CONTAINER_ATTRIBUTE: 'MISPLACED_CONTAINER_ATTRIBUTE',
   // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
   // space: a space is a pure word-separator with no ink to position or style,
   // so the decoration is dropped and the space keeps its identity (ZSA is

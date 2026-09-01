@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, targetOfClass, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -1436,6 +1436,42 @@ class BlissSVGBuilder {
       if (explicit) this.#rootPrefixedNames.add(name);
       this.globalSvgAttributes[name] = value;
     };
+
+    // Whether the element a target names is painted at all, decided from the
+    // processed options exactly as the emitters decide it. A report about what an
+    // attribute DOES is silent where nothing draws; UNKNOWN_LAYER, which reports
+    // whether a target EXISTS, is deliberately not gated this way.
+    //
+    // Per element for the background, where the paper rect and the three zones
+    // are mutually exclusive and that choice is already settled here: naming a
+    // zone the author never asked for would name an element their output does
+    // not contain. Per LAYER for the grid, because which lines survive a crop is
+    // known only at render, where a warning would double on every repeated
+    // svgCode read. Anything else counts as drawn, so a painted element added
+    // later reports rather than falling silent.
+    const { grid, background, backgroundTop, backgroundMid, backgroundBottom } = this.#processedOptions;
+    const hasZones = Boolean(backgroundTop || backgroundMid || backgroundBottom);
+    const backgroundDraws = new Map([
+      ['backgroundZone', !hasZones && Boolean(background)],
+      ['zoneTop', hasZones && Boolean(backgroundTop || background)],
+      ['zoneMid', hasZones && Boolean(backgroundMid || background)],
+      ['zoneBottom', hasZones && Boolean(backgroundBottom || background)],
+    ]);
+    const elementIsDrawn = (element) => {
+      if (element.startsWith('grid')) return Boolean(grid);
+      if (backgroundDraws.has(element)) return backgroundDraws.get(element);
+      return true;
+    };
+    // A container is drawn when any child it wraps is. Deliberately not
+    // elementIsDrawn, whose true-by-default answer is meant for a painted
+    // element it has not been taught about: `background` is a wrapper rather
+    // than one of the rects it knows, so that answer would be true with nothing
+    // drawn at all. Two containers, so the second arm IS the background; a third
+    // one would need an arm of its own here.
+    const containerIsDrawn = (layer) => layer === 'grid'
+      ? Boolean(grid)
+      : [...backgroundDraws.values()].some(Boolean);
+
     for (const [key, value] of Object.entries(blissObj.options ?? {})) {
       if (INTERNAL_OPTIONS.has(key)) continue;
       if (isLayerAttributeKey(key)) {
@@ -1485,6 +1521,17 @@ class BlissSVGBuilder {
           });
           continue;
         }
+        // Judged after the refusals above, so a name we drop is never also
+        // described as landing somewhere. No `continue` below it: the value IS
+        // emitted where it was asked for, and only the silence about it goes.
+        const container = CONTAINER_SHADOWED_ATTRIBUTES.get(target.layer);
+        if (container?.names.includes(target.attribute) && containerIsDrawn(target.layer)) {
+          this.#warnings.push({
+            code: WARNING_CODES.MISPLACED_CONTAINER_ATTRIBUTE,
+            message: `"${key}" was emitted on the ${target.layer} group, but each of its children writes its own "${target.attribute}", and a value written on the child beats one inherited from the parent, so it never shows. Write "${container.childTarget}--${target.attribute}" to reach the children themselves.`,
+            source: key,
+          });
+        }
         if (target.layer === 'root') {
           // The prefix suspends name RESOLUTION, never name GUARDS, so a
           // prefixed root key faces every guard the bare branch faces. It goes
@@ -1524,32 +1571,6 @@ class BlissSVGBuilder {
       // the author could have written and not the pipeline's internal name.
       setRootAttribute(attrName, isNamedOptionKey(key) ? camelToKebab(key) : key, false, value);
     }
-
-    // Whether the element a target names is painted at all, decided from the
-    // processed options exactly as the emitters decide it. A report about what an
-    // attribute DOES is silent where nothing draws; UNKNOWN_LAYER, which reports
-    // whether a target EXISTS, is deliberately not gated this way.
-    //
-    // Per element for the background, where the paper rect and the three zones
-    // are mutually exclusive and that choice is already settled here: naming a
-    // zone the author never asked for would name an element their output does
-    // not contain. Per LAYER for the grid, because which lines survive a crop is
-    // known only at render, where a warning would double on every repeated
-    // svgCode read. Anything else counts as drawn, so a painted element added
-    // later reports rather than falling silent.
-    const { grid, background, backgroundTop, backgroundMid, backgroundBottom } = this.#processedOptions;
-    const hasZones = Boolean(backgroundTop || backgroundMid || backgroundBottom);
-    const backgroundDraws = new Map([
-      ['backgroundZone', !hasZones && Boolean(background)],
-      ['zoneTop', hasZones && Boolean(backgroundTop || background)],
-      ['zoneMid', hasZones && Boolean(backgroundMid || background)],
-      ['zoneBottom', hasZones && Boolean(backgroundBottom || background)],
-    ]);
-    const elementIsDrawn = (element) => {
-      if (element.startsWith('grid')) return Boolean(grid);
-      if (backgroundDraws.has(element)) return backgroundDraws.get(element);
-      return true;
-    };
 
     // A raw target displaces a written curated option when both reach the same
     // attribute on the same painted element. Judged on the two WRITTEN keys:
