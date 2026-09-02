@@ -65,7 +65,7 @@ Compare that with the unprefixed spelling, which fades the grid and the artwork 
 
 The prefixed form is a raw channel: the attribute name is emitted exactly as written, and it goes where you sent it, with no interpretation. That is what makes `content--color` reach the real `color` attribute, where the plain `color` option is a friendlier name for `stroke`. It is also why the two spellings of `vector-effect` do different things: written plain, the library knows it only works on the shapes themselves and moves it down onto the character paths, while `root--vector-effect` writes it on the root `<svg>`, where it has no effect, because naming a target asks for a place and not for a result.
 
-A target prefix only means something at global scope, since these parts belong to the document as a whole. Written on a word, character or part it is reported and dropped. A prefix that matches no class the library writes, such as `foo--x`, is reported too, and nothing is emitted for it.
+A target prefix only means something at global scope, since these parts belong to the document as a whole. Written on a word, character or part it is dropped: reported when you wrote it in a bracket, and in silence when it arrived through object input or `setTransientOptions`. A prefix that matches no class the library writes, such as `foo--x`, is reported too, and nothing is emitted for it.
 
 Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, or markup that reads as a working link and is not one, so two names are refused behind a prefix, each reported:
 
@@ -82,7 +82,7 @@ Two of the targets are containers. `background--` and `grid--` name groups, and 
 [grid;grid--stroke=red]||B313   →  reports, and points at grid-line--stroke
 ```
 
-The names this covers are the ones the group's own drawing writes on its children: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, and `x`, `y`, `width`, `height`, `stroke` and `fill` for the background. Every other name lands on the group and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit and `grid--shape-rendering` replaces the value the grid sets for itself. A name outside the list that a group cannot use is inert without a word from us, `background--rx` among them, since a group has no corners to round: saying which of those are meaningful would mean publishing a judgement about every SVG attribute, and this list only claims to know the names the library writes itself. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
+The names this covers are the ones the group's own drawing writes on its children: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, and `x`, `y`, `width`, `height`, `stroke` and `fill` for the background. Every other name lands on the group and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit and `grid--shape-rendering` replaces the value the grid sets for itself (in Safari the lines keep their own, which an inline `@supports` rule gives them). A name outside the list that a group cannot use is inert without a word from us, `background--rx` among them, since a group has no corners to round: saying which of those are meaningful would mean publishing a judgement about every SVG attribute, and this list only claims to know the names the library writes itself. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
 
 A third case says nothing at all, because there is nothing to say. A target whose element this picture does not contain is silent: `[grid-line--sky--stroke=red]||` with no `grid` emits nothing and reports nothing, and so does `background-zone--mid--fill` when no zones are set. Switch the grid or the zone on, and the same key works.
 
@@ -200,6 +200,7 @@ The root `<svg>` carries the document's own attributes: the size and `viewBox`, 
   <g class="bliss-background">
     <rect class="bliss-background-zone" .../>
   </g>
+  <style>...</style>            <!-- only with a grid: keeps the lines crisp in Safari -->
   <g class="bliss-grid" ...>
     <path class="bliss-grid-line bliss-grid-line--minor" .../>
     <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" .../>
@@ -212,7 +213,7 @@ The root `<svg>` carries the document's own attributes: the size and `viewBox`, 
 
 The background is a group in every case, holding one rectangle that covers the picture, or one rectangle for each zone you set, so `background--` means the same thing whichever you asked for.
 
-Because the painting defaults sit on the root, an attribute you set globally sits beside them and replaces the one it names for everything that does not set its own. The artwork sets none, so a global `stroke` or `stroke-width` reaches every character. The grid lines and the background rectangles do set their own, which is what the targets above are for.
+Because the painting defaults sit on the root, an attribute you set globally sits beside them and replaces the one it names for everything that does not set its own. Most of the artwork sets none, so a global `stroke` reaches every character. Two things do set their own, and both are worth knowing. The grid lines and the background rectangles carry their own paint, which is what the targets above are for. And a dot carries its own `stroke-width`, because a dot's size is derived from that width rather than drawn with it, so the two spellings part company on dots: `[stroke-width=2]||` grows the dot along with everything else, while `[content--stroke-width=2]||` thickens the strokes and leaves the dot exactly where it was.
 
 ### Class names
 

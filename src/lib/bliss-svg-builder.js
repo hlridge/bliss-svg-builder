@@ -1419,9 +1419,12 @@ class BlissSVGBuilder {
     this.#rootPrefixedNames = new Set();
     const setRootAttribute = (name, key, explicit, value) => {
       const prior = rootAttributeSource.get(name);
-      // Two bare keys are one channel and keep the last-wins silence they have
-      // always had. The report exists for the collision this feature creates,
-      // between a bare key and the `root--` spelling of the same attribute.
+      // Two bare keys are one channel and keep the silence they have always
+      // had. NOT last-wins, though it reads that way: the options pass rebuilds
+      // the bag with every curated key ahead of every raw one, so the raw name
+      // lands second and wins whatever order they were written in. The report
+      // exists for the collision this feature creates, between a bare key and
+      // the `root--` spelling of the same attribute.
       if (prior && (explicit || prior.explicit)) {
         const winner = explicit ? key : prior.key;
         const loser = explicit ? prior.key : key;

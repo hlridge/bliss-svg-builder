@@ -207,7 +207,7 @@ Dropping it is what keeps it out of the drawing. An option key the library does 
 
 ### `MISPLACED_LAYER_OPTION`
 
-A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged. This code's name is older than the vocabulary: what it calls a layer is what the handbook calls a [target](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture), and they are the same thing.
+A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope **in a bracket**. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged. The same key reaching the same scope through object input or `setTransientOptions` is dropped too, but in silence: nothing is emitted and no warning is raised. This code's name is older than the vocabulary: what it calls a layer is what the handbook calls a [target](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture), and they are the same thing.
 
 ```
 [grid--opacity=0.3]|B291   →  renders B291, the prefixed key dropped
@@ -246,7 +246,7 @@ The names, per container:
 | `grid--` | `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `d` | `grid-line--` |
 | `background--` | `x`, `y`, `width`, `height`, `stroke`, `fill` | `background-zone--` |
 
-The rule behind those lists is "every name the container's own drawing writes on its children", which is why `rx` and `opacity` are absent (nothing writes them on a child, so `grid--opacity` fades the grid as a unit and `background--rx` is simply inert), and why `shape-rendering` is absent too (the grid group carries that one itself, and a written value replaces it and works). `class` is the single exception to the rule: every child carries one, but so does the group, and a `class` you write there merges with the group's own name.
+The rule behind those lists is "every name the container's own drawing writes on its children", which is why `rx` and `opacity` are absent (nothing writes them on a child, so `grid--opacity` fades the grid as a unit and `background--rx` is simply inert), and why `shape-rendering` is absent too: the grid group carries that one itself, so a written value replaces it rather than being shadowed. One caveat the list cannot express is that the library also ships an inline `@supports` rule setting `shape-rendering` on the grid lines in WebKit, and a CSS rule beats a value inherited from the group, so in Safari the lines keep theirs. `class` is the single exception to the rule: every child carries one, but so does the group, and a `class` you write there merges with the group's own name.
 
 Nothing is dropped. The value is emitted where you asked for it, so `toString()` returns what you wrote and the warning comes back with it; only the silence about it goes. The report is about the name and the place, not about what the picture ended up looking like, and it is silent when the container is not drawn at all: `[grid--stroke=red]||B291` without `grid` says nothing, exactly as `[grid-color=red]` says nothing there.
 
@@ -380,7 +380,7 @@ A token that is not even a valid code shape (for example `!B81`) cannot be repre
 
 ### `UNKNOWN_LAYER`
 
-A global option written in `<target>--<attribute>` form that does not resolve to a target and an attribute. A target is a class the library writes with the `bliss-` prefix removed, and the attribute is what follows the **last** `--`; the three ways a key can miss share one code, and each message says which one it is:
+A global option written in `<target>--<attribute>` form that does not resolve to a target and an attribute. This code's name is older than the vocabulary, exactly as [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)'s is: what it calls a layer is what the handbook calls a target, and they are the same thing. A target is a class the library writes with the `bliss-` prefix removed, and the attribute is what follows the **last** `--`; the three ways a key can miss share one code, and each message says which one it is:
 
 ```
 [foo--x=1]||B291       →  warns: names no target the library knows

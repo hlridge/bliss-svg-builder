@@ -85,7 +85,11 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
  * semantics, the open-ended thing C8 refused to build for vector-effect. That
  * is why `rx` and `opacity` are out (nothing stamps them, so we cannot say a
  * child's value takes effect instead) and why `shape-rendering` is out (the
- * grid group carries it itself, and a written one replaces it and works).
+ * grid group carries it itself, so a written one replaces it rather than being
+ * shadowed by a child. The embedded `@supports` stylesheet does set it on
+ * `.bliss-grid-line` in WebKit, where a CSS rule beats an inherited
+ * presentation attribute and the lines keep their own; that is a stylesheet we
+ * ship, not a value the emitter stamps, so it does not meet the rule above).
  * `class` is the one carve-out from the rule: every child carries it, but the
  * container carries it too and an authored value MERGES there, so reporting it
  * would report a live feature.
