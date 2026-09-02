@@ -360,7 +360,7 @@ Two keys setting one attribute on one element, where only one value can be writt
 
 It reports more-than-one rather than value-lost, so two keys carrying the same value still raise it. Two keys of the same kind are not a collision, and stay as silent as they have always been: `[color=red;stroke=blue]||` writes blue, in either written order, because the raw attribute name beats the friendlier alias, and says nothing about it.
 
-The warning follows the drawing. It is silent when this picture contains nothing that would carry the values, so `[grid-color=red;grid-line--stroke=blue]||B291` without `grid` says nothing, and silent for a single shape the render leaves out: `[background=beige;background-zone--top--fill=blue]||B291` paints one rect covering the picture and no zones, so nothing collides and the beige is undisturbed.
+The warning follows the drawing, and how closely depends on the layer. For the **background** it follows the individual rect, because which rects are painted is settled before anything is drawn: `[background=beige;background-zone--top--fill=blue]||B291` paints one rect covering the picture and no zones, so nothing collides and the beige is undisturbed. For the **grid** it follows the layer switch, so `[grid-color=red;grid-line--stroke=blue]||B291` without `grid` says nothing, while a line that a crop removed is still named: `[grid;crop-bottom=5;grid-earth-color=red;grid-line--earth--stroke=blue]||B291` names `grid-line--earth` although the crop left no earth line to paint. That is deliberate. Which lines a crop leaves is known only at render, and a warning about a written option is more useful than a warning that goes quiet whenever the picture is cropped.
 
 ### `DUPLICATE_KEY`
 
