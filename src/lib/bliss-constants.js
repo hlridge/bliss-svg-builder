@@ -59,6 +59,11 @@ export const ELEMENT_CLASSES = Object.freeze({
  *
  * Closed and ours: it lists names the library itself computes, not a table of
  * SVG semantics. Keyed by ELEMENT_CLASSES entry.
+ *
+ * Add an option to a chain here and it becomes reportable the moment something
+ * writes it; leave one out and that option is silently never named as displaced.
+ * Every name in every chain carries a row in `layer-sub-targets.test.js`, since
+ * an entry no test reaches can be deleted with the whole suite green.
  */
 export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   gridMinor:  { stroke: ['grid-minor-color', 'grid-color'],

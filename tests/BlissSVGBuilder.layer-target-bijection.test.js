@@ -31,6 +31,12 @@ import { LAYER_TARGETS, CLASS_PREFIX } from '../src/lib/bliss-constants.js';
  *   that reads the declaration, so a divergence needs an emitter that bypasses
  *   it, but that bypass is exactly what this file guards. **Each new
  *   option-gated emitter owes this file a configuration.**
+ * - WHICH element a declared class belongs to. Both sides of every assertion
+ *   here are derived from `ELEMENT_CLASSES`, so swapping two entries' class
+ *   lists moves the harvest and the vocabulary together and leaves this file
+ *   green. Measured: exchanging `zoneMid` and `zoneBottom` passes all 16 rows
+ *   and is caught loudly elsewhere (`svg-structure`, `crop-dimension-clamp`,
+ *   three `layer-sub-targets` zone rows). A membership guard, not a placement one.
  * - Refusals and precedence, see `BlissSVGBuilder.layer-attribute-refusals.test.js`.
  */
 
