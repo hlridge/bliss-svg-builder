@@ -115,7 +115,10 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
     it.each([
       ['the curated alias', '[color=red;root--stroke=blue]||B291', 'stroke="blue"', 'color', 'root--stroke'],
-      ['the reverse written order', '[root--stroke=blue;color=red]||B291', 'stroke="blue"', 'color', 'root--stroke'],
+      // NOT a reverse-order row, though it reads like one: the options pass hands
+      // every curated key to the split loop first, so this runs the identical
+      // iteration as the row above. The `fill` rows below are what reverse it.
+      ['the curated alias written second', '[root--stroke=blue;color=red]||B291', 'stroke="blue"', 'color', 'root--stroke'],
       ['two explicit widths', '[stroke-width=2;root--stroke-width=3]||B291', 'stroke-width="3"', 'stroke-width', 'root--stroke-width'],
     ])('lets the named target beat %s and reports the loser', (_case, input, expected, loser, winner) => {
       const builder = new BlissSVGBuilder(input);
@@ -265,6 +268,14 @@ describe('BlissSVGBuilder sub-element targets', () => {
         .toHaveLength(0);
     });
 
+    it('says nothing for the other four line families either', () => {
+      // the row above reaches the gate through the sky family alone, so a gate
+      // narrowed to that one family would pass it while reporting four elements
+      // no output contains
+      expect(new BlissSVGBuilder('[grid-color=blue;grid-line--stroke=red]||B291').warnings)
+        .toHaveLength(0);
+    });
+
     it('names each displaced option once, listing every element it reached', () => {
       const builder = new BlissSVGBuilder(
         '[grid;grid-color=blue;grid-sky-color=green;grid-line--stroke=red]||B291');
@@ -284,6 +295,34 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
       expect(warning.message).toContain('grid-line--sky--stroke');
       expect(warning.message).not.toContain('"grid-line--stroke"');
+    });
+
+    it('names the winner PER ELEMENT when two raw keys displace one option', () => {
+      // both raw keys beat `grid-color`, on different lines, so there is one
+      // report each. Collapsing them onto the curated key alone would leave a
+      // single warning saying the general key won on the sky line, and its
+      // "remove whichever you did not mean" would point at the key that paints
+      const builder = new BlissSVGBuilder(
+        '[grid;grid-color=blue;grid-line--stroke=red;grid-line--sky--stroke=green]||B291');
+      const displaced = builder.warnings.filter(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(displaced).toHaveLength(2);
+      expect(displaced.map(w => w.source)).toEqual(['grid-color', 'grid-color']);
+      expect(displaced[0].message)
+        .toContain('on grid-line--minor, grid-line--medium, grid-line--major, grid-line--earth, so "grid-line--stroke" was used');
+      expect(displaced[1].message)
+        .toContain('on grid-line--sky, so "grid-line--sky--stroke" was used');
+    });
+
+    it('names a family the bulk option reaches only through the major chain', () => {
+      // `grid-major-color` sits mid-chain for the sky and earth lines and first
+      // for the major family: drop it from any one of the three and that family
+      // silently stops being named
+      const builder = new BlissSVGBuilder('[grid;grid-major-color=blue;grid-line--stroke=red]||B291');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning.source).toBe('grid-major-color');
+      expect(warning.message).toContain('on grid-line--major, grid-line--sky, grid-line--earth');
     });
 
     it('does not report a raw key that a more specific raw key overrides', () => {
@@ -311,6 +350,27 @@ describe('BlissSVGBuilder sub-element targets', () => {
       expect(warning.source).toBe('background');
       expect(warning.message).toContain('background-zone');
       expect(warning.message).not.toContain('--top');
+    });
+
+    it('leaves the paper rect out once the zones are drawing', () => {
+      // `background` paints the zones the author left out, so the bulk option is
+      // displaced on those zones and the paper rect is not in the output at all
+      const builder = new BlissSVGBuilder('[background=beige;background-top=red;background-zone--fill=blue]||B291');
+      const displaced = builder.warnings.filter(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(displaced.map(w => w.source)).toEqual(['background-top', 'background']);
+      expect(displaced[1].message).toContain('on background-zone--mid, background-zone--bottom');
+      expect(displaced.every(w => !/on background-zone,/.test(w.message))).toBe(true);
+    });
+
+    it('reports a zone the bulk option painted', () => {
+      // the mid zone here draws from `background`, not from a zone option, so a
+      // gate reading the zone option alone would call it undrawn and go quiet
+      const builder = new BlissSVGBuilder('[background=beige;background-top=red;background-zone--mid--fill=blue]||B291');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning.source).toBe('background');
+      expect(warning.message).toContain('on background-zone--mid');
     });
 
     it('reports a displaced width as readily as a displaced colour', () => {
@@ -417,7 +477,11 @@ describe('BlissSVGBuilder sub-element targets', () => {
       const builder = new BlissSVGBuilder('[grid;grid-line--sky--stroke-dasharray=2]||B291');
 
       expect(builder.toString()).toBe('[grid;grid-line--sky--stroke-dasharray=2]||B291');
-      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      // reparsing that string and comparing would assert nothing: `toString()`
+      // just returned the literal this builder was made from, so both sides
+      // would be builds of one string. The markup and the JSON route can differ.
+      expect(linesWithClass(builder.svgCode, 'bliss-grid-line--sky')[0])
+        .toContain('stroke-dasharray="2"');
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
     });
 

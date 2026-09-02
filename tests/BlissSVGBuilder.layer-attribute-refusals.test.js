@@ -202,6 +202,12 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       expect(unknown.message).toContain('grid-line--sky');
       expect(empty.message).toContain('no target name');
       expect(empty.message).not.toContain('names no target the library knows');
+      // both carry the remedy, and it is the clause an author ACTS on: the one
+      // wrong spelling it could name is the prefixed one, which this vocabulary
+      // refuses (`bliss-grid--opacity` is an UNKNOWN_LAYER row above)
+      for (const warning of [unknown, empty]) {
+        expect(warning.message).toContain('Write the attribute with no prefix to put it on the root.');
+      }
     });
 
     it('does not call the content target unknown when only the attribute is missing', () => {
