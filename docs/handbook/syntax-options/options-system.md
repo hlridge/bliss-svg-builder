@@ -189,6 +189,8 @@ Built-in visual options can be applied at any scope:
 
 [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through) (like `fill`, `opacity`, `stroke-dasharray`, etc.) also work at any scope.
 
+One pass-through form is global-only: a key that [names a part of the picture](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture) before the attribute, such as `grid--opacity` or `grid-line--sky--stroke`. Those parts belong to the document as a whole, so below global scope the key is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning. Write the attribute without the prefix to put it on the element you are already scoping to.
+
 Canvas-wide options configure the whole SVG (its margins, grid, backgrounds, spacing, metadata), so they only take effect at global scope (`[opts]||`). Placed at word, character, or part scope they are dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning and the content renders unchanged:
 
 | Family | Keys |

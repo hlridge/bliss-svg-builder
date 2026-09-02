@@ -16,7 +16,7 @@ builder.warnings;
 
 - `code` — a stable identifier from the list below (the `WarningCode` type in TypeScript)
 - `message` — a human-readable description, including how to fix the input
-- `source` — the fragment of your input that triggered the warning, always a string you can search your own input for. For an attribute it is the key on its own whenever the **key** is what the report is about, prefix included: a refused name (`content--xmlns`), a key whose value cannot take effect where it landed (`grid--stroke`), or the losing half of a collision (`grid-sky-color`). It is the option as written when the **value** is what went wrong (`stroke-width=-2`), and a comma-separated list of keys where one report names several (`margin, crop-top`)
+- `source` — the fragment of your input that triggered the warning, always a string you can search your own input for. It is the **key on its own**, prefix included, when the report is about the attribute itself: a refused name (`content--xmlns`), a key whose value cannot take effect where it landed (`grid--stroke`), or the losing half of a collision (`grid-sky-color`); where one report names several keys they are comma-separated (`margin, crop-top`). It is the **option as written** when the report is about the option in its bracket: a value the library refused (`stroke-width=-2`), or a key at a scope that cannot use it (`grid--opacity=0.3`)
 
 Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully.
 
@@ -207,16 +207,16 @@ Dropping it is what keeps it out of the drawing. An option key the library does 
 
 ### `MISPLACED_LAYER_OPTION`
 
-A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged.
+A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged. This code's name is older than the vocabulary: what it calls a layer is what the handbook calls a [target](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture), and they are the same thing.
 
 ```
-[grid--opacity=0.3]|B291   →  renders B291, the layer key dropped
-[grid;grid--opacity=0.3]||B291 →  valid: global scope is where layers live
+[grid--opacity=0.3]|B291   →  renders B291, the prefixed key dropped
+[grid;grid--opacity=0.3]||B291 →  valid: global scope is where these parts live
 ```
 
 Any other option in the same bracket is kept, so `[grid--opacity=0.3;fill=red]|B291` still renders the word filled red.
 
-Dropping it is what keeps it out of the drawing. An unrecognized key is passed through to the SVG as an attribute, so leaving the layer key in place would put `grid--opacity="0.3"` into the output, where it means nothing to any renderer. To style just that element, write the attribute without a prefix.
+Dropping it is what keeps it out of the drawing. An unrecognized key is passed through to the SVG as an attribute, so leaving the prefixed key in place would put `grid--opacity="0.3"` into the output, where it means nothing to any renderer. To style just that element, write the attribute without a prefix.
 
 ### `MISPLACED_LINK_ATTRIBUTE`
 
@@ -232,7 +232,7 @@ The prefixed channel emits an attribute name exactly as written, and this is one
 
 ### `MISPLACED_CONTAINER_ATTRIBUTE`
 
-An attribute written on one of the two container targets, `background--` or `grid--`, under a name that container's own drawing writes on each of the shapes inside it. The attribute is emitted on the group exactly as written and then never shows, because the shape's own value is the one that takes effect. The warning names the target that reaches the shapes:
+An attribute written on one of the two container targets, `background--` or `grid--`, under a name that container's own drawing writes on each of the shapes inside it. The attribute is emitted on the group exactly as written and then never shows. Two mechanisms produce that one outcome: a paint name is passed down to the shapes, which set their own and so beat it, while a geometry name is inert on a group, which carries none. The message states what the two share, that the shape's value is the one that takes effect, and names the target that reaches the shapes:
 
 ```
 [grid;grid--stroke=red]||B291                     →  points at grid-line--stroke
@@ -360,7 +360,7 @@ Two keys setting one attribute on one element, where only one value can be writt
 
 It reports more-than-one rather than value-lost, so two keys carrying the same value still raise it. Two keys of the same kind are not a collision, and stay as silent as they have always been: `[color=red;stroke=blue]||` writes blue, in either written order, because the raw attribute name beats the friendlier alias, and says nothing about it.
 
-The warning follows the drawing. It is silent when the layer that would carry the values is switched off, so `[grid-color=red;grid-line--stroke=blue]||B291` without `grid` says nothing, and silent for a single shape the render does not contain: `[background=beige;background-zone--top--fill=blue]||B291` paints one rect covering the picture and no zones, so nothing collides and the beige is undisturbed.
+The warning follows the drawing. It is silent when this picture contains nothing that would carry the values, so `[grid-color=red;grid-line--stroke=blue]||B291` without `grid` says nothing, and silent for a single shape the render leaves out: `[background=beige;background-zone--top--fill=blue]||B291` paints one rect covering the picture and no zones, so nothing collides and the beige is undisturbed.
 
 ### `DUPLICATE_KEY`
 
@@ -461,7 +461,7 @@ Invalid *codes* passed to `applyIndicators()` are a different case: each one war
 
 An attribute name that can never be emitted: an `on*` event handler, or a name containing anything outside letters, digits and dashes. Such a name is skipped at render wherever it appears, so nothing can execute; this warning exists because the skip used to be silent, leaving an author with a key they had every reason to think was working.
 
-It is reported at every scope, and for the layer form the name after the `--` is what is judged:
+It is reported at every scope, and for a prefixed key the name after the last `--` is what is judged:
 
 ```
 [onclick=alert(1)]||B291         →  warns, nothing emitted

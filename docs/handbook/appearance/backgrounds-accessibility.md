@@ -32,11 +32,14 @@ The background rects sit in a group, and each one carries a class you can select
 | `bliss-background-zone--mid` | Mid zone rect |
 | `bliss-background-zone--bottom` | Bottom zone rect |
 
-The group is there in both cases. `background` alone puts one `<rect class="bliss-background-zone">` in it, covering the whole picture; the zone options put three in it, each with its own `--top`, `--mid` or `--bottom` class beside the shared one.
+The group is there in both cases. `background` alone puts one `<rect class="bliss-background-zone">` in it, covering the whole picture. The zone options put in one rect for each zone that ends up with a color, so two zone options give two rects, and a `background` written beside them colors the zones you left out and brings the count to three.
 
-Each of these names is also a target for [pass-through attributes](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture): drop the `bliss-` prefix and put the attribute after a `--`, so `[background-top=red;background-zone--top--rx=3]||` rounds the corners of the top zone alone.
+Each of these names is also a target for [pass-through attributes](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture): drop the `bliss-` prefix and put the attribute after a `--`, so in `[background-top=red;background-mid=green;background-bottom=blue;background-zone--top--rx=3]||` it is the top zone alone whose corners are rounded.
 
-If you have a stylesheet written against an earlier release, `.bliss-background` is the selector to revisit. It now matches the group rather than a rect, and a `fill` written on the group does not reach a rect that sets its own, so `.bliss-background { fill: pink }` stops painting. Use `.bliss-background-zone` for the rects, and `.bliss-background-zone--top` and its siblings for one zone.
+A stylesheet written against an earlier release needs two changes here, and neither announces itself:
+
+- `.bliss-background--top`, `--mid` and `--bottom` are now `.bliss-background-zone--top`, `--mid` and `--bottom`. The old spellings match nothing at all.
+- `.bliss-background` now matches the group rather than a rect. A `fill` written on the group does not reach a rect that sets its own, so `.bliss-background { fill: pink }` stops painting; use `.bliss-background-zone` instead.
 
 ### Bulk Default with Zone Overrides
 

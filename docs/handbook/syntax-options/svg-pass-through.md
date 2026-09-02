@@ -26,7 +26,7 @@ The name you write is the name that is emitted, exactly as you typed it. That ma
 
 A global option applies to everything. When you want just one part of the output, prefix the attribute with the name of the thing you mean, using a double dash.
 
-**The rule is one sentence: every class the library writes is addressable, by that same name with the `bliss-` prefix removed.** The group with `class="bliss-grid"` is `grid--`, the sky line with `class="bliss-grid-line bliss-grid-line--sky"` is `grid-line--sky--`, and the root `<svg>`, which carries `class="bliss-root"`, is `root--`. Nothing is inferred and no list is consulted, so a class you can see in the output is a name you can write.
+**The rule is one sentence: every class the library writes is addressable, by that same name with the `bliss-` prefix removed.** The group with `class="bliss-grid"` is `grid--`, the sky line with `class="bliss-grid-line bliss-grid-line--sky"` is `grid-line--sky--`, and the root `<svg>`, which carries `class="bliss-root"`, is `root--`. The table below is the whole vocabulary, and the library derives it from the classes its own drawing writes rather than keeping it by hand, so it cannot drift from the markup, and a class added in a later release is targetable the moment it exists. A class of your own, added with the `class` option, is not a target: it names your rule, not one of ours.
 
 | Target | Where it lands |
 |--------|----------------|
@@ -76,13 +76,15 @@ Raw means the library does not rename or reinterpret your attribute. It does not
 
 ### When a value is written but cannot show
 
-Two of the targets are containers. `background--` and `grid--` name groups, and the shapes inside them are given their own values for the names those groups write, so a value on the group is emitted where you asked for it and then never shows. You are told which target reaches the shapes instead:
+Two of the targets are containers. `background--` and `grid--` name groups, and a value written on a group can fail to show for either of two reasons: a paint name such as `stroke` is passed down to the shapes inside, which set their own and so beat it, and a geometry name such as `width` is inert on a group, which carries no geometry to begin with. Both end the same way, so both are reported the same way. The value is emitted where you asked for it, and you are told which target reaches the shapes:
 
 ```
 [grid;grid--stroke=red]||B313   →  reports, and points at grid-line--stroke
 ```
 
-The names this covers are the ones the group's own drawing writes on its children: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, and `x`, `y`, `width`, `height`, `stroke` and `fill` for the background. Every other name lands on the group and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit, `grid--shape-rendering` replaces the value the grid sets for itself, and `background--rx` is inert without a word from us, since a group has no corners to round. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
+The names this covers are the ones the group's own drawing writes on its children: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, and `x`, `y`, `width`, `height`, `stroke` and `fill` for the background. Every other name lands on the group and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit and `grid--shape-rendering` replaces the value the grid sets for itself. A name outside the list that a group cannot use is inert without a word from us, `background--rx` among them, since a group has no corners to round: saying which of those are meaningful would mean publishing a judgement about every SVG attribute, and this list only claims to know the names the library writes itself. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
+
+A third case says nothing at all, because there is nothing to say. A target whose element this picture does not contain is silent: `[grid-line--sky--stroke=red]||` with no `grid` emits nothing and reports nothing, and so does `background-zone--mid--fill` when no zones are set. Switch the grid or the zone on, and the same key works.
 
 The other report is for two keys that set one attribute on one target. The key that names its target wins, because the other one has to be resolved to a target first, and the one that lost is named:
 
@@ -208,24 +210,24 @@ The root `<svg>` carries the document's own attributes: the size and `viewBox`, 
 </svg>
 ```
 
-The background is a group in every case, holding one rectangle that covers the picture or the three zone rectangles when you set the zones separately, so `background--` means the same thing whichever you asked for.
+The background is a group in every case, holding one rectangle that covers the picture, or one rectangle for each zone you set, so `background--` means the same thing whichever you asked for.
 
-Because the painting defaults sit on the root, an attribute you set globally sits beside them and replaces the one it names, rather than being overruled by markup further down.
+Because the painting defaults sit on the root, an attribute you set globally sits beside them and replaces the one it names for everything that does not set its own. The artwork sets none, so a global `stroke` or `stroke-width` reaches every character. The grid lines and the background rectangles do set their own, which is what the targets above are for.
 
 ### Class names
 
-Every element the library draws carries a class, and this is all of them:
+These are all the classes the library writes:
 
 - `bliss-root` on the `<svg>`
-- `bliss-background` on the background group, `bliss-background-zone` on every rectangle inside it, and `bliss-background-zone--top`, `--mid`, `--bottom` on the zone rectangles when the zones are set separately
+- `bliss-background` on the background group, `bliss-background-zone` on every rectangle inside it, and `bliss-background-zone--top`, `--mid`, `--bottom` on the rectangle for each zone you set
 - `bliss-grid` on the grid group, `bliss-grid-line` on every line, and `bliss-grid-line--minor`, `--medium`, `--major` by family, with `--sky` and `--earth` on the two reference lines, which carry `--major` as well
 - `bliss-content` on the group holding the artwork
 
-These names are stable, so it is safe to write CSS and query selectors against them, and each one doubles as a target: remove `bliss-` and put the attribute after a `--`.
+Anything else the library draws, including the character paths and the `<g>` around a word, character or part, carries no class of ours. These names are stable from this release on, so it is safe to write CSS and query selectors against them, and each one doubles as a target: remove `bliss-` and put the attribute after a `--`.
 
 A `class` you set is added to the element's own name rather than replacing it, so `[class=mine]||` produces `class="bliss-root mine"` and your stylesheet and ours can coexist.
 
-If you have a stylesheet written against an earlier release, `.bliss-background` is the one selector to revisit: it now matches the group rather than the rectangle, and a `fill` on the group does not reach a rectangle that sets its own. Select `.bliss-background-zone` for the paper, and `.bliss-background-zone--top` and its siblings for one zone.
+A stylesheet written against an earlier release needs two changes, and neither announces itself. `.bliss-background--top`, `--mid` and `--bottom` were renamed to `.bliss-background-zone--top`, `--mid` and `--bottom`, so the old spellings now match nothing at all. And `.bliss-background` matches the group rather than the rectangle, where a `fill` does not reach a rectangle that sets its own, so select `.bliss-background-zone` for the paper.
 
 ### Attributes the library keeps
 
