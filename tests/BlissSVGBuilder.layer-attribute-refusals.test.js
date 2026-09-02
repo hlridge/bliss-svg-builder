@@ -198,6 +198,10 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       const unknown = new BlissSVGBuilder('[foo--x=1]||B291').warnings[0];
       const empty = new BlissSVGBuilder('[--x=1]||B291').warnings[0];
 
+      // `source` is the fragment the author searches their own input for, and
+      // nothing else in the suite pins it for this code
+      expect(unknown.source).toBe('foo--x');
+      expect(empty.source).toBe('--x');
       expect(unknown.message).toContain('names no target the library knows');
       expect(unknown.message).toContain('grid-line--sky');
       expect(empty.message).toContain('no target name');

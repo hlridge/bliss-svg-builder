@@ -130,9 +130,14 @@ describe('BlissSVGBuilder layer attributes', () => {
     ])('warns MISPLACED_LAYER_OPTION at %s scope and emits no attribute', (_scope, input, key) => {
       const builder = new BlissSVGBuilder(input);
 
-      expect(builder.warnings.some(w => w.code === 'MISPLACED_LAYER_OPTION')).toBe(true);
+      const warning = builder.warnings.find(w => w.code === 'MISPLACED_LAYER_OPTION');
+
+      expect(warning).toBeDefined();
       expect(builder.svgCode).not.toContain(key);
       expect(builder.svgCode).toContain('<path');
+      // the remedy is the half an author acts on: without it the message says
+      // the key was ignored and nothing about the spelling that works here
+      expect(warning.message).toContain('without a layer prefix');
     });
 
     it('keeps the other options written in the same bracket', () => {
@@ -220,7 +225,24 @@ describe('BlissSVGBuilder layer attributes', () => {
 
       expect(warning).toBeDefined();
       expect(warning.source).toContain('margin');
+      // the message names what it displaced, and that clause is the one the
+      // author reads: `source` alone can stay right while the sentence stops
+      // saying which option went dead
+      expect(warning.message).toContain('"margin" no longer shapes it');
       expect(rootTag(builder.svgCode)).toContain('viewBox="0 0 10 10"');
+    });
+
+    it.each([
+      ['crop', '[crop=2;viewBox="0 0 10 10"]||B291'],
+      ['min-width', '[min-width=20;viewBox="0 0 10 10"]||B291'],
+      ['center', '[center;viewBox="0 0 10 10"]||B291'],
+      ['margin-top', '[margin-top=2;viewBox="0 0 10 10"]||B291'],
+    ])('names %s too, since every geometry option can be displaced', (option, input) => {
+      const warning = new BlissSVGBuilder(input).warnings
+        .find(w => w.code === 'MULTIPLE_GEOMETRY_VALUES');
+
+      expect(warning).toBeDefined();
+      expect(warning.source).toContain(option);
     });
 
     it('stays silent when only the override is written', () => {

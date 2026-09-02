@@ -373,6 +373,49 @@ describe('BlissSVGBuilder sub-element targets', () => {
       expect(warning.message).toContain('on background-zone--mid');
     });
 
+    // One row per NAME in CURATED_ATTRIBUTE_SOURCES, because a chain entry that
+    // no input reaches can be deleted with the whole suite green: eight of the
+    // sixteen were in that state until this table existed. The rule this file
+    // keeps relearning is that a row per table is not a row per entry.
+    it.each([
+      ['grid-color',               'grid-line--stroke'],
+      ['grid-minor-color',         'grid-line--minor--stroke'],
+      ['grid-medium-color',        'grid-line--medium--stroke'],
+      ['grid-major-color',         'grid-line--major--stroke'],
+      ['grid-sky-color',           'grid-line--sky--stroke'],
+      ['grid-earth-color',         'grid-line--earth--stroke'],
+      ['grid-stroke-width',        'grid-line--stroke-width'],
+      ['grid-minor-stroke-width',  'grid-line--minor--stroke-width'],
+      ['grid-medium-stroke-width', 'grid-line--medium--stroke-width'],
+      ['grid-major-stroke-width',  'grid-line--major--stroke-width'],
+      ['grid-sky-stroke-width',    'grid-line--sky--stroke-width'],
+      ['grid-earth-stroke-width',  'grid-line--earth--stroke-width'],
+    ])('names %s when a raw key displaces it', (curated, rawKey) => {
+      const builder = new BlissSVGBuilder(`[grid;${curated}=2;${rawKey}=3]||B291`);
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning).toBeDefined();
+      expect(warning.source).toBe(curated);
+      // a bulk option sits in all five chains, so the source alone cannot see it
+      // dropped from one of them: the element list is what changes there
+      if (curated === 'grid-color' || curated === 'grid-stroke-width') {
+        expect(warning.message).toContain(
+          'on grid-line--minor, grid-line--medium, grid-line--major, grid-line--sky, grid-line--earth');
+      }
+    });
+
+    it.each([
+      ['background',        '[background=beige;background-zone--fill=blue]||B291'],
+      ['background-top',    '[background-top=r;background-mid=g;background-bottom=b;background-zone--top--fill=blue]||B291'],
+      ['background-mid',    '[background-top=r;background-mid=g;background-bottom=b;background-zone--mid--fill=blue]||B291'],
+      ['background-bottom', '[background-top=r;background-mid=g;background-bottom=b;background-zone--bottom--fill=blue]||B291'],
+    ])('names %s when a raw key displaces it', (curated, input) => {
+      const warning = new BlissSVGBuilder(input).warnings
+        .find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES' && w.source === curated);
+
+      expect(warning).toBeDefined();
+    });
+
     it('reports a displaced width as readily as a displaced colour', () => {
       const builder = new BlissSVGBuilder(
         '[grid;grid-sky-stroke-width=2;grid-line--sky--stroke-width=3]||B291');
