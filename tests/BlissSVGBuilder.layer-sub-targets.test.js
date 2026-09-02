@@ -32,6 +32,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Silence when a target names a real class that nothing drew.
  * - A resolved target's attribute name being judged on the half after the last
  *   `--`, so an unsafe name reports the safety gate rather than the vocabulary.
+ * - A working key surviving BOTH serializers unchanged, with the attribute still
+ *   in the markup and the report still raised on the way back in. That is what
+ *   these rows uniquely add: the codes themselves are pinned above.
  *
  * Does NOT cover:
  * - Layer-level targeting (`grid--`, `content--`, `background--`) and its
@@ -419,10 +422,10 @@ describe('BlissSVGBuilder sub-element targets', () => {
     });
 
     it.each([
-      ['a displaced curated option',    '[grid;grid-sky-color=blue;grid-line--stroke=red]||B291', 'MULTIPLE_ATTRIBUTE_VALUES'],
-      ['a duplicated root attribute',   '[fill=red;root--fill=red]||B291',                        'MULTIPLE_ATTRIBUTE_VALUES'],
-      ['a shadowed container attribute', '[grid;grid--stroke=red]||B291',                         'MISPLACED_CONTAINER_ATTRIBUTE'],
-    ])('reports %s again after a round trip', (_case, input, code) => {
+      ['a displaced curated option',     '[grid;grid-sky-color=blue;grid-line--stroke=red]||B291', 'MULTIPLE_ATTRIBUTE_VALUES',     'stroke="red"'],
+      ['a duplicated root attribute',    '[fill=red;root--fill=red]||B291',                        'MULTIPLE_ATTRIBUTE_VALUES',     'fill="red"'],
+      ['a shadowed container attribute', '[grid;grid--stroke=red]||B291',                          'MISPLACED_CONTAINER_ATTRIBUTE', '<g class="bliss-grid" shape-rendering="crispEdges" stroke="red">'],
+    ])('reports %s again after a round trip', (_case, input, code, emitted) => {
       // nothing is refused in these three: every key is emitted and the picture
       // is unchanged by the round trip. What has to survive is the REPORT, since
       // a stored composition that renders the same way and goes quiet would hide
@@ -432,7 +435,12 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
       expect(written).toBe(input);
       expect(reparsed.warnings.map(w => w.code)).toContain(code);
-      expect(reparsed.svgCode).toBe(new BlissSVGBuilder(input).svgCode);
+      // The value has to come back with its report, so the reparse is checked
+      // against the MARKUP and against the other serializer. Comparing it with a
+      // fresh build of `input` would assert nothing at all: `written` is `input`
+      // by the line above, so both sides would be builds of one string.
+      expect(reparsed.svgCode).toContain(emitted);
+      expect(new BlissSVGBuilder(new BlissSVGBuilder(input).toJSON()).svgCode).toBe(reparsed.svgCode);
     });
   });
 

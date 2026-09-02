@@ -19,9 +19,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   outermost element.
  * - A key naming a target that does not exist, an empty target half and an
  *   empty attribute half, each reported once, each with its own reason, and
- *   each round-tripping. The root faces the same two refusals behind its own
- *   prefix: the provenance stamp, and an attribute name carrying its own `--`,
- *   which the last-dash split reads as a target nothing carries.
+ *   each round-tripping. An attribute name carrying its own `--` joins them,
+ *   behind any prefix, because the last-dash split reads it as a target nothing
+ *   carries.
+ * - The root facing the library's own refusals behind its own prefix, the
+ *   provenance stamp among them: naming the root deliberately does not get past
+ *   a guard the bare spelling faces.
  * - A known layer that is not currently drawn staying silent, since the
  *   criterion is a target the library knows and not one it is emitting.
  * - A layer attribute name refused by the safety gate.

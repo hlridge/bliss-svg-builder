@@ -81,8 +81,11 @@ export interface BlissOptions {
   // <svg>; `<target>--<attribute>` lands on the elements carrying that class,
   // where a target is any class the library writes minus the `bliss-` prefix
   // and the key splits at the LAST `--` (`'grid-line--sky--stroke-dasharray': 2`).
-  // At element scope the key lands on that element's own <g>, and a target
-  // prefix is refused. Includes `boolean` so the boolean options (`grid`,
+  // At element scope the key lands on that element's own <g>; a target prefix
+  // has nothing to name there, so it is dropped, reported with
+  // `MISPLACED_LAYER_OPTION` when it was written in a DSL bracket and dropped
+  // in silence on the object-input and transient surfaces. Includes `boolean`
+  // so the boolean options (`grid`,
   // `center`, `error-placeholder`) conform to the index signature; without it
   // `tsc` rejects this interface.
   [key: string]: string | number | boolean | undefined;
@@ -590,9 +593,10 @@ export interface GlyphDefinition {
    * well-formed option names (letters, digits, hyphens; camelCase accepted;
    * names beginning with `on` are rejected, as for any attribute) and may not
    * include a global-only (builder-canvas) option key such as `margin` or
-   * `grid` — those configure the whole SVG and would be inert on a
-   * definition; `define()` reports a violation in its `errors` result,
-   * `patchDefinition()` throws.
+   * `grid`, nor a target-prefixed key such as `content--fill` or
+   * `grid-line--sky--stroke` — those configure the whole SVG or name a part of
+   * it, and would be inert on a definition; `define()` reports a violation in
+   * its `errors` result, `patchDefinition()` throws.
    */
   defaultOptions?: BlissOptions;
 }
@@ -802,15 +806,19 @@ export interface Warning {
   /** Human-readable description of the issue. */
   readonly message: string;
   /**
-   * The problematic fragment of the input that triggered the warning. It is the
-   * KEY on its own, prefix included, when the report is about the attribute
-   * itself: a refused name (`content--xmlns`), a key whose value cannot take
-   * effect where it landed (`grid--stroke`), or the displaced half of a
-   * collision (`grid-sky-color`); several keys in one report are
-   * comma-separated (`margin, crop-top`). It is the OPTION AS WRITTEN when the
-   * report is about the option in its bracket: a refused value
-   * (`stroke-width=-2`), or a key at a scope that cannot use it
-   * (`grid--opacity=0.3`).
+   * The part of your input the warning is about. Its SHAPE follows the code
+   * rather than one rule, so match on `code` first and read `source` as scoped
+   * to what that code reports. For an attribute it is usually the KEY on its
+   * own, prefix included, where the attribute itself is what is wrong (a
+   * refused name, `content--xmlns`; a key whose value cannot take effect where
+   * it landed, `grid--stroke`; the displaced half of a raw-versus-curated
+   * collision, `grid-sky-color`), and usually the OPTION AS WRITTEN where the
+   * option is (a refused value, `stroke-width=-2`; a key at a scope that cannot
+   * use it, `grid--opacity=0.3`). Other codes point at the spelling they are
+   * about instead: several option names comma-separated (`margin, crop-top`), a
+   * coordinate suffix (`:1`), a whole bracket (`[color=red]`), or, where the
+   * input could not be parsed as a code at all, the parser's description of what
+   * it read (`Invalid format: B291[x=1]`) rather than a substring of the input.
    */
   readonly source: string;
 }
