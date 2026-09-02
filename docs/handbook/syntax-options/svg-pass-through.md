@@ -16,16 +16,42 @@ The name you write is the name that is emitted, exactly as you typed it. That ma
 
 <Demo code="[opacity=0.5]||B313" title="opacity fades the whole picture" />
 
-## Targeting One Layer
+```
+[stroke-dasharray=2,1]||B313
+```
 
-A global option applies to everything. When you want just one part of the output, prefix the attribute with the layer you mean, using a double dash:
+<Demo code="[stroke-dasharray=2,1]||B313" title="stroke-dasharray passes through" />
 
-| Prefix | Where it lands |
+## Targeting One Part of the Picture
+
+A global option applies to everything. When you want just one part of the output, prefix the attribute with the name of the thing you mean, using a double dash.
+
+**The rule is one sentence: every class the library writes is addressable, by that same name with the `bliss-` prefix removed.** The group with `class="bliss-grid"` is `grid--`, the sky line with `class="bliss-grid-line bliss-grid-line--sky"` is `grid-line--sky--`, and the root `<svg>`, which carries `class="bliss-root"`, is `root--`. Nothing is inferred and no list is consulted, so a class you can see in the output is a name you can write.
+
+| Target | Where it lands |
 |--------|----------------|
 | *(none)* | the root `<svg>`, so the whole picture |
-| `background--` | the paper rectangle, or each of the three zone rectangles when you have set them separately |
+| `root--` | the same root `<svg>`, named rather than assumed |
+| `background--` | the group holding the background rectangles |
+| `background-zone--` | every background rectangle |
+| `background-zone--top--`, `--mid--`, `--bottom--` | one zone rectangle |
 | `grid--` | the reference grid group |
+| `grid-line--` | every grid line |
+| `grid-line--minor--`, `--medium--`, `--major--` | one family of grid lines |
+| `grid-line--sky--`, `--earth--` | the sky line, or the earth line |
 | `content--` | the group holding the Bliss artwork |
+
+```
+[grid;grid-line--sky--stroke-dasharray=0.5]||B313
+```
+
+<Demo code="[grid;grid-line--sky--stroke-dasharray=0.5]||B313" title="Only the sky line is dashed" />
+
+**The key splits at its LAST double dash**, which is what lets a target carry one of its own: in `grid-line--sky--stroke-dasharray` the target is `grid-line--sky` and the attribute is `stroke-dasharray`. The one thing that costs is an attribute name with a double dash inside it, so `content--data--foo` reads as a target called `content--data`, which nothing carries, and is reported instead of emitted.
+
+The families overlap exactly as the classes do. The sky and earth lines carry `bliss-grid-line--major` as well as their own class, so `grid-line--major--` reaches all three of them, the same three that the `grid-major-color` option paints. Where two targets both reach one element, the more specific class wins, so writing `grid-line--stroke=red` and `grid-line--sky--stroke=blue` together turns every line red except the sky line, which is blue.
+
+<Demo code="[grid;grid-line--stroke=red;grid-line--sky--stroke=blue]||B313" title="Every line red, the sky line blue" />
 
 ```
 [grid;grid--opacity=0.3]||B313
@@ -37,22 +63,35 @@ Compare that with the unprefixed spelling, which fades the grid and the artwork 
 
 <Demo code="[grid;opacity=0.3]||B313" title="Everything faded" />
 
-The prefixed form is a raw channel: the attribute name is emitted exactly as written, with no interpretation. That is what makes `content--color` reach the real `color` attribute, where the plain `color` option is a friendlier name for `stroke`.
+The prefixed form is a raw channel: the attribute name is emitted exactly as written, and it goes where you sent it, with no interpretation. That is what makes `content--color` reach the real `color` attribute, where the plain `color` option is a friendlier name for `stroke`. It is also why the two spellings of `vector-effect` do different things: written plain, the library knows it only works on the shapes themselves and moves it down onto the character paths, while `root--vector-effect` writes it on the root `<svg>`, where it has no effect, because naming a target asks for a place and not for a result.
 
-A layer prefix only means something at global scope, since the layers belong to the document as a whole. Written on a word, character or part it is reported and dropped. A prefix naming a layer that does not exist, such as `foo--x`, is reported too, and nothing is emitted for it.
+A target prefix only means something at global scope, since these parts belong to the document as a whole. Written on a word, character or part it is reported and dropped. A prefix that matches no class the library writes, such as `foo--x`, is reported too, and nothing is emitted for it.
 
-Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, or markup that reads as a working link and is not one, so two names are refused on a layer, each reported:
+Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, or markup that reads as a working link and is not one, so two names are refused behind a prefix, each reported:
 
-- `xmlns`, on any layer. A second namespace declaration moves that whole subtree out of SVG, and nothing renders it. This one is refused wherever you write it, on the root and at word, character and part scope as well. See [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name).
-- The link attributes (`href`, `target`, `rel`, `download`, `hreflang`, `type`, `referrerpolicy`), on any layer. A link is an `<a>` element wrapping the content it links, and a layer is a plain group or rectangle, so the attribute would sit where every engine ignores it. Written without a prefix they are not refused. They belong to the `<a>` wrapper described under [Links with href](#links-with-href): write an `href` and they travel onto it. Write one without an `href` and there is no wrapper to carry it, so it is dropped. See [`MISPLACED_LINK_ATTRIBUTE`](/reference/warning-codes#misplaced-link-attribute).
+- `xmlns`, on any target. A second namespace declaration moves that whole subtree out of SVG, and nothing renders it. This one is refused wherever you write it, on the root and at word, character and part scope as well. See [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name).
+- The link attributes (`href`, `target`, `rel`, `download`, `hreflang`, `type`, `referrerpolicy`), on any target. A link is an `<a>` element wrapping the content it links, and no target is one, so the attribute would sit where every engine ignores it. Written without a prefix they are not refused. They belong to the `<a>` wrapper described under [Links with href](#links-with-href): write an `href` and they travel onto it. Write one without an `href` and there is no wrapper to carry it, so it is dropped. See [`MISPLACED_LINK_ATTRIBUTE`](/reference/warning-codes#misplaced-link-attribute).
 
-`data-generator` is not in that list: the library owns it on the root, where it stamps what produced the file, but `[content--data-generator=mine]||` collides with nothing and is emitted like any other data attribute.
+`data-generator` is not in that list: the library owns it on the root, where it stamps what produced the file, so `root--data-generator` is refused there like the bare spelling, but `[content--data-generator=mine]||` collides with nothing and is emitted like any other data attribute.
+
+### When a value is written but cannot show
+
+Two of the targets are containers. `background--` and `grid--` name groups, and the shapes inside them are given their own values for the names those groups write, so a value on the group is emitted where you asked for it and then never shows. You are told which target reaches the shapes instead:
 
 ```
-[stroke-dasharray=2,1]||B313
+[grid;grid--stroke=red]||B313   →  reports, and points at grid-line--stroke
 ```
 
-<Demo code="[stroke-dasharray=2,1]||B313" title="stroke-dasharray passes through" />
+The names this covers are the ones the group's own drawing writes on its children: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, and `x`, `y`, `width`, `height`, `stroke` and `fill` for the background. Every other name lands on the group and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit, `grid--shape-rendering` replaces the value the grid sets for itself, and `background--rx` is inert without a word from us, since a group has no corners to round. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
+
+The other report is for two keys that set one attribute on one target. The key that names its target wins, because the other one has to be resolved to a target first, and the one that lost is named:
+
+```
+[grid;grid-color=red;grid-line--stroke=blue]||B313  →  blue lines; "grid-color" is named
+[color=red;root--stroke=blue]||B313                 →  blue strokes; "color" is named
+```
+
+See [`MULTIPLE_ATTRIBUTE_VALUES`](/reference/warning-codes#multiple-attribute-values).
 
 ## Stroke Line Joins & Caps
 
@@ -64,7 +103,7 @@ Bliss SVG Builder sets `stroke-linejoin` and `stroke-linecap` to `round` by defa
 
 ## Style Attribute
 
-The `style` attribute passes through like any other, so you can apply inline CSS at whichever level you target (global, one layer, word, character, or part):
+The `style` attribute passes through like any other, so you can apply inline CSS at whichever level you target (global, one part of the picture, word, character, or part):
 
 ```
 [content--style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313
@@ -102,7 +141,7 @@ You can assign an `id` to the root `<svg>` via pass-through:
 [id=my-bliss-symbol]||B313
 ```
 
-This is useful when you need to reference the SVG from external CSS or JavaScript. To put an id on one layer instead, use its prefix: `[content--id=ink]||`.
+This is useful when you need to reference the SVG from external CSS or JavaScript. To put an id on one part of the picture instead, name it: `[content--id=ink]||`.
 
 ## Links with href
 
@@ -151,26 +190,42 @@ Pass-through attributes are sanitized:
 
 ## SVG Structure
 
-The root `<svg>` carries the document's own attributes: the size and `viewBox`, a `data-generator` attribute naming the library version, the default painting values, and anything you set globally. Each layer below it carries its own `<layer>--` attributes; word-, character-, and part-level attributes go on nested `<g>` elements inside the content group.
+The root `<svg>` carries the document's own attributes: the size and `viewBox`, a `data-generator` attribute naming the library version, the default painting values, and anything you set globally. Each part below it carries its own `<target>--` attributes; word-, character-, and part-level attributes go on nested `<g>` elements inside the content group.
 
 ```html
 <svg xmlns="..." data-generator="bliss-svg-builder/..." width="..." height="..." viewBox="..."
      class="bliss-root" fill="none" stroke="#000000" stroke-width="0.5" ...>
-  <rect class="bliss-background" .../>
-  <g class="bliss-grid" ...>...</g>
+  <g class="bliss-background">
+    <rect class="bliss-background-zone" .../>
+  </g>
+  <g class="bliss-grid" ...>
+    <path class="bliss-grid-line bliss-grid-line--minor" .../>
+    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" .../>
+  </g>
   <g class="bliss-content">
     <!-- character paths -->
   </g>
 </svg>
 ```
 
+The background is a group in every case, holding one rectangle that covers the picture or the three zone rectangles when you set the zones separately, so `background--` means the same thing whichever you asked for.
+
 Because the painting defaults sit on the root, an attribute you set globally sits beside them and replaces the one it names, rather than being overruled by markup further down.
 
 ### Class names
 
-Each layer carries a class you can select on: `bliss-root`, `bliss-background` (or `bliss-background--top`, `--mid` and `--bottom` when you set the zones separately), `bliss-grid` and `bliss-content`. These names are stable, so it is safe to write CSS and query selectors against them.
+Every element the library draws carries a class, and this is all of them:
 
-A `class` you set is added to the layer's own name rather than replacing it, so `[class=mine]||` produces `class="bliss-root mine"` and your stylesheet and ours can coexist.
+- `bliss-root` on the `<svg>`
+- `bliss-background` on the background group, `bliss-background-zone` on every rectangle inside it, and `bliss-background-zone--top`, `--mid`, `--bottom` on the zone rectangles when the zones are set separately
+- `bliss-grid` on the grid group, `bliss-grid-line` on every line, and `bliss-grid-line--minor`, `--medium`, `--major` by family, with `--sky` and `--earth` on the two reference lines, which carry `--major` as well
+- `bliss-content` on the group holding the artwork
+
+These names are stable, so it is safe to write CSS and query selectors against them, and each one doubles as a target: remove `bliss-` and put the attribute after a `--`.
+
+A `class` you set is added to the element's own name rather than replacing it, so `[class=mine]||` produces `class="bliss-root mine"` and your stylesheet and ours can coexist.
+
+If you have a stylesheet written against an earlier release, `.bliss-background` is the one selector to revisit: it now matches the group rather than the rectangle, and a `fill` on the group does not reach a rectangle that sets its own. Select `.bliss-background-zone` for the paper, and `.bliss-background-zone--top` and its siblings for one zone.
 
 ### Attributes the library keeps
 
@@ -184,7 +239,7 @@ Two names on the root belong to the library and are reported rather than applied
 | `stroke-dasharray` | `2,1` | Dashed lines |
 | `fill` | `#eee` | Fill color |
 | `transform` | `rotate(15)` | SVG transform |
-| `class` | `my-class` | CSS class, added to the layer's own name |
+| `class` | `my-class` | CSS class, added to the element's own name |
 | `id` | `my-symbol` | Element ID |
 | `style` | `filter:blur(1px)` | Inline CSS (lengths mean different things on the root and inside the picture, and Safari does not apply a `filter` to a group at all, see [Style Attribute](#style-attribute)) |
 | `preserveAspectRatio` | `xMidYMid` | How the picture fits its box (global only, since it belongs to the root) |

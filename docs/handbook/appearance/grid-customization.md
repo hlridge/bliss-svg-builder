@@ -110,6 +110,20 @@ When embedding SVGs inline in a web page, you can target grid elements with CSS.
 
 The entire grid is wrapped in `<g class="bliss-grid">`.
 
+### Using a class as a target
+
+Each of these class names is also a **target**, which lets you put any SVG attribute on those lines and not only the colours and widths the options cover. A target is the class with the `bliss-` prefix removed, and the attribute follows the last `--`, so `bliss-grid-line--sky` is written `grid-line--sky--` and the sky line's dashes are `grid-line--sky--stroke-dasharray`:
+
+```
+[grid;grid-line--sky--stroke-dasharray=0.5]||B313
+```
+
+<Demo code="[grid;grid-line--sky--stroke-dasharray=0.5]||B313" title="Dashes on the sky line alone" />
+
+The targets overlap exactly as the classes do. `grid-line--` reaches every line, `grid-line--major--` reaches the three that carry `bliss-grid-line--major` (the major family, plus the sky and earth lines, which are major lines too), and where two of them reach the same line the more specific class wins. Set a colour through both channels at once, as in `[grid;grid-color=red;grid-line--stroke=blue]||`, and the raw key is the one that takes effect, with the option it displaced named in a [`MULTIPLE_ATTRIBUTE_VALUES`](/reference/warning-codes#multiple-attribute-values) warning.
+
+Attributes written on `grid--` land on the group, where `opacity` fades the grid as a unit. The names the grid writes on each line, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d`, cannot take effect there, and writing one is reported with [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute), pointing at `grid-line--` instead. See [pass-through attributes](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture) for the whole mechanism.
+
 ## Options Reference
 
 See [Options Quick Reference](/reference/options-quick-reference) for the complete list of grid color and stroke-width options with defaults and value ranges.

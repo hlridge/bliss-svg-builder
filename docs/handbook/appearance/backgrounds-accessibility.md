@@ -22,16 +22,21 @@ Each zone maps to a region in the 20-unit Bliss coordinate space:
 
 ### CSS Classes
 
-Each background rect gets a CSS class matching its option name:
+The background rects sit in a group, and each one carries a class you can select on:
 
 | Class | Applies to |
 |-------|-----------|
-| `bliss-background` | Full background rect (or zone wrapper `<g>`) |
-| `bliss-background--top` | Top zone rect |
-| `bliss-background--mid` | Mid zone rect |
-| `bliss-background--bottom` | Bottom zone rect |
+| `bliss-background` | The group holding the rects |
+| `bliss-background-zone` | Every background rect, whether there is one or three |
+| `bliss-background-zone--top` | Top zone rect |
+| `bliss-background-zone--mid` | Mid zone rect |
+| `bliss-background-zone--bottom` | Bottom zone rect |
 
-When `background` is used alone, it produces a single `<rect class="bliss-background">`. When zone options are present, the zone rects are wrapped in `<g class="bliss-background">`.
+The group is there in both cases. `background` alone puts one `<rect class="bliss-background-zone">` in it, covering the whole picture; the zone options put three in it, each with its own `--top`, `--mid` or `--bottom` class beside the shared one.
+
+Each of these names is also a target for [pass-through attributes](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture): drop the `bliss-` prefix and put the attribute after a `--`, so `[background-top=red;background-zone--top--rx=3]||` rounds the corners of the top zone alone.
+
+If you have a stylesheet written against an earlier release, `.bliss-background` is the selector to revisit. It now matches the group rather than a rect, and a `fill` written on the group does not reach a rect that sets its own, so `.bliss-background { fill: pink }` stops painting. Use `.bliss-background-zone` for the rects, and `.bliss-background-zone--top` and its siblings for one zone.
 
 ### Bulk Default with Zone Overrides
 
@@ -39,7 +44,7 @@ The `background` option acts as a default for all three zones when any zone opti
 
 <Demo code="[background=#f5f5f5;background-mid=#e8f5e9]||B313" title="Gray default, green mid override" />
 
-When `background` is used alone (without any zone options), it produces a single full background as before.
+When `background` is used alone (without any zone options), it produces a single rect covering the whole picture rather than three.
 
 ## Accessible Labels
 

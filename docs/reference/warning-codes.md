@@ -16,7 +16,7 @@ builder.warnings;
 
 - `code` — a stable identifier from the list below (the `WarningCode` type in TypeScript)
 - `message` — a human-readable description, including how to fix the input
-- `source` — the fragment of your input that triggered the warning, always a string you can search your own input for. When the library refused an attribute **name**, it is the key on its own, prefix included (`content--xmlns`), so two refusals in one bracket can be told apart; when the **value** is what went wrong, it is the option as written (`stroke-width=-2`)
+- `source` — the fragment of your input that triggered the warning, always a string you can search your own input for. For an attribute it is the key on its own whenever the **key** is what the report is about, prefix included: a refused name (`content--xmlns`), a key whose value cannot take effect where it landed (`grid--stroke`), or the losing half of a collision (`grid-sky-color`). It is the option as written when the **value** is what went wrong (`stroke-width=-2`), and a comma-separated list of keys where one report names several (`margin, crop-top`)
 
 Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully.
 
@@ -29,7 +29,7 @@ The prefix tells you what kind of problem occurred:
 | `MALFORMED_` | Input did not parse in the required shape |
 | `OUT_OF_RANGE_` | A well-formed number outside what the attribute can carry |
 | `MISPLACED_` | A well-formed token in the wrong position |
-| `MULTIPLE_` | More than one where only one is allowed (the first wins) |
+| `MULTIPLE_` | More than one where only one is allowed; each code says which one survives |
 | `DUPLICATE_` | The same identifier used twice |
 | `UNKNOWN_` | An unrecognized reference |
 | `DROPPED_` | Something discarded during an operation |
@@ -207,7 +207,7 @@ Dropping it is what keeps it out of the drawing. An option key the library does 
 
 ### `MISPLACED_LAYER_OPTION`
 
-A layer-targeting option (`grid--opacity`, `content--color`, anything with a `--` in its key) written at part, word, or character scope. The layers belong to the document as a whole, so below global scope there is nothing for the key to name; it is dropped and the content renders unchanged.
+A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged.
 
 ```
 [grid--opacity=0.3]|B291   →  renders B291, the layer key dropped
@@ -220,14 +220,35 @@ Dropping it is what keeps it out of the drawing. An unrecognized key is passed t
 
 ### `MISPLACED_LINK_ATTRIBUTE`
 
-A link attribute written for a layer: `href`, `target`, `rel`, `download`, `hreflang`, `type` or `referrerpolicy` behind a `background--`, `grid--` or `content--` prefix. A link is an `<a>` element wrapping the content it links, and no layer is one, so the attribute is dropped.
+A link attribute written behind a target prefix: `href`, `target`, `rel`, `download`, `hreflang`, `type` or `referrerpolicy` after any target name, `root--` and the sub-element targets included. A link is an `<a>` element wrapping the content it links, and no target is one, so the attribute is dropped. The message names the target you wrote.
 
 ```
 [content--href=https://example.com]||B291   →  warns, no attribute emitted
 [background=beige;background--href=…]||B291 →  warns, no attribute emitted
+[root--href=https://example.com]||B291      →  warns: the root <svg> is not one either
 ```
 
-The layer channel emits an attribute name exactly as written, and this is one of the few places it refuses instead. Emitted, these attributes sit on a plain `<g>` or `<rect>`, where every engine ignores them, so the markup would read as a link that had simply stopped working. The written key survives `toString()`, so it re-reports rather than disappearing from a stored composition.
+The prefixed channel emits an attribute name exactly as written, and this is one of the few places it refuses instead. Emitted, these attributes sit on a plain `<g>`, `<rect>`, `<path>` or the root `<svg>`, where every engine ignores them, so the markup would read as a link that had simply stopped working. The written key survives `toString()`, so it re-reports rather than disappearing from a stored composition.
+
+### `MISPLACED_CONTAINER_ATTRIBUTE`
+
+An attribute written on one of the two container targets, `background--` or `grid--`, under a name that container's own drawing writes on each of the shapes inside it. The attribute is emitted on the group exactly as written and then never shows, because the shape's own value is the one that takes effect. The warning names the target that reaches the shapes:
+
+```
+[grid;grid--stroke=red]||B291                     →  points at grid-line--stroke
+[background=beige;background--fill=red]||B291     →  points at background-zone--fill
+```
+
+The names, per container:
+
+| Target | Names it covers | Write instead |
+|--------|-----------------|---------------|
+| `grid--` | `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `d` | `grid-line--` |
+| `background--` | `x`, `y`, `width`, `height`, `stroke`, `fill` | `background-zone--` |
+
+The rule behind those lists is "every name the container's own drawing writes on its children", which is why `rx` and `opacity` are absent (nothing writes them on a child, so `grid--opacity` fades the grid as a unit and `background--rx` is simply inert), and why `shape-rendering` is absent too (the grid group carries that one itself, and a written value replaces it and works). `class` is the single exception to the rule: every child carries one, but so does the group, and a `class` you write there merges with the group's own name.
+
+Nothing is dropped. The value is emitted where you asked for it, so `toString()` returns what you wrote and the warning comes back with it; only the silence about it goes. The report is about the name and the place, not about what the picture ended up looking like, and it is silent when the container is not drawn at all: `[grid--stroke=red]||B291` without `grid` says nothing, exactly as `[grid-color=red]` says nothing there.
 
 ### `MISPLACED_SPACE_DECORATION`
 
@@ -327,6 +348,20 @@ The `viewBox` written directly at global scope while `margin`, `crop`, `min-widt
 
 Remove the `viewBox` to size the picture with the options, or remove the options to size it by hand.
 
+### `MULTIPLE_ATTRIBUTE_VALUES`
+
+Two keys setting one attribute on one element, where only one value can be written. The key that names its target wins, because the other one has to be resolved to a target first, and the key that lost is named:
+
+```
+[grid;grid-color=red;grid-line--stroke=blue]||B291    →  blue lines; "grid-color" is named
+[background=beige;background-zone--fill=blue]||B291   →  a blue background; "background" is named
+[color=red;root--stroke=blue]||B291                   →  a blue stroke; "color" is named
+```
+
+It reports more-than-one rather than value-lost, so two keys carrying the same value still raise it. Two keys of the same kind are not a collision, and stay as silent as they have always been: `[color=red;stroke=blue]||` writes blue, in either written order, because the raw attribute name beats the friendlier alias, and says nothing about it.
+
+The warning follows the drawing. It is silent when the layer that would carry the values is switched off, so `[grid-color=red;grid-line--stroke=blue]||B291` without `grid` says nothing, and silent for a single shape the render does not contain: `[background=beige;background-zone--top--fill=blue]||B291` paints one rect covering the picture and no zones, so nothing collides and the beige is undisturbed.
+
 ### `DUPLICATE_KEY`
 
 Two elements carry the same user-assigned `key` (for example in object input passed to the constructor). Keys identify elements for `getElementByKey()`, so they must be unique. Auto-generated keys never collide.
@@ -345,17 +380,21 @@ A token that is not even a valid code shape (for example `!B81`) cannot be repre
 
 ### `UNKNOWN_LAYER`
 
-A global option written in `<layer>--<attribute>` form that does not resolve to a layer and an attribute. The layers are `background`, `grid` and `content`; the three ways a key can miss share one code and each says which one it is:
+A global option written in `<target>--<attribute>` form that does not resolve to a target and an attribute. A target is a class the library writes with the `bliss-` prefix removed, and the attribute is what follows the **last** `--`; the three ways a key can miss share one code, and each message says which one it is:
 
 ```
-[foo--x=1]||B291       →  warns: names no layer the library knows
-[--x=1]||B291          →  warns: no layer name before the "--"
-[content--=red]||B291  →  warns: names the content layer but no attribute
+[foo--x=1]||B291       →  warns: names no target the library knows
+[--x=1]||B291          →  warns: no target name before the "--"
+[content--=red]||B291  →  warns: names the content target but no attribute
 ```
 
-The test is a layer this library **knows**, not one it happens to be drawing. `[grid--opacity=0.3]||` with the grid switched off is silent and emits nothing, exactly as the named `[grid-color=red]` is silent there.
+Every message but the last one lists the whole vocabulary, so you never have to look it up: `root`, `background`, `background-zone`, `background-zone--top`, `background-zone--mid`, `background-zone--bottom`, `grid`, `grid-line`, `grid-line--minor`, `grid-line--medium`, `grid-line--major`, `grid-line--sky`, `grid-line--earth` and `content`.
 
-Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a layer this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix.
+Splitting at the last `--` is what lets a target carry one of its own, so `grid-line--sky--stroke-dasharray` resolves to the sky line and `stroke-dasharray`. The cost is that an attribute name with a `--` inside it cannot be reached behind a prefix: `content--data--foo` reads as a target called `content--data`, which nothing carries, and is reported here.
+
+The test is a target this library **knows**, not one it happens to be drawing. `[grid--opacity=0.3]||` with the grid switched off is silent and emits nothing, exactly as the named `[grid-color=red]` is silent there, and a sub-element that this render leaves out is silent for the same reason.
+
+Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix.
 
 ## Refused Because the Name Is the Library's
 
@@ -366,15 +405,15 @@ An option naming one of the two attributes the library owns: `xmlns` and `data-g
 ```
 [xmlns=http://example.com]||B291          →  warns, the SVG namespace is kept
 [data-generator=me]||B291                 →  warns, the library's stamp is kept
-[content--xmlns=http://example.com]||B291 →  warns: xmlns is refused on a layer too
+[content--xmlns=http://example.com]||B291 →  warns: xmlns is refused behind a prefix too
 [xmlns=http://example.com]B291            →  warns: and on a single character too
 ```
 
 The two are guarded at different reaches, because they are refused for different reasons.
 
-`xmlns` has exactly one legal value, and it is refused **wherever you write it**: on the root, on any layer, and at word, character or part scope. A second namespace declaration moves that element and everything under it out of SVG, so browsers will not render it and this library's own `svgElement` cannot parse it, and that is true at any depth. A bad value is one thing; a document that is no longer SVG is something else.
+`xmlns` has exactly one legal value, and it is refused **wherever you write it**: on the root, behind any target prefix, and at word, character or part scope. A second namespace declaration moves that element and everything under it out of SVG, so browsers will not render it and this library's own `svgElement` cannot parse it, and that is true at any depth. A bad value is one thing; a document that is no longer SVG is something else.
 
-`data-generator` is refused **on the root only**. It records what produced the file, and a stamp anyone can overwrite tells a reader nothing. Anywhere below the root the same name collides with nothing, so `[content--data-generator=me]||` and `[data-generator=me]B291` are ordinary data attributes and are emitted. To record your own pipeline on the root, add a `data-` attribute of your own.
+`data-generator` is refused **on the root only**, and that includes the `root--data-generator` spelling: naming the root deliberately does not get around it. It records what produced the file, and a stamp anyone can overwrite tells a reader nothing. Anywhere below the root the same name collides with nothing, so `[content--data-generator=me]||` and `[data-generator=me]B291` are ordinary data attributes and are emitted. To record your own pipeline on the root, add a `data-` attribute of your own.
 
 Every other root attribute is yours, including `width`, `height` and `viewBox`, which replace the computed values when you write them.
 
