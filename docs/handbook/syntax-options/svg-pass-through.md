@@ -6,7 +6,7 @@ Any option that Bliss SVG Builder doesn't recognize as a built-in option is pass
 
 The builder maintains a set of known option keys (`color`, `stroke-width`, `margin`, `grid`, etc.). When you set an option that isn't in this set, it passes through to the SVG output as-is.
 
-Where a pass-through attribute lands depends on the level you set it at. A **global** option goes on the root `<svg>` element, so it applies to the whole picture: the artwork, and the paper and grid if you have switched them on. A **word**, **character**, or **part** option goes on a `<g>` that wraps just that word, character, or part.
+Where a pass-through attribute lands depends on the level you set it at. A **global** option goes on the root `<svg>` element, so it covers the whole picture: the artwork, and the paper and grid if you have switched them on. Anything inside that sets its own value for that attribute keeps it, which is what the prefixed spellings further down are for. A **word**, **character**, or **part** option goes on a `<g>` that wraps just that word, character, or part.
 
 The name you write is the name that is emitted, exactly as you typed it. That matters for the SVG attributes spelled in camelCase, such as `preserveAspectRatio` and `gradientUnits`, and for your own `data-` attributes.
 
