@@ -28,8 +28,9 @@ import { NUMERIC_OPTION_POLICY, KNOWN_OPTION_KEYS } from '../src/lib/bliss-const
  *   `offset` arm is therefore unexercised by behaviour here**, because all
  *   seven keys gated in this task are lengths: the negative-is-honoured half of
  *   the rule arrives with the margins and crops.
- * - The geometry that overflows only after two accepted values are combined
- *   (`[margin=1e308]`), which no input gate can see.
+ * - A geometry that overflows out of accepted values (`[margin=1e308]`, or a
+ *   single `[char-space=1e308]` reaching the six-times width multiplier),
+ *   which no input gate can see because every value going in was legal.
  * - The camelCase namespace collision, see
  *   `BlissSVGBuilder.option-namespace-split.test.js`.
  */
@@ -115,6 +116,85 @@ describe('BlissSVGBuilder option value gate', () => {
         expect(render(dsl).svgCode, dsl).toBe(plain(key));
         expect(codes(dsl), dsl).toEqual(['INVALID_OPTION_VALUE']);
       }
+    });
+
+    // A quoted blank reaches the gate as a string of spaces, where the bare and
+    // unquoted forms arrive as `true` and `''`. `Number(' ')` is 0, so without
+    // this the library sets a spacing of 0 that nobody typed, in silence, from
+    // the DSL itself.
+    it.each([
+      ['char-space', '" "'],
+      ['char-space', '"  "'],
+      ['dot-width', '" "'],
+    ])('refuses %s=%s, a value that is blank rather than absent', (key, value) => {
+      const dsl = `[${key}=${value}]||${CARRIER[key]}`;
+      expect(render(dsl).svgCode).toBe(plain(key));
+      expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('still honours a number padded with spaces', () => {
+      // The refusal above is about a value with no digits in it, not about
+      // whitespace, so ` 5 ` keeps working.
+      const padded = render('[char-space=" 5 "]||B291/B291');
+      expect(padded.svgCode).toBe(render('[char-space=5]||B291/B291').svgCode);
+      expect(padded.warnings).toEqual([]);
+    });
+  });
+
+  describe('when a value that is not a number reaches a surface the DSL cannot spell', () => {
+    // Every one of these coerces to a number the author never wrote:
+    // Number(false), Number(null), Number([]) and Number(' ') are all 0, and
+    // Number([5]) is 5. The DSL can only produce strings, so these arrive
+    // through the constructor, through object input, and through the mutation
+    // opts argument, which is why the gate judges the TYPE rather than trusting
+    // Number() to fail.
+    const objectInput = (value) => {
+      const composition = new BlissSVGBuilder('B291/B291').toJSON();
+      composition.options = { 'char-space': value };
+      return new BlissSVGBuilder(composition);
+    };
+    const unwritten = () => new BlissSVGBuilder('B291/B291').svgCode;
+
+    it.each([
+      ['false', false], ['true', true], ['a blank string', ' '],
+    ])('refuses %s in the constructor options', (label, value) => {
+      const builder = new BlissSVGBuilder('B291/B291', { charSpace: value });
+      expect(builder.svgCode, label).toBe(unwritten());
+      expect(builder.warnings.map((w) => w.code), label).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it.each([
+      ['null', null], ['undefined', undefined], ['an empty list', []],
+      ['a list holding a number', [5]], ['an object', {}],
+    ])('never sees %s in the constructor options, because #toRaw drops it first', (label, value) => {
+      // Pre-existing and deliberately untouched: #toRaw skips null, undefined
+      // and every object before the gate exists, so the option is genuinely
+      // unwritten and the render is right. There is nothing to report because
+      // nothing reached the option. Object input has no #toRaw in front of it,
+      // which is why the rows below expect a warning for the same values.
+      const builder = new BlissSVGBuilder('B291/B291', { charSpace: value });
+      expect(builder.svgCode, label).toBe(unwritten());
+      expect(builder.warnings, label).toEqual([]);
+    });
+
+    it.each([
+      ['false', false], ['null', null], ['a blank string', ' '],
+      ['an empty list', []], ['a list holding a number', [5]],
+    ])('refuses %s in object input, which has no #toRaw filter in front of it', (label, value) => {
+      const builder = objectInput(value);
+      expect(builder.svgCode, label).toBe(unwritten());
+      expect(builder.warnings.map((w) => w.code), label).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('shows the author what it was given rather than what it coerced to', () => {
+      // `[5]` is the row that makes this matter: it coerces to 5, so a message
+      // built from the coerced value would say a number is not a number.
+      const composition = new BlissSVGBuilder('B291/B291').toJSON();
+      composition.options = { 'char-space': [5] };
+      expect(new BlissSVGBuilder(composition).warnings[0].message).toBe(
+        '"char-space" needs a number and [5] is not one, so it was ignored: '
+        + 'the spacing keeps the value it would have had without it.'
+      );
     });
   });
 
@@ -202,10 +282,48 @@ describe('BlissSVGBuilder option value gate', () => {
       expect(NUMERIC_OPTION_POLICY.size).toBe(26);
     });
 
-    it('names a kind, a noun and a fallback for every key', () => {
+    it('carries the exact kind and noun for every key', () => {
+      // Both halves are load-bearing and neither is checkable by shape: `kind`
+      // decides whether a negative value is refused, and `noun` is shipped text
+      // in every message the key can raise. A truthiness check passes on any
+      // string, so a typo in a row no message row happens to cover ships a
+      // garbled warning with the whole suite green.
+      expect(Object.fromEntries(
+        [...NUMERIC_OPTION_POLICY].map(([key, { kind, noun }]) => [key, `${kind}/${noun}`])
+      )).toEqual({
+        'stroke-width': 'length/stroke',
+        'dot-extra-width': 'length/dot',
+        'sdot-extra-width': 'length/dot',
+        'dot-width': 'length/dot',
+        'sdot-width': 'length/dot',
+        'char-space': 'length/spacing',
+        'word-space': 'length/spacing',
+        'external-glyph-space': 'length/spacing',
+        margin: 'offset/margin',
+        'margin-top': 'offset/margin',
+        'margin-bottom': 'offset/margin',
+        'margin-left': 'offset/margin',
+        'margin-right': 'offset/margin',
+        'min-width': 'length/width',
+        crop: 'offset/crop',
+        'crop-top': 'offset/crop',
+        'crop-bottom': 'offset/crop',
+        'crop-left': 'offset/crop',
+        'crop-right': 'offset/crop',
+        'grid-stroke-width': 'length/grid line width',
+        'grid-major-stroke-width': 'length/grid line width',
+        'grid-medium-stroke-width': 'length/grid line width',
+        'grid-minor-stroke-width': 'length/grid line width',
+        'grid-sky-stroke-width': 'length/grid line width',
+        'grid-earth-stroke-width': 'length/grid line width',
+        'svg-height': 'length/height',
+      });
+    });
+
+    it('records where every key falls back to', () => {
+      // Documentation rather than behaviour, so truthiness is the right check:
+      // nothing reads this string, and pinning prose would fail on a reword.
       for (const [key, policy] of NUMERIC_OPTION_POLICY) {
-        expect(['length', 'offset'], key).toContain(policy.kind);
-        expect(policy.noun, key).toBeTruthy();
         expect(policy.fallback, key).toBeTruthy();
       }
     });

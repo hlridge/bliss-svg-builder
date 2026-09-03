@@ -463,7 +463,9 @@ export const WARNING_CODES = Object.freeze({
   // and conformant renderers drop the whole path. Negative is floored to 0, an
   // invisible but legal stroke; non-finite is refused and the default stands.
   // A width that is not a number at all still falls back to the default in
-  // silence, which is why INVALID_ stays reserved.
+  // silence. This is the last hand-written gate: every other numeric option now
+  // goes through judgeNumericOptionValue, and stroke-width joins them next,
+  // which retires this code in favour of the two below.
   OUT_OF_RANGE_STROKE_WIDTH: 'OUT_OF_RANGE_STROKE_WIDTH',
   // a numeric option given something that is not a number at all. INVALID_ is
   // the reserved verb for exactly this: OUT_OF_RANGE_ answers for a well-formed
@@ -658,12 +660,12 @@ export const NUMERIC_OPTION_POLICY = new Map([
   ['crop-bottom',              { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
   ['crop-left',                { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
   ['crop-right',               { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
-  ['grid-stroke-width',        { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
-  ['grid-major-stroke-width',  { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
-  ['grid-medium-stroke-width', { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
-  ['grid-minor-stroke-width',  { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
-  ['grid-sky-stroke-width',    { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
-  ['grid-earth-stroke-width',  { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['grid-stroke-width',        { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
+  ['grid-major-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
+  ['grid-medium-stroke-width', { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
+  ['grid-minor-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
+  ['grid-sky-stroke-width',    { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
+  ['grid-earth-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
   ['svg-height',               { kind: 'length', noun: 'height',   fallback: 'six times the viewBox height, in #svgCode' }],
 ]);
 
@@ -687,18 +689,32 @@ export const judgeNumericOptionValue = (key, rawValue) => {
   if (!policy) return null;
   const tail = `so it was ignored: the ${policy.noun} keeps the value it would have had without it.`;
   const source = rawValue === true ? key : `${key}=${rawValue}`;
-  if (rawValue === true || rawValue === '') {
+  // Blank rather than absent: a bare key arrives as `true`, an empty value as
+  // '', a quoted blank as whitespace, and an omitted one as null or undefined.
+  // Number() turns every one of them into 0, so each would otherwise set a
+  // spacing nobody typed.
+  const isBlank = rawValue === true || rawValue === null || rawValue === undefined
+    || (typeof rawValue === 'string' && rawValue.trim() === '');
+  if (isBlank) {
     return {
       code: WARNING_CODES.INVALID_OPTION_VALUE,
       message: `"${key}" needs a number and was written without one, ${tail}`,
       source,
     };
   }
-  const written = Number(rawValue);
+  // The TYPE decides, not what Number() makes of it. Number(false) is 0 and
+  // Number([5]) is 5, so trusting the NaN check below would honour a value the
+  // author never wrote as a number. Only a number, or a string carrying one,
+  // can be honoured; a padded number such as ' 5 ' still is.
+  const written = typeof rawValue === 'number' || typeof rawValue === 'string'
+    ? Number(rawValue)
+    : NaN;
   if (Number.isNaN(written)) {
     return {
       code: WARNING_CODES.INVALID_OPTION_VALUE,
-      message: `"${key}" needs a number and "${rawValue}" is not one, ${tail}`,
+      // Shown as it was given, not as it coerced: `[5]` reads as a list rather
+      // than as the number 5, which is the whole reason it was refused.
+      message: `"${key}" needs a number and ${JSON.stringify(rawValue)} is not one, ${tail}`,
       source,
     };
   }

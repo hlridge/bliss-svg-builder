@@ -25,8 +25,9 @@ import { BlissSVGBuilder } from '../src/index';
  *   separators (`//`).
  *
  * Does NOT cover:
- * - The `word-space` and `char-space` options' parser/range/clamping
- *   behavior; see `BlissSVGBuilder.spacing.test.js`.
+ * - The `word-space` and `char-space` options' parsing, and which values
+ *   they honour or refuse; see `BlissSVGBuilder.spacing.test.js` and
+ *   `BlissSVGBuilder.option-value-gate.test.js`.
  * - How the parser groups consecutive space glyphs into composition
  *   children; see `BlissSVGBuilder.space-grouping.test.js`.
  */
