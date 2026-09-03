@@ -10,8 +10,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * (`RK:`/`AK:`) on parsed-tree x positioning.
  *
  * Covers:
- * - `char-space=N` (default 2, clamp range [0, 10]) and its effect on
- *   `composition.children[].x` and total composition width.
+ * - `char-space=N` (default 2, no upper limit, refused below 0) and its
+ *   effect on `composition.children[].x` and total composition width.
  * - `min-width=N` left-aligned expansion of the viewBox; interaction
  *   with `margin`, `crop`, and `grid`; clamping of negative values.
  * - `min-width=N` with `[center]`: symmetric expansion around content
@@ -100,24 +100,31 @@ describe('BlissSVGBuilder spacing options', () => {
       expect(char2.x).toBe(18); // B313 width (8) + spacing (10)
     });
 
-    it('clamps char-space values below 0 to 0', () => {
+    it('refuses a char-space below 0 and spaces as if it were unwritten', () => {
       const builder = new BlissSVGBuilder('[char-space=-5]||B313/B1');
 
       const comp = builder.composition;
       const word = comp.children[0];
       const char2 = word.children[1]; // B1
 
-      expect(char2.x).toBe(8); // B313 width (8) + clamped spacing (0)
+      // Refused rather than floored to 0, so the spacing falls back to its
+      // default 2: B313 width (8) + 2.
+      expect(char2.x).toBe(10);
+      expect(char2.x).toBe(new BlissSVGBuilder('B313/B1').composition.children[0].children[1].x);
+      expect(builder.warnings.map(warning => warning.code)).toEqual(['OUT_OF_RANGE_OPTION_VALUE']);
     });
 
-    it('clamps char-space values above 10 to 10', () => {
+    it('honours a char-space above the retired ceiling of 10', () => {
       const builder = new BlissSVGBuilder('[char-space=99]||B313/B1');
 
       const comp = builder.composition;
       const word = comp.children[0];
       const char2 = word.children[1]; // B1
 
-      expect(char2.x).toBe(18); // B313 width (8) + clamped spacing (10)
+      // The ceiling is gone: B313 width (8) + the written 99. It used to clamp
+      // to 10 (x = 18) and say nothing.
+      expect(char2.x).toBe(107);
+      expect(builder.warnings).toEqual([]);
     });
 
     it('affects total width of multiple characters', () => {

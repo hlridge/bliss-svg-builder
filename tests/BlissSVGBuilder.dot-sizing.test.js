@@ -13,11 +13,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - `dot-extra-width` as a bulk knob: SDOT follows as half, DOT takes the
  *   full value.
  * - `sdot-extra-width`: overrides the SDOT half-default (and the SDOT
- *   default), wins over `dot-extra-width` for SDOT, never touches DOT, and
- *   clamps to 0-1.
+ *   default), wins over `dot-extra-width` for SDOT, never touches DOT, is
+ *   honoured above the retired ceiling of 1, and is refused below 0.
  * - Absolute `dot-width`/`sdot-width`: pin the rendered diameter (inked
  *   stroke-width = value/2), beat the relative knobs, stay independent of
- *   `stroke-width`, and clamp to [0, 1.5].
+ *   `stroke-width`, are honoured above the retired cap of 1.5, and are
+ *   refused below 0.
  * - Indicator dots render at SDOT ink (0.33325): the directly-composed
  *   B83/B907 dots, the B84/B85/B912 dots relocated off the shared PERIOD
  *   glyph B270, and the inherited dot inside composites (B88). The shared
@@ -76,14 +77,20 @@ describe('BlissSVGBuilder dot sizing', () => {
       expect(svg).not.toContain('stroke-width="0.65"'); // the sdot value must not bleed into DOT
     });
 
-    it('clamps to a maximum of 1', () => {
-      // sdot-extra-width=2 clamps to 1: (0.5 + 1) / 2 = 0.75
-      expect(new BlissSVGBuilder('[sdot-extra-width=2]||SDOT').svgCode).toContain('stroke-width="0.75"');
+    it('honours a value above the retired ceiling of 1', () => {
+      // no ceiling any more: (0.5 + 2) / 2 = 1.25, where 2 used to clamp to 1
+      const builder = new BlissSVGBuilder('[sdot-extra-width=2]||SDOT');
+      expect(builder.svgCode).toContain('stroke-width="1.25"');
+      expect(builder.warnings).toEqual([]);
     });
 
-    it('clamps to a minimum of 0', () => {
-      // sdot-extra-width=-0.5 clamps to 0: (0.5 + 0) / 2 = 0.25
-      expect(new BlissSVGBuilder('[sdot-extra-width=-0.5]||SDOT').svgCode).toContain('stroke-width="0.25"');
+    it('refuses a negative value and sizes the dot as if it were unwritten', () => {
+      // Refused rather than floored to 0, so SDOT keeps its own default extra
+      // 0.1665: (0.5 + 0.1665) / 2 = 0.33325, where the floor drew 0.25.
+      const builder = new BlissSVGBuilder('[sdot-extra-width=-0.5]||SDOT');
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('SDOT').svgCode);
+      expect(builder.svgCode).toContain('stroke-width="0.33325"');
+      expect(builder.warnings.map(warning => warning.code)).toEqual(['OUT_OF_RANGE_OPTION_VALUE']);
     });
   });
 
@@ -108,19 +115,27 @@ describe('BlissSVGBuilder dot sizing', () => {
       expect(new BlissSVGBuilder('[stroke-width=1.5;dot-width=0.8]||DOT').svgCode).toContain('stroke-width="0.4"');
     });
 
-    it('clamps an oversized dot-width to the maximum 1.5', () => {
-      // dot-width=5 clamps to 1.5 → 1.5 / 2 = 0.75
-      expect(new BlissSVGBuilder('[dot-width=5]||DOT').svgCode).toContain('stroke-width="0.75"');
+    it('honours an oversized dot-width instead of capping it at 1.5', () => {
+      // no cap any more: dot-width=5 → 5 / 2 = 2.5, where it used to draw 0.75
+      const builder = new BlissSVGBuilder('[dot-width=5]||DOT');
+      expect(builder.svgCode).toContain('stroke-width="2.5"');
+      expect(builder.warnings).toEqual([]);
     });
 
-    it('clamps an oversized sdot-width to the maximum 1.5', () => {
-      // sdot-width=5 clamps to 1.5 → 0.75 (the same shared cap as dot-width)
-      expect(new BlissSVGBuilder('[sdot-width=5]||SDOT').svgCode).toContain('stroke-width="0.75"');
+    it('honours an oversized sdot-width instead of capping it at 1.5', () => {
+      // the shared cap is gone for both families: 5 / 2 = 2.5
+      const builder = new BlissSVGBuilder('[sdot-width=5]||SDOT');
+      expect(builder.svgCode).toContain('stroke-width="2.5"');
+      expect(builder.warnings).toEqual([]);
     });
 
-    it('clamps a negative dot-width to 0', () => {
-      // dot-width=-1 clamps to 0 → 0 (an invisible dot, no crash)
-      expect(new BlissSVGBuilder('[dot-width=-1]||DOT').svgCode).toContain('stroke-width="0"');
+    it('refuses a negative dot-width and sizes the dot as if it were unwritten', () => {
+      // Refused rather than floored to 0, so DOT keeps its own default extra
+      // 0.333: (0.5 + 0.333) / 2 = 0.4165, where the floor drew an invisible 0.
+      const builder = new BlissSVGBuilder('[dot-width=-1]||DOT');
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('DOT').svgCode);
+      expect(builder.svgCode).toContain('stroke-width="0.4165"');
+      expect(builder.warnings.map(warning => warning.code)).toEqual(['OUT_OF_RANGE_OPTION_VALUE']);
     });
   });
 

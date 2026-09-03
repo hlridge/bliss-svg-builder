@@ -16,9 +16,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - `stroke-width` multi-level semantics: option appears at global AND
  *   element levels (not in internalOptions).
  * - DOT and COMMA element stroke-width formula:
- *   dotStrokeWidth = (baseStrokeWidth + extraDotWidth) / 2 with
- *   stroke-width taken as written and dot-extra-width clamped to
- *   max 1; COMMA tail stroke-width = dot stroke-width * 2/3.
+ *   dotStrokeWidth = (baseStrokeWidth + extraDotWidth) / 2 with both
+ *   stroke-width and dot-extra-width taken as written; COMMA tail
+ *   stroke-width = dot stroke-width * 2/3.
  * - Empty `<path d=""/>` cleanup for DOT, COMMA, external glyphs,
  *   and element-level wrappers; valid path data preserved.
  * - SVG well-formedness for stroke-bearing output: properly quoted
@@ -42,7 +42,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `fill`/`opacity`/etc. onto the root, HTML-entity
  *   escaping of attribute values.
  * - `dot-extra-width` feeding the DOT/COMMA stroke-width formula
- *   (clamped to max 1) at global and element scopes.
+ *   (taken as written; the max-1 clamp is retired) at global and
+ *   element scopes.
  *
  * Does NOT cover:
  * - Per-definition `defaultOptions` and the inner-`<g>`-wins cascade,
@@ -215,12 +216,14 @@ describe('BlissSVGBuilder stroke and color', () => {
       expect(svg).not.toContain('stroke-width="0.9165"');
     });
 
-    it('clamps dot-extra-width before applying to DOT (max 1)', () => {
+    it('feeds the written dot-extra-width into the DOT formula unclamped', () => {
       const builder = new BlissSVGBuilder('[dot-extra-width=2]||DOT');
       const svg = builder.svgCode;
 
-      // dot-extra-width clamped to 1: (0.5 + 1) / 2 = 0.75
-      expect(svg).toContain('stroke-width="0.75"');
+      // no ceiling on dot-extra-width any more: (0.5 + 2) / 2 = 1.25
+      expect(svg).toContain('stroke-width="1.25"');
+      expect(svg).not.toContain('stroke-width="0.75"'); // the retired clamp-to-1 result
+      expect(builder.warnings).toEqual([]);
     });
   });
 

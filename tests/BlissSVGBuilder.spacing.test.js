@@ -16,7 +16,8 @@ import { BlissSVGBuilder } from '../src/index';
  * (question mark, exclamation, period, comma, etc.).
  *
  * Covers:
- * - The `word-space` numeric range [0, 20] with clamping at both ends.
+ * - `word-space` honoured as written above the retired ceiling of 20, and
+ *   refused below 0 (the value falls back to the default rather than to 0).
  * - Default values (word-space=8, char-space=2) and their effect on
  *   composition.children[].x coordinates.
  * - Automatic punctuation-space derivation as word-space / 2 for words
@@ -79,22 +80,27 @@ describe('BlissSVGBuilder spacing', () => {
       expect(comp.children[2].x).toBe(23); // B291: wide spacing
     });
 
-    it('clamps word-space values below 0 to 0', () => {
+    it('refuses a word-space below 0 and spaces as if it were unwritten', () => {
       const builder = new BlissSVGBuilder('[word-space=-5]||B313//B291');
       const comp = builder.composition;
 
-      // word-space clamped to 0: TSP advanceWidth = 0 - 2 = -2
-      // B313 advanceX = 10, TSP advanceX = -2, B291 at x = 8
-      expect(comp.children[2].x).toBe(8);
+      // A width is a distance and nothing draws a negative one, so the value is
+      // refused rather than floored to 0: word-space falls back to its default
+      // 8, TSP advanceWidth = 8 - 2 = 6, B291 at x = 10 + 6 = 16.
+      expect(comp.children[2].x).toBe(16);
+      expect(comp.children[2].x).toBe(new BlissSVGBuilder('B313//B291').composition.children[2].x);
+      expect(builder.warnings.map(warning => warning.code)).toEqual(['OUT_OF_RANGE_OPTION_VALUE']);
     });
 
-    it('clamps word-space values above 20 to 20', () => {
+    it('honours a word-space above the retired ceiling of 20', () => {
       const builder = new BlissSVGBuilder('[word-space=25]||B313//B291');
       const comp = builder.composition;
 
-      // word-space clamped to 20: TSP advanceWidth = 20 - 2 = 18
-      // B313 advanceX = 10, TSP advanceX = 18, B291 at x = 28
-      expect(comp.children[2].x).toBe(28);
+      // The ceiling is gone: 25 is used as written, so TSP advanceWidth =
+      // 25 - 2 = 23 and B291 sits at x = 10 + 23 = 33. It used to clamp to 20
+      // (x = 28) and say nothing.
+      expect(comp.children[2].x).toBe(33);
+      expect(builder.warnings).toEqual([]);
     });
 
     it('affects total width of multiple words', () => {

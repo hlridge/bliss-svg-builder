@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, DOT_WIDTH_MAX, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -224,81 +224,55 @@ class BlissSVGBuilder {
       }
     }
 
-    // dot-extra-width: Number, clamped 0-1
-    if ('dot-extra-width' in rawOptions && !isNaN(rawOptions['dot-extra-width'])) {
-      let dotExtraWidth = Number(rawOptions['dot-extra-width']);
-      if (dotExtraWidth < 0) {
-        dotExtraWidth = 0;
-      } else if (dotExtraWidth > 1) {
-        dotExtraWidth = 1;
-      }
-      options.dotExtraWidth = dotExtraWidth;
+    // The dot and spacing family: honoured exactly as written, or refused and
+    // reported. Both bounds are gone. The ceilings rewrote a written value in
+    // silence, and the floor at 0 did the same thing to a negative one; a
+    // refusal falls back to the value the option would have had without it,
+    // which the consumer's own default supplies. `judgeNumericOptionValue`
+    // also answers the "is this a number at all" question the old `!isNaN`
+    // guard answered silently.
+    if ('dot-extra-width' in rawOptions) {
+      const refusal = judgeNumericOptionValue('dot-extra-width', rawOptions['dot-extra-width']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.dotExtraWidth = Number(rawOptions['dot-extra-width']);
     }
 
-    // sdot-extra-width: Number, clamped 0-1 (small-dot override of the dot-extra-width half-default)
-    if ('sdot-extra-width' in rawOptions && !isNaN(rawOptions['sdot-extra-width'])) {
-      let sdotExtraWidth = Number(rawOptions['sdot-extra-width']);
-      if (sdotExtraWidth < 0) {
-        sdotExtraWidth = 0;
-      } else if (sdotExtraWidth > 1) {
-        sdotExtraWidth = 1;
-      }
-      options.sdotExtraWidth = sdotExtraWidth;
+    // sdot-extra-width: the small-dot override of the dot-extra-width half-default
+    if ('sdot-extra-width' in rawOptions) {
+      const refusal = judgeNumericOptionValue('sdot-extra-width', rawOptions['sdot-extra-width']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.sdotExtraWidth = Number(rawOptions['sdot-extra-width']);
     }
 
-    // dot-width: absolute rendered dot diameter, clamped [0, DOT_WIDTH_MAX]
-    if ('dot-width' in rawOptions && !isNaN(rawOptions['dot-width'])) {
-      let dotWidth = Number(rawOptions['dot-width']);
-      if (dotWidth < 0) {
-        dotWidth = 0;
-      } else if (dotWidth > DOT_WIDTH_MAX) {
-        dotWidth = DOT_WIDTH_MAX;
-      }
-      options.dotWidth = dotWidth;
+    // dot-width / sdot-width: absolute rendered dot diameter
+    if ('dot-width' in rawOptions) {
+      const refusal = judgeNumericOptionValue('dot-width', rawOptions['dot-width']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.dotWidth = Number(rawOptions['dot-width']);
     }
 
-    // sdot-width: absolute rendered dot diameter, clamped [0, DOT_WIDTH_MAX]
-    if ('sdot-width' in rawOptions && !isNaN(rawOptions['sdot-width'])) {
-      let sdotWidth = Number(rawOptions['sdot-width']);
-      if (sdotWidth < 0) {
-        sdotWidth = 0;
-      } else if (sdotWidth > DOT_WIDTH_MAX) {
-        sdotWidth = DOT_WIDTH_MAX;
-      }
-      options.sdotWidth = sdotWidth;
+    if ('sdot-width' in rawOptions) {
+      const refusal = judgeNumericOptionValue('sdot-width', rawOptions['sdot-width']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.sdotWidth = Number(rawOptions['sdot-width']);
     }
 
-    // char-space: Number, clamped 0-10
-    if ('char-space' in rawOptions && !isNaN(rawOptions['char-space'])) {
-      let charSpace = Number(rawOptions['char-space']);
-      if (charSpace < 0) {
-        charSpace = 0;
-      } else if (charSpace > 10) {
-        charSpace = 10;
-      }
-      options.charSpace = charSpace;
+    if ('char-space' in rawOptions) {
+      const refusal = judgeNumericOptionValue('char-space', rawOptions['char-space']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.charSpace = Number(rawOptions['char-space']);
     }
 
-    // word-space: Number, clamped 0-20
-    if ('word-space' in rawOptions && !isNaN(rawOptions['word-space'])) {
-      let wordSpace = Number(rawOptions['word-space']);
-      if (wordSpace < 0) {
-        wordSpace = 0;
-      } else if (wordSpace > 20) {
-        wordSpace = 20;
-      }
-      options.wordSpace = wordSpace;
+    if ('word-space' in rawOptions) {
+      const refusal = judgeNumericOptionValue('word-space', rawOptions['word-space']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.wordSpace = Number(rawOptions['word-space']);
     }
 
-    // external-glyph-space: Number, clamped 0-3
-    if ('external-glyph-space' in rawOptions && !isNaN(rawOptions['external-glyph-space'])) {
-      let externalGlyphSpace = Number(rawOptions['external-glyph-space']);
-      if (externalGlyphSpace < 0) {
-        externalGlyphSpace = 0;
-      } else if (externalGlyphSpace > 3) {
-        externalGlyphSpace = 3;
-      }
-      options.externalGlyphSpace = externalGlyphSpace;
+    if ('external-glyph-space' in rawOptions) {
+      const refusal = judgeNumericOptionValue('external-glyph-space', rawOptions['external-glyph-space']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.externalGlyphSpace = Number(rawOptions['external-glyph-space']);
     }
 
     // margin: Sets ALL 4 margins

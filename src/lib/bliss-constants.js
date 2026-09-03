@@ -424,15 +424,6 @@ export const TRANSIENT_REFUSED_OPTION_KEYS = new Set([
 ]);
 
 /**
- * Upper bound for the absolute `dot-width` / `sdot-width` options (a rendered
- * dot diameter in glyph units), so an absolute dot cannot exceed what the
- * relative `dot-extra-width` knob can already reach. The lower bound is 0 (an
- * invisible dot; no crash). This ceiling once mirrored `stroke-width`'s, which
- * has since been retired; the dot family keeps its own.
- */
-export const DOT_WIDTH_MAX = 1.5;
-
-/**
  * The complete warning-code vocabulary. Single source of truth: every warning
  * emitted on `builder.warnings` references `WARNING_CODES.X` rather than an inline
  * literal, so the set is typo-proof and discoverable in one place.
@@ -474,6 +465,15 @@ export const WARNING_CODES = Object.freeze({
   // A width that is not a number at all still falls back to the default in
   // silence, which is why INVALID_ stays reserved.
   OUT_OF_RANGE_STROKE_WIDTH: 'OUT_OF_RANGE_STROKE_WIDTH',
+  // a numeric option given something that is not a number at all. INVALID_ is
+  // the reserved verb for exactly this: OUT_OF_RANGE_ answers for a well-formed
+  // number the attribute cannot carry, and the two are different repairs.
+  INVALID_OPTION_VALUE: 'INVALID_OPTION_VALUE',
+  // a numeric option given a well-formed number nothing can use: non-finite at
+  // any scope, or negative where the quantity is a length. Refused rather than
+  // clamped, because a clamp substitutes a value the author did not write and
+  // says nothing about it.
+  OUT_OF_RANGE_OPTION_VALUE: 'OUT_OF_RANGE_OPTION_VALUE',
   // misplaced: a well-formed token in the wrong position
   MISPLACED_HEAD_MARKER: 'MISPLACED_HEAD_MARKER',
   MISPLACED_CHARACTER_INDICATOR: 'MISPLACED_CHARACTER_INDICATOR',
@@ -608,6 +608,120 @@ export const WARNING_CODES = Object.freeze({
   // glyph-level applyIndicators() slot (the API's character-indicator channel)
   NON_INDICATOR_AS_CHARACTER_INDICATOR: 'NON_INDICATOR_AS_CHARACTER_INDICATOR',
 });
+
+/**
+ * Every numeric option, by the spelling an author writes it in, and what its
+ * value may be.
+ *
+ * `kind` decides one thing only, the negative rule. A LENGTH is a distance and
+ * nothing can draw a negative one, so it is refused. An OFFSET may be negative
+ * and means something there: a negative margin or crop pushes the viewBox out
+ * instead of pulling it in, and the viewBox floors its dimensions at 0 anyway.
+ *
+ * `noun` is how the warning names the thing that kept its old value, so the
+ * message describes an outcome the author can see rather than an internal key.
+ *
+ * `fallback` records where the value comes from when one is refused. A refused
+ * option falls back exactly as if it had never been written, so the consumer's
+ * own `?? default` supplies it; recording it here means a reader does not have
+ * to find the consumer to know what a refusal looks like.
+ *
+ * There is no upper bound in this table and there must not be one. Seven of
+ * these keys were clamped until this change, which rewrote a written value in
+ * silence: `[char-space=50]` rendered byte-identical to `[char-space=10]` with
+ * an empty warnings array. Honour the value or refuse it; never substitute one
+ * quietly.
+ *
+ * These 26 are exactly the numeric members of KNOWN_OPTION_KEYS. The two
+ * numeric options NOT here are `relative-kerning` and `absolute-kerning`, which
+ * are absent from that set as well (the parser promotes them rather than
+ * dispatching on them) and carry their own gate, MALFORMED_KERNING_VALUE. They
+ * are gated, just not from here.
+ */
+export const NUMERIC_OPTION_POLICY = new Map([
+  ['stroke-width',             { kind: 'length', noun: 'stroke',   fallback: '0.5 at the root; below it, whatever is inherited' }],
+  ['dot-extra-width',          { kind: 'length', noun: 'dot',      fallback: 'the dot-sizing walk in bliss-element.js' }],
+  ['sdot-extra-width',         { kind: 'length', noun: 'dot',      fallback: 'the dot-sizing walk in bliss-element.js' }],
+  ['dot-width',                { kind: 'length', noun: 'dot',      fallback: 'the dot-sizing walk in bliss-element.js' }],
+  ['sdot-width',               { kind: 'length', noun: 'dot',      fallback: 'the dot-sizing walk in bliss-element.js' }],
+  ['char-space',               { kind: 'length', noun: 'spacing',  fallback: '2, in #sharedOptions' }],
+  ['word-space',               { kind: 'length', noun: 'spacing',  fallback: '8, in #sharedOptions' }],
+  ['external-glyph-space',     { kind: 'length', noun: 'spacing',  fallback: '0.8, in #sharedOptions' }],
+  ['margin',                   { kind: 'offset', noun: 'margin',   fallback: '0.75, in #svgCode' }],
+  ['margin-top',               { kind: 'offset', noun: 'margin',   fallback: '0.75, in #svgCode' }],
+  ['margin-bottom',            { kind: 'offset', noun: 'margin',   fallback: '0.75, in #svgCode' }],
+  ['margin-left',              { kind: 'offset', noun: 'margin',   fallback: '0.75, in #svgCode' }],
+  ['margin-right',             { kind: 'offset', noun: 'margin',   fallback: '0.75, in #svgCode' }],
+  ['min-width',                { kind: 'length', noun: 'width',    fallback: '0, in #svgCode' }],
+  ['crop',                     { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
+  ['crop-top',                 { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
+  ['crop-bottom',              { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
+  ['crop-left',                { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
+  ['crop-right',               { kind: 'offset', noun: 'crop',     fallback: '0, in #svgCode' }],
+  ['grid-stroke-width',        { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['grid-major-stroke-width',  { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['grid-medium-stroke-width', { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['grid-minor-stroke-width',  { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['grid-sky-stroke-width',    { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['grid-earth-stroke-width',  { kind: 'length', noun: 'grid line', fallback: '0.166, in #processOptions' }],
+  ['svg-height',               { kind: 'length', noun: 'height',   fallback: 'six times the viewBox height, in #svgCode' }],
+]);
+
+/**
+ * Judges one written value for a numeric option. Two arms and no third: the
+ * value is either refused, in which case the option falls back exactly as if it
+ * had never been written, or honoured exactly as written.
+ *
+ * The order of the checks is observable, so it is fixed here rather than left to
+ * each caller: something that is not a number at all is INVALID, a well-formed
+ * number the SVG format cannot carry is OUT_OF_RANGE, and the negative rule runs
+ * last and only for a length. A bare key (`[margin]`) and an empty value
+ * (`[margin=]`) are refusals too, because `Number(true)` is 1 and `Number('')`
+ * is 0 and honouring either would have the library invent a value nobody typed.
+ *
+ * Returns null when the value is honoured, so the caller assigns it; otherwise
+ * the warning to report, and the caller assigns nothing.
+ */
+export const judgeNumericOptionValue = (key, rawValue) => {
+  const policy = NUMERIC_OPTION_POLICY.get(key);
+  if (!policy) return null;
+  const tail = `so it was ignored: the ${policy.noun} keeps the value it would have had without it.`;
+  const source = rawValue === true ? key : `${key}=${rawValue}`;
+  if (rawValue === true || rawValue === '') {
+    return {
+      code: WARNING_CODES.INVALID_OPTION_VALUE,
+      message: `"${key}" needs a number and was written without one, ${tail}`,
+      source,
+    };
+  }
+  const written = Number(rawValue);
+  if (Number.isNaN(written)) {
+    return {
+      code: WARNING_CODES.INVALID_OPTION_VALUE,
+      message: `"${key}" needs a number and "${rawValue}" is not one, ${tail}`,
+      source,
+    };
+  }
+  // The key is quoted and leads rather than following an article, because an
+  // article cannot be chosen for 26 names at once: "a sdot-extra-width" and
+  // "a external-glyph-space" are both wrong, and the rule that picks between
+  // "a" and "an" is about sound, not spelling.
+  if (!Number.isFinite(written)) {
+    return {
+      code: WARNING_CODES.OUT_OF_RANGE_OPTION_VALUE,
+      message: `"${key}" cannot be ${written}, which is not a length the SVG format can carry, ${tail}`,
+      source,
+    };
+  }
+  if (policy.kind === 'length' && written < 0) {
+    return {
+      code: WARNING_CODES.OUT_OF_RANGE_OPTION_VALUE,
+      message: `"${key}" cannot be ${written}, because a negative ${policy.noun} cannot be drawn, ${tail}`,
+      source,
+    };
+  }
+  return null;
+};
 
 /**
  * Maps semantic indicator types to their root B-codes.
