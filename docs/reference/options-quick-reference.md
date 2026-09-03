@@ -15,7 +15,7 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | Option | Default | Range | Description |
 |--------|---------|-------|-------------|
 | `color` | `#000000` | Any color | Stroke color. This name is taken, so the raw `color` attribute is written `content--color` (see [targeting one part](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture)) |
-| `stroke-width` | `0.5` | Any drawable width | Line thickness. A negative width is floored to `0` and a non-finite one is ignored, both reported with [`OUT_OF_RANGE_STROKE_WIDTH`](/reference/warning-codes#out-of-range-stroke-width) |
+| `stroke-width` | `0.5` | Any drawable width | Line thickness. A negative or non-finite width is refused and the stroke keeps the width it would have had, reported with [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value) |
 | `fill` | `none` | Any color | Fill color |
 | `opacity` | `1` | 0-1 | Transparency |
 

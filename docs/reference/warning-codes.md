@@ -101,18 +101,35 @@ B313/RK:x/B431         →  renders both characters, default spacing
 
 ## Values Out of Range
 
-### `OUT_OF_RANGE_STROKE_WIDTH`
+Every option that takes a number follows one rule: the value you write is either used exactly as written or refused and reported. Nothing is quietly substituted. When a value is refused, nothing is written in its place, so the option falls back to what it would have been if you had never written it.
 
-A `stroke-width` that parses as a number but that nothing can draw with. Any width you can draw is yours, at any scope, including a very heavy one; these two are refused because the width also sizes dot glyphs, where it becomes a radius, so an undrawable width can drop a whole glyph rather than just thicken a line.
+### `INVALID_OPTION_VALUE`
+
+A numeric option given something that is not a number.
 
 ```
-[stroke-width=-2]||B291         →  warns, 0 is drawn (a legal, invisible stroke)
+[crop-top=aut0]||B291        →  warns, the picture is not cropped
+[stroke-width=abc]||B291     →  warns, the default 0.5 is drawn
+[margin]||B291               →  warns, the default margin is used
+[margin=]||B291              →  warns, the default margin is used
+```
+
+The last two are the cases worth knowing about: writing the key with no value at all is refused too. A bare `[margin]` used to set a margin of 1 and `[margin=]` a margin of 0, neither of which you asked for.
+
+### `OUT_OF_RANGE_OPTION_VALUE`
+
+A numeric option given a well-formed number that nothing can use: an infinity anywhere, or a negative value where the quantity is a length.
+
+```
+[stroke-width=-2]||B291         →  warns, the default 0.5 is drawn
 [stroke-width=Infinity]||B291   →  warns, the default 0.5 is drawn
+[svg-height=-10]||B291          →  warns, the height is left alone
+[margin=-5]||B291               →  no warning, the margin is honoured
 ```
 
-A negative width is floored to `0`. A non-finite one is ignored and nothing is written in its place, so the stroke keeps the width it would have had: the library default at global scope, and whatever the element inherits below it. A width that is not a number at all (`[stroke-width=abc]`) is not covered by this code: it falls back to the default in silence, as it always has.
+The last line is the distinction: a length is a distance, and nothing can draw a negative one, so it is refused. A margin or a crop is an offset, and a negative one means something (it pushes the viewBox outwards instead of pulling it in), so it is honoured.
 
-The written value is kept in the composition, so it survives `toString()` and reports again when the composition is parsed back.
+For both codes the written value is kept in the composition, so it survives `toString()` and reports again when the composition is parsed back.
 
 ## Misplaced Tokens
 
