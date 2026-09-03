@@ -17,17 +17,22 @@ import { NUMERIC_OPTION_POLICY, KNOWN_OPTION_KEYS } from '../src/lib/bliss-const
  *   set 1 and 0 respectively because `Number(true)` is 1 and `Number('')` is 0.
  * - A well-formed number nothing can carry: non-finite at any scope, and
  *   negative where the quantity is a LENGTH (`OUT_OF_RANGE_OPTION_VALUE`).
+ * - The ten keys that had no gate of any kind before: the four individual
+ *   crops, the six grid stroke widths and `svg-height`, each of which used to
+ *   ship `NaN` or a negative length straight into the markup in silence.
+ * - Both arms of the policy table's `kind`. A negative LENGTH is refused; a
+ *   negative OFFSET is honoured, because a negative margin or crop pushes the
+ *   viewBox out and means something there.
+ * - The bulk-versus-specific interaction: a refused `crop-top` must not wipe
+ *   the `cropTop` an accepted `crop=2` already set.
  * - The transcription of `NUMERIC_OPTION_POLICY` itself: membership against
  *   `KNOWN_OPTION_KEYS`, a complete row per key, and the absence of any
  *   upper bound.
  *
  * Does NOT cover:
- * - The nineteen keys gated in the following task (`stroke-width`, the five
- *   margins, `min-width`, the five crops, `svg-height` and the six grid stroke
- *   widths). Their rows are added to this file there. **The policy table's
- *   `offset` arm is therefore unexercised by behaviour here**, because all
- *   seven keys gated in this task are lengths: the negative-is-honoured half of
- *   the rule arrives with the margins and crops.
+ * - `stroke-width`, which reaches the same gate but keeps its own file,
+ *   `BlissSVGBuilder.stroke-width-range.test.js`, because it is the one key in
+ *   the table that is written at four scopes and feeds path geometry.
  * - A geometry that overflows out of accepted values (`[margin=1e308]`, or a
  *   single `[char-space=1e308]` reaching the six-times width multiplier),
  *   which no input gate can see because every value going in was legal.
@@ -53,6 +58,11 @@ const codes = (dsl) => render(dsl).warnings.map((w) => w.code);
  * Every entry below was then confirmed to render differently at two legal
  * values, so a row on it can fail. Extend this table, not the individual rows,
  * when a new numeric option arrives.
+ *
+ * The six grid stroke widths are deliberately absent: they need a companion
+ * `grid` option to draw anything at all, so they cannot be written in the
+ * `[key=value]||carrier` shape every helper here assumes. Their rows spell the
+ * input out and carry their own plain-render comparison.
  */
 const CARRIER = {
   'char-space': 'B291/B291',
@@ -64,8 +74,19 @@ const CARRIER = {
   'sdot-extra-width': 'SDOT',
   margin: 'B291',
   'margin-top': 'B291',
+  'margin-bottom': 'B291',
+  'margin-left': 'B291',
+  'margin-right': 'B291',
   crop: 'B291',
   'crop-top': 'B291',
+  'crop-bottom': 'B291',
+  'crop-left': 'B291',
+  'crop-right': 'B291',
+  // H is 8 units wide, so a min-width above that widens the viewBox; B291 is
+  // the same width and would work identically, but H is what the spacing
+  // suite already uses for this option.
+  'min-width': 'H',
+  'svg-height': 'B291',
 };
 const plain = (key) => render(CARRIER[key]).svgCode;
 
@@ -199,16 +220,168 @@ describe('BlissSVGBuilder option value gate', () => {
   });
 
   describe('when an option is given a value the format cannot carry', () => {
-    // Non-finite is refused for both kinds of quantity; only the negative rule
-    // splits them, and the offset half of that split lands with the margins.
+    // Non-finite is refused for BOTH kinds of quantity, which is why the
+    // margin and crop rows sit beside the spacing ones here. Only the negative
+    // rule splits the two kinds apart, and that split is pinned from both
+    // sides below: a negative length here, a negative offset in the honoured
+    // block further down.
     it.each([
       ['char-space', 'Infinity'], ['char-space', '-Infinity'], ['char-space', '-5'],
       ['word-space', '-5'],
       ['dot-width', '-1'],
+      ['min-width', '-10'],
+      ['svg-height', '-10'],
+      ['margin', 'Infinity'], ['margin', '-Infinity'],
+      ['crop', 'Infinity'],
+      ['crop-top', 'Infinity'],
     ])('refuses %s=%s with OUT_OF_RANGE_OPTION_VALUE', (key, value) => {
       const dsl = `[${key}=${value}]||${CARRIER[key]}`;
       expect(render(dsl).svgCode).toBe(plain(key));
       expect(codes(dsl)).toEqual(['OUT_OF_RANGE_OPTION_VALUE']);
+    });
+
+    it('stops emitting a negative width and height on the root', () => {
+      // The render-equality row above cannot say WHAT was wrong with the old
+      // output, and `width="-4.4186"` is the thing an author actually saw.
+      expect(render('[svg-height=-10]||B291').svgCode).not.toContain('width="-4.4186"');
+    });
+
+    it('stops emitting an infinite viewBox', () => {
+      // `[margin=Infinity]` used to reach the markup verbatim, as
+      // viewBox="-Infinity -Infinity Infinity Infinity".
+      expect(render('[margin=Infinity]||B291').svgCode).not.toContain('Infinity');
+    });
+  });
+
+  describe('when a key that never had a gate is given a bad value', () => {
+    // Ten keys arrived at this task with no check of any kind: the four
+    // individual crops, the six grid stroke widths and svg-height. Each shipped
+    // its bad value straight into the markup.
+    it.each([
+      ['crop-top'], ['crop-bottom'], ['crop-left'], ['crop-right'],
+    ])('refuses %s=aut0 instead of shipping NaN in the viewBox', (key) => {
+      // A row per side, not one for the family: each side is its own
+      // assignment, and a gate that reached only the first would leave three
+      // keys shipping NaN with the suite green. `aut0` rather than `abc`
+      // because the typo this is written for is a mistyped `auto`.
+      const dsl = `[${key}=aut0]||${CARRIER[key]}`;
+      const builder = render(dsl);
+      expect(builder.svgCode).not.toContain('NaN');
+      expect(builder.svgCode).toBe(plain(key));
+      expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(builder.warnings[0].source).toBe(`${key}=aut0`);
+    });
+
+    it.each([
+      'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
+      'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
+    ])('refuses %s=abc instead of stamping stroke-width="NaN" on the lines', (key) => {
+      // Spelled out rather than run through CARRIER: a grid width draws
+      // nothing without the companion `grid` option, so the comparison render
+      // needs that option too.
+      const builder = render(`[grid;${key}=abc]||B291`);
+      expect(builder.svgCode).not.toContain('NaN');
+      expect(builder.svgCode).toBe(render('[grid]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+      // The six widths share one helper, and the key it is handed decides both
+      // the message and the length-versus-offset rule. Without this the helper
+      // could pass a fixed key and all six rows would still pass.
+      expect(builder.warnings[0].source).toBe(`${key}=abc`);
+    });
+
+    it('refuses a negative grid stroke width, which is a length', () => {
+      // The width reached the markup as stroke-width="-1", which is a length
+      // no renderer draws. Separate from the row above because it is the other
+      // arm of the gate, and the six-key row only ever enters the first.
+      const builder = render('[grid;grid-stroke-width=-1]||B291');
+      expect(builder.svgCode).not.toContain('stroke-width="-1"');
+      expect(builder.svgCode).toBe(render('[grid]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_OPTION_VALUE']);
+    });
+
+    it('refuses a bare grid stroke width rather than drawing at 1', () => {
+      // Number(true) is 1, so the bare key drew the lines six times thicker
+      // than the 0.166 default, in silence.
+      const builder = render('[grid;grid-stroke-width]||B291');
+      expect(builder.svgCode).toBe(render('[grid]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it.each([
+      ['svg-height'], ['min-width'],
+    ])('refuses %s=abc, which used to be dropped without a word', (key) => {
+      const dsl = `[${key}=abc]||${CARRIER[key]}`;
+      expect(render(dsl).svgCode).toBe(plain(key));
+      expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('refuses a crop value that is a word the option does not know', () => {
+      // `crop` has three legal string values and used to drop anything else
+      // silently, because the numeric tail was guarded by `!isNaN`.
+      const dsl = '[crop=nonsense]||B291';
+      expect(render(dsl).svgCode).toBe(plain('crop'));
+      expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+  });
+
+  describe('when an offset key is written bare or empty', () => {
+    // The OFFSET half of the bare/empty pair. Number(true) is 1 and Number('')
+    // is 0, so `[margin]` set a margin of 1 and `[margin=]` a margin of 0
+    // against a default of 0.75, both in silence and neither typed.
+    it.each([
+      ['margin'], ['margin-top'], ['crop'], ['crop-top'],
+    ])('refuses the bare and the empty form of %s', (key) => {
+      for (const dsl of [`[${key}]||${CARRIER[key]}`, `[${key}=]||${CARRIER[key]}`]) {
+        expect(render(dsl).svgCode, dsl).toBe(plain(key));
+        expect(codes(dsl), dsl).toEqual(['INVALID_OPTION_VALUE']);
+      }
+    });
+  });
+
+  describe('when a bulk value and a specific one disagree', () => {
+    // A refusal assigns nothing, which is what lets an accepted bulk value
+    // stand. Assigning `undefined` instead would read as "no crop" and quietly
+    // undo the `crop=2` the author did write and the library did accept.
+    it('keeps an accepted crop when the specific one beside it is refused', () => {
+      const builder = render('[crop=2;crop-top=abc]||B291');
+      expect(builder.svgCode).not.toContain('NaN');
+      expect(builder.svgCode).toBe(render('[crop=2]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('keeps an accepted margin when the specific one beside it is refused', () => {
+      const builder = render('[margin=2;margin-top=abc]||B291');
+      expect(builder.svgCode).toBe(render('[margin=2]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('refuses the bulk value alone and lets the specific one stand', () => {
+      // The other direction, and the one that says the two refusals are
+      // independent rather than one gate covering both.
+      const builder = render('[crop=abc;crop-top=2]||B291');
+      expect(builder.svgCode).toBe(render('[crop-top=2]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    // The grid widths run the same bulk-then-specific cascade through five
+    // accumulators rather than through four assignments, so they need the
+    // interaction pinned separately. Without this row the guard on each
+    // category and specific step can be deleted and the whole suite still
+    // passes: every other grid row writes ONE width option, and one option
+    // never has an accepted value beneath it to wipe.
+    it('keeps an accepted bulk grid width when a specific one beside it is refused', () => {
+      const builder = render('[grid;grid-stroke-width=2;grid-sky-stroke-width=abc]||B291');
+      expect(builder.svgCode).not.toContain('NaN');
+      // the sky line keeps the bulk 2, rather than dropping to the 0.166
+      // default as it would if the refusal overwrote the accepted value
+      expect(builder.svgCode).toBe(render('[grid;grid-stroke-width=2]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('refuses the bulk grid width alone and lets the specific one stand', () => {
+      const builder = render('[grid;grid-stroke-width=abc;grid-sky-stroke-width=2]||B291');
+      expect(builder.svgCode).toBe(render('[grid;grid-sky-stroke-width=2]||B291').svgCode);
+      expect(builder.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
     });
   });
 
@@ -221,6 +394,51 @@ describe('BlissSVGBuilder option value gate', () => {
     ])('honours %s=0 in silence', (key) => {
       const builder = render(`[${key}=0]||${CARRIER[key]}`);
       expect(builder.svgCode).not.toBe(plain(key));
+      expect(builder.warnings).toEqual([]);
+    });
+
+    // These already pass, and their job is to stop this task breaking them:
+    // every one is a value a clamp would have rewritten.
+    it.each([
+      ['[svg-height=0]||B291', 'width="0" height="0"'],
+      ['[svg-height=1e9]||B291', 'height="1000000000"'],
+      ['[min-width=20]||H', 'viewBox="-0.75 -0.75 21.5 21.5"'],
+    ])('honours %s in silence', (dsl, fragment) => {
+      const builder = render(dsl);
+      expect(builder.svgCode).toContain(fragment);
+      expect(builder.warnings).toEqual([]);
+    });
+
+    // The OFFSET arm from the honoured side, one row per call site that can
+    // reach it. Without these the gate could refuse every negative number and
+    // only the `kind` transcription row would notice, which pins the table
+    // rather than the behaviour. Per call site rather than per key because the
+    // key a caller passes is what looks `kind` up: hand the bulk `crop` branch
+    // the name of a length and every negative crop starts being refused, with
+    // the transcription row still green.
+    it.each([
+      ['[margin=-5]||B291', 'viewBox="5 5 0 10"'],
+      ['[margin-left=-5]||B291', 'viewBox="5 -0.75 3.75 21.5"'],
+      ['[crop=-5]||B291', 'viewBox="-5.75 -5.75 19.5 31.5"'],
+      ['[crop-top=-5]||B291', 'viewBox="-0.75 -5.75 9.5 26.5"'],
+      ['[crop-left=-5]||B291', 'viewBox="-5.75 -0.75 14.5 21.5"'],
+    ])('honours the negative offset in %s, because an offset may be negative', (dsl, fragment) => {
+      const builder = render(dsl);
+      expect(builder.svgCode).toContain(fragment);
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it.each([
+      ['[crop=auto]||B291', 'viewBox="-0.75 7.25 9.5 9.5"'],
+      ['[crop=auto-vertical]||B291', 'viewBox="-0.75 7.25 9.5 9.5"'],
+      ['[crop=compact]||B291', 'viewBox="-0.75 3.25 9.5 17.5"'],
+      ['[crop-top=auto]||B291', 'viewBox="-0.75 7.25 9.5 13.5"'],
+    ])('leaves the string values crop accepts alone: %s', (dsl, fragment) => {
+      // The gate runs on the numeric path only. A gate written in front of the
+      // string arms instead of behind them refuses all four of these, and
+      // nothing else in the suite writes `crop-top=auto`.
+      const builder = render(dsl);
+      expect(builder.svgCode).toContain(fragment);
       expect(builder.warnings).toEqual([]);
     });
   });
@@ -263,6 +481,23 @@ describe('BlissSVGBuilder option value gate', () => {
         '"char-space" cannot be Infinity, which is not a length the SVG format can carry, '
         + 'so it was ignored: the spacing keeps the value it would have had without it.'
       );
+    });
+
+    // One row per CALL SITE, not per key. The gate is handed a key by ten
+    // different callers, and that key decides the message, the noun and
+    // whether a negative value is refused. Every row elsewhere in this file
+    // asserts the warning CODE, which is identical whichever key was passed,
+    // so a caller handing over the wrong one survives all of them.
+    it.each([
+      ['[crop=abc]||B291', 'crop=abc'],
+      ['[crop-left=abc]||B291', 'crop-left=abc'],
+      ['[margin=Infinity]||B291', 'margin=Infinity'],
+      ['[margin-left=abc]||B291', 'margin-left=abc'],
+      ['[min-width=abc]||H', 'min-width=abc'],
+      ['[svg-height=abc]||B291', 'svg-height=abc'],
+      ['[stroke-width=abc]||B291', 'stroke-width=abc'],
+    ])('names the option as written in %s', (dsl, source) => {
+      expect(render(dsl).warnings[0].source).toBe(source);
     });
   });
 

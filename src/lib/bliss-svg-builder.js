@@ -187,41 +187,23 @@ class BlissSVGBuilder {
   #processOptions(rawOptions = {}, addBuilderDefaults = false) {
     const options = {};
 
-    // stroke-width: Number, taken as written. The old 0.1-1.5 clamp was what
-    // made the raw value unreachable: a name the library curates was also the
-    // only spelling of it, so an author who wanted a heavier stroke had no
-    // second channel to ask through. Non-numeric input still falls through to
-    // the default rather than poisoning the layout with NaN.
+    // stroke-width: honoured exactly as written, or refused and reported. The
+    // old 0.1-1.5 clamp was what made the raw value unreachable: a name the
+    // library curates was also the only spelling of it, so an author who
+    // wanted a heavier stroke had no second channel to ask through.
     //
-    // Retiring the ceiling retired the floor with it, and the two are not the
-    // same thing: an unusual width is the author's business, a width nothing
-    // can draw is not. The value also feeds path geometry (a dot's radius is
-    // derived from it), so a negative one reaches the path data as a negative
-    // arc radius and conformant renderers drop the whole glyph.
-    if ('stroke-width' in rawOptions && !isNaN(rawOptions['stroke-width'])) {
-      const written = Number(rawOptions['stroke-width']);
-      const source = `stroke-width=${rawOptions['stroke-width']}`;
-      if (!Number.isFinite(written)) {
-        this.#warnings.push({
-          code: WARNING_CODES.OUT_OF_RANGE_STROKE_WIDTH,
-          // Deliberately does not name the width that IS drawn. Nothing is
-          // written in place of a refused value, so at global scope the
-          // library default shows through and at every other scope whatever
-          // the element inherits does; naming the default would be false
-          // below the root.
-          message: `A stroke-width of ${written} is not a length the SVG format can carry, so it was ignored: the stroke keeps the width it would have had without it.`,
-          source,
-        });
-      } else if (written < 0) {
-        this.#warnings.push({
-          code: WARNING_CODES.OUT_OF_RANGE_STROKE_WIDTH,
-          message: `A stroke-width of ${written} cannot be drawn, and a negative width is an error in the path data it feeds, so 0 was used instead. That is a legal width and draws an invisible stroke.`,
-          source,
-        });
-        options.strokeWidth = 0;
-      } else {
-        options.strokeWidth = written;
-      }
+    // A negative width is refused rather than floored to 0. Flooring was the
+    // same silent substitution the ceiling made, one step further down, and it
+    // mattered here because the value feeds path geometry as well as the
+    // attribute: a dot's radius is derived from it, so a negative one reaches
+    // the path data as a negative arc radius and conformant renderers drop the
+    // whole glyph. A refusal falls back to the width the element would have had
+    // anyway, which is the library default at the root and whatever is
+    // inherited below it.
+    if ('stroke-width' in rawOptions) {
+      const refusal = judgeNumericOptionValue('stroke-width', rawOptions['stroke-width']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.strokeWidth = Number(rawOptions['stroke-width']);
     }
 
     // The dot and spacing family: honoured exactly as written, or refused and
@@ -275,36 +257,42 @@ class BlissSVGBuilder {
       else options.externalGlyphSpace = Number(rawOptions['external-glyph-space']);
     }
 
+    // The margin family. A margin is an OFFSET in the policy table, so a
+    // negative one is honoured and pushes the viewBox outwards; only a
+    // non-finite value or something that is not a number at all is refused.
     // margin: Sets ALL 4 margins
-    if ('margin' in rawOptions && !isNaN(rawOptions['margin'])) {
-      const m = Number(rawOptions['margin']);
-      options.marginTop = m;
-      options.marginBottom = m;
-      options.marginLeft = m;
-      options.marginRight = m;
-    }
-
-    // Individual margins (override the above if present)
-    if ('margin-top' in rawOptions && !isNaN(rawOptions['margin-top'])) {
-      options.marginTop = Number(rawOptions['margin-top']);
-    }
-    if ('margin-bottom' in rawOptions && !isNaN(rawOptions['margin-bottom'])) {
-      options.marginBottom = Number(rawOptions['margin-bottom']);
-    }
-    if ('margin-left' in rawOptions && !isNaN(rawOptions['margin-left'])) {
-      options.marginLeft = Number(rawOptions['margin-left']);
-    }
-    if ('margin-right' in rawOptions && !isNaN(rawOptions['margin-right'])) {
-      options.marginRight = Number(rawOptions['margin-right']);
-    }
-
-    // min-width: Number, clamped to 0 minimum (negative values become 0)
-    if ('min-width' in rawOptions && !isNaN(rawOptions['min-width'])) {
-      let minWidth = Number(rawOptions['min-width']);
-      if (minWidth < 0) {
-        minWidth = 0;
+    if ('margin' in rawOptions) {
+      const refusal = judgeNumericOptionValue('margin', rawOptions['margin']);
+      if (refusal) this.#warnings.push(refusal);
+      else {
+        const m = Number(rawOptions['margin']);
+        options.marginTop = m;
+        options.marginBottom = m;
+        options.marginLeft = m;
+        options.marginRight = m;
       }
-      options.minWidth = minWidth;
+    }
+
+    // Individual margins (override the above if present). A refusal assigns
+    // NOTHING rather than a fallback, which is what lets an accepted bulk
+    // `margin` still stand underneath it: writing `undefined` here would read
+    // as "no margin" downstream and quietly undo a value the author did write.
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      const key = `margin-${side}`;
+      if (!(key in rawOptions)) continue;
+      const refusal = judgeNumericOptionValue(key, rawOptions[key]);
+      if (refusal) this.#warnings.push(refusal);
+      else options[`margin${side[0].toUpperCase()}${side.slice(1)}`] = Number(rawOptions[key]);
+    }
+
+    // min-width: a LENGTH, so a negative one is refused rather than floored to
+    // 0. The floor made no visible difference, because a refused min-width
+    // falls back to 0 anyway, but it was still a value the library substituted
+    // without saying so.
+    if ('min-width' in rawOptions) {
+      const refusal = judgeNumericOptionValue('min-width', rawOptions['min-width']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.minWidth = Number(rawOptions['min-width']);
     }
 
     // Boolean options: [option] = true, absence = false
@@ -377,35 +365,59 @@ class BlissSVGBuilder {
       let mediumWidth = 0.166;
       let minorWidth = 0.166;
 
+      // Every width is judged before it is allowed to move an accumulator, so
+      // a refused value leaves whatever the level below it put there standing:
+      // a bad `grid-sky-stroke-width` falls back to the bulk width if one was
+      // accepted, and to the default otherwise, exactly as if it had never been
+      // written. Returns undefined for both "not written" and "refused",
+      // because the caller does the same thing in either case.
+      //
+      // These six had no check at all before. A written value went straight
+      // through `Number()`, so `[grid;grid-stroke-width=abc]` stamped
+      // stroke-width="NaN" on every line the option named, in silence.
+      const gridStrokeWidth = (key) => {
+        if (!(key in rawOptions)) return undefined;
+        const refusal = judgeNumericOptionValue(key, rawOptions[key]);
+        if (refusal) {
+          this.#warnings.push(refusal);
+          return undefined;
+        }
+        return Number(rawOptions[key]);
+      };
+
       // Apply bulk option (sets all grid widths)
-      if ('grid-stroke-width' in rawOptions) {
-        const gsw = Number(rawOptions['grid-stroke-width']);
-        skyWidth = earthWidth = majorWidth = mediumWidth = minorWidth = gsw;
+      const bulkWidth = gridStrokeWidth('grid-stroke-width');
+      if (bulkWidth !== undefined) {
+        skyWidth = earthWidth = majorWidth = mediumWidth = minorWidth = bulkWidth;
       }
 
       // Apply category option for major grids (overrides bulk for major lines)
-      if ('grid-major-stroke-width' in rawOptions) {
-        const gmsw = Number(rawOptions['grid-major-stroke-width']);
-        skyWidth = earthWidth = majorWidth = gmsw;
+      const categoryMajorWidth = gridStrokeWidth('grid-major-stroke-width');
+      if (categoryMajorWidth !== undefined) {
+        skyWidth = earthWidth = majorWidth = categoryMajorWidth;
       }
 
       // Apply category option for medium grid (overrides bulk)
-      if ('grid-medium-stroke-width' in rawOptions) {
-        mediumWidth = Number(rawOptions['grid-medium-stroke-width']);
+      const categoryMediumWidth = gridStrokeWidth('grid-medium-stroke-width');
+      if (categoryMediumWidth !== undefined) {
+        mediumWidth = categoryMediumWidth;
       }
 
       // Apply category option for minor grid (overrides bulk)
-      if ('grid-minor-stroke-width' in rawOptions) {
-        minorWidth = Number(rawOptions['grid-minor-stroke-width']);
+      const categoryMinorWidth = gridStrokeWidth('grid-minor-stroke-width');
+      if (categoryMinorWidth !== undefined) {
+        minorWidth = categoryMinorWidth;
       }
 
       // Apply specific options (most specific, override everything)
-      if ('grid-sky-stroke-width' in rawOptions) {
-        skyWidth = Number(rawOptions['grid-sky-stroke-width']);
+      const specificSkyWidth = gridStrokeWidth('grid-sky-stroke-width');
+      if (specificSkyWidth !== undefined) {
+        skyWidth = specificSkyWidth;
       }
 
-      if ('grid-earth-stroke-width' in rawOptions) {
-        earthWidth = Number(rawOptions['grid-earth-stroke-width']);
+      const specificEarthWidth = gridStrokeWidth('grid-earth-stroke-width');
+      if (specificEarthWidth !== undefined) {
+        earthWidth = specificEarthWidth;
       }
 
       // Assign to options object
@@ -428,29 +440,47 @@ class BlissSVGBuilder {
         options.autoVertical = true;
       } else if (c === 'compact') {
         options.cropCompact = true;
-      } else if (!isNaN(c)) {
-        const n = Number(c);
-        options.cropTop = n;
-        options.cropBottom = n;
-        options.cropLeft = n;
-        options.cropRight = n;
+      } else {
+        // Those three are the whole of crop's non-numeric vocabulary, so
+        // anything else is judged as a number. The gate runs BEHIND the string
+        // arms rather than in front of them, or it would refuse all three.
+        // The old `!isNaN(c)` tail dropped `[crop=nonsense]` without a word.
+        const refusal = judgeNumericOptionValue('crop', c);
+        if (refusal) this.#warnings.push(refusal);
+        else {
+          const n = Number(c);
+          options.cropTop = n;
+          options.cropBottom = n;
+          options.cropLeft = n;
+          options.cropRight = n;
+        }
       }
     }
 
-    // Individual crop values (override the above if present)
-    // Each can be a number or 'auto'
-    const parseCropValue = (val) => val === 'auto' ? 'auto' : Number(val);
-    if ('crop-top' in rawOptions) {
-      options.cropTop = parseCropValue(rawOptions['crop-top']);
-    }
-    if ('crop-bottom' in rawOptions) {
-      options.cropBottom = parseCropValue(rawOptions['crop-bottom']);
-    }
-    if ('crop-left' in rawOptions) {
-      options.cropLeft = parseCropValue(rawOptions['crop-left']);
-    }
-    if ('crop-right' in rawOptions) {
-      options.cropRight = parseCropValue(rawOptions['crop-right']);
+    // Individual crop values (override the above if present).
+    // 'auto' is a legal value here and the only string one; everything else is
+    // judged as a number, which is what the old unconditional `Number(val)`
+    // skipped: `[crop-top=aut0]` reached the viewBox as NaN, in silence.
+    //
+    // A refusal returns undefined and the caller assigns NOTHING, which is what
+    // lets an accepted bulk `crop` still stand underneath: assigning undefined
+    // would overwrite the value `crop=2` had already put there.
+    const resolveCropValue = (key, val) => {
+      if (val === 'auto') return 'auto';
+      const refusal = judgeNumericOptionValue(key, val);
+      if (refusal) {
+        this.#warnings.push(refusal);
+        return undefined;
+      }
+      return Number(val);
+    };
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      const key = `crop-${side}`;
+      if (!(key in rawOptions)) continue;
+      const value = resolveCropValue(key, rawOptions[key]);
+      if (value !== undefined) {
+        options[`crop${side[0].toUpperCase()}${side.slice(1)}`] = value;
+      }
     }
 
     // Other string options
@@ -479,9 +509,13 @@ class BlissSVGBuilder {
       options.svgTitle = escapeHtml(rawOptions['svg-title']);
     }
 
-    // SVG element height (presentation size, not viewBox)
-    if ('svg-height' in rawOptions && !isNaN(rawOptions['svg-height'])) {
-      options.svgHeight = Number(rawOptions['svg-height']);
+    // SVG element height (presentation size, not viewBox). A LENGTH: the root
+    // width is derived from it, so a negative one emitted a negative width and
+    // height on the <svg> itself. Zero is legal and draws an empty picture.
+    if ('svg-height' in rawOptions) {
+      const refusal = judgeNumericOptionValue('svg-height', rawOptions['svg-height']);
+      if (refusal) this.#warnings.push(refusal);
+      else options.svgHeight = Number(rawOptions['svg-height']);
     }
 
     // Preserve any options that weren't explicitly processed (like fill, opacity, stroke-dasharray, etc.)

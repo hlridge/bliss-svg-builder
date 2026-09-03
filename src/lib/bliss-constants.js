@@ -457,16 +457,6 @@ export const WARNING_CODES = Object.freeze({
   MALFORMED_WORD_INDICATOR: 'MALFORMED_WORD_INDICATOR',
   MALFORMED_COORDINATES: 'MALFORMED_COORDINATES',
   MALFORMED_KERNING_VALUE: 'MALFORMED_KERNING_VALUE',
-  // out-of-range: a stroke width that parses as a number but that nothing can
-  // draw with. The width also feeds path geometry (a dot's radius is derived
-  // from it), so a negative one reaches the path data as a negative arc radius
-  // and conformant renderers drop the whole path. Negative is floored to 0, an
-  // invisible but legal stroke; non-finite is refused and the default stands.
-  // A width that is not a number at all still falls back to the default in
-  // silence. This is the last hand-written gate: every other numeric option now
-  // goes through judgeNumericOptionValue, and stroke-width joins them next,
-  // which retires this code in favour of the two below.
-  OUT_OF_RANGE_STROKE_WIDTH: 'OUT_OF_RANGE_STROKE_WIDTH',
   // a numeric option given something that is not a number at all. INVALID_ is
   // the reserved verb for exactly this: OUT_OF_RANGE_ answers for a well-formed
   // number the attribute cannot carry, and the two are different repairs.

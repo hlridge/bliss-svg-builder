@@ -58,12 +58,19 @@ describe('BlissSVGBuilder crop dimension clamp', () => {
       expect(height).toBe(117);
     });
 
-    it('treats crop:true as numeric 1 and clamps identically', () => {
-      // note: crop:true coerces to numeric 1 (isNaN(true) === false)
+    it('refuses crop:true instead of treating it as numeric 1', () => {
+      // crop:true used to reach the numeric tail, because isNaN(true) is false
+      // and Number(true) is 1, so asking for a crop without saying how much
+      // silently cropped by one unit. It is refused now, and the document is
+      // sized as if no crop had been asked for. That is a DIFFERENT picture
+      // from crop:1 here, which is why this row still earns its place: the
+      // clamp it used to reach is no longer reached at all.
       const asTrue = render('', { crop: true });
       const asOne = render('', { crop: 1 });
-      expect(asTrue.svg).toBe(asOne.svg);
-      expect(asTrue.vb[2]).toBe(0);
+      expect(asTrue.svg).not.toBe(asOne.svg);
+      expect(asTrue.svg).toBe(render('', {}).svg);
+      expect(new BlissSVGBuilder('', { crop: true }).warnings.map((w) => w.code))
+        .toEqual(['INVALID_OPTION_VALUE']);
     });
 
     it('clamps identically for object-input {groups:[{glyphs:[]}]}', () => {

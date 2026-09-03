@@ -56,7 +56,13 @@ describe('BlissParser global option scope', () => {
     'center', 'min-width', 'char-space', 'word-space', 'external-glyph-space',
     'svg-title', 'svg-desc', 'svg-height', 'error-placeholder',
   ];
-  const BOOLEAN_KEYS = new Set(['grid', 'center', 'error-placeholder', 'crop']);
+  // `crop` is deliberately NOT here. It takes 'auto', 'auto-vertical',
+  // 'compact' or a number, so its bare form is a value-less numeric option
+  // rather than a boolean; it only ever behaved like one because Number(true)
+  // is 1, and that coercion is now refused. What the bare form does is pinned
+  // in `BlissSVGBuilder.option-value-gate.test.js`, which owns value gating;
+  // this file is about SCOPE, and a real crop value exercises that unchanged.
+  const BOOLEAN_KEYS = new Set(['grid', 'center', 'error-placeholder']);
   // Bracket text for a key: boolean keys use the bare form, color-like keys
   // get a color value, the rest a small number ('hi' for the svg-text pair).
   const bracketFor = (key) => {
