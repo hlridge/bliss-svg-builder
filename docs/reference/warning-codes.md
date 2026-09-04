@@ -131,6 +131,19 @@ The last line is the distinction: a length is a distance, and nothing can draw a
 
 For both codes the written value is kept in the composition, so it survives `toString()` and reports again when the composition is parsed back.
 
+### `OUT_OF_RANGE_COMPUTED_GEOMETRY`
+
+The other side of that rule: every value was accepted, and the size they work out to is what nothing can carry. Two very large numbers can add up past the largest number JavaScript holds, and the `width` and `height` on the root are six times the viewBox, so a value that is fine on its own can still overflow once it is multiplied.
+
+```
+[margin=1e308]||B291        →  warns, the picture is sized as if no margin were written
+[crop-top=1e308]||B291      →  no warning, an empty picture at a far-off origin is valid SVG
+```
+
+Only a size that cannot be written down is refused. A merely enormous one is yours to write.
+
+Every option that sizes the picture is dropped together, since the overflow belongs to the result rather than to any one of them, and `source` names the ones you wrote, comma-separated. The exception is a spacing (`char-space`, `word-space`, `external-glyph-space`): it widens the composition itself, which is measured before the size is judged, so there the warning is the whole report and the fix is to write a smaller value.
+
 ## Misplaced Tokens
 
 These fire when a well-formed token is attached to a unit whose granularity does not match. The token is dropped, the content still renders, and a dropped token is not re-emitted by `toString()`.
