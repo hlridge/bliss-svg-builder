@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -1382,6 +1382,10 @@ class BlissSVGBuilder {
       ...(blissObj.options ?? {}), ...(blissObj.transientOptions ?? {}),
     });
     const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(camelToKebab(key)));
+    // The wider set, for the overflow report below: `svg-height` and the three
+    // spacings never shape the viewBox, so they are absent above, but each can
+    // put a number in the root that the format cannot carry.
+    const writtenSizeOptions = writtenKeys.filter(key => SIZE_OPTION_KEYS.has(camelToKebab(key)));
     // Taken as written, with no camelCase canonicalization, because this set
     // answers "did the author's key produce this attribute" and the options pass
     // recognises the kebab spelling alone. The constructor and the transient
@@ -1640,6 +1644,35 @@ class BlissSVGBuilder {
     }
 
     this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });
+
+    // The output side. Every value that got here passed its own gate, so what
+    // is judged is the arithmetic: two terms can sum past the largest double,
+    // and the six-times presentation multiplier can run off the end of one that
+    // survived on its own. No input gate can see either.
+    //
+    // It runs here rather than in the `#svgCode` getter so the warning is
+    // raised by construction like every other one. From the getter, this single
+    // code would be absent until somebody read the markup, and would need its
+    // own guard against piling up on a second read.
+    const geometry = this.#computeGeometry();
+    const carried = [
+      geometry.viewBoxX, geometry.viewBoxY, geometry.viewBoxWidth, geometry.viewBoxHeight,
+      geometry.svgWidth, geometry.svgHeight,
+    ];
+    if (!carried.every((value) => Number.isFinite(value))) {
+      // Removing them IS the fallback: the getter's own `?? 0.75` and `?? 0`
+      // then supply the defaults, so the picture comes out sized exactly as it
+      // would have been had none of them been written, and `#computeGeometry`
+      // needs no second mode. A spacing is the one cause this cannot answer,
+      // because it is baked into the composition long before the geometry can
+      // be judged; the report is the whole remedy there.
+      for (const key of COMPUTED_GEOMETRY_INPUTS) delete this.#processedOptions[key];
+      this.#warnings.push({
+        code: WARNING_CODES.OUT_OF_RANGE_COMPUTED_GEOMETRY,
+        message: `"${writtenSizeOptions.join('", "')}" works out to a picture size the SVG format cannot carry, so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`,
+        source: writtenSizeOptions.join(', '),
+      });
+    }
   }
 
   /**

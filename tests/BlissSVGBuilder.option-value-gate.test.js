@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
-import { NUMERIC_OPTION_POLICY, KNOWN_OPTION_KEYS } from '../src/lib/bliss-constants.js';
+import {
+  NUMERIC_OPTION_POLICY, KNOWN_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS,
+} from '../src/lib/bliss-constants.js';
 
 /**
  * Pins the one rule every numeric option now follows: a written value is
@@ -28,14 +32,17 @@ import { NUMERIC_OPTION_POLICY, KNOWN_OPTION_KEYS } from '../src/lib/bliss-const
  * - The transcription of `NUMERIC_OPTION_POLICY` itself: membership against
  *   `KNOWN_OPTION_KEYS`, a complete row per key, and the absence of any
  *   upper bound.
+ * - The output side, where every written value was accepted and the COMPUTED
+ *   size is what nothing can carry (`OUT_OF_RANGE_COMPUTED_GEOMETRY`): a
+ *   margin that overflows, an origin that overflows while both dimensions stay
+ *   finite, a root dimension that overflows while the whole viewBox is finite,
+ *   the finite-but-absurd geometry the check must leave alone, and the one
+ *   trigger (a spacing) the fallback cannot repair.
  *
  * Does NOT cover:
  * - `stroke-width`, which reaches the same gate but keeps its own file,
  *   `BlissSVGBuilder.stroke-width-range.test.js`, because it is the one key in
  *   the table that is written at four scopes and feeds path geometry.
- * - A geometry that overflows out of accepted values (`[margin=1e308]`, or a
- *   single `[char-space=1e308]` reaching the six-times width multiplier),
- *   which no input gate can see because every value going in was legal.
  * - The camelCase namespace collision, see
  *   `BlissSVGBuilder.option-namespace-split.test.js`.
  */
@@ -592,6 +599,114 @@ describe('BlissSVGBuilder option value gate', () => {
       for (const [key, policy] of NUMERIC_OPTION_POLICY) {
         expect(Object.keys(policy), key).not.toContain('max');
       }
+    });
+  });
+
+  describe('when accepted values compute a geometry the format cannot carry', () => {
+    // Every value written below passes its own gate: 1e308 is finite, and a
+    // margin or a crop may be negative. The refusal happens on the way OUT,
+    // where two terms sum past the largest double or the six-times
+    // presentation multiplier runs off the end of it.
+
+    it('refuses an overflowing margin and sizes the picture as if none were written', () => {
+      const b = render('[margin=1e308]||B291');
+      expect(b.svgCode).not.toContain('Infinity');
+      // The fallback is "as if the option were never written", so the margins
+      // return to their 0.75 default. NOT [margin=0], which is a different
+      // picture: viewBox="0 0 8 20" against the default "-0.75 -0.75 9.5 21.5".
+      expect(b.svgCode).toBe(render('B291').svgCode);
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      // Bare key names joined, matching MULTIPLE_GEOMETRY_VALUES, which is the
+      // precedent for a geometry-family code no single key owns. NOT
+      // "margin=1e308": no single value was refused, the computed result was.
+      expect(b.warnings[0].source).toBe('margin');
+    });
+
+    it('has the warning before svgCode is ever read', () => {
+      // The contract row. It fails if the check is written in the getter, which
+      // is the shape a reader will reach for first, and which would make this
+      // one code order-dependent when every other is raised by construction.
+      const b = render('[margin=1e308]||B291');
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+    });
+
+    it('does not accumulate across repeated svgCode reads', () => {
+      const b = render('[margin=1e308]||B291');
+      void b.svgCode; void b.svgCode; void b.svgCode;
+      expect(b.warnings.filter((w) => w.code === 'OUT_OF_RANGE_COMPUTED_GEOMETRY')).toHaveLength(1);
+    });
+
+    // Six numbers are judged, and `[margin=1e308]` above makes four of them
+    // non-finite at once, so it vouches for a check that reads any one of the
+    // four. Each row below leaves exactly ONE non-finite, so dropping that
+    // number from the check kills exactly one row. Isolating inputs measured
+    // 2026-09-04 by replaying the geometry arithmetic; the shapes they need are
+    // why several carry four options:
+    //
+    //   viewBoxX       two terms of opposite sign, the width subtracting to 0
+    //   viewBoxY       the same vertically
+    //   viewBoxWidth   svg-height set, so svgWidth reads 0 off the zero-height
+    //                  guard instead of overflowing with it
+    //   viewBoxHeight  svg-height set, so svgHeight is the written value
+    //   svgWidth       svg-height on a picture wide enough that the ratio
+    //                  multiplies past the end (49.5 / 21.5, so 2.3 x 1e308)
+    //   svgHeight      one margin, six-timesed, with the width left alone
+    //
+    // viewBoxWidth and viewBoxHeight also pin svg-height as one of the options
+    // the fallback drops, which the narrower GEOMETRY_OPTION_KEYS does not hold.
+    it.each([
+      ['the viewBox origin x', '[margin-left=-1e308;crop-left=1e308]', 'B291', 'margin-left, crop-left'],
+      ['the viewBox origin y', '[margin-top=-1e308;crop-top=1e308]', 'B291', 'margin-top, crop-top'],
+      ['the viewBox width', '[svg-height=100;margin-left=1e308;margin-right=1e308;crop-top=25]', 'B291',
+        'svg-height, margin-left, margin-right, crop-top'],
+      ['the viewBox height', '[svg-height=100;margin-top=1e308;margin-bottom=1e308]', 'B291',
+        'svg-height, margin-top, margin-bottom'],
+      ['the root width', '[svg-height=1e308]', 'B291/B291/B291/B291/B291', 'svg-height'],
+      ['the root height', '[margin-top=1e308]', 'B291', 'margin-top'],
+    ])('catches %s when it is the only number that overflows', (_arm, options, carrier, source) => {
+      const b = render(`${options}||${carrier}`);
+      expect(b.svgCode).toBe(render(carrier).svgCode);
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      expect(b.warnings[0].source).toBe(source);
+    });
+
+    it('leaves a finite but absurd geometry alone', () => {
+      // The boundary the check must not cross. A crop of 1e308 puts the origin
+      // at 1e308 and empties the picture, which is valid SVG and a legal value
+      // now that no option has a ceiling. Only NON-FINITE is refused, so a
+      // check written against a magnitude threshold fails here.
+      const b = render('[crop-top=1e308]||B291');
+      expect(b.svgCode).toContain('viewBox="-0.75 1e+308 9.5 0"');
+      expect(b.warnings).toEqual([]);
+    });
+
+    it('reports a spacing that overflows, though dropping options cannot repair it', () => {
+      // The one trigger the fallback cannot answer, pinned rather than left
+      // implied. A spacing widens the COMPOSITION, so by the time the geometry
+      // is judged the content is already 1e308 units across, and removing the
+      // margin and crop options narrows nothing. The report is the whole
+      // remedy here: the author reduces the spacing.
+      const b = render('[char-space=1e308]||B291/B291');
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      expect(b.warnings[0].source).toBe('char-space');
+      expect(b.svgCode).toContain('width="Infinity"');
+    });
+
+    it('drops every option the geometry reads', () => {
+      // The fallback is a fixed list and the geometry it answers for is not.
+      // An option added to #computeGeometry but not to the list would go on
+      // shaping the picture after the report said every sizing option had been
+      // dropped, with the whole suite green. This reads the method's own source
+      // so the two cannot drift.
+      const builderPath = resolve(import.meta.dirname, '..', 'src', 'lib', 'bliss-svg-builder.js');
+      // `\r?` on both ends: this tree checks out CRLF, and an anchor written
+      // with bare \n matches nothing, which would pass the method off as
+      // missing rather than as unchanged.
+      const body = readFileSync(builderPath, 'utf8').match(/#computeGeometry\(\) \{([\s\S]*?)\r?\n {2}\}\r?\n/);
+      expect(body, '#computeGeometry not found in bliss-svg-builder.js').not.toBeNull();
+      const read = [...body[1].matchAll(/#processedOptions\.(\w+)/g)].map((m) => m[1]);
+      expect(read.length).toBeGreaterThan(0);
+      expect([...new Set(read)].sort()).toEqual([...COMPUTED_GEOMETRY_INPUTS].sort());
     });
   });
 });

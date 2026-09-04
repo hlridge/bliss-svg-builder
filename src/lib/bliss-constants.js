@@ -182,6 +182,40 @@ export const GEOMETRY_OPTION_KEYS = new Set([
   'min-width', 'center',
 ]);
 
+/**
+ * The written options whose values reach one of the six numbers the root
+ * carries: the four `viewBox` terms and the `width`/`height` pair. A superset
+ * of `GEOMETRY_OPTION_KEYS`, which answers the narrower question of what a
+ * hand-written `viewBox` displaces: `svg-height` sizes the root without
+ * touching the viewBox, and the three spacings widen the composition the
+ * viewBox is measured from. An overflow report names whichever of these was
+ * written, so the author is told which values to reduce.
+ */
+export const SIZE_OPTION_KEYS = new Set([
+  ...GEOMETRY_OPTION_KEYS,
+  'svg-height',
+  'char-space', 'word-space', 'external-glyph-space',
+]);
+
+/**
+ * Every processed option the geometry is computed from, in the internal
+ * spelling the options pass leaves behind once the bulk keys are expanded.
+ * Removing all of them is how an overflow falls back: the consumers' own `??`
+ * defaults then supply the size, so there is no second mode to write.
+ *
+ * The spacings are deliberately absent. They are consumed into the shared
+ * options and baked into the composition before the geometry can be judged, so
+ * removing them here would narrow nothing;
+ * `BlissSVGBuilder.option-value-gate.test.js` pins that limit.
+ */
+export const COMPUTED_GEOMETRY_INPUTS = [
+  'minWidth', 'center',
+  'marginTop', 'marginBottom', 'marginLeft', 'marginRight',
+  'cropTop', 'cropBottom', 'cropLeft', 'cropRight',
+  'cropCompact', 'autoVertical',
+  'svgHeight',
+];
+
 /** True for a key written in the `<layer>--<attribute>` form, valid or not. */
 export const isLayerAttributeKey = (key) => key.includes('--');
 
@@ -466,6 +500,12 @@ export const WARNING_CODES = Object.freeze({
   // clamped, because a clamp substitutes a value the author did not write and
   // says nothing about it.
   OUT_OF_RANGE_OPTION_VALUE: 'OUT_OF_RANGE_OPTION_VALUE',
+  // every written value was accepted and the size they COMPUTE is what nothing
+  // can carry: two terms sum past the largest double, or the six-times
+  // presentation multiplier runs off the end of it. Separate from
+  // OUT_OF_RANGE_OPTION_VALUE because no single value is out of range here;
+  // MULTIPLE_GEOMETRY_VALUES is the precedent for a code no one key owns.
+  OUT_OF_RANGE_COMPUTED_GEOMETRY: 'OUT_OF_RANGE_COMPUTED_GEOMETRY',
   // misplaced: a well-formed token in the wrong position
   MISPLACED_HEAD_MARKER: 'MISPLACED_HEAD_MARKER',
   MISPLACED_CHARACTER_INDICATOR: 'MISPLACED_CHARACTER_INDICATOR',
