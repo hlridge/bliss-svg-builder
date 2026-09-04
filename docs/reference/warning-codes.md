@@ -16,7 +16,7 @@ builder.warnings;
 
 - `code` — a stable identifier from the list below (the `WarningCode` type in TypeScript)
 - `message` — a human-readable description, including how to fix the input
-- `source` — the part of your input the warning is about. Its shape follows the code rather than one rule, so match on `code` first and read `source` as scoped to what that code reports. For an attribute it is usually the **key on its own**, prefix included, where the attribute itself is what is wrong (a refused name, `content--xmlns`; a key whose value cannot take effect where it landed, `grid--stroke`; the losing half of a collision, `grid-sky-color`), and usually the **option as written** where the option is (a refused value, `stroke-width=-2`; a key at a scope that cannot use it, `grid--opacity=0.3`). Other codes point at the spelling they are about: several option names comma-separated (`margin, crop-top`), a coordinate suffix (`:1`), a whole bracket (`[color=red]`), or, where the input could not be parsed as a code at all, the parser's description of what it read (`Invalid format: B291[x=1]`) rather than a substring of your input
+- `source` — the part of your input the warning is about. Its shape follows the code rather than one rule, so match on `code` first and read `source` as scoped to what that code reports. For an attribute it is usually the **key on its own**, prefix included, where the attribute itself is what is wrong (a refused name, `content--xmlns`; a key whose value cannot take effect where it landed, `grid--stroke`; the losing half of a collision, `grid-sky-color`), and usually the **option as written** where the option is (a refused value, `stroke-width=-2`; a key at a scope that cannot use it, `grid--opacity=0.3`). Other codes point at the spelling they are about: several option names comma-separated (`margin, crop-top`), a coordinate suffix (`:1`), a whole bracket (`[color=red]`), or, where the input could not be parsed as a code at all, the parser's description of what it read (`Invalid format: B291[x=1]`) rather than a substring of your input. It is empty only where the report is about a computed result that no key you wrote produced, and the message stands on its own there
 
 Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully.
 
@@ -27,7 +27,7 @@ The prefix tells you what kind of problem occurred:
 | Prefix | Meaning |
 |--------|---------|
 | `MALFORMED_` | Input did not parse in the required shape |
-| `OUT_OF_RANGE_` | A well-formed number outside what the attribute can carry |
+| `OUT_OF_RANGE_` | A number, written or computed, outside what the format can carry |
 | `MISPLACED_` | A well-formed token in the wrong position |
 | `MULTIPLE_` | More than one where only one is allowed; each code says which one survives |
 | `DUPLICATE_` | The same identifier used twice |
@@ -142,7 +142,9 @@ The other side of that rule: every value was accepted, and the size they work ou
 
 Only a size that cannot be written down is refused. A merely enormous one is yours to write.
 
-Every option that sizes the picture is dropped together, since the overflow belongs to the result rather than to any one of them, and `source` names the ones you wrote, comma-separated. The exception is a spacing (`char-space`, `word-space`, `external-glyph-space`): it widens the composition itself, which is measured before the size is judged, so there the warning is the whole report and the fix is to write a smaller value.
+Every option that sizes the picture is dropped together, since the overflow belongs to the result rather than to any one of them, and `source` names the ones you wrote, comma-separated.
+
+Some of it cannot be repaired that way, and those cases are reported rather than fixed. A spacing (`char-space`, `word-space`, `external-glyph-space`), a glyph position, or a kerning value widens the composition itself, which is measured before the size is judged, so there is no sizing option to drop. Where none of them was written at all, `source` is empty and the message says so; the fix is to write a smaller value.
 
 ## Misplaced Tokens
 
