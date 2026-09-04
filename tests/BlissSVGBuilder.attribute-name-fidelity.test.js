@@ -14,9 +14,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   translating to the kebab spelling the pipeline processes, ON THE
  *   PROGRAMMATIC surface, which is the only one that converts on the way in.
  * - An already-kebab attribute name passing through unchanged.
- * - A camelCase key written in a BRACKET, which converts nothing on the way in
- *   and is therefore an author's key: emitted verbatim, and inert on the value
- *   the same name computes.
+ * - The same camelCase key on both surfaces, which is the contrast this file
+ *   exists for: the options argument converts it and it curates, a bracket
+ *   converts nothing and it is emitted verbatim.
  *
  * Does NOT cover:
  * - The mechanism that makes the bracket rows above true, or the collisions it
@@ -63,31 +63,30 @@ describe('BlissSVGBuilder attribute name fidelity', () => {
     });
   });
 
-  describe('when a named option is written in camelCase inside a bracket', () => {
-    // The describe above pins the PROGRAMMATIC surface, where the conversion
-    // happens on the way in and is correct. A bracket converts nothing on the
-    // way in, so a camelCase key there is not a curated option at all: it
-    // reaches the markup verbatim, exactly as preserveAspectRatio does, and it
-    // computes nothing. Until the two option bags were separated it was renamed
-    // at the emit boundary instead, and where the kebab name had an internal
-    // camelCase twin (35 of the 38 multi-word options) the author's string was
-    // swallowed into the library's own processed bag and read as if it had
-    // already been validated. Measured 2026-08-30: [marginTop=3] gave
-    // height="12184.5" by string concatenation and [svgHeight=200] threw out of
-    // the svgCode getter, both in silence.
-    it('emits the name verbatim, never renamed to its kebab twin', () => {
-      const builder = new BlissSVGBuilder('[gridColor=blue]||B291');
-      expect(builder.svgCode).toContain('gridColor="blue"');
-      expect(builder.svgCode).not.toContain('grid-color="blue"');
+  describe('when the same camelCase key is written on both surfaces', () => {
+    // The contrast is the point, and it is what makes this file rather than
+    // `option-namespace-split.test.js` the home for it: one spelling, two
+    // surfaces, opposite treatment. The options ARGUMENT converts on the way in
+    // and the key curates; a bracket converts nothing, so the same spelling is
+    // an author's attribute name and reaches the markup exactly as written,
+    // like preserveAspectRatio. The sibling file owns the mechanism and the
+    // collisions this separates; these two rows own the fidelity claim.
+    //
+    // `strokeWidth` is the sharpest case and the reason the pair is written out
+    // rather than assumed: it is the one key the library both computes and
+    // publishes under another name, so a rename reaching the author's half
+    // leaves the bracket spelling half-working, setting stroke-width while
+    // computing nothing. Measured in that state: `<svg … stroke-width="1">`.
+    it('converts it when it is the options argument', () => {
+      const builder = new BlissSVGBuilder('B4', { strokeWidth: 1 });
+      expect(builder.svgCode).toMatch(/<svg[^>]*\sstroke-width="1"/);
+      expect(builder.svgCode).not.toContain('strokeWidth');
     });
 
-    it('cannot resize the picture, because it never reaches the computed bag', () => {
-      expect(new BlissSVGBuilder('[marginTop=3]||B291').svgCode)
-        .toContain('viewBox="-0.75 -0.75 9.5 21.5"');
-    });
-
-    it('renders rather than throwing out of the svgCode getter', () => {
-      expect(() => new BlissSVGBuilder('[svgHeight=200]||B291').svgCode).not.toThrow();
+    it('emits it verbatim when it is written in a bracket', () => {
+      const builder = new BlissSVGBuilder('[strokeWidth=1]||B4');
+      expect(builder.svgCode).toMatch(/<svg[^>]*\sstrokeWidth="1"/);
+      expect(builder.svgCode).not.toContain('stroke-width="1"');
     });
   });
 

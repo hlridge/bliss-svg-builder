@@ -366,12 +366,13 @@ export const GLOBAL_ONLY_OPTION_KEYS = new Set([
  * It used to hide the library's own computed values as well, which is no longer
  * a job anybody has: the options pass returns those in a separate bag, and the
  * only ones that reach the markup at all are the two the publication map
- * renames. What is left is position and kerning, which the parser PROMOTES onto
- * the options bag rather than the author writing them there. Both spellings of
- * each kerning key, because a bracket carries the kebab one and without it an
- * unrecognized `relative-kerning` fell through to the attribute pass-through and
- * landed in the shipped SVG as `<g relative-kerning="3">`, which is not an
- * attribute of anything.
+ * renames. What is left is position and kerning, which reach the emitters
+ * through the author's bag whether the author wrote them in a bracket or the
+ * parser promoted them there. Both spellings of each kerning key, because a
+ * bracket carries the kebab one and without it an unrecognized
+ * `relative-kerning` fell through to the attribute pass-through and landed in
+ * the shipped SVG as `<g relative-kerning="3">`, which is not an attribute of
+ * anything.
  */
 export const INTERNAL_OPTIONS = new Set([
   'x',
@@ -383,15 +384,24 @@ export const INTERNAL_OPTIONS = new Set([
 ]);
 
 /**
- * The only renaming left in the pipeline: the two values the library computes
- * that also reach the markup, and the attribute names they reach it under.
+ * The only renaming on the way OUT: the two values the library computes that
+ * also reach the markup, and the attribute names they reach it under.
  * Everything else in the computed bag is consumed by the emitters, and
  * everything in the author's bag is emitted exactly as the author typed it.
+ * (`#toRaw` still renames on the way IN, translating the programmatic camelCase
+ * spelling to the kebab one the options pass dispatches on; that is the other
+ * direction and a different question.)
  *
  * It replaces a blanket `isNamedOptionKey ? camelToKebab : identity`, which was
  * the mechanism that let an author's raw key be renamed on its way out. Shared
  * by the root and the element scopes, which used to carry separate copies of the
  * same table and could therefore disagree.
+ *
+ * **Apply it only while building the published walk, never as a lookup over the
+ * keys being emitted.** `strokeWidth` is a key here AND a spelling a bracket can
+ * carry, and a bracket's `strokeWidth` is an author's key, so a shared lookup
+ * renames the author's own key on its way out and leaves that one spelling
+ * half-working: setting the attribute while computing nothing.
  *
  * A Map, not an object literal, so an inherited name (constructor, toString)
  * can never answer for a real key.

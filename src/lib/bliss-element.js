@@ -138,15 +138,25 @@ export class BlissElement {
     // what that bag did, where every curated key was rebuilt ahead of every raw
     // one, so a raw `stroke` landed second and beat a curated `color` whatever
     // order the author wrote the two in.
+    //
+    // The rename happens HERE, on the published walk alone, and not as a lookup
+    // inside the loop. A lookup would reach the author's keys too, and
+    // `strokeWidth` is a map KEY as well as an internal name: a bracket can
+    // spell it, it is not curated vocabulary, so it lands in the author's bag
+    // and a shared lookup renamed it on its way out.
+    //
+    // Each entry is [name as emitted, value, whether it was RESOLVED from a
+    // curated option rather than written]. The last decides the collision rule
+    // below, which the pre-resolved name can no longer answer by itself.
     const emitted = [
-      // Own-key test, not `in`, which walks the prototype chain: the same rule
-      // the attribute lookup below follows, applied to membership as well.
-      ...[...PUBLICATION_MAP.keys()].filter((name) => Object.hasOwn(computed, name)).map((name) => [name, computed[name]]),
-      ...Object.entries(written),
+      // Own-key test, not `in`, which walks the prototype chain.
+      ...[...PUBLICATION_MAP].flatMap(([name, attribute]) =>
+        Object.hasOwn(computed, name) ? [[attribute, computed[name], true]] : []),
+      ...Object.entries(written).map(([key, value]) => [key, value, false]),
     ];
 
     // Values are already escaped by #processOptions at the input boundary
-    for (const [key, value] of emitted) {
+    for (const [key, value, isAlias] of emitted) {
       if (INTERNAL_OPTIONS.has(key) || !isSafeAttributeName(key)) continue;
 
       if (anchorAttrNames.has(key)) {
@@ -156,22 +166,15 @@ export class BlissElement {
         }
         anchorAttrs.push(`${key}="${value}"`);
       } else {
-        // A Map, not an object literal, so asking it for an inherited name
-        // (constructor, toString, valueOf) can never answer with a function and
-        // stringify it into the markup. An author's key is never a member: both
-        // names it holds are curated, so a written `color` or `stroke-width`
-        // was consumed into the computed bag and only reaches here through the
-        // published walk above.
-        const attrName = PUBLICATION_MAP.get(key) ?? key;
         // A name that declares what the document IS is refused wherever it is
         // written, not only on the root: a second namespace declaration
         // re-binds the default namespace for this group and everything under
         // it, so those paths stop being SVG and nothing draws them. The
         // builder reports it once per rebuild; here it is only kept out of the
         // markup.
-        if (DOCUMENT_DEFINING_ATTRIBUTES.has(attrName)) continue;
+        if (DOCUMENT_DEFINING_ATTRIBUTES.has(key)) continue;
         // vector-effect is non-inherited; capture it for relocation onto paths
-        if (attrName === 'vector-effect') { vectorEffect = value; continue; }
+        if (key === 'vector-effect') { vectorEffect = value; continue; }
         if (key === 'pointer-events') hasPointerEvents = true;
         // Each attribute name is emitted once (issue #28). On a collision the
         // explicitly-named attribute wins over an alias (color -> stroke,
@@ -179,9 +182,8 @@ export class BlissElement {
         // first, so the skip branch is defensive: it keeps explicit-wins an
         // invariant rather than an artifact of that ordering, independent of
         // option order.
-        const isAlias = attrName !== key;
-        if (!groupAttrs.has(attrName) || !isAlias) {
-          groupAttrs.set(attrName, value);
+        if (!groupAttrs.has(key) || !isAlias) {
+          groupAttrs.set(key, value);
         }
       }
     }

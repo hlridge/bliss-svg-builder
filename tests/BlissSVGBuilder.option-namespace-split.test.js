@@ -54,8 +54,38 @@ const warningsBesidesSpelling = (b) => b.warnings.filter((w) => w.code !== SPELL
 describe('BlissSVGBuilder option namespace split', () => {
   describe('when a curated option is written in its programmatic spelling', () => {
     it('does not poison the dot geometry it never set', () => {
-      // Measured before the split: r=2.58325 against a correct r=0.20825, 7.75x.
-      expect(dotPath(render('[strokeWidth=1]||B4'))).toBe(dotPath(render('B4')));
+      // The literal default rather than a second build of the same input: two
+      // builds move together under a change to the default itself, and nothing
+      // else in the suite pins this number. Measured before the split: r=2.58325
+      // against this r=0.20825, 7.75x the radius the option it looks like gives.
+      expect(dotPath(render('[strokeWidth=1]||B4')))
+        .toBe('M-0.20825,16a0.20825,0.20825 0 1,1 0.4165,0a0.20825,0.20825 0 1,1 -0.4165,0');
+      expect(dotPath(render('B4'))).toBe(dotPath(render('[strokeWidth=1]||B4')));
+    });
+
+    it.each([
+      ['at the root', '[strokeWidth=1]||B4', /<svg[^>]*\sstrokeWidth="1"/],
+      ['at element scope', '[strokeWidth=1]B291', /<g[^>]*\sstrokeWidth="1"/],
+    ])('emits it verbatim %s, rather than under the name it publishes', (_where, dsl, present) => {
+      // `strokeWidth` is the one spelling that is BOTH an author's key and a key
+      // of the publication map, so a rename applied to the keys being emitted
+      // rather than to the published walk caught it and left it half-working:
+      // setting stroke-width while computing nothing. Measured in that state:
+      // root `stroke-width="1"`, no camel attribute, and a paint that changed.
+      const svg = render(dsl).svgCode;
+      expect(svg).toMatch(present);
+      expect(svg).not.toContain('stroke-width="1"');
+    });
+
+    it('does not collide with the attribute it used to be renamed to', () => {
+      // Two spellings of one attribute collide and report; a camel key and a
+      // `root--` key are two different attributes and must not. This row is the
+      // absence of a warning, so it is the one that notices the rename coming
+      // back.
+      const b = render('[strokeWidth=2;root--stroke-width=3]||B291');
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="3"/);
+      expect(b.svgCode).toMatch(/<svg[^>]*\sstrokeWidth="2"/);
     });
 
     it('does not poison the viewBox by string concatenation', () => {
@@ -127,14 +157,22 @@ describe('BlissSVGBuilder option namespace split', () => {
 
   describe('when a computed value is also published as an attribute', () => {
     it.each([
-      ['at the root', '[color=red;stroke-width=2]||B291'],
-      ['at element scope', '[color=red;stroke-width=2]B291'],
-    ])('reaches the markup %s', (_where, dsl) => {
+      ['at the root', '[color=red;stroke-width=2]||B291', /<svg[^>]*\sstroke="red"[^>]*\sstroke-width="2"/],
+      ['at element scope', '[color=red;stroke-width=2]B291', /<g stroke-width="2" stroke="red">/],
+    ])('reaches the markup %s', (_where, dsl, placed) => {
       // Options PRECEDE the code, so `B291[color=red]` would be an unknown code
       // rendering nothing and the row would pass against a broken build.
-      const svg = render(dsl).svgCode;
-      expect(svg).toContain('stroke="red"');
-      expect(svg).toContain('stroke-width="2"');
+      //
+      // Matched against the ELEMENT that must carry them, not searched for
+      // anywhere in the document: both names inherit down onto the shapes, so a
+      // plain `toContain` passes with the values on the wrong element.
+      //
+      // The root half pins the paint defaults `#svgCode` writes, NOT this
+      // chunk's published walk, which at the root only registers the two names
+      // so a `root--` key can collide with them; that collision is pinned in
+      // `layer-sub-targets.test.js`. The element half is the walk: nothing else
+      // emits these two below the root.
+      expect(render(dsl).svgCode).toMatch(placed);
       expect(warningsBesidesSpelling(render(dsl))).toEqual([]);
     });
 
@@ -198,7 +236,11 @@ describe('BlissSVGBuilder option namespace split', () => {
     });
 
     it('reaches a part that draws a shape of its own', () => {
-      expect(render('[data-depth=prt]>B291').svgCode).toContain('<g data-depth="prt">');
+      // C1 and not B291: a B-code part is built from sub-parts and takes the
+      // composite branch below, so it would give this block two rows on one site
+      // and leave the single-shape site pinned by nothing. Verified by nulling
+      // that site alone and watching this row, and only this row, die.
+      expect(render('[data-depth=prt]>C1').svgCode).toContain('<g data-depth="prt">');
     });
 
     it('reaches a part built from sub-parts', () => {
@@ -236,9 +278,19 @@ describe('BlissSVGBuilder option namespace split', () => {
     });
 
     it('never puts the second bag in the JSON', () => {
-      const json = JSON.stringify(render('[gridColor=blue;data-depth=chr]B291').toJSON());
-      expect(json).not.toContain('authoredOptions');
-      expect(json).toContain('gridColor');
+      // The serialized tree is compared WHOLE, not searched for the bag's NAME:
+      // a leak under any other field name passes a name check, and a leak at the
+      // root passes a check that only reads the glyph.
+      expect(render('[gridColor=blue;data-depth=chr]B291').toJSON()).toEqual({
+        options: {},
+        groups: [{
+          glyphs: [{
+            parts: [{ codeName: 'B291' }],
+            options: { gridColor: 'blue', 'data-depth': 'chr' },
+            codeName: 'B291',
+          }],
+        }],
+      });
     });
   });
 });

@@ -537,7 +537,8 @@ class BlissSVGBuilder {
     // loop below into the author's bag, ship as `<g relativeKerning="3">` and
     // move nothing.
     for (const key of ['relativeKerning', 'absoluteKerning']) {
-      if (key in rawOptions) processed[key] = rawOptions[key];
+      // Own-key test, not `in`, which walks the prototype chain.
+      if (Object.hasOwn(rawOptions, key)) processed[key] = rawOptions[key];
     }
 
     // Everything the library does not curate keeps the author's exact spelling
@@ -1454,17 +1455,37 @@ class BlissSVGBuilder {
     // Global options split three ways: the named vocabulary was consumed above,
     // a `<layer>--<attribute>` key goes to the layer it names, and everything
     // else goes to the root.
-    // The two computed values that also reach the markup, and the names they
-    // reach it under. Everything else the library computes is consumed by the
-    // emitters, and everything the author wrote is emitted exactly as typed, so
-    // this is the only renaming left in the pipeline. It replaces both a
-    // one-entry `color -> stroke` map and a blanket "kebab-case anything that
-    // looks like one of our option names", and that blanket was the mechanism
-    // that renamed an author's own key on its way out.
-    const publishedPairs = [...PUBLICATION_MAP.keys()]
+    // The two computed values that also reach the markup, resolved to the names
+    // they reach it under. Everything else the library computes is consumed by
+    // the emitters, and everything the author wrote is emitted exactly as typed.
+    //
+    // The rename happens HERE, while the published walk is being built, and not
+    // inside the loop below. A lookup in the loop would reach the author's keys
+    // too, and `strokeWidth` is a map KEY as well as an internal name: a bracket
+    // can spell it, it is not curated vocabulary (the curated set holds kebab),
+    // so it lands in the author's bag and a shared lookup renamed it to
+    // `stroke-width` on its way out. That left one spelling half-working after
+    // the split, setting the attribute while computing nothing, which is exactly
+    // what the separation exists to end.
+    //
+    // Each entry is [the spelling a bracket carries, the attribute name, value].
+    // The first is what a warning names: kebab-casing exactly these two gives
+    // `stroke-width` and `color`, the options an author actually writes.
+    //
+    // At the ROOT this walk does not decide the markup, which surprises everyone
+    // who reads it: `#svgCode` builds the root tag from its own paint defaults,
+    // where `stroke` is the computed colour and `stroke-width` the computed
+    // width, and the value this walk writes lands on top of an identical one.
+    // What it decides is the REPORT. Registering the two names here is what lets
+    // a `root--stroke` collide with a curated `color` and say so; delete the
+    // walk and the markup is byte-identical while the collision goes silent.
+    // Element scope is the opposite: there the walk is the only thing that emits
+    // them.
+    const publishedPairs = [...PUBLICATION_MAP].flatMap(([name, attribute]) =>
       // Own-key test, not `in`, which walks the prototype chain.
-      .filter((name) => Object.hasOwn(this.#processedOptions, name))
-      .map((name) => [name, this.#processedOptions[name]]);
+      Object.hasOwn(this.#processedOptions, name)
+        ? [[camelToKebab(name), attribute, this.#processedOptions[name]]]
+        : []);
     this.globalSvgAttributes = {};
     this.#layerAttributes = {};
     // Which key wrote each root attribute, and whether it named the root
@@ -1479,11 +1500,11 @@ class BlissSVGBuilder {
     const setRootAttribute = (name, key, explicit, value) => {
       const prior = rootAttributeSource.get(name);
       // Two bare keys are one channel and keep the silence they have always
-      // had. NOT last-wins, though it reads that way: the options pass rebuilds
-      // the bag with every curated key ahead of every raw one, so the raw name
-      // lands second and wins whatever order they were written in. The report
-      // exists for the collision this feature creates, between a bare key and
-      // the `root--` spelling of the same attribute.
+      // had. NOT last-wins, though it reads that way: the walk above visits the
+      // published pair before the author's keys, so a raw `stroke` lands second
+      // and beats a curated `color` whatever order they were written in. The
+      // report exists for the collision this feature creates, between a bare key
+      // and the `root--` spelling of the same attribute.
       if (prior && (explicit || prior.explicit)) {
         const winner = explicit ? key : prior.key;
         const loser = explicit ? prior.key : key;
@@ -1543,7 +1564,11 @@ class BlissSVGBuilder {
     // options pass rebuilt it with every curated key ahead of every raw one, so
     // a raw `stroke` landed second and beat a curated `color` whatever order the
     // author wrote the two in.
-    for (const [key, value] of [...publishedPairs, ...Object.entries(blissObj.authoredOptions ?? {})]) {
+    for (const [key, attrName, value] of [
+      ...publishedPairs,
+      // An author's key IS its own attribute name. Nothing renames it.
+      ...Object.entries(blissObj.authoredOptions ?? {}).map(([k, v]) => [k, k, v]),
+    ]) {
       if (INTERNAL_OPTIONS.has(key)) continue;
       if (isLayerAttributeKey(key)) {
         // The prefixed channel is RAW: the name after `--` is emitted verbatim,
@@ -1629,13 +1654,6 @@ class BlissSVGBuilder {
         continue;
       }
       if (!isSafeAttributeName(key)) continue;
-      // A Map, not an object literal, so asking it for an inherited name
-      // (constructor, toString, valueOf) can never answer with a function and
-      // stringify it into the markup. An author's key is never a member: both
-      // names it holds are curated, so a written `color` or `stroke-width` was
-      // consumed into the computed bag and only reaches here through the walk
-      // above.
-      const attrName = PUBLICATION_MAP.get(key) ?? key;
       if (DOCUMENT_DEFINING_ATTRIBUTES.has(attrName) || LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
         this.#warnings.push({
           code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
@@ -1644,10 +1662,7 @@ class BlissSVGBuilder {
         });
         continue;
       }
-      // A published value arrived under its internal name; a warning names the
-      // spelling a bracket carries instead, which for exactly these two is what
-      // kebab-casing gives. An author's key is already the spelling they wrote.
-      setRootAttribute(attrName, PUBLICATION_MAP.has(key) ? camelToKebab(key) : key, false, value);
+      setRootAttribute(attrName, key, false, value);
     }
 
     // A raw target displaces a written curated option when both reach the same

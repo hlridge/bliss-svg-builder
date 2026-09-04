@@ -438,11 +438,12 @@ describe('BlissSVGBuilder sub-element targets', () => {
       expect(warning.source).toBe('grid-earth-color');
     });
 
-    it('says nothing for a spelling the options pass does not read', () => {
-      // `[grid;gridColor=blue]` paints nothing: the camelCase form is an
-      // author's key, not a curated one, so the grid stays grey and the key is
-      // emitted on the root verbatim. Naming it as displaced would report a
-      // collision that never happened.
+    it('says nothing for a spelling the options pass does not curate', () => {
+      // `[grid;gridColor=blue]` paints nothing: the pass reads the key, escapes
+      // it and files it with the author's own, but the camelCase form is not
+      // curated vocabulary, so the grid stays grey and the key is emitted on the
+      // root verbatim. Naming it as displaced would report a collision that
+      // never happened.
       const builder = new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291');
       expect(builder.warnings).toHaveLength(0);
       expect(builder.svgCode).toContain('gridColor="blue"');
