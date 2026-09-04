@@ -127,12 +127,15 @@ describe('BlissSVGBuilder option namespace split', () => {
     // curated geometry sets. That canonicalization was right while one bag
     // carried both spellings; with two bags it makes each report name a key that
     // computes nothing, so the author is told to remove or reduce something that
-    // was never doing anything. The live channels are unaffected: the
-    // constructor, `setTransientOptions` and a `toJSON` rebuild all pass through
-    // `#toRaw`, which kebab-cases before the options pass, so a camelCase key
-    // that still computes has already stopped being camelCase by here. A bracket
-    // and a hand-written options object are the only two channels that keep the
-    // spelling, and on those it is inert.
+    // was never doing anything. The live channels are unaffected: the options
+    // argument and `setTransientOptions` both pass through `#toRaw`, which
+    // kebab-cases before the options pass, so a camelCase key that still
+    // computes has already stopped being camelCase by here. A bracket and a
+    // hand-written options object are the only two channels that keep the
+    // spelling, and on those it is inert. Object input is not a third
+    // converting channel, it is cloned verbatim; a `toJSON()` round trip is
+    // safe because the converting channels kebab-case BEFORE serializing, so
+    // the only camelCase a serialization carries is the inert kind.
     it('is not reported as displaced when the viewBox is written by hand', () => {
       // Measured before the fix: MULTIPLE_GEOMETRY_VALUES, source "marginTop",
       // announcing that the hand-written viewBox replaced a value this key never

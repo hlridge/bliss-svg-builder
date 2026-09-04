@@ -1410,14 +1410,19 @@ class BlissSVGBuilder {
     });
     // All three sets below match the spelling AS WRITTEN, with no camelCase
     // canonicalization, because each answers "did this key produce that value"
-    // and the options pass dispatches on the kebab spelling alone. The
-    // constructor, `setTransientOptions` and a rebuild from `toJSON` all pass
-    // through `#toRaw`, which kebab-cases on the way in, so a camelCase key that
-    // still computes has stopped being camelCase before it reaches here. The two
-    // channels that keep the spelling, a bracket and a hand-written options
-    // object, leave it an author's key: it lands in the second bag, is emitted
-    // as typed and shapes nothing. Canonicalizing here names such a key as
+    // and the options pass dispatches on the kebab spelling alone. The two
+    // channels that COMPUTE from camelCase, the options argument and
+    // `setTransientOptions`, both pass through `#toRaw`, which kebab-cases on
+    // the way in, so such a key has stopped being camelCase before it reaches
+    // here. A bracket and a hand-written options object keep the spelling, and
+    // there it is an author's key: it lands in the second bag, is emitted as
+    // typed and shapes nothing. Canonicalizing here names such a key as
     // displaced, or as a value to reduce, on the strength of work it never did.
+    //
+    // Object input is NOT a third converting channel: it is cloned verbatim, so
+    // a rebuild normalizes nothing. It is safe for the opposite reason, that the
+    // converting channels kebab-case BEFORE serializing, so the only camelCase a
+    // `toJSON()` can carry is the inert kind it was handed.
     const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(key));
     // The wider set, for the overflow report below: `svg-height` and the three
     // spacings never shape the viewBox, so they are absent above, but each can
