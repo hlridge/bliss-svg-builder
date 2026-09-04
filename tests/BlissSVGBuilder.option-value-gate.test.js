@@ -681,11 +681,14 @@ describe('BlissSVGBuilder option value gate', () => {
     });
 
     it('reports a spacing that overflows, though dropping options cannot repair it', () => {
-      // The one trigger the fallback cannot answer, pinned rather than left
-      // implied. A spacing widens the COMPOSITION, so by the time the geometry
-      // is judged the content is already 1e308 units across, and removing the
-      // margin and crop options narrows nothing. The report is the whole
-      // remedy here: the author reduces the spacing.
+      // RULED, DO NOT FILE THIS AS A GAP: the one trigger the fallback cannot
+      // answer, and it stays that way deliberately. A spacing widens the
+      // COMPOSITION, so by the time the geometry is judged the content is
+      // already 1e308 units across and removing the sizing options narrows
+      // nothing. Repairing it means building the composition a second time
+      // without the spacing the author wrote, which is a render-path change
+      // with a duplicate-warning risk, spent on a value no one writes. The
+      // report names the spacing and says to reduce it, which is the remedy.
       const b = render('[char-space=1e308]||B291/B291');
       expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
       expect(b.warnings[0].source).toBe('char-space');
