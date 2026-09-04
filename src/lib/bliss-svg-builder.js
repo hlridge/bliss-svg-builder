@@ -4161,14 +4161,25 @@ class BlissSVGBuilder {
     return { patched: true };
   }
 
-  get #svgCode() {
+  /**
+   * Every number the picture is made of: the content box, the margins and crops
+   * applied to it, and the two root dimensions derived from the result.
+   *
+   * It sits outside the `#svgCode` getter so `#rebuild` can judge the same
+   * numbers the markup will carry without rendering anything. Pure arithmetic
+   * over `#processedOptions` and the composition's own bounds, so calling it a
+   * second time per render costs nothing and changes nothing.
+   *
+   * Returns exactly what its callers read. `color` and `strokeWidth` stayed
+   * behind in the getter: they are paint, not geometry, and no size depends on
+   * them.
+   */
+  #computeGeometry() {
     // Computed rendering dimensions
     const width = Math.max(this.composition.width, this.#processedOptions.minWidth ?? 0);
     const height = 20;
 
     // User-provided options with defaults
-    const color = this.#processedOptions.color ?? "#000000";
-    const strokeWidth = this.#processedOptions.strokeWidth ?? 0.5;
     const marginTop = this.#processedOptions.marginTop ?? 0.75;
     const marginBottom = this.#processedOptions.marginBottom ?? 0.75;
     const marginLeft = this.#processedOptions.marginLeft ?? 0.75;
@@ -4235,7 +4246,6 @@ class BlissSVGBuilder {
       viewBoxX -= offset;
       gridOffsetX = viewBoxX + marginLeft;
     }
-    const content = this.svgContent;
     // Clamp to >= 0: when crop insets past the available box (an empty
     // document, or a crop larger than the content), the raw difference goes
     // negative, which is invalid SVG. Flooring at 0 keeps the crop monotonic
@@ -4256,6 +4266,24 @@ class BlissSVGBuilder {
       svgWidth = svgAttributeMultiplier * viewBoxWidth;
       svgHeight = svgAttributeMultiplier * viewBoxHeight;
     }
+
+    return {
+      width, height, cropTop, cropBottom, cropLeft, cropRight, gridOffsetX,
+      viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight, svgWidth, svgHeight,
+    };
+  }
+
+  get #svgCode() {
+    const {
+      width, height, cropTop, cropBottom, cropLeft, cropRight, gridOffsetX,
+      viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight, svgWidth, svgHeight,
+    } = this.#computeGeometry();
+
+    // User-provided options with defaults
+    const color = this.#processedOptions.color ?? "#000000";
+    const strokeWidth = this.#processedOptions.strokeWidth ?? 0.5;
+
+    const content = this.svgContent;
 
     const round = (num) => parseFloat(num.toFixed(4));
 
