@@ -1408,18 +1408,24 @@ class BlissSVGBuilder {
     const writtenKeys = Object.keys({
       ...(blissObj.options ?? {}), ...(blissObj.transientOptions ?? {}),
     });
-    const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(camelToKebab(key)));
+    // All three sets below match the spelling AS WRITTEN, with no camelCase
+    // canonicalization, because each answers "did this key produce that value"
+    // and the options pass dispatches on the kebab spelling alone. The
+    // constructor, `setTransientOptions` and a rebuild from `toJSON` all pass
+    // through `#toRaw`, which kebab-cases on the way in, so a camelCase key that
+    // still computes has stopped being camelCase before it reaches here. The two
+    // channels that keep the spelling, a bracket and a hand-written options
+    // object, leave it an author's key: it lands in the second bag, is emitted
+    // as typed and shapes nothing. Canonicalizing here names such a key as
+    // displaced, or as a value to reduce, on the strength of work it never did.
+    const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(key));
     // The wider set, for the overflow report below: `svg-height` and the three
     // spacings never shape the viewBox, so they are absent above, but each can
     // put a number in the root that the format cannot carry.
-    const writtenSizeOptions = writtenKeys.filter(key => SIZE_OPTION_KEYS.has(camelToKebab(key)));
-    // Taken as written, with no camelCase canonicalization, because this set
-    // answers "did the author's key produce this attribute" and the options pass
-    // recognises the kebab spelling alone. The constructor and the transient
-    // channel canonicalize on the way in (#toRaw), so their camelCase form is
-    // already kebab here; a bracket and a hand-written options object keep
-    // whatever was typed, and `[grid;gridColor=blue]` paints nothing, so naming
-    // it as displaced would report a collision that never happened.
+    const writtenSizeOptions = writtenKeys.filter(key => SIZE_OPTION_KEYS.has(key));
+    // Same rule, asked of the attribute channel: `[grid;gridColor=blue]` paints
+    // nothing, so naming it as displaced would report a collision that never
+    // happened.
     const writtenOptions = new Set(writtenKeys);
 
     this.#processAllOptions(blissObj, true);

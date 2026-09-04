@@ -24,8 +24,16 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - An author's key is emitted VERBATIM. The blanket camelCase-to-kebab rename
  *   is gone, so `[gridColor=blue]` ships `gridColor="blue"` and not the
  *   `grid-color="blue"` it used to invent.
+ * - The two reports that name written option keys back to the author, which both
+ *   canonicalized camelCase before matching and so named keys that compute
+ *   nothing: the one about a hand-written viewBox displacing the options, and
+ *   the one about a computed size the format cannot carry. The second is checked
+ *   on both of its arms, since removing the key can leave the list non-empty or
+ *   empty it, and the message branches on that.
  * - The constructor's camelCase, which is its documented spelling and keeps
- *   working, because `#toRaw` kebab-cases before the options pass runs.
+ *   working, because `#toRaw` kebab-cases before the options pass runs. It is
+ *   also the control for the two reports above: on that channel the key really
+ *   did shape the picture, so it is still named, in its kebab spelling.
  * - Kerning, which the parser promotes onto the options bag rather than the
  *   author writing it, so it belongs with the computed values and must not fall
  *   through into the markup.
@@ -111,6 +119,56 @@ describe('BlissSVGBuilder option namespace split', () => {
       expect(() => { b = render('[svgHeight=200]||B291'); return b.svgCode; }).not.toThrow();
       expect(b.svgCode).toContain('width="57" height="129"');
       expect(warningsBesidesSpelling(b)).toEqual([]);
+    });
+
+    // Two reports name written option keys back to the author, and both filtered
+    // the written list through `camelToKebab` before matching it against the
+    // curated geometry sets. That canonicalization was right while one bag
+    // carried both spellings; with two bags it makes each report name a key that
+    // computes nothing, so the author is told to remove or reduce something that
+    // was never doing anything. The live channels are unaffected: the
+    // constructor, `setTransientOptions` and a `toJSON` rebuild all pass through
+    // `#toRaw`, which kebab-cases before the options pass, so a camelCase key
+    // that still computes has already stopped being camelCase by here. A bracket
+    // and a hand-written options object are the only two channels that keep the
+    // spelling, and on those it is inert.
+    it('is not reported as displaced when the viewBox is written by hand', () => {
+      // Measured before the fix: MULTIPLE_GEOMETRY_VALUES, source "marginTop",
+      // announcing that the hand-written viewBox replaced a value this key never
+      // produced. The kebab twin is displaced and still reports, in
+      // `layer-attributes.test.js`.
+      const b = render('[marginTop=3;viewBox="0 0 10 10"]||B291');
+      expect(warningsBesidesSpelling(b)).toEqual([]);
+      expect(b.svgCode).toContain('viewBox="0 0 10 10"');
+    });
+
+    it('is not named among the values to reduce when a curated option overflows', () => {
+      // The second call site of the same conversion, and the plan named only the
+      // first. This report exists to say WHICH written options to reduce, so a
+      // key that sizes nothing is worse than noise here. Measured before the fix:
+      // source "margin, marginTop". `margin` alone overflows; the camel key rides
+      // along.
+      const b = render('[margin=1e308;marginTop=3]||B291');
+      expect(warningsBesidesSpelling(b).map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      expect(warningsBesidesSpelling(b)[0].source).toBe('margin');
+    });
+
+    it('does not make the overflow report name an option when the content is what overflowed', () => {
+      // The second arm of the same filter, and a different observable outcome:
+      // above it is removed from a list that stays non-empty, here removing it
+      // empties the list, and the message BRANCHES on that. The overflow comes
+      // from a position at element scope, which no builder-scope set can see, so
+      // there is nothing to drop and the report has to say so. Measured before
+      // the fix: `"marginTop" works out to a picture size...`, which named a key
+      // that sizes nothing AND claimed options had been dropped. The kebab twin
+      // below is the control and still takes the named branch.
+      const camel = render('[marginTop=3]||[x=1e308]>B291');
+      const kebab = render('[margin-top=3]||[x=1e308]>B291');
+      const overflow = (b) => b.warnings.find((w) => w.code === 'OUT_OF_RANGE_COMPUTED_GEOMETRY');
+
+      expect(overflow(camel).source).toBe('');
+      expect(overflow(camel).message).toContain('The content works out to');
+      expect(overflow(kebab).source).toBe('margin-top');
     });
 
     it('leaves the grid alone where the camel spelling used to paint it', () => {
@@ -204,6 +262,21 @@ describe('BlissSVGBuilder option namespace split', () => {
     it('keeps working, because #toRaw kebabs it before processing', () => {
       expect(viewBox(render('B291', { marginTop: 3 }))).toBe('viewBox="-0.75 -3 9.5 23.75"');
       expect(render('B291', { svgHeight: 86 }).svgCode).toContain('height="86"');
+    });
+
+    it('is still reported as displaced, under the kebab spelling it arrived as', () => {
+      // The control for the two silenced reports above, and the row that fails if
+      // the fix is taken further than dropping the conversion. The same key on
+      // the same input reports here and stays silent from a bracket, because here
+      // it really did shape the viewBox: `#toRaw` turned it into `margin-top`
+      // before the options pass, so the report names what the author would have
+      // to remove, in a spelling the author did not type. That is the existing
+      // behaviour of every other camelCase key on this channel.
+      const b = render('B291', { marginTop: 3, viewBox: '0 0 10 10' });
+      const displaced = b.warnings.filter((w) => w.code === 'MULTIPLE_GEOMETRY_VALUES');
+
+      expect(displaced).toHaveLength(1);
+      expect(displaced[0].source).toBe('margin-top');
     });
   });
 
