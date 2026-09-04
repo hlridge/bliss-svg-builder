@@ -256,6 +256,27 @@ describe('BlissSVGBuilder layer attributes', () => {
 
       expect(builder.warnings.some(w => w.code === 'MULTIPLE_GEOMETRY_VALUES')).toBe(false);
     });
+
+    it.each([
+      ['svg-height', '[svg-height=200;viewBox="0 0 10 10"]||B291'],
+      ['char-space', '[char-space=9;viewBox="0 0 10 10"]||B291'],
+      ['word-space', '[word-space=9;viewBox="0 0 10 10"]||B291'],
+      ['external-glyph-space', '[external-glyph-space=9;viewBox="0 0 10 10"]||B291'],
+    ])('stays silent for %s, which sizes the picture but never shaped the viewBox', (_option, input) => {
+      // These four are the difference between the two sets the report reads
+      // from: `SIZE_OPTION_KEYS` is every option that can reach one of the six
+      // numbers the root carries, and the narrower `GEOMETRY_OPTION_KEYS` is the
+      // subset a hand-written viewBox actually displaces. `svg-height` sizes the
+      // root without shaping the viewBox; the three spacings widen the
+      // composition the viewBox is measured FROM, and it still measures them.
+      // Nothing else distinguishes the two sets, so widening this filter to the
+      // wider one told the author these had gone dead and left the whole suite
+      // green.
+      const builder = new BlissSVGBuilder(input);
+      void builder.svgCode;
+
+      expect(builder.warnings.some(w => w.code === 'MULTIPLE_GEOMETRY_VALUES')).toBe(false);
+    });
   });
 
   describe('when a valid layer key is serialized', () => {
