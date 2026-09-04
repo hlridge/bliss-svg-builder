@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
+import { PUBLICATION_MAP } from '../src/lib/bliss-constants.js';
 
 /**
  * Pins the namespace separation: the library's computed values and the author's
@@ -214,6 +215,17 @@ describe('BlissSVGBuilder option namespace split', () => {
   });
 
   describe('when a computed value is also published as an attribute', () => {
+    it('renames exactly two names and no others', () => {
+      // The membership row. Behaviour CAN see the order of these two, since they
+      // are emitted in table order and the element-scope row below matches
+      // `stroke-width` ahead of `stroke` as a sequence: swapping the table and
+      // this row together still fails there. What behaviour cannot see is a
+      // THIRD entry, which publishes a computed value under a name no row looks
+      // for and leaves the whole suite green. Measured both ways. Asserting the
+      // table whole is what makes adding one a decision rather than an accident.
+      expect([...PUBLICATION_MAP]).toEqual([['strokeWidth', 'stroke-width'], ['color', 'stroke']]);
+    });
+
     it.each([
       ['at the root', '[color=red;stroke-width=2]||B291', /<svg[^>]*\sstroke="red"[^>]*\sstroke-width="2"/],
       ['at element scope', '[color=red;stroke-width=2]B291', /<g stroke-width="2" stroke="red">/],
