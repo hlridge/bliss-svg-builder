@@ -141,8 +141,11 @@ Guessing where the dashes go would be right for the table above, where the libra
 The last four position a single element rather than the canvas, so they belong on the element that carries them, through `setOptions()` or the opts argument of `addGlyph`/`insertPart`/`replaceGlyph` and the rest of that family. They mean exactly what the DSL spelling of the same value means, and they serialize to it:
 
 ```js
-builder.glyph(0).part(1).setOptions({ x: 2, y: 10 });   // toString(): 'B291;DOT:2,10'
-builder.glyph(1).setOptions({ relativeKerning: -1 });   // toString(): 'B291/RK:-1/B291'
+const dot = new BlissSVGBuilder('B291;DOT');
+dot.glyph(0).part(1).setOptions({ x: 2, y: 10 });   // toString(): 'B291;DOT:2,10'
+
+const pair = new BlissSVGBuilder('B291/B291');
+pair.glyph(1).setOptions({ relativeKerning: -1 });  // toString(): 'B291/RK:-1/B291'
 ```
 
 ### Type Conventions
