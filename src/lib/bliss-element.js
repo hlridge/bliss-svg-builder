@@ -139,7 +139,9 @@ export class BlissElement {
     // one, so a raw `stroke` landed second and beat a curated `color` whatever
     // order the author wrote the two in.
     const emitted = [
-      ...[...PUBLICATION_MAP.keys()].filter((name) => name in computed).map((name) => [name, computed[name]]),
+      // Own-key test, not `in`, which walks the prototype chain: the same rule
+      // the attribute lookup below follows, applied to membership as well.
+      ...[...PUBLICATION_MAP.keys()].filter((name) => Object.hasOwn(computed, name)).map((name) => [name, computed[name]]),
       ...Object.entries(written),
     ];
 

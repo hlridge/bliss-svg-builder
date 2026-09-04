@@ -1462,7 +1462,8 @@ class BlissSVGBuilder {
     // looks like one of our option names", and that blanket was the mechanism
     // that renamed an author's own key on its way out.
     const publishedPairs = [...PUBLICATION_MAP.keys()]
-      .filter((name) => name in this.#processedOptions)
+      // Own-key test, not `in`, which walks the prototype chain.
+      .filter((name) => Object.hasOwn(this.#processedOptions, name))
       .map((name) => [name, this.#processedOptions[name]]);
     this.globalSvgAttributes = {};
     this.#layerAttributes = {};
