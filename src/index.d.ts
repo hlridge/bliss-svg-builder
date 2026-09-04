@@ -821,6 +821,10 @@ export interface Warning {
    * coordinate suffix (`:1`), a whole bracket (`[color=red]`), or, where the
    * input could not be parsed as a code at all, the parser's description of what
    * it read (`Invalid format: B291[x=1]`) rather than a substring of the input.
+   * It is the EMPTY string only where the report is about a computed result and
+   * no written key produced it (`OUT_OF_RANGE_COMPUTED_GEOMETRY`, when the size
+   * comes from the content rather than from an option); the message stands on
+   * its own there.
    */
   readonly source: string;
 }

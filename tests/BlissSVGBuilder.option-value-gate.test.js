@@ -695,12 +695,50 @@ describe('BlissSVGBuilder option value gate', () => {
       expect(b.svgCode).toContain('width="Infinity"');
     });
 
+    it.each([
+      ['crop=compact', 'cropCompact'],
+      ['crop=auto-vertical', 'autoVertical'],
+    ])('drops %s too, which only its own crop shows', (written, _internal) => {
+      // Two entries in the deletion list whose effect no other row can see: a
+      // refused margin already falls back to the plain picture, so a list that
+      // forgot these two would look right on every margin row. B138 has room
+      // above its ink, so a compact or auto-vertical crop MOVES the viewBox
+      // (`-0.75 3.25 8.5 17.5` against the default `-0.75 -0.75 8.5 21.5`),
+      // and the fallback is "as if no sizing option were written", which
+      // includes this one.
+      const b = render(`[${written};margin=1e308]||B138`);
+      expect(b.svgCode).toBe(render('B138').svgCode);
+      expect(b.svgCode).not.toBe(render(`[${written}]||B138`).svgCode);
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+    });
+
+    it('names nothing, and says so, when no sizing option was written', () => {
+      // A glyph POSITION written as an option gates on finite alone, so it
+      // widens the composition from element scope where the builder-scope set
+      // of written sizing options cannot see it. The report used to open with
+      // an empty pair of quotes and tell the author to reduce nothing.
+      // `[y=1e308]` deliberately does NOT fire: the vertical extent is the
+      // fixed 20-unit band, not the content's bounds.
+      const b = render('[x=1e308]>B291');
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      expect(b.warnings[0].source).toBe('');
+      expect(b.warnings[0].message).not.toContain('""');
+      expect(b.warnings[0].message).toContain('no option that sizes the picture was written');
+      expect(render('[y=1e308]>B291').warnings).toEqual([]);
+    });
+
     it('drops every option the geometry reads', () => {
       // The fallback is a fixed list and the geometry it answers for is not.
       // An option added to #computeGeometry but not to the list would go on
       // shaping the picture after the report said every sizing option had been
       // dropped, with the whole suite green. This reads the method's own source
       // so the two cannot drift.
+      //
+      // What it does NOT see: the match stops at the first `}` sitting at two
+      // spaces, which today is the method's own close, because no nested block
+      // closes at that indent. A template literal in the body containing such a
+      // line would truncate the match and hide the tail. There is none; check
+      // this comment if one is ever added.
       const builderPath = resolve(import.meta.dirname, '..', 'src', 'lib', 'bliss-svg-builder.js');
       // `\r?` on both ends: this tree checks out CRLF, and an anchor written
       // with bare \n matches nothing, which would pass the method off as

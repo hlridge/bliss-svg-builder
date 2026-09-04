@@ -1667,9 +1667,16 @@ class BlissSVGBuilder {
       // because it is baked into the composition long before the geometry can
       // be judged; the report is the whole remedy there.
       for (const key of COMPUTED_GEOMETRY_INPUTS) delete this.#processedOptions[key];
+      // Two triggers, and the second one names nothing. A glyph position or a
+      // kerning value written as an OPTION (`[x=1e308]>B291`) gates on finite
+      // alone, so it widens the composition from ELEMENT scope, where this
+      // builder-scope set cannot see it. Naming the options anyway printed an
+      // empty pair of quotes and told the author to reduce nothing.
       this.#warnings.push({
         code: WARNING_CODES.OUT_OF_RANGE_COMPUTED_GEOMETRY,
-        message: `"${writtenSizeOptions.join('", "')}" works out to a picture size the SVG format cannot carry, so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`,
+        message: writtenSizeOptions.length > 0
+          ? `"${writtenSizeOptions.join('", "')}" works out to a picture size the SVG format cannot carry, so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`
+          : `The content works out to a picture size the SVG format cannot carry, and no option that sizes the picture was written to drop. Reduce the positions or kerning that spread it until the width, height and viewBox come out finite.`,
         source: writtenSizeOptions.join(', '),
       });
     }
