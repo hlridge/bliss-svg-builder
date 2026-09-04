@@ -40,7 +40,7 @@ Dot size is controlled separately from the line `stroke-width`, with two relativ
 
 ### Relative sizing
 
-`dot-extra-width` sets how much wider a dot is than the line stroke (rendered diameter = `stroke-width + value`, range 0 to 1). It is a **bulk** knob: it sizes the full `DOT`, and the small `SDOT` follows at half the value, preserving the size relationship.
+`dot-extra-width` sets how much wider a dot is than the line stroke (rendered diameter = `stroke-width + value`, any width from 0 up). It is a **bulk** knob: it sizes the full `DOT`, and the small `SDOT` follows at half the value, preserving the size relationship.
 
 <Demo code="[grid;dot-extra-width=1]||DOT:2,10;SDOT:6,10" title="dot-extra-width=1: DOT grows, SDOT follows at half" />
 
@@ -50,7 +50,7 @@ To size the small dot on its own, use `sdot-extra-width`, which overrides the ha
 
 ### Absolute sizing
 
-`dot-width` and `sdot-width` pin a dot's **rendered diameter** directly (range 0 to 1.5), independent of `stroke-width`. This is useful when you need predictable dot metrics regardless of line weight.
+`dot-width` and `sdot-width` pin a dot's **rendered diameter** directly (any width from 0 up), independent of `stroke-width`. This is useful when you need predictable dot metrics regardless of line weight.
 
 <Demo code="[grid;dot-width=1.5]||DOT:4,10" title="dot-width=1.5: absolute diameter" />
 
