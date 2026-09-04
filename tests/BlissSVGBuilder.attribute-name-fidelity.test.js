@@ -14,12 +14,13 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   translating to the kebab spelling the pipeline processes, ON THE
  *   PROGRAMMATIC surface, which is the only one that converts on the way in.
  * - An already-kebab attribute name passing through unchanged.
- * - The ruled contract for a camelCase key written in a BRACKET, as `it.todo`
- *   tripwires: that surface does not convert on the way in, so the key is
- *   renamed at the emit boundary or swallowed into the library's own
- *   processed-option bag instead. Ruled and scheduled, not built.
+ * - A camelCase key written in a BRACKET, which converts nothing on the way in
+ *   and is therefore an author's key: emitted verbatim, and inert on the value
+ *   the same name computes.
  *
  * Does NOT cover:
+ * - The mechanism that makes the bracket rows above true, or the collisions it
+ *   ends, see `BlissSVGBuilder.option-namespace-split.test.js`.
  * - Which element the attribute lands on, see
  *   `BlissSVGBuilder.layer-attributes.test.js`.
  * - The unsafe-name gate (`onclick`), see
@@ -63,24 +64,31 @@ describe('BlissSVGBuilder attribute name fidelity', () => {
   });
 
   describe('when a named option is written in camelCase inside a bracket', () => {
-    // RULED, NOT BUILT. The describe above pins the PROGRAMMATIC surface, where
-    // the conversion happens on the way in and is correct. A bracket converts
-    // nothing on the way in, so the ruling is that a camelCase key there is not
-    // a curated option at all and must reach the markup verbatim, exactly as
-    // preserveAspectRatio does. Today it is renamed at the emit boundary
-    // instead, and where that kebab name has an internal camelCase twin (35 of
-    // the 38 multi-word options) the value is swallowed into the library's own
-    // processed-option bag and read as if it had already been validated.
-    // Measured 2026-08-30, full census on the backlog row "Option-value
-    // validation across the whole vocabulary (+ the camelCase namespace
-    // collision)": [marginTop=3] silently gives height="12184.5" by string
-    // concatenation, [svgHeight=200] throws out of the svgCode getter, and
-    // [gridMajorColor=red] paints the major lines only where the kebab spelling
-    // paints major, sky and earth. User ruling 2026-08-29: fix before the 1.1.0
-    // cut. These three rows are the tripwire that keeps it visible until then.
-    it.todo('emits [gridColor=blue] verbatim as gridColor="blue", never renamed to grid-color');
-    it.todo('keeps a bracket key out of the processed-option bag, so [marginTop=3] cannot resize the picture');
-    it.todo('renders [svgHeight=200] instead of throwing "num.toFixed is not a function"');
+    // The describe above pins the PROGRAMMATIC surface, where the conversion
+    // happens on the way in and is correct. A bracket converts nothing on the
+    // way in, so a camelCase key there is not a curated option at all: it
+    // reaches the markup verbatim, exactly as preserveAspectRatio does, and it
+    // computes nothing. Until the two option bags were separated it was renamed
+    // at the emit boundary instead, and where the kebab name had an internal
+    // camelCase twin (35 of the 38 multi-word options) the author's string was
+    // swallowed into the library's own processed bag and read as if it had
+    // already been validated. Measured 2026-08-30: [marginTop=3] gave
+    // height="12184.5" by string concatenation and [svgHeight=200] threw out of
+    // the svgCode getter, both in silence.
+    it('emits the name verbatim, never renamed to its kebab twin', () => {
+      const builder = new BlissSVGBuilder('[gridColor=blue]||B291');
+      expect(builder.svgCode).toContain('gridColor="blue"');
+      expect(builder.svgCode).not.toContain('grid-color="blue"');
+    });
+
+    it('cannot resize the picture, because it never reaches the computed bag', () => {
+      expect(new BlissSVGBuilder('[marginTop=3]||B291').svgCode)
+        .toContain('viewBox="-0.75 -0.75 9.5 21.5"');
+    });
+
+    it('renders rather than throwing out of the svgCode getter', () => {
+      expect(() => new BlissSVGBuilder('[svgHeight=200]||B291').svgCode).not.toThrow();
+    });
   });
 
   describe('when an attribute name is already kebab-case', () => {

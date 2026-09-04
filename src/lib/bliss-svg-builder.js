@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -181,11 +181,23 @@ class BlissSVGBuilder {
   #mutationWarnings = [];
   #generation = 0;
 
-  // Processes raw options (kebab-case) into internal options (camelCase).
+  // Processes raw options (kebab-case) into two bags that cannot collide.
+  //
+  // `processed` holds what the library computed, under internal camelCase names;
+  // `authored` holds every key we do not curate, spelled exactly as the author
+  // wrote it and escaped. One bag held both before, so an author writing a
+  // curated option in its internal spelling (`[strokeWidth=1]`, `[marginTop=3]`)
+  // landed on the value the library had computed under that same name: the
+  // string won, and the arithmetic downstream either concatenated it into the
+  // viewBox or threw. Two bags make that impossible by construction rather than
+  // by a skip list somebody has to maintain.
+  //
   // Bulk options expanded here (not in output): 'margin', 'crop', 'grid-color', 'grid-stroke-width'.
   // @param {boolean} addBuilderDefaults - If true, adds defaults for builder-level options (grid, etc.)
+  // @returns {{processed: Object, authored: Object}}
   #processOptions(rawOptions = {}, addBuilderDefaults = false) {
-    const options = {};
+    const processed = {};
+    const authored = {};
 
     // stroke-width: honoured exactly as written, or refused and reported. The
     // old 0.1-1.5 clamp was what made the raw value unreachable: a name the
@@ -203,7 +215,7 @@ class BlissSVGBuilder {
     if ('stroke-width' in rawOptions) {
       const refusal = judgeNumericOptionValue('stroke-width', rawOptions['stroke-width']);
       if (refusal) this.#warnings.push(refusal);
-      else options.strokeWidth = Number(rawOptions['stroke-width']);
+      else processed.strokeWidth = Number(rawOptions['stroke-width']);
     }
 
     // The dot and spacing family: honoured exactly as written, or refused and
@@ -216,45 +228,45 @@ class BlissSVGBuilder {
     if ('dot-extra-width' in rawOptions) {
       const refusal = judgeNumericOptionValue('dot-extra-width', rawOptions['dot-extra-width']);
       if (refusal) this.#warnings.push(refusal);
-      else options.dotExtraWidth = Number(rawOptions['dot-extra-width']);
+      else processed.dotExtraWidth = Number(rawOptions['dot-extra-width']);
     }
 
     // sdot-extra-width: the small-dot override of the dot-extra-width half-default
     if ('sdot-extra-width' in rawOptions) {
       const refusal = judgeNumericOptionValue('sdot-extra-width', rawOptions['sdot-extra-width']);
       if (refusal) this.#warnings.push(refusal);
-      else options.sdotExtraWidth = Number(rawOptions['sdot-extra-width']);
+      else processed.sdotExtraWidth = Number(rawOptions['sdot-extra-width']);
     }
 
     // dot-width / sdot-width: absolute rendered dot diameter
     if ('dot-width' in rawOptions) {
       const refusal = judgeNumericOptionValue('dot-width', rawOptions['dot-width']);
       if (refusal) this.#warnings.push(refusal);
-      else options.dotWidth = Number(rawOptions['dot-width']);
+      else processed.dotWidth = Number(rawOptions['dot-width']);
     }
 
     if ('sdot-width' in rawOptions) {
       const refusal = judgeNumericOptionValue('sdot-width', rawOptions['sdot-width']);
       if (refusal) this.#warnings.push(refusal);
-      else options.sdotWidth = Number(rawOptions['sdot-width']);
+      else processed.sdotWidth = Number(rawOptions['sdot-width']);
     }
 
     if ('char-space' in rawOptions) {
       const refusal = judgeNumericOptionValue('char-space', rawOptions['char-space']);
       if (refusal) this.#warnings.push(refusal);
-      else options.charSpace = Number(rawOptions['char-space']);
+      else processed.charSpace = Number(rawOptions['char-space']);
     }
 
     if ('word-space' in rawOptions) {
       const refusal = judgeNumericOptionValue('word-space', rawOptions['word-space']);
       if (refusal) this.#warnings.push(refusal);
-      else options.wordSpace = Number(rawOptions['word-space']);
+      else processed.wordSpace = Number(rawOptions['word-space']);
     }
 
     if ('external-glyph-space' in rawOptions) {
       const refusal = judgeNumericOptionValue('external-glyph-space', rawOptions['external-glyph-space']);
       if (refusal) this.#warnings.push(refusal);
-      else options.externalGlyphSpace = Number(rawOptions['external-glyph-space']);
+      else processed.externalGlyphSpace = Number(rawOptions['external-glyph-space']);
     }
 
     // The margin family. A margin is an OFFSET in the policy table, so a
@@ -266,10 +278,10 @@ class BlissSVGBuilder {
       if (refusal) this.#warnings.push(refusal);
       else {
         const m = Number(rawOptions['margin']);
-        options.marginTop = m;
-        options.marginBottom = m;
-        options.marginLeft = m;
-        options.marginRight = m;
+        processed.marginTop = m;
+        processed.marginBottom = m;
+        processed.marginLeft = m;
+        processed.marginRight = m;
       }
     }
 
@@ -282,7 +294,7 @@ class BlissSVGBuilder {
       if (!(key in rawOptions)) continue;
       const refusal = judgeNumericOptionValue(key, rawOptions[key]);
       if (refusal) this.#warnings.push(refusal);
-      else options[`margin${side[0].toUpperCase()}${side.slice(1)}`] = Number(rawOptions[key]);
+      else processed[`margin${side[0].toUpperCase()}${side.slice(1)}`] = Number(rawOptions[key]);
     }
 
     // min-width: a LENGTH, so a negative one is refused rather than floored to
@@ -292,18 +304,18 @@ class BlissSVGBuilder {
     if ('min-width' in rawOptions) {
       const refusal = judgeNumericOptionValue('min-width', rawOptions['min-width']);
       if (refusal) this.#warnings.push(refusal);
-      else options.minWidth = Number(rawOptions['min-width']);
+      else processed.minWidth = Number(rawOptions['min-width']);
     }
 
     // Boolean options: [option] = true, absence = false
     if (rawOptions.center === true) {
-      options.center = true;
+      processed.center = true;
     }
     if (rawOptions.grid === true) {
-      options.grid = true;
+      processed.grid = true;
     }
     if (rawOptions['error-placeholder'] === true) {
-      options.errorPlaceholder = true;
+      processed.errorPlaceholder = true;
     }
 
     // Grid colors - hierarchy: bulk → category → specific
@@ -347,12 +359,12 @@ class BlissSVGBuilder {
         earthColor = rawOptions['grid-earth-color'];
       }
 
-      // Assign to options object (escaped for safe SVG output)
-      options.gridSkyColor = escapeHtml(skyColor);
-      options.gridEarthColor = escapeHtml(earthColor);
-      options.gridMajorColor = escapeHtml(majorColor);
-      options.gridMediumColor = escapeHtml(mediumColor);
-      options.gridMinorColor = escapeHtml(minorColor);
+      // Assign to processed object (escaped for safe SVG output)
+      processed.gridSkyColor = escapeHtml(skyColor);
+      processed.gridEarthColor = escapeHtml(earthColor);
+      processed.gridMajorColor = escapeHtml(majorColor);
+      processed.gridMediumColor = escapeHtml(mediumColor);
+      processed.gridMinorColor = escapeHtml(minorColor);
     }
 
     // Grid stroke widths - same hierarchy pattern
@@ -420,26 +432,26 @@ class BlissSVGBuilder {
         earthWidth = specificEarthWidth;
       }
 
-      // Assign to options object
-      options.gridSkyStrokeWidth = skyWidth;
-      options.gridEarthStrokeWidth = earthWidth;
-      options.gridMajorStrokeWidth = majorWidth;
-      options.gridMediumStrokeWidth = mediumWidth;
-      options.gridMinorStrokeWidth = minorWidth;
+      // Assign to processed object
+      processed.gridSkyStrokeWidth = skyWidth;
+      processed.gridEarthStrokeWidth = earthWidth;
+      processed.gridMajorStrokeWidth = majorWidth;
+      processed.gridMediumStrokeWidth = mediumWidth;
+      processed.gridMinorStrokeWidth = minorWidth;
     }
 
     // crop: Sets ALL 4 crop values (number or 'auto')
     if ('crop' in rawOptions) {
       const c = rawOptions['crop'];
       if (c === 'auto') {
-        options.cropTop = 'auto';
-        options.cropBottom = 'auto';
-        options.cropLeft = 'auto';
-        options.cropRight = 'auto';
+        processed.cropTop = 'auto';
+        processed.cropBottom = 'auto';
+        processed.cropLeft = 'auto';
+        processed.cropRight = 'auto';
       } else if (c === 'auto-vertical') {
-        options.autoVertical = true;
+        processed.autoVertical = true;
       } else if (c === 'compact') {
-        options.cropCompact = true;
+        processed.cropCompact = true;
       } else {
         // Those three are the whole of crop's non-numeric vocabulary, so
         // anything else is judged as a number. The gate runs BEHIND the string
@@ -449,10 +461,10 @@ class BlissSVGBuilder {
         if (refusal) this.#warnings.push(refusal);
         else {
           const n = Number(c);
-          options.cropTop = n;
-          options.cropBottom = n;
-          options.cropLeft = n;
-          options.cropRight = n;
+          processed.cropTop = n;
+          processed.cropBottom = n;
+          processed.cropLeft = n;
+          processed.cropRight = n;
         }
       }
     }
@@ -479,34 +491,34 @@ class BlissSVGBuilder {
       if (!(key in rawOptions)) continue;
       const value = resolveCropValue(key, rawOptions[key]);
       if (value !== undefined) {
-        options[`crop${side[0].toUpperCase()}${side.slice(1)}`] = value;
+        processed[`crop${side[0].toUpperCase()}${side.slice(1)}`] = value;
       }
     }
 
     // Other string options
     if ('color' in rawOptions) {
-      options.color = escapeHtml(rawOptions.color);
+      processed.color = escapeHtml(rawOptions.color);
     }
     if ('background' in rawOptions) {
-      options.background = escapeHtml(rawOptions.background); // empty string => transparent background
+      processed.background = escapeHtml(rawOptions.background); // empty string => transparent background
     }
     if ('background-top' in rawOptions) {
-      options.backgroundTop = escapeHtml(rawOptions['background-top']);
+      processed.backgroundTop = escapeHtml(rawOptions['background-top']);
     }
     if ('background-mid' in rawOptions) {
-      options.backgroundMid = escapeHtml(rawOptions['background-mid']);
+      processed.backgroundMid = escapeHtml(rawOptions['background-mid']);
     }
     if ('background-bottom' in rawOptions) {
-      options.backgroundBottom = escapeHtml(rawOptions['background-bottom']);
+      processed.backgroundBottom = escapeHtml(rawOptions['background-bottom']);
     }
     if ('text' in rawOptions) {
-      options.text = escapeHtml(rawOptions.text);
+      processed.text = escapeHtml(rawOptions.text);
     }
     if ('svg-desc' in rawOptions) {
-      options.svgDesc = escapeHtml(rawOptions['svg-desc']);
+      processed.svgDesc = escapeHtml(rawOptions['svg-desc']);
     }
     if ('svg-title' in rawOptions) {
-      options.svgTitle = escapeHtml(rawOptions['svg-title']);
+      processed.svgTitle = escapeHtml(rawOptions['svg-title']);
     }
 
     // SVG element height (presentation size, not viewBox). A LENGTH: the root
@@ -515,20 +527,29 @@ class BlissSVGBuilder {
     if ('svg-height' in rawOptions) {
       const refusal = judgeNumericOptionValue('svg-height', rawOptions['svg-height']);
       if (refusal) this.#warnings.push(refusal);
-      else options.svgHeight = Number(rawOptions['svg-height']);
+      else processed.svgHeight = Number(rawOptions['svg-height']);
     }
 
-    // Preserve any options that weren't explicitly processed (like fill, opacity, stroke-dasharray, etc.)
-    // Only skip options that are in KNOWN_OPTION_KEYS (already processed above)
+    // Promoted by the parser, not written by the author: these two are
+    // library-resolved numbers and belong with the computed values. The curated
+    // set does not list them, because it lists what this method dispatches on
+    // and kerning is resolved earlier, so without this they fall through the
+    // loop below into the author's bag, ship as `<g relativeKerning="3">` and
+    // move nothing.
+    for (const key of ['relativeKerning', 'absoluteKerning']) {
+      if (key in rawOptions) processed[key] = rawOptions[key];
+    }
+
+    // Everything the library does not curate keeps the author's exact spelling
+    // (fill, opacity, stroke-dasharray, a data attribute, a camelCase SVG name).
     // String values are escaped here at the input boundary so downstream code can use them safely.
     // Numeric values pass through as-is — they're used for calculations, not SVG markup.
     for (const [key, value] of Object.entries(rawOptions)) {
-      if (!KNOWN_OPTION_KEYS.has(key)) {
-        options[key] = typeof value === 'string' ? escapeHtml(value) : value;
-      }
+      if (KNOWN_OPTION_KEYS.has(key)) continue;
+      authored[key] = typeof value === 'string' ? escapeHtml(value) : value;
     }
 
-    return options;
+    return { processed, authored };
   }
 
   // Recursively process options at all levels (groups, glyphs, parts)
@@ -604,7 +625,12 @@ class BlissSVGBuilder {
           });
         }
       }
-      obj.options = this.#processOptions(obj.options, isTopLevel);
+      const { processed, authored } = this.#processOptions(obj.options, isTopLevel);
+      obj.options = processed;
+      // Assigned unconditionally on every node that carries options, so the
+      // field is present or the node had no options at all. Every reader still
+      // guards with `?? {}`, because the second case is ordinary.
+      obj.authoredOptions = authored;
     }
     if (obj.groups) {
       for (const group of obj.groups) {
@@ -1404,7 +1430,18 @@ class BlissSVGBuilder {
       externalGlyphSpace: externalGlyphSpace ?? 0.8,
       warnings: this.#warnings,
       errorPlaceholder: errorPlaceholder === true,
-      errorPlaceholderParts: ERROR_PLACEHOLDER_PARTS,
+      // Parsed once at module load and injected into the tree at RENDER time,
+      // which is after the options pass has run over everything else, so it
+      // needs its own. REFSQUARE carries a definition default (the dashes that
+      // say "this is a placeholder"), and an option that never met the pass sits
+      // in the computed bag under the author's spelling, where no emitter reads
+      // it: the placeholder would draw as a solid square. Processed on a clone,
+      // because the constant is shared by every builder and every rebuild.
+      errorPlaceholderParts: (() => {
+        const parts = structuredClone(ERROR_PLACEHOLDER_PARTS);
+        for (const part of parts) this.#processAllOptions(part, false);
+        return parts;
+      })(),
       keys: new Set(),
     };
     if (blissObj._parseWarnings) {
@@ -1417,7 +1454,16 @@ class BlissSVGBuilder {
     // Global options split three ways: the named vocabulary was consumed above,
     // a `<layer>--<attribute>` key goes to the layer it names, and everything
     // else goes to the root.
-    const attrMap = { 'color': 'stroke' };
+    // The two computed values that also reach the markup, and the names they
+    // reach it under. Everything else the library computes is consumed by the
+    // emitters, and everything the author wrote is emitted exactly as typed, so
+    // this is the only renaming left in the pipeline. It replaces both a
+    // one-entry `color -> stroke` map and a blanket "kebab-case anything that
+    // looks like one of our option names", and that blanket was the mechanism
+    // that renamed an author's own key on its way out.
+    const publishedPairs = [...PUBLICATION_MAP.keys()]
+      .filter((name) => name in this.#processedOptions)
+      .map((name) => [name, this.#processedOptions[name]]);
     this.globalSvgAttributes = {};
     this.#layerAttributes = {};
     // Which key wrote each root attribute, and whether it named the root
@@ -1490,7 +1536,13 @@ class BlissSVGBuilder {
       return true;
     };
 
-    for (const [key, value] of Object.entries(blissObj.options ?? {})) {
+    // Published pair first, then the author's keys. Two bags have no order
+    // between them, so the order is stated here rather than inherited from how
+    // one bag happened to be built. It reproduces exactly what that bag did: the
+    // options pass rebuilt it with every curated key ahead of every raw one, so
+    // a raw `stroke` landed second and beat a curated `color` whatever order the
+    // author wrote the two in.
+    for (const [key, value] of [...publishedPairs, ...Object.entries(blissObj.authoredOptions ?? {})]) {
       if (INTERNAL_OPTIONS.has(key)) continue;
       if (isLayerAttributeKey(key)) {
         // The prefixed channel is RAW: the name after `--` is emitted verbatim,
@@ -1576,12 +1628,13 @@ class BlissSVGBuilder {
         continue;
       }
       if (!isSafeAttributeName(key)) continue;
-      // Own-key test, not a plain lookup: attrMap is an object literal, so
-      // asking it for an inherited name (constructor, toString, valueOf)
-      // answers with the function and stringifies it into the markup.
-      const attrName = Object.hasOwn(attrMap, key)
-        ? attrMap[key]
-        : (isNamedOptionKey(key) ? camelToKebab(key) : key);
+      // A Map, not an object literal, so asking it for an inherited name
+      // (constructor, toString, valueOf) can never answer with a function and
+      // stringify it into the markup. An author's key is never a member: both
+      // names it holds are curated, so a written `color` or `stroke-width` was
+      // consumed into the computed bag and only reaches here through the walk
+      // above.
+      const attrName = PUBLICATION_MAP.get(key) ?? key;
       if (DOCUMENT_DEFINING_ATTRIBUTES.has(attrName) || LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
         this.#warnings.push({
           code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
@@ -1590,9 +1643,10 @@ class BlissSVGBuilder {
         });
         continue;
       }
-      // The canonical kebab spelling a bracket carries, so a warning names what
-      // the author could have written and not the pipeline's internal name.
-      setRootAttribute(attrName, isNamedOptionKey(key) ? camelToKebab(key) : key, false, value);
+      // A published value arrived under its internal name; a warning names the
+      // spelling a bracket carries instead, which for exactly these two is what
+      // kebab-casing gives. An author's key is already the spelling they wrote.
+      setRootAttribute(attrName, PUBLICATION_MAP.has(key) ? camelToKebab(key) : key, false, value);
     }
 
     // A raw target displaces a written curated option when both reach the same

@@ -439,12 +439,13 @@ describe('BlissSVGBuilder sub-element targets', () => {
     });
 
     it('says nothing for a spelling the options pass does not read', () => {
-      // `[grid;gridColor=blue]` paints nothing (the grid stays grey and a dead
-      // grid-color lands on the root), so naming it as displaced would report a
-      // collision that never happened. Whether that spelling should curate at
-      // all belongs to the option-value work, and this row moves with it.
-      expect(new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291').warnings)
-        .toHaveLength(0);
+      // `[grid;gridColor=blue]` paints nothing: the camelCase form is an
+      // author's key, not a curated one, so the grid stays grey and the key is
+      // emitted on the root verbatim. Naming it as displaced would report a
+      // collision that never happened.
+      const builder = new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291');
+      expect(builder.warnings).toHaveLength(0);
+      expect(builder.svgCode).toContain('gridColor="blue"');
     });
   });
 

@@ -360,78 +360,45 @@ export const GLOBAL_ONLY_OPTION_KEYS = new Set([
 ]);
 
 /**
- * Options that should NOT be rendered as SVG attributes.
+ * Keys the emitters must never write as SVG attributes even though they reach
+ * them in the author's bag.
  *
- * Builder-level options: handled by SVG construction logic (margins, grid, cropping, etc.)
- * Element-level positioning: handled by element positioning logic (x, y, kerning)
- * Internal calculation options: used for calculations but not rendered (dot family: dotExtraWidth, sdotExtraWidth, dotWidth, sdotWidth)
- *
- * Note: strokeWidth is NOT here - it's a multi-level option like 'color'
- * that can appear at both global and element levels as SVG attributes.
+ * It used to hide the library's own computed values as well, which is no longer
+ * a job anybody has: the options pass returns those in a separate bag, and the
+ * only ones that reach the markup at all are the two the publication map
+ * renames. What is left is position and kerning, which the parser PROMOTES onto
+ * the options bag rather than the author writing them there. Both spellings of
+ * each kerning key, because a bracket carries the kebab one and without it an
+ * unrecognized `relative-kerning` fell through to the attribute pass-through and
+ * landed in the shipped SVG as `<g relative-kerning="3">`, which is not an
+ * attribute of anything.
  */
 export const INTERNAL_OPTIONS = new Set([
-  // Grid options (builder-level only)
-  'grid',
-  'gridSkyColor',
-  'gridEarthColor',
-  'gridMajorColor',
-  'gridMediumColor',
-  'gridMinorColor',
-  'gridSkyStrokeWidth',
-  'gridEarthStrokeWidth',
-  'gridMajorStrokeWidth',
-  'gridMediumStrokeWidth',
-  'gridMinorStrokeWidth',
-
-  // Cropping and margins (builder-level only)
-  'cropTop',
-  'cropBottom',
-  'cropLeft',
-  'cropRight',
-  'marginTop',
-  'marginBottom',
-  'marginLeft',
-  'marginRight',
-
-  // Internal calculation options
-  'dotExtraWidth',
-  'sdotExtraWidth',
-  'dotWidth',
-  'sdotWidth',
-
-  // Builder-level settings
-  'background',
-  'backgroundTop',
-  'backgroundMid',
-  'backgroundBottom',
-  'charSpace',
-  'wordSpace',
-
-  'externalGlyphSpace',
-  'minWidth',
-  'center',
-  'autoVertical',
-  'cropCompact',
-  'text',
-  'svgDesc',
-  'svgTitle',
-  'svgHeight',
-  'errorPlaceholder',
-
-  // Element identity (extracted to node.key before option processing)
-  'key',
-
-  // Element positioning (handled by positioning logic, not SVG attributes).
-  // Both spellings of the two kerning keys: a user writes the kebab form in a
-  // bracket, and without it here an unrecognized `relative-kerning` fell
-  // through to the attribute pass-through and landed in the shipped SVG as
-  // `<g relative-kerning="3">`, which is not an attribute of anything.
   'x',
   'y',
   'relativeKerning',
   'absoluteKerning',
   'relative-kerning',
   'absolute-kerning'
+]);
+
+/**
+ * The only renaming left in the pipeline: the two values the library computes
+ * that also reach the markup, and the attribute names they reach it under.
+ * Everything else in the computed bag is consumed by the emitters, and
+ * everything in the author's bag is emitted exactly as the author typed it.
+ *
+ * It replaces a blanket `isNamedOptionKey ? camelToKebab : identity`, which was
+ * the mechanism that let an author's raw key be renamed on its way out. Shared
+ * by the root and the element scopes, which used to carry separate copies of the
+ * same table and could therefore disagree.
+ *
+ * A Map, not an object literal, so an inherited name (constructor, toString)
+ * can never answer for a real key.
+ */
+export const PUBLICATION_MAP = new Map([
+  ['strokeWidth', 'stroke-width'],
+  ['color', 'stroke'],
 ]);
 
 /**

@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, DOCUMENT_DEFINING_ATTRIBUTES, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, DOCUMENT_DEFINING_ATTRIBUTES, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -72,11 +72,13 @@ export class BlissElement {
    * Ensures consistent wrapping behavior across all element levels.
    *
    * @param {string} content - The content to wrap (raw path data or HTML string)
-   * @param {Object} options - The options containing anchor and group attributes
+   * @param {Object} processed - The library's computed values, of which only the
+   *   two in PUBLICATION_MAP reach the markup
+   * @param {Object} authored - The author's own keys, emitted as they were typed
    * @returns {string} The wrapped content
    */
-  static #wrapWithAnchorAndGroup(content, options) {
-    const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(options);
+  static #wrapWithAnchorAndGroup(content, processed, authored) {
+    const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(processed, authored);
 
     // Content that starts with '<' is already wrapped in proper tags
     // Raw path data or fragments need wrapping
@@ -105,10 +107,9 @@ export class BlissElement {
     return content;
   }
 
-  static #separateAnchorAndGroupOptions(options) {
-    if (!options || typeof options !== 'object') {
-      return { anchorAttrs: '', groupAttrs: '', hasHref: false };
-    }
+  static #separateAnchorAndGroupOptions(processed, authored) {
+    const computed = processed && typeof processed === 'object' ? processed : {};
+    const written = authored && typeof authored === 'object' ? authored : {};
 
     const anchorAttrNames = new Set([
       'href',
@@ -119,14 +120,6 @@ export class BlissElement {
       'type',
       'referrerpolicy'
     ]);
-
-    // Use shared INTERNAL_OPTIONS constant
-    // Multi-level options (strokeWidth, color, fill, opacity, etc.) are NOT in this set - they should render as attributes.
-
-    const attrMap = {
-      'color': 'stroke',
-      'strokeWidth': 'stroke-width'
-    };
 
     const anchorAttrs = [];
     const groupAttrs = new Map(); // attrName -> value; deduped, explicit name beats alias
@@ -139,8 +132,19 @@ export class BlissElement {
       return /^(https?:|mailto:|tel:|\/|#)/i.test(cleaned);
     };
 
+    // The two computed values the library publishes first, then everything the
+    // author wrote. Two bags have no order between them, so the order is stated
+    // rather than inherited from how one bag happened to be built: it reproduces
+    // what that bag did, where every curated key was rebuilt ahead of every raw
+    // one, so a raw `stroke` landed second and beat a curated `color` whatever
+    // order the author wrote the two in.
+    const emitted = [
+      ...[...PUBLICATION_MAP.keys()].filter((name) => name in computed).map((name) => [name, computed[name]]),
+      ...Object.entries(written),
+    ];
+
     // Values are already escaped by #processOptions at the input boundary
-    for (const [key, value] of Object.entries(options)) {
+    for (const [key, value] of emitted) {
       if (INTERNAL_OPTIONS.has(key) || !isSafeAttributeName(key)) continue;
 
       if (anchorAttrNames.has(key)) {
@@ -150,10 +154,13 @@ export class BlissElement {
         }
         anchorAttrs.push(`${key}="${value}"`);
       } else {
-        // Own-key test, not a plain lookup: attrMap is an object literal, so
-        // asking it for an inherited name (constructor, toString, valueOf)
-        // answers with the function and stringifies it into the markup.
-        const attrName = Object.hasOwn(attrMap, key) ? attrMap[key] : key;
+        // A Map, not an object literal, so asking it for an inherited name
+        // (constructor, toString, valueOf) can never answer with a function and
+        // stringify it into the markup. An author's key is never a member: both
+        // names it holds are curated, so a written `color` or `stroke-width`
+        // was consumed into the computed bag and only reaches here through the
+        // published walk above.
+        const attrName = PUBLICATION_MAP.get(key) ?? key;
         // A name that declares what the document IS is refused wherever it is
         // written, not only on the root: a second namespace declaration
         // re-binds the default namespace for this group and everything under
@@ -166,10 +173,10 @@ export class BlissElement {
         if (key === 'pointer-events') hasPointerEvents = true;
         // Each attribute name is emitted once (issue #28). On a collision the
         // explicitly-named attribute wins over an alias (color -> stroke,
-        // strokeWidth -> stroke-width). Today #processOptions already orders the
-        // color alias ahead of a passthrough stroke, so the skip branch is
-        // defensive: it keeps explicit-wins an invariant rather than an artifact
-        // of that ordering, independent of option order.
+        // strokeWidth -> stroke-width). The walk above already puts the aliases
+        // first, so the skip branch is defensive: it keeps explicit-wins an
+        // invariant rather than an artifact of that ordering, independent of
+        // option order.
         const isAlias = attrName !== key;
         if (!groupAttrs.has(attrName) || !isAlias) {
           groupAttrs.set(attrName, value);
@@ -471,18 +478,18 @@ export class BlissElement {
           : childContents.join('');
 
         // At level 0 (sentence/global), only pass anchor attributes to #wrapWithAnchorAndGroup
-        // SVG-level attributes (stroke-width, color, etc.) are handled by the SVG builder
+        // SVG-level attributes (stroke-width, color, etc.) are handled by the SVG builder,
+        // so no computed value is offered here at all: the whole anchor family
+        // is uncurated, and therefore lives in the author's bag.
         const anchorAttrNames = new Set(['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy']);
         const filteredOptions = {};
-        if (this.#blissObj.options) {
-          for (const [key, value] of Object.entries(this.#blissObj.options)) {
-            if (anchorAttrNames.has(key)) {
-              filteredOptions[key] = value;
-            }
+        for (const [key, value] of Object.entries(this.#blissObj.authoredOptions ?? {})) {
+          if (anchorAttrNames.has(key)) {
+            filteredOptions[key] = value;
           }
         }
 
-        return BlissElement.#wrapWithAnchorAndGroup(content, filteredOptions);
+        return BlissElement.#wrapWithAnchorAndGroup(content, null, filteredOptions);
       };
     } else if (this.#level === 1) {
       // Group level
@@ -573,7 +580,7 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
-        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions);
       };
 
       // A fail-flagged group (group.errorCode) can no longer reach here: the
@@ -765,7 +772,7 @@ export class BlissElement {
               ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
               : childContents.join('');
 
-            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions);
           };
         }
       } else {
@@ -1373,7 +1380,7 @@ export class BlissElement {
         pathOptions
       );
 
-      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options);
+      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.authoredOptions);
     };
   }
 
@@ -1458,7 +1465,7 @@ export class BlissElement {
         ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
         : childContents.join('');
 
-      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options);
+      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions);
     };
   }
 }

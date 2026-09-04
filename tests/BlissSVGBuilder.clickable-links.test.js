@@ -450,8 +450,11 @@ describe('BlissSVGBuilder clickable links', () => {
     });
 
     it('passes only anchor-related options through the root wrapper from direct BlissElement construction', () => {
+      // The whole anchor family and `fill` are uncurated, so the builder's
+      // options pass puts every one of them in the author's bag. A hand-built
+      // node carries them where a built one would.
       const element = new BlissElement({
-        options: {
+        authoredOptions: {
           href: '/root',
           target: '_blank',
           rel: 'noopener',

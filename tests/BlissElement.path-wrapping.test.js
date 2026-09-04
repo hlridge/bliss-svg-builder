@@ -93,6 +93,11 @@ describe('BlissElement path wrapping', () => {
     }
   });
 
+  // A node reaching BlissElement has been through the builder's options pass,
+  // which returns two bags: the library's computed values under `options` and
+  // everything the author wrote under `authoredOptions`. The group wrapper below
+  // is forced by an authored `fill`, so these hand-built nodes carry it where a
+  // built one would.
   describe('when an element\'s children mix raw and tagged content', () => {
     test('wraps each raw child group of the root in a <path> element', () => {
       const element = new BlissElement({
@@ -109,7 +114,7 @@ describe('BlissElement path wrapping', () => {
     test('wraps each raw child glyph of a group in a <path> element', () => {
       const element = new BlissElement({
         groups: [{
-          options: { fill: 'red' },
+          authoredOptions: { fill: 'red' },
           glyphs: [rawGlyph(), taggedGlyph()]
         }]
       });
@@ -122,7 +127,7 @@ describe('BlissElement path wrapping', () => {
       const element = new BlissElement({
         groups: [{
           glyphs: [{
-            options: { fill: 'blue' },
+            authoredOptions: { fill: 'blue' },
             parts: [
               { codeName: C15_RAW },
               { codeName: C15_TAGGED, x: 3 }
@@ -141,7 +146,7 @@ describe('BlissElement path wrapping', () => {
           { codeName: C14_TAGGED },
           { codeName: C14_RAW, x: 3 }
         ],
-        options: { fill: 'red' }
+        authoredOptions: { fill: 'red' }
       }]));
 
       expect(element.getSvgContent())

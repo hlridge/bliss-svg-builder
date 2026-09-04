@@ -467,6 +467,17 @@ describe('BlissSVGBuilder defaultOptions', () => {
       expect(svg).toContain('stroke-dasharray="2 2"');
       expect(svg).not.toContain('stroke-dasharray="0 0.777"');
     });
+
+    it('keeps the dashes on the error placeholder, which is built from REFSQUARE', () => {
+      // The placeholder fragment is parsed once at module load and injected at
+      // RENDER time, so it is the one node in the tree that does not reach the
+      // options pass on the way in and needs its own. Without it the dashes,
+      // which are what say "this is a placeholder", go missing and the square
+      // draws solid. Pinned here rather than left to the image corpus, which is
+      // where it was caught and is a slow way to learn it.
+      const builder = new BlissSVGBuilder('[error-placeholder]||H;NB');
+      expect(builder.svgCode).toContain('stroke-dasharray="0 0.999"');
+    });
   });
 
   describe('when a shape-type definition carries defaultOptions', () => {
