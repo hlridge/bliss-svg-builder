@@ -315,6 +315,31 @@ describe('BlissSVGBuilder option value gate', () => {
       expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
     });
 
+    // A row per SIDE, matching the four crop rows above. The margin loop hands
+    // the gate a key built from the side it is on, and until these existed no
+    // row anywhere wrote a bad value for `margin-bottom` or `margin-right`:
+    // only accepted-value rows, which cannot see a misrouted key. A mutant
+    // that judged those two sides under a different name passed all 4691.
+    it.each([
+      ['margin-top'], ['margin-bottom'], ['margin-left'], ['margin-right'],
+    ])('refuses %s=abc and names the side that was written', (key) => {
+      const dsl = `[${key}=abc]||${CARRIER[key]}`;
+      const builder = render(dsl);
+      expect(builder.svgCode).toBe(plain(key));
+      expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(builder.warnings[0].source).toBe(`${key}=abc`);
+    });
+
+    it.each([
+      ['margin-top'], ['margin-bottom'], ['margin-left'], ['margin-right'],
+    ])('refuses the bare form of %s and names it alone', (key) => {
+      const dsl = `[${key}]||${CARRIER[key]}`;
+      const builder = render(dsl);
+      expect(builder.svgCode).toBe(plain(key));
+      expect(codes(dsl)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(builder.warnings[0].source).toBe(key);
+    });
+
     it('refuses a crop value that is a word the option does not know', () => {
       // `crop` has three legal string values and used to drop anything else
       // silently, because the numeric tail was guarded by `!isNaN`.
