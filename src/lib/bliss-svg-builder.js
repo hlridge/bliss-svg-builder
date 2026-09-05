@@ -3740,8 +3740,20 @@ class BlissSVGBuilder {
       if (!isSafeAttributeName(normalized)) {
         throw new Error(`${callName}("${code}"): defaultOptions key "${key}" is not a valid option name.`);
       }
-      if (GLOBAL_ONLY_OPTION_KEYS.has(normalized) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(normalized))) {
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include the global-only option "${key}"; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
+      // The two internal names have no curated kebab twin, so neither spelling
+      // test below can see that they mean `crop`, which IS global-only:
+      // `camelToKebab` gives `auto-vertical`, which is not an option at all.
+      // Resolved through the same lookup the options pass uses, or the guard
+      // refuses `crop` while accepting two spellings of it — and an accepted one
+      // is stored, is inert here exactly as `crop` would be, and then reports
+      // MISPLACED_OPTION_SPELLING at render naming a remedy this guard refuses.
+      const internalOnly = INTERNAL_ONLY_SPELLINGS.get(normalized);
+      const meant = internalOnly ? internalOnly.split('=')[0] : normalized;
+      if (GLOBAL_ONLY_OPTION_KEYS.has(meant) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(meant))) {
+        const named = internalOnly
+          ? `"${key}", the programmatic spelling of the global-only option "${internalOnly}"`
+          : `the global-only option "${key}"`;
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include ${named}; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
       // Same reasoning one step along: a layer key targets a layer of the whole
       // SVG, so it is inert wherever a definition's defaults attach.

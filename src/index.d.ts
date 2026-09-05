@@ -596,7 +596,8 @@ export interface GlyphDefinition {
    * target-prefixed key such as `content--fill` or `grid-line--sky--stroke` —
    * those configure the whole SVG or name a part of it, and would be inert on a
    * definition; `define()` reports a violation in its `errors` result,
-   * `patchDefinition()` throws.
+   * `patchDefinition()` throws. `autoVertical` and `cropCompact` are refused on
+   * the same ground, being the programmatic spellings of `crop`.
    *
    * This is a programmatic surface, so a curated option may be written in
    * camelCase (`{ strokeWidth: 2 }`) and is stored under its `stroke-width`

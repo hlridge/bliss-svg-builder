@@ -340,6 +340,23 @@ describe('BlissParser global option scope', () => {
       expect(BlissSVGBuilder.isDefined('GOPT_DEFCAMEL')).toBe(false);
     });
 
+    it.each([
+      ['autoVertical', 'crop=auto-vertical', 'GOPT_DEFAV'],
+      ['cropCompact', 'crop=compact', 'GOPT_DEFCC'],
+    ])('rejects %s, an internal name for the global-only crop', (key, meant, code) => {
+      // The two internal names with no curated kebab twin of their own:
+      // `camelToKebab` gives `auto-vertical`, which is not an option at all, so
+      // neither spelling test above can see that the key means `crop`. Accepted,
+      // it is stored, is inert here exactly as `crop` would be, and then reports
+      // MISPLACED_OPTION_SPELLING at render naming `crop=auto-vertical` as the
+      // remedy -- which this guard refuses. One dead end reported as two.
+      const result = BlissSVGBuilder.define({ [code]: { codeString: 'B291', defaultOptions: { [key]: true } } });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(key);
+      expect(result.errors[0]).toContain(meant);
+      expect(BlissSVGBuilder.isDefined(code)).toBe(false);
+    });
+
     it('rejects the shape and external-glyph define paths too', () => {
       // pins the guard call on the remaining two define paths (one shared
       // helper, four call sites; glyph and bare are pinned above)
