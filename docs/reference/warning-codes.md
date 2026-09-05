@@ -526,6 +526,23 @@ builder.part(1).setTransientOptions({ x: 5 });
 
 A transient option written on a space is a different case and reports `MISPLACED_SPACE_DECORATION`, exactly as a normal option on a space already does.
 
+### `MISPLACED_OPTION_SPELLING`
+
+A named option written in its camelCase spelling somewhere that reads the kebab-case one. The JavaScript entry points take camelCase (`{ marginTop: 3 }`); a DSL bracket and a hand-written object-input `options` bag take `margin-top`. Written the other way round the key is not a named option at all: it lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), so it is emitted exactly as typed and sets nothing.
+
+```js
+new BlissSVGBuilder('[marginTop=3]||B291');
+// warns; the margin is not applied and the root carries marginTop="3"
+new BlissSVGBuilder('[margin-top=3]||B291');   // the bracket spelling
+new BlissSVGBuilder('B291', { marginTop: 3 }); // the JavaScript spelling
+```
+
+Two internal names are reported the same way and name a whole option instead of a key, because they have no bracket spelling of their own: `[autoVertical]` points at `crop=auto-vertical`, and `[cropCompact]` at `crop=compact`. Both still work in the JavaScript entry points.
+
+The key is kept rather than dropped, so it round-trips through `toString()` and reports again on a reparse. It is reported once per place it was written, at every level, since each is a separate key that does nothing.
+
+This is about the library's own [named options](/reference/options-quick-reference) only. A pass-through attribute is never renamed in either direction, so write it the way SVG spells it: `preserveAspectRatio` is genuinely camelCase and `stroke-dasharray` genuinely hyphenated.
+
 ## Illegal Operands
 
 ### `WORD_AS_PART`
