@@ -444,8 +444,13 @@ describe('BlissSVGBuilder sub-element targets', () => {
       // curated vocabulary, so the grid stays grey and the key is emitted on the
       // root verbatim. Naming it as displaced would report a collision that
       // never happened.
+      //
+      // The spelling itself IS reported, by `MISPLACED_OPTION_SPELLING`, which
+      // is a statement about the key rather than about two values meeting on one
+      // attribute. Filtered out rather than counted, so this row keeps meaning
+      // "no collision" and would fail if the displacement report came back.
       const builder = new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291');
-      expect(builder.warnings).toHaveLength(0);
+      expect(builder.warnings.filter(w => w.code !== 'MISPLACED_OPTION_SPELLING')).toHaveLength(0);
       expect(builder.svgCode).toContain('gridColor="blue"');
     });
   });

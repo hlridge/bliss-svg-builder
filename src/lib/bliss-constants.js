@@ -284,6 +284,42 @@ export const isNamedOptionKey = (key) => {
 };
 
 /**
+ * True for a curated option written in the spelling only the JavaScript entry
+ * points read: the kebab form is a curated option, and this key is not that
+ * form. Such a key reaches an options bag as an ordinary attribute name, so it
+ * is emitted as written and sets nothing.
+ *
+ * Deliberately NOT `isNamedOptionKey`, which also answers for the two kerning
+ * names. The parser writes `relativeKerning` into the options bag itself,
+ * promoted there from `[relative-kerning=N]` or an `RK:`/`AK:` marker, so at the
+ * point this is asked a promoted key and a written one are the same key and
+ * nothing here could tell them apart. The bracket spelling of kerning is judged
+ * at the parser instead, where the written form is still visible.
+ */
+export const isProgrammaticSpelling = (key) =>
+  !KNOWN_OPTION_KEYS.has(key) && KNOWN_OPTION_KEYS.has(camelToKebab(key));
+
+/**
+ * The two internal option names with no curated kebab spelling of their own, and
+ * the whole option that reaches the same behaviour. Both worked as bracket
+ * options until the options bags were separated, by the same accident as every
+ * other internal name: the key fell through into the bag under exactly the name
+ * the consumer reads.
+ *
+ * `camelToKebab` gives `auto-vertical` and `crop-compact`, neither of which is
+ * an option, so `isProgrammaticSpelling` above cannot see these two and its
+ * message would name a key that does not exist. A lookup, because there is no
+ * rule that derives `crop=compact` from `cropCompact`.
+ *
+ * Not a general "did you mean" mechanism, which is ruled out: these are names
+ * the library itself uses, so nothing is being guessed about what was meant.
+ */
+export const INTERNAL_ONLY_SPELLINGS = new Map([
+  ['autoVertical', 'crop=auto-vertical'],
+  ['cropCompact', 'crop=compact'],
+]);
+
+/**
  * Serializes one option VALUE for DSL emission (`[key=value]` brackets).
  * A value carrying characters the DSL grammar would otherwise claim (`;`
  * splits options and parts, `]` ends the bracket, `[` opens one, `|` splits
@@ -532,6 +568,14 @@ export const WARNING_CODES = Object.freeze({
   // (a compound indicator's decomposed anatomy must round-trip), and neither
   // does an unclassifiable part (unknown code, error node).
   MISPLACED_INDICATOR_PART: 'MISPLACED_INDICATOR_PART',
+  // a curated option written in the spelling only the JavaScript entry points
+  // read (`[marginTop=3]`, or a hand-authored `{ marginTop: 3 }` options bag).
+  // The right key in the wrong channel: those entry points translate camelCase
+  // to the curated kebab spelling on the way in, and an option bracket does not,
+  // so the key lands in the author's bag, is emitted as written and sets
+  // nothing. Emitted rather than dropped, because it is a usable attribute name
+  // and the pass-through rule is that such a name reaches the markup as typed.
+  MISPLACED_OPTION_SPELLING: 'MISPLACED_OPTION_SPELLING',
   // a space code (TSP/QSP) in a `;`-part slot: a space is a word-level
   // separator, never a character part, so the space part is dropped from
   // render and serialization while the character still renders. A single-part

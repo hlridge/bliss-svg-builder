@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isProgrammaticSpelling, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -545,8 +545,31 @@ class BlissSVGBuilder {
     // (fill, opacity, stroke-dasharray, a data attribute, a camelCase SVG name).
     // String values are escaped here at the input boundary so downstream code can use them safely.
     // Numeric values pass through as-is — they're used for calculations, not SVG markup.
+    //
+    // Two of those keys are a curated option in the spelling only the JavaScript
+    // entry points read, and both are reported HERE rather than at an emitter:
+    // this pass runs once per rebuild and reaches every scope, where the
+    // emitters run per render and are spread across two files. The key is left
+    // in the bag, so it still round-trips, re-warns on reparse and is emitted as
+    // written — a usable attribute name reaches the markup as typed, which is
+    // the pass-through rule and not an exception to it.
     for (const [key, value] of Object.entries(rawOptions)) {
       if (KNOWN_OPTION_KEYS.has(key)) continue;
+      const internalOnly = INTERNAL_ONLY_SPELLINGS.get(key);
+      if (internalOnly) {
+        this.#warnings.push({
+          code: WARNING_CODES.MISPLACED_OPTION_SPELLING,
+          message: `"${key}" is the programmatic spelling of the "${internalOnly}" option, which the JavaScript entry points read. Written as an option it is not curated, so it was emitted as written and sets nothing. Write "${internalOnly}" instead.`,
+          source: key,
+        });
+      } else if (isProgrammaticSpelling(key)) {
+        const curated = camelToKebab(key);
+        this.#warnings.push({
+          code: WARNING_CODES.MISPLACED_OPTION_SPELLING,
+          message: `"${key}" is the programmatic spelling of "${curated}", which the JavaScript entry points read. Written as an option it is not curated, so it was emitted as written and sets nothing. Write "${curated}" instead.`,
+          source: key,
+        });
+      }
       authored[key] = typeof value === 'string' ? escapeHtml(value) : value;
     }
 
@@ -791,6 +814,22 @@ class BlissSVGBuilder {
     for (const [key, value] of Object.entries(obj)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;
+      // Two internal names have no kebab twin for isNamedOptionKey to find, so
+      // they are translated by name to the option they mean. Same job the
+      // camelToKebab branch below does for the rest of the curated vocabulary,
+      // done by lookup because there is no rule to derive it from.
+      //
+      // The truthiness test is not decoration: both are boolean switches, so
+      // translating unconditionally would turn `{ autoVertical: false }` INTO
+      // the crop it asks not to have.
+      const internalOnly = INTERNAL_ONLY_SPELLINGS.get(key);
+      if (internalOnly) {
+        if (value) {
+          const [optionKey, optionValue] = internalOnly.split('=');
+          raw[optionKey] = optionValue;
+        }
+        continue;
+      }
       const kebabKey = isNamedOptionKey(key) ? camelToKebab(key) : key;
       if (typeof value === 'boolean') {
         raw[kebabKey] = value;
