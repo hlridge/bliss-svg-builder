@@ -3692,11 +3692,30 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = defaultOptionsSnapshot;
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
       }
     }
 
     blissElementDefinitions[code] = entry;
+  }
+
+  // `define()` and `patchDefinition()` are JavaScript entry points, so camelCase
+  // is their spelling of the curated vocabulary, exactly as it is the
+  // constructor's, `addGlyph`'s and the handle setters'. They translate it the
+  // same way and by the same gate: only names the library owns in BOTH spellings
+  // are touched, because hyphenating an arbitrary name is a guess that would
+  // destroy `preserveAspectRatio` and every camelCase data attribute.
+  //
+  // Runs AFTER the global-only guard, on the object that guard judged, for two
+  // reasons. The guard's error must name the spelling the caller typed, or it
+  // tells them to fix a key they never wrote; and translating first could not
+  // smuggle anything past it anyway, since it already tests both spellings.
+  static #toCuratedSpelling(defaultOptions) {
+    const translated = {};
+    for (const [key, value] of Object.entries(defaultOptions)) {
+      translated[isNamedOptionKey(key) ? camelToKebab(key) : key] = value;
+    }
+    return translated;
   }
 
   // A definition's defaultOptions attach at glyph/part level, where a
@@ -3805,7 +3824,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = defaultOptionsSnapshot;
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
       }
     }
 
@@ -3850,7 +3869,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = defaultOptionsSnapshot;
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
       }
     }
 
@@ -3979,7 +3998,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = defaultOptionsSnapshot;
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
       }
     }
 
@@ -4296,7 +4315,7 @@ class BlissSVGBuilder {
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, defaultOptionsSnapshot);
       }
-      changes = { ...changes, defaultOptions: defaultOptionsSnapshot };
+      changes = { ...changes, defaultOptions: BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot) };
     }
 
     // Apply changes

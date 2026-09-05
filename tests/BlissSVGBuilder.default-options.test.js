@@ -69,6 +69,84 @@ describe('BlissSVGBuilder defaultOptions', () => {
     return BlissSVGBuilder.define(definitions, options);
   }
 
+  describe('when a curated option is written in its programmatic spelling', () => {
+    // `define()` is a JavaScript entry point, so camelCase is its spelling, and
+    // it translates the curated vocabulary on the way in exactly as the
+    // constructor, `addGlyph` and the handle setters do. It was the one entry
+    // point that did not, which is why the options-bag split broke it: measured
+    // before this fix, `{ strokeWidth: 2 }` emitted a dead `strokeWidth="2"` and
+    // painted nothing, while its kebab twin painted.
+    //
+    // The sibling question, a camel spelling written where NO translation
+    // happens (a DSL bracket, a hand-authored options bag), is reported instead:
+    // see `BlissSVGBuilder.option-namespace-split.test.js`.
+
+    it('translates it, as every other programmatic entry point does', () => {
+      defineTracked({ DOPTCAMEL: { type: 'glyph', codeString: 'B291', defaultOptions: { strokeWidth: 2 } } });
+      const b = new BlissSVGBuilder('DOPTCAMEL');
+      expect(b.svgCode).toContain('stroke-width="2"');
+      expect(b.svgCode).not.toContain('strokeWidth');
+      expect(b.warnings).toEqual([]);
+    });
+
+    it('renders byte-identically to the kebab spelling', () => {
+      // The two spellings are one option, so the pictures cannot differ. This is
+      // the row that fails if the translation lands on the wrong name.
+      defineTracked({
+        DOPTPAIRA: { type: 'glyph', codeString: 'B291', defaultOptions: { strokeWidth: 2 } },
+        DOPTPAIRB: { type: 'glyph', codeString: 'B291', defaultOptions: { 'stroke-width': 2 } },
+      });
+      expect(new BlissSVGBuilder('DOPTPAIRA').svgCode.replace(/DOPTPAIRA/g, 'X'))
+        .toBe(new BlissSVGBuilder('DOPTPAIRB').svgCode.replace(/DOPTPAIRB/g, 'X'));
+    });
+
+    it('leaves a name the library does not curate in the spelling it was written', () => {
+      // `strokeDasharray` is not ours in either spelling, so translating it
+      // would be a guess. The same rule protects `preserveAspectRatio`, which is
+      // genuinely camelCase in SVG and would be destroyed by a blanket kebab.
+      defineTracked({ DOPTRAW: { type: 'glyph', codeString: 'B291',
+                                 defaultOptions: { strokeDasharray: '1 1', preserveAspectRatio: 'none' } } });
+      const svg = new BlissSVGBuilder('DOPTRAW').svgCode;
+      expect(svg).toContain('strokeDasharray="1 1"');
+      expect(svg).toContain('preserveAspectRatio="none"');
+    });
+
+    it('names the written spelling when the guard refuses the key', () => {
+      // The global-only guard runs on what was WRITTEN and the translation after
+      // it, so a rejected key is reported in the spelling the caller typed. The
+      // other order would tell an author to fix a key they never wrote.
+      const result = BlissSVGBuilder.define({ DOPTBAD: { codeString: 'B291', defaultOptions: { marginTop: 2 } } });
+      expect(result.errors[0]).toContain('marginTop');
+      expect(BlissSVGBuilder.isDefined('DOPTBAD')).toBe(false);
+    });
+
+    it.each([
+      ['glyph', { type: 'glyph', codeString: 'B291' }],
+      ['shape', { type: 'shape', getPath: (x, y) => `M${x},${y}h4v4h-4z`, width: 4, height: 4 }],
+      ['externalGlyph', { type: 'externalGlyph', getPath: (x, y) => `M${x},${y}h2v8h-2z`, width: 2, char: 'τ' }],
+      ['bare', { codeString: 'B291' }],
+    ])('translates on the %s definition path', (kind, shape) => {
+      // FOUR define paths take defaultOptions, each with its own copy of the
+      // snapshot-guard-store sequence, and the row above reaches only the glyph
+      // one. Three sites would stay wrong with the whole suite green.
+      // Asserted on what the registry STORES, which is the site's own output, so
+      // no row here depends on the definition being renderable.
+      const code = trackCode(`DOPTPATH${kind.toUpperCase()}`);
+      BlissSVGBuilder.define({ [code]: { ...shape, defaultOptions: { strokeWidth: 2 } } });
+      expect(BlissSVGBuilder.getDefinition(code).defaultOptions).toEqual({ 'stroke-width': 2 });
+    });
+
+    it('translates on patchDefinition as well as define', () => {
+      // Two entry points take defaultOptions and both snapshot before they
+      // validate; a fix applied to one leaves the other emitting a dead key.
+      defineTracked({ DOPTPATCH: { type: 'glyph', codeString: 'B291', defaultOptions: { 'stroke-width': 1 } } });
+      BlissSVGBuilder.patchDefinition('DOPTPATCH', { defaultOptions: { strokeWidth: 3 } });
+      const svg = new BlissSVGBuilder('DOPTPATCH').svgCode;
+      expect(svg).toContain('stroke-width="3"');
+      expect(svg).not.toContain('strokeWidth');
+    });
+  });
+
   describe('when a definition declares defaultOptions', () => {
 
     it('accepts the defaultOptions field on a glyph definition', () => {

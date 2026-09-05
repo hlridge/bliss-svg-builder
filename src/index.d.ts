@@ -590,13 +590,21 @@ export interface GlyphDefinition {
   kerningRules?: Record<string, any>;
   /**
    * Default options merged into each use of the definition. Keys must be
-   * well-formed option names (letters, digits, hyphens; camelCase accepted;
-   * names beginning with `on` are rejected, as for any attribute) and may not
-   * include a global-only (builder-canvas) option key such as `margin` or
-   * `grid`, nor a target-prefixed key such as `content--fill` or
-   * `grid-line--sky--stroke` — those configure the whole SVG or name a part of
-   * it, and would be inert on a definition; `define()` reports a violation in
-   * its `errors` result, `patchDefinition()` throws.
+   * well-formed option names (letters, digits, hyphens; names beginning with
+   * `on` are rejected, as for any attribute) and may not include a global-only
+   * (builder-canvas) option key such as `margin` or `grid`, nor a
+   * target-prefixed key such as `content--fill` or `grid-line--sky--stroke` —
+   * those configure the whole SVG or name a part of it, and would be inert on a
+   * definition; `define()` reports a violation in its `errors` result,
+   * `patchDefinition()` throws.
+   *
+   * This is a programmatic surface, so a curated option may be written in
+   * camelCase (`{ strokeWidth: 2 }`) and is stored under its `stroke-width`
+   * spelling, exactly as the constructor's options argument does it. Any other
+   * name is stored as written, because only names the library owns in both
+   * spellings can be translated without guessing: `preserveAspectRatio` is
+   * genuinely camelCase in SVG, and `stroke-dasharray` genuinely hyphenated, so
+   * each must be written the way SVG spells it.
    */
   defaultOptions?: BlissOptions;
 }
