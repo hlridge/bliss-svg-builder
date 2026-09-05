@@ -217,6 +217,15 @@ describe('BlissSVGBuilder option namespace split', () => {
     // Everything above pins that the spelling does NOTHING. The rows below pin
     // that the library says so, which is the whole point of separating the bags:
     // before it, the key landed on a computed value and the damage was silent.
+    it('has a spelling to test in each derived list', () => {
+      // Both lists are DERIVED, and an `it.each` over an empty array generates
+      // no rows and reports success. Membership rather than a count: a count
+      // fails the day a legitimate option is added, which is the one thing the
+      // derivation exists to absorb.
+      expect(CURATED_CAMEL_SPELLINGS).toEqual(expect.arrayContaining(['strokeWidth', 'marginTop', 'gridSkyColor']));
+      expect(SINGLE_WORD_OPTIONS).toEqual(expect.arrayContaining(['margin', 'crop', 'grid']));
+    });
+
     it.each(CURATED_CAMEL_SPELLINGS)('reports %s, naming the spelling that works', (camel) => {
       const misplaced = spellingReports(render(`[${camel}=1]||B291`));
       expect(misplaced).toHaveLength(1);
@@ -527,6 +536,14 @@ describe('BlissSVGBuilder option namespace split', () => {
     it('round-trips the DSL unchanged', () => {
       expect(render('[gridColor=blue;data-depth=chr]B291').toString())
         .toBe('[gridColor=blue;data-depth=chr]B291');
+    });
+
+    it('reports again when the round-tripped DSL is parsed', () => {
+      // The public page promises this, and the row above cannot see it: the
+      // text surviving and the report coming back with it are separable, so a
+      // change to where the authoring tree is snapshotted could keep the one
+      // and lose the other while every serialization row stays green.
+      expect(spellingReports(render(render('[marginTop=3]||B291').toString()))).toHaveLength(1);
     });
 
     it('never puts the second bag in the JSON', () => {

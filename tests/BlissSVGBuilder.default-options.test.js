@@ -111,6 +111,27 @@ describe('BlissSVGBuilder defaultOptions', () => {
       expect(svg).toContain('preserveAspectRatio="none"');
     });
 
+    it('translates a kerning name, which the report side deliberately does not judge', () => {
+      // The translation gate is `isNamedOptionKey`, which answers for the two
+      // kerning spellings as well as the curated vocabulary; the REPORT asks
+      // `KNOWN_OPTION_KEYS`, which does not. The two halves disagree on purpose:
+      // the parser writes `relativeKerning` into an options bag itself, so a
+      // report there cannot tell a promoted key from a written one, while a
+      // definition's defaults are a programmatic surface where camelCase is the
+      // documented spelling of everything else.
+      //
+      // Asserted on what the registry STORES. `kerningOptionEntries` reads all
+      // four spellings, so no rendered picture can see which one was stored, and
+      // a mutant that stores the camel key survives the whole suite otherwise.
+      defineTracked({
+        DOPTKERNA: { type: 'glyph', codeString: 'B291', defaultOptions: { relativeKerning: 3 } },
+        DOPTKERNB: { type: 'glyph', codeString: 'B291', defaultOptions: { 'relative-kerning': 3 } },
+      });
+      expect(BlissSVGBuilder.getDefinition('DOPTKERNA').defaultOptions).toEqual({ 'relative-kerning': 3 });
+      expect(new BlissSVGBuilder('B99/DOPTKERNA').svgCode.replace(/DOPTKERNA/g, 'X'))
+        .toBe(new BlissSVGBuilder('B99/DOPTKERNB').svgCode.replace(/DOPTKERNB/g, 'X'));
+    });
+
     it('names the written spelling when the guard refuses the key', () => {
       // The global-only guard runs on what was WRITTEN and the translation after
       // it, so a rejected key is reported in the spelling the caller typed. The
