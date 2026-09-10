@@ -198,6 +198,7 @@ class BlissSVGBuilder {
   #withoutRefusedTextValues(rawOptions) {
     let kept = rawOptions;
     for (const [key, value] of Object.entries(rawOptions)) {
+      if (BlissSVGBuilder.#nameIsAlreadyRefused(key)) continue;
       const refusal = judgeTextOptionValue(key, value);
       if (!refusal) continue;
       this.#warnings.push(refusal);
@@ -205,6 +206,30 @@ class BlissSVGBuilder {
       delete kept[key];
     }
     return kept;
+  }
+
+  // A key that will never carry a value, whatever was written in it, because a
+  // gate has already refused the NAME.
+  //
+  // The same rule `canonicalOptionKey` follows one pass earlier: a gate that
+  // exists to make a value usable buys nothing on a name that can never carry
+  // one. It also decides which of two reports an author gets when a key is
+  // wrong twice, and the name is the one worth having: told that `null` is not
+  // a text value, an author fixes the value and `nosuch--fill` is just as dead,
+  // where the name refusal hands them the list of targets that exist.
+  //
+  // Each arm names a report raised elsewhere for the same key: the safety gate
+  // and the reserved-name guard in #processAllOptions and the root split, the
+  // layer-key split loop, and the whole-option shorthands in the pass-through
+  // loop below.
+  static #nameIsAlreadyRefused(key) {
+    if (INTERNAL_ONLY_SPELLINGS.has(key)) return true;
+    const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
+    if (isLayerAttributeKey(key) && !target) return true;
+    const name = target ? target.attribute : key;
+    return !isSafeAttributeName(name)
+      || isDocumentDefiningAttribute(name)
+      || isLibraryOwnedRootAttribute(name);
   }
 
   // Processes raw options (kebab-case) into two bags that cannot collide.

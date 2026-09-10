@@ -118,6 +118,8 @@ The last two are the cases worth knowing about: writing the key with no value at
 
 The second kind only reaches the library from JavaScript, since a value written in a bracket is always text. An object, an array, a `null` or an `undefined` handed to an option that writes text used to be put into the picture as whatever JavaScript made of it: `{ color: null }` painted `stroke="null"`, and an object given to `svg-title` or `aria-label` arrived as `[object Object]`. Those are refused now, and the option falls back the same way a refused number does.
 
+Where you get the warning depends on how the value reaches the option. In a composition object, and in a definition's own default options, it reaches the option and is refused there. Passed as the builder's second argument or through `setOptions()`, a value of this kind is dropped on the way in and never reaches the option at all, so nothing is written and there is nothing to report.
+
 ### `OUT_OF_RANGE_OPTION_VALUE`
 
 A numeric option given a well-formed number that nothing can use: an infinity anywhere, or a negative value where the quantity is a length.

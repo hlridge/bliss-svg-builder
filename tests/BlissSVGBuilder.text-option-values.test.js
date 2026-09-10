@@ -57,6 +57,7 @@ const codes = (b) => b.warnings.map((w) => w.code);
 // only channel that can deliver these values: the DSL can only produce strings,
 // and `#toRaw` drops them in front of every other JavaScript entry point.
 const atDocument = (options) => ({ options, groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }] }] }] });
+const atCharacter = (options) => ({ groups: [{ glyphs: [{ codeName: 'B291', options, parts: [{ codeName: 'B291' }] }] }] });
 
 const unwritten = () => build(atDocument({})).svgCode;
 
@@ -110,6 +111,72 @@ describe('BlissSVGBuilder text option values', () => {
         expect(codes(b), kind).toEqual(['INVALID_OPTION_VALUE']);
         expect(b.svgCode, kind).toBe(unwritten());
       }
+    });
+  });
+
+  describe('when the bag sits below the whole document', () => {
+    it('gates a character bag too, not only the global one', () => {
+      // Every other row here writes at document scope, where the options pass
+      // takes a second argument it does not take below. A gate wired to that
+      // argument would leave every inner bag ungated with the suite green.
+      const b = build(atCharacter({ color: null }));
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.svgCode).not.toContain('stroke="null"');
+    });
+  });
+
+  describe('when more than one value in a bag is refused', () => {
+    it('reports every one of them, in the order they were written', () => {
+      // A sweep that stopped at the first refusal would report one and let the
+      // rest through to the markup, with every single-value row still green.
+      const b = build(atDocument({ color: null, myOwnAttr: [1, 2], 'svg-title': { a: 1 } }));
+      expect(b.warnings.map((w) => w.source)).toEqual([
+        'color=null', 'myOwnAttr=1,2', 'svg-title=[object Object]',
+      ]);
+      expect(b.svgCode).toBe(unwritten());
+    });
+  });
+
+  describe('when a key is wrong in its name as well as its value', () => {
+    it.each([
+      ['a layer target that does not exist', 'nosuch--fill', 'UNKNOWN_LAYER'],
+      ['a layer key with no attribute after it', 'root--', 'UNKNOWN_LAYER'],
+      ['a name the library stamps itself', 'data-generator', 'RESERVED_ATTRIBUTE_NAME'],
+      ['a name that declares what the file is', 'xmlns', 'RESERVED_ATTRIBUTE_NAME'],
+      ['an event handler', 'onclick', 'UNSAFE_ATTRIBUTE_NAME'],
+      ['a whole option spelled as one word', 'autoVertical', 'MISPLACED_OPTION_SPELLING'],
+    ])('keeps the report about the name for %s', (_kind, key, expected) => {
+      // The name is the report worth having. Told only that `null` is not a text
+      // value, an author fixes the value and `nosuch--fill` is just as dead,
+      // where the name refusal hands them the targets that exist. So the value
+      // gate passes over a name another gate has already refused, rather than
+      // displacing it or reporting beside it.
+      //
+      // The control is the same key carrying a usable value: both must report
+      // the same thing, or the value decided which defect the author heard about.
+      const scope = key === 'xmlns' ? atCharacter : atDocument;
+      expect(codes(build(scope({ [key]: null })))).toEqual([expected]);
+      expect(codes(build(scope({ [key]: 'x' })))).toEqual([expected]);
+    });
+  });
+
+  describe('when a value refers back to itself', () => {
+    it('reports it rather than throwing out of the constructor', () => {
+      // An ordinary parent/child config with a back-pointer, not a contrived
+      // self-reference. The refusal message is built by serializing the value,
+      // and an unguarded serializer throws here, which reaches the caller as no
+      // picture and no diagnosis instead of a refusal they can act on.
+      const parent = { id: 'theme' };
+      const child = { name: 'accent', parent };
+      parent.children = [child];
+      const b = build(atDocument({ 'aria-label': child }));
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.svgCode).toBe(unwritten());
+    });
+
+    it('refuses it on a numeric option too, which has the same message to build', () => {
+      const b = build(atDocument({ margin: (() => { const o = {}; o.self = o; return o; })() }));
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
     });
   });
 
@@ -196,13 +263,29 @@ describe('BlissSVGBuilder text option values', () => {
     });
 
     it('leaves a kerning value to its own gate where kerning applies', () => {
-      // A kerning option is a NUMBER, and it already has a gate that says so.
-      // It is absent from the curated vocabulary only because the parser
-      // promotes it rather than dispatching on it, so without an exemption the
-      // text gate would claim it and tell the author a number needs text.
+      // A control on the kerning gate rather than on the exemption: this row
+      // stays green with the exemption removed, because the kerning resolver
+      // deletes the written key before the options pass runs. The row below is
+      // the one that can tell the exemption from its absence.
       const composition = new BlissSVGBuilder('B99/B291').toJSON();
       composition.groups[0].glyphs[1].options = { relativeKerning: { a: 1 } };
       expect(codes(build(composition))).toEqual(['MALFORMED_KERNING_VALUE']);
+    });
+
+    it.each([
+      ['a list the position gate reads as a number', [5]],
+      ['an absent coordinate, which is what {x: record.x} yields', undefined],
+      ['a null the position gate reads as zero', null],
+    ])('leaves a coordinate written as %s to the position gate', (_kind, value) => {
+      // `x` and `y` are uncurated names whose values never become attribute
+      // text: an emitter reads them as geometry, and MALFORMED_COORDINATES is
+      // their gate. Claiming them here refused a value the position gate had
+      // already read and honoured, so `{x: [5]}` positioned the character AND
+      // reported the option as dropped, and the ordinary `{x: record.x}` idiom
+      // raised one warning per axis per node.
+      const b = build(atCharacter({ x: value }));
+      expect(codes(b)).toEqual([]);
+      expect(b.svgCode).toBe(build(atCharacter({ x: value === undefined ? undefined : Number(value) })).svgCode);
     });
 
     it.each([
@@ -219,6 +302,13 @@ describe('BlissSVGBuilder text option values', () => {
       // Silence here matches what a VALID value does at the same scope, which
       // is also silent: whether an out-of-scope kerning option should be
       // reported at all is the kerning gate's question, not this gate's.
+      //
+      // KNOWN GAP, pinned as CURRENT behaviour: the DSL DOES report here
+      // (`[relative-kerning=3]||B291` gives `MISPLACED_KERNING_OPTION`) and the
+      // object channel does not, which is filed in `backlog.md` beside the
+      // identically-shaped target-prefixed-key row. When that is fixed this row
+      // goes red and wants rewriting, not deleting: the claim it must keep is
+      // that whatever is reported here is NOT `INVALID_OPTION_VALUE`.
       const b = build(atDocument({ [key]: { a: 1 } }));
       expect(codes(b)).toEqual([]);
       expect(b.svgCode).toBe(unwritten());

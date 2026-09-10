@@ -842,6 +842,25 @@ export const NUMERIC_OPTION_POLICY = new Map([
  * Returns null when the value is honoured, so the caller assigns it; otherwise
  * the warning to report, and the caller assigns nothing.
  */
+/**
+ * A refused value as a refusal message should show it: as it was GIVEN, not as
+ * it coerced. `[5]` reads as a list rather than as the number 5, which is the
+ * whole reason it was refused, and a message built from the coerced form would
+ * say a number is not a number.
+ *
+ * `JSON.stringify` throws on a value that refers back to itself, which an
+ * ordinary parent/child config with a back-pointer does. Left unguarded that
+ * throw escapes the constructor, so a caller who hands the builder a value it
+ * cannot use gets no picture and no diagnosis instead of a refusal.
+ */
+const describeRefusedValue = (rawValue) => {
+  try {
+    return JSON.stringify(rawValue) ?? String(rawValue);
+  } catch {
+    return Object.prototype.toString.call(rawValue);
+  }
+};
+
 export const judgeNumericOptionValue = (key, rawValue) => {
   const policy = NUMERIC_OPTION_POLICY.get(key);
   if (!policy) return null;
@@ -870,9 +889,7 @@ export const judgeNumericOptionValue = (key, rawValue) => {
   if (Number.isNaN(written)) {
     return {
       code: WARNING_CODES.INVALID_OPTION_VALUE,
-      // Shown as it was given, not as it coerced: `[5]` reads as a list rather
-      // than as the number 5, which is the whole reason it was refused.
-      message: `"${key}" needs a number and ${JSON.stringify(rawValue)} is not one, ${tail}`,
+      message: `"${key}" needs a number and ${describeRefusedValue(rawValue)} is not one, ${tail}`,
       source,
     };
   }
@@ -906,18 +923,6 @@ export const judgeNumericOptionValue = (key, rawValue) => {
 export const BOOLEAN_OPTION_KEYS = new Set(['center', 'grid', 'error-placeholder']);
 
 /**
- * A kerning name in any of its four spellings, kebab or camel. Derived from the
- * kebab pair rather than listed, the same way `isNamedOptionKey` reads them.
- *
- * The two kerning options are NUMBERS with a gate of their own
- * (MALFORMED_KERNING_VALUE), but they are absent from `KNOWN_OPTION_KEYS`
- * because the parser promotes them instead of dispatching on them, so the text
- * gate below would otherwise claim them and tell an author that a numeric
- * option needs a text value.
- */
-const isKerningOptionKey = (key) => KERNING_OPTION_SPELLINGS.has(camelToKebab(key));
-
-/**
  * The curated options whose value reaches the document as TEXT, derived rather
  * than listed: everything in the curated vocabulary that is neither a number
  * nor a switch nor `key`, which names the element rather than anything in the
@@ -936,9 +941,16 @@ export const TEXT_OPTION_KEYS = new Set(
  * True for a key whose value the library will write into the document as text.
  * A name the library does not curate at all is one of these too: it is emitted
  * as the author typed it, so whatever it carries becomes attribute text.
+ *
+ * `INTERNAL_OPTIONS` is exactly the set of uncurated names where that premise is
+ * FALSE: position and kerning reach an emitter as geometry and never as text,
+ * and each already has a gate of its own (MALFORMED_COORDINATES,
+ * MALFORMED_KERNING_VALUE). Without the exemption a text refusal lands on a
+ * value the position gate has already read and honoured, so `{x: [5]}` both
+ * positions the element and reports the option as dropped.
  */
 export const isTextValuedOptionKey = (key) => (
-  !isKerningOptionKey(key)
+  !INTERNAL_OPTIONS.has(key)
   && (TEXT_OPTION_KEYS.has(key) || !KNOWN_OPTION_KEYS.has(key))
 );
 
@@ -948,10 +960,17 @@ export const isTextValuedOptionKey = (key) => (
  * no third: the value is refused, in which case the option falls back exactly
  * as if it had never been written, or it is honoured exactly as written.
  *
- * Only four kinds are refused, and none of them has a text form the author
- * meant. Everything else primitive is honoured, INCLUDING a boolean: a bare key
- * in a bracket (`[myOwnAttr]`) arrives as `true`, so refusing booleans would
- * refuse the DSL's own shorthand.
+ * Nothing that is not a primitive is honoured, and neither is `null` or
+ * `undefined`, because none of them has a text form the author meant. Every
+ * other primitive is, INCLUDING a boolean: a bare key in a bracket
+ * (`[myOwnAttr]`) arrives as `true`, so refusing booleans would refuse the
+ * DSL's own shorthand.
+ *
+ * Four of those kinds reach this gate; a function and a symbol are refused for
+ * the same reason but are unreachable, since `structuredClone` rejects both in
+ * the constructor and `#toRaw` drops them on every other channel. They are
+ * written out anyway, so the rule reads as one rule rather than as a list of
+ * the cases that happen to arrive today.
  *
  * Without it, all four were stringified straight into the shipped document:
  * `{color: null}` painted `stroke="null"` on the symbol and
@@ -971,11 +990,7 @@ export const judgeTextOptionValue = (key, rawValue) => {
   const writable = rawValue !== null && rawValue !== undefined
     && typeof rawValue !== 'object' && typeof rawValue !== 'function' && typeof rawValue !== 'symbol';
   if (writable) return null;
-  // Shown as it was given, not as it coerced: `[1,2]` reads as a list, where
-  // the coerced form reads as the string "1,2" and hides why it was refused.
-  // `JSON.stringify` answers undefined for the kinds it cannot represent, which
-  // is what the String() fallback is for.
-  const shown = JSON.stringify(rawValue) ?? String(rawValue);
+  const shown = describeRefusedValue(rawValue);
   // An option the library curates has a value of its own to fall back to; a
   // name it does not curate has none, so the honest thing to say about it is
   // that nothing is emitted under it at all.
