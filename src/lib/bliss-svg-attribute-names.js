@@ -14,16 +14,27 @@
  *   recipe   for each element in SVG_ELEMENT_BASIS, union `elems[el].attrs`
  *            with every `attrsGroups[g]` named by `elems[el].attrsGroups`;
  *            then drop namespaced names, then add the link attributes below.
- *   minus    namespaced names (`xlink:*`, `xml:*`). The option-key grammar
- *            splits on the colon before any lookup could see them, so owning
- *            them here would be a promise the entry points cannot keep.
+ *   minus    namespaced names (`xlink:*`, `xml:*`). Neither entry point can
+ *            deliver one, by two different mechanisms: an option bracket splits
+ *            the key on the colon before any lookup could see it, and an
+ *            options object keeps the key whole but is refused by the safety
+ *            gate with `UNSAFE_ATTRIBUTE_NAME`. Owning them here would be a
+ *            promise neither channel can keep.
  *   plus     the SVG 2 link attributes the library routes onto an `<a>`:
  *            href, rel, download, hreflang, referrerpolicy. SVGO's collections
  *            describe SVG 1.1, which knows only `xlink:href`, so the five names
- *            the library already emits are absent upstream. `target` and `type`
- *            come through the 1.1 union already.
+ *            the library already emits are absent upstream. The other two
+ *            routed names arrive through the 1.1 union: `target` from `<a>`,
+ *            and `type` from `<style>` and nowhere else, which is why dropping
+ *            `<style>` from the basis is not the isolated change it looks like.
  *   census   116 names: 13 camelCase, 50 hyphenated, 53 single-word, resolving
  *            to 116 distinct normalized keys.
+ *
+ * Eighteen of the 116 are inert in both directions and are kept anyway: the
+ * `on*` event handlers are refused by the safety gate under every spelling, so
+ * no canonicalization can make one live. They stay because the list is faithful
+ * to its source, and because excluding them would be the kind of unstated
+ * special case the basis exists to refuse.
  *
  * The list is pinned here rather than generated at build time. Its invariants
  * are carried by `tests/BlissSVGBuilder.svg-attribute-vocabulary.test.js`: one
@@ -43,12 +54,12 @@
  * exactly these, so a feature that emits a tenth element leaves the vocabulary
  * short until it is added here.
  */
-export const SVG_ELEMENT_BASIS = Object.freeze(new Set([
+export const SVG_ELEMENT_BASIS = new Set([
   'a', 'desc', 'g', 'path', 'rect', 'style', 'svg', 'text', 'title',
-]));
+]);
 
 /** The owner's spelling of every attribute name in scope. */
-export const SVG_ATTRIBUTE_NAMES = Object.freeze(new Set([
+export const SVG_ATTRIBUTE_NAMES = new Set([
   'alignment-baseline', 'baseProfile', 'baseline-shift', 'class', 'clip', 'clip-path',
   'clip-rule', 'color', 'color-interpolation', 'color-interpolation-filters', 'color-profile',
   'color-rendering', 'contentScriptType', 'contentStyleType', 'cursor', 'd', 'direction',
@@ -68,7 +79,7 @@ export const SVG_ATTRIBUTE_NAMES = Object.freeze(new Set([
   'target', 'text-anchor', 'text-decoration', 'text-overflow', 'text-rendering', 'textLength',
   'title', 'transform', 'transform-origin', 'type', 'unicode-bidi', 'vector-effect', 'version',
   'viewBox', 'visibility', 'width', 'word-spacing', 'writing-mode', 'x', 'y', 'zoomAndPan',
-]));
+]);
 
 /**
  * The form every spelling of one name collapses to. Hyphens carry no meaning

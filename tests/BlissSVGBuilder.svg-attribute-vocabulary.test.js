@@ -17,6 +17,13 @@
  *   `<a>`, which the upstream SVG 1.1 source does not carry.
  *
  * Does NOT cover:
+ * - Markup a custom `getPath` returns. A definition whose `getPath` returns a
+ *   string starting with `<` is embedded verbatim, so that documented API can
+ *   put an element outside the basis into the output today, not only some
+ *   future feature. The vocabulary is unaffected because attributes written
+ *   inside returned markup never pass through the option system, so the basis
+ *   stays the union it needs to be. The equality row below covers what the
+ *   library itself emits, which is the part the vocabulary depends on.
  * - Any effect on rendered output. This module is pure data plus one pure
  *   function and is wired to nothing yet; the ingest behaviour lands in the
  *   next task and is pinned alongside it in this file.
@@ -28,18 +35,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
+import { BlissSVGBuilder, ANCHOR_ATTRIBUTE_NAMES } from '../src/lib/bliss-svg-builder.js';
 import {
   SVG_ATTRIBUTE_NAMES,
   SVG_ELEMENT_BASIS,
   normalizeAttributeName,
   svgAttributeSpelling,
 } from '../src/lib/bliss-svg-attribute-names.js';
-
-// The library's own link attributes, restated rather than imported, so this
-// file fails if either side moves. They are SVG 2 names on <a>; the SVG 1.1
-// source the rest of the vocabulary is generated from has no entry for them.
-const LINK_ATTRIBUTES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
 // One input per element in the basis, so the equality assertion below is only
 // as honest as this list is complete.
@@ -54,16 +56,6 @@ const REACHING_INPUTS = [
   'B449;B81/B451;;B99',
   '[grid;background=red;svg-title=T;svg-desc=D;href=https://example.com;text=cap]||B449;B81/B451;;B99',
 ];
-
-const elementsEmittedBy = (inputs) => {
-  const emitted = new Set();
-  for (const input of inputs) {
-    for (const match of new BlissSVGBuilder(input).svgCode.matchAll(/<([a-zA-Z][a-zA-Z0-9-]*)[\s/>]/g)) {
-      emitted.add(match[1]);
-    }
-  }
-  return emitted;
-};
 
 describe('BlissSVGBuilder SVG attribute vocabulary', () => {
   describe('when a written name is resolved to its owner', () => {
@@ -113,8 +105,11 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
   });
 
   describe('when the vocabulary is checked against what the library emits', () => {
+    // The vocabulary is generated from an SVG 1.1 source, which knows only
+    // `xlink:href` on an anchor, so these names were added by hand. Imported
+    // rather than restated: a copy of the list would only catch itself moving.
     it('covers every link attribute the library routes onto an anchor', () => {
-      const missing = LINK_ATTRIBUTES.filter((name) => svgAttributeSpelling(name) !== name);
+      const missing = ANCHOR_ATTRIBUTE_NAMES.filter((name) => svgAttributeSpelling(name) !== name);
       expect(missing).toEqual([]);
     });
 
@@ -122,7 +117,13 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
     // Equality, not subset: a subset assertion passes when an element goes
     // unreachable, which would hide a feature being removed.
     it('emits no element outside the declared basis, and reaches every element in it', () => {
-      expect([...elementsEmittedBy(REACHING_INPUTS)].sort()).toEqual([...SVG_ELEMENT_BASIS].sort());
+      const emitted = new Set();
+      for (const input of REACHING_INPUTS) {
+        for (const match of new BlissSVGBuilder(input).svgCode.matchAll(/<([a-zA-Z][a-zA-Z0-9-]*)[\s/>]/g)) {
+          emitted.add(match[1]);
+        }
+      }
+      expect([...emitted].sort()).toEqual([...SVG_ELEMENT_BASIS].sort());
     });
   });
 });

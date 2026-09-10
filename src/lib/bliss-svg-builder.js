@@ -82,7 +82,9 @@ function serializeOptions(opts, skipKeys) {
 // (with its href safety allowlist), so they must never double-emit as plain
 // content-<g> attributes: href is not a valid <g> attribute, and an
 // allowlist-rejected href would resurface verbatim.
-const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
+// Exported so the attribute-vocabulary test can assert the vocabulary still covers
+// every routed name. A restated copy there would only ever catch itself moving.
+export const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
 // Why a target key emitted nothing. All three shapes fail the same way, so they
 // share a code, but each fails for its own reason and a message covering all
