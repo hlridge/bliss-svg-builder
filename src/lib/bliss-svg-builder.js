@@ -119,8 +119,13 @@ const RESERVED_ATTRIBUTE_REASONS = new Map([
   ['xmlns', 'declares what the file is rather than anything about the picture, and a second declaration moves everything under it out of SVG, where no renderer draws it'],
   ['data-generator', "is the library's own stamp recording what produced the file, and a stamp anyone can overwrite tells its reader nothing; record your own pipeline under a name of your own"],
 ]);
+// The reason is looked up on the NAME and the sentence quotes the SPELLING. The
+// two guards judge these names without regard to casing, since an SVG placed
+// inline in an HTML page has its attribute names lowercased there, so a written
+// `XMLNS` has to find `xmlns`'s reason while the author still reads back the
+// spelling they typed.
 const reservedAttributeMessage = (name) =>
-  `"${name}" ${RESERVED_ATTRIBUTE_REASONS.get(name)}, so the written value was refused.`;
+  `"${name}" ${RESERVED_ATTRIBUTE_REASONS.get(String(name).toLowerCase())}, so the written value was refused.`;
 
 // Renders one layer's attribute map as markup. An empty map yields an empty
 // string, so a tag built from it closes without a stray space.

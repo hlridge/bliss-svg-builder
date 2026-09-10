@@ -133,6 +133,21 @@ describe('BlissSVGBuilder document namespace', () => {
       expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
     });
 
+    // The guard judges the name and the sentence quotes the spelling. Looking
+    // the reason up on the written casing put the word "undefined" where the
+    // reason belongs, on every miscased refusal.
+    it.each([
+      ['[XMLNS=http://example.com]||B291', 'XMLNS', 'declares what the file is'],
+      ['[Data-Generator=me]||B291', 'Data-Generator', "the library's own stamp"],
+    ])('gives %s the reason its lowercase spelling gets', (input, written, reason) => {
+      const warning = new BlissSVGBuilder(input).warnings
+        .find(w => w.code === 'RESERVED_ATTRIBUTE_NAME');
+
+      expect(warning.message).toContain(reason);
+      expect(warning.message).toContain(`"${written}"`);
+      expect(warning.message).not.toContain('undefined');
+    });
+
     it('refuses the library stamp on the root in another casing', () => {
       const builder = new BlissSVGBuilder('[DATA-GENERATOR=me]||B291');
 

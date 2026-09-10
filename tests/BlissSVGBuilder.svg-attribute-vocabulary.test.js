@@ -257,12 +257,33 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
 
     // The lookup answers for a standard and stays silent about anything the
     // library curates, so a curated name cannot be resolved to an attribute
-    // here and skip the curated cascade.
-    it.each(['strokeWidth', 'stroke-width', 'color', 'marginTop', 'myOwnAttr', 'dataAttr'])(
-      'leaves %s for the curated vocabulary or the author', (key) => {
-        expect(canonicalOptionKey(key)).toBe(key);
-      },
-    );
+    // here and skip the curated cascade. `STROKE-WIDTH` and `COLOR` are the two
+    // that matter: they are the whole curated-and-SVG intersection written in a
+    // casing the curated vocabulary itself does not answer for, so the guard is
+    // the only thing holding them, and without a row here a lookup that asked
+    // "is the WRITTEN key curated" instead of "is the OWNER" passes the suite.
+    it.each([
+      'strokeWidth', 'stroke-width', 'STROKE-WIDTH',
+      'color', 'COLOR',
+      'marginTop', 'myOwnAttr', 'dataAttr',
+    ])('leaves %s for the curated vocabulary or the author', (key) => {
+      expect(canonicalOptionKey(key)).toBe(key);
+    });
+
+    // Whether either of these should COMPUTE is class 1's question ("a curated
+    // name works in either casing"), which the DSL does not answer until the
+    // curated vocabulary canonicalizes there. Until then the shipped answer is
+    // that they stay the author's own attribute, and this row is what makes a
+    // change to that deliberate rather than incidental.
+    it.each([
+      ['STROKE-WIDTH', '2', 'stroke-width="0.5"'],
+      ['COLOR', 'red', 'stroke="#000000"'],
+    ])('does not let %s reach the curated cascade', (key, value, untouched) => {
+      const builder = new BlissSVGBuilder(`[${key}=${value}]||B291`);
+
+      expect(builder.svgCode).toContain(`${key}="${value}"`);
+      expect(builder.svgCode).toContain(untouched);
+    });
   });
 
   describe('when a layer prefix suspends resolution', () => {

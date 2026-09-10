@@ -339,7 +339,14 @@ const ARIA_PROGRAMMATIC_NAME = /^aria[A-Z]/;
  * when nobody does. Casing and hyphenation carry no meaning in a name a
  * standard owns, so `view-box`, `viewbox` and `VIEWBOX` all reach `viewBox`.
  *
- * Three kinds of key are deliberately returned untouched.
+ * Four kinds of key are deliberately returned untouched, and the four tests are
+ * written in the order below only for readability: no key satisfies two of them
+ * with different answers, so a future arm must not assume the order is load-
+ * bearing.
+ *
+ * A name the library will REFUSE is not a name it renames, which is the first
+ * test below and the reason the eighteen event handlers in the vocabulary are
+ * inert in both directions rather than merely unemitted.
  *
  * A `<target>--attribute` key means its attribute LITERALLY, which is the one
  * way to demand a name the library would otherwise resolve. Skipping the whole
@@ -356,11 +363,9 @@ const ARIA_PROGRAMMATIC_NAME = /^aria[A-Z]/;
  * A name nobody owns is the author's, and an author's name is never rewritten.
  */
 export const canonicalOptionKey = (key) => {
-  // A name the library will refuse is not a name it renames. Resolution exists
-  // to make a written name work, so it buys nothing on a name that can never be
-  // emitted, and it costs the author the ability to find in their own input the
-  // spelling the refusal names. This is what keeps the eighteen event handlers
-  // in the vocabulary inert in BOTH directions rather than merely unemitted.
+  // Resolution exists to make a written name WORK, so it buys nothing on a name
+  // that can never be emitted, and it costs the author the ability to find in
+  // their own input the spelling the refusal names.
   if (!isSafeAttributeName(key)) return key;
   if (isLayerAttributeKey(key)) return key;
   if (ARIA_PROGRAMMATIC_NAME.test(key)) return `aria-${key.slice(4).toLowerCase()}`;

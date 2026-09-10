@@ -230,6 +230,7 @@ describe('BlissSVGBuilder transient options', () => {
       ['absolute-kerning', 3],
       ['absoluteKerning', 3],
       ['key', 'mine'],
+      ['X', 5],
     ])('refuses %s and warns MISPLACED_TRANSIENT_OPTION', (key, value) => {
       const b = new BlissSVGBuilder('B291;C8');
       b.part(1).setTransientOptions({ [key]: value });
@@ -243,6 +244,16 @@ describe('BlissSVGBuilder transient options', () => {
 
       const warning = b.warnings.find(w => w.code === 'MISPLACED_TRANSIENT_OPTION');
       expect(warning.source).toBe('relative-kerning');
+    });
+
+    it('names a standard-owned key as it was stored too', () => {
+      const b = new BlissSVGBuilder('B291;C8');
+      b.part(1).setTransientOptions({ X: 5 });
+
+      // the same rule as the row above, reached the other way: the refused set
+      // holds `x`, and `X` is a casing of the name SVG owns, so the bag holds
+      // `x` by the time anything judges it
+      expect(b.warnings.find(w => w.code === 'MISPLACED_TRANSIENT_OPTION').source).toBe('x');
     });
 
     it('refuses the camelCase spelling that only object input can deliver', () => {
