@@ -339,26 +339,26 @@ const ARIA_PROGRAMMATIC_NAME = /^aria[A-Z]/;
  * when nobody does. Casing and hyphenation carry no meaning in a name a
  * standard owns, so `view-box`, `viewbox` and `VIEWBOX` all reach `viewBox`.
  *
- * Four kinds of key are deliberately returned untouched, and the four tests are
- * written in the order below only for readability: no key satisfies two of them
- * with different answers, so a future arm must not assume the order is load-
- * bearing.
+ * The library's OWN vocabulary is asked first, and it accepts exactly two
+ * spellings: the kebab one a bracket carries and the camelCase one JavaScript
+ * writes. It is asked first so a name we share with a standard stays ours:
+ * `strokeWidth` means the option that computes a stroke width, not the raw
+ * attribute of that name, and `color` still means the paint we publish as
+ * `stroke`. The narrower acceptance is deliberate and is what keeps
+ * `STROKE-WIDTH` a literal attribute name: a standard owns its names in every
+ * casing and hyphenation, we own ours in the two we publish.
  *
- * A name the library will REFUSE is not a name it renames, which is the first
- * test below and the reason the eighteen event handlers in the vocabulary are
- * inert in both directions rather than merely unemitted.
+ * Three kinds of key are then returned untouched.
+ *
+ * A name the library will REFUSE is not a name it renames, which is the reason
+ * the eighteen event handlers in the vocabulary are inert in both directions
+ * rather than merely unemitted.
  *
  * A `<target>--attribute` key means its attribute LITERALLY, which is the one
  * way to demand a name the library would otherwise resolve. Skipping the whole
  * key also keeps a prefix from being read as part of a name: stripping the
  * dashes from `content--script-type` would otherwise land on SVG's
  * `contentScriptType`.
- *
- * A name the LIBRARY curates belongs to the curated vocabulary, which resolves
- * it, computes from it, and publishes it under whatever attribute it means. A
- * standard sharing the name changes nothing, so `strokeWidth` must not be
- * quietly turned into the raw attribute `stroke-width` here and skip the
- * cascade that owns it.
  *
  * A name nobody owns is the author's, and an author's name is never rewritten.
  */
@@ -368,9 +368,46 @@ export const canonicalOptionKey = (key) => {
   // their own input the spelling the refusal names.
   if (!isSafeAttributeName(key)) return key;
   if (isLayerAttributeKey(key)) return key;
+  if (isNamedOptionKey(key)) return camelToKebab(key);
   if (ARIA_PROGRAMMATIC_NAME.test(key)) return `aria-${key.slice(4).toLowerCase()}`;
   const owner = svgAttributeSpelling(key);
+  // A miscased spelling of a name we curate (`STROKE-WIDTH`) reaches here with
+  // a curated owner and no curated spelling of its own, and stays literal.
   return owner === undefined || isNamedOptionKey(owner) ? key : owner;
+};
+
+/**
+ * Watches one options bag being filled and reports when two spellings of one
+ * name land on the same key. Resolution is what makes the collision invisible:
+ * before it, both spellings survived side by side and the reader could see
+ * them; after it, one value silently displaces the other.
+ *
+ * The LAST value written wins, so the displaced one is the earlier. That is
+ * the only rule available once spelling has been declared meaningless, and it
+ * is the one object spread already implies: `{...defaults, marginTop: 3}` must
+ * let the explicit override beat a `margin-top` default, whichever way each was
+ * spelled.
+ *
+ * Two writes of the SAME spelling are not this: a plain duplicate is visible in
+ * the source and has always taken the last value in silence.
+ *
+ * @param {(warning: object) => void} warn - where to send the report
+ * @returns {(writtenKey: string, storedKey: string, value: unknown) => void}
+ */
+export const optionSpellingWatcher = (warn) => {
+  const written = new Map();
+  return (writtenKey, storedKey, value) => {
+    const displaced = written.get(storedKey);
+    written.set(storedKey, { key: writtenKey, value });
+    if (displaced === undefined || displaced.key === writtenKey) return;
+    // A bare key is stored as `true`, so name it the way it was written.
+    const source = displaced.value === true ? displaced.key : `${displaced.key}=${displaced.value}`;
+    warn({
+      code: WARNING_CODES.MULTIPLE_OPTION_SPELLINGS,
+      message: `An option takes one value however it is spelled, so "${source}" is ignored. "${displaced.key}" and "${writtenKey}" are two spellings of one name, and the last value written wins.`,
+      source,
+    });
+  };
 };
 
 /**
@@ -659,6 +696,14 @@ export const WARNING_CODES = Object.freeze({
   // too-many / duplicate
   MULTIPLE_HEAD_MARKERS: 'MULTIPLE_HEAD_MARKERS',
   MULTIPLE_OPTION_BRACKETS: 'MULTIPLE_OPTION_BRACKETS',
+  // one option written twice under two spellings in one bag
+  // (`[marginTop=3;margin-top=4]`, or `{ viewBox: …, 'view-box': … }`). Both
+  // spellings name one option, so the second write displaces the first and the
+  // last value written wins; the displaced value is named. Two writes of the
+  // SAME spelling are a plain duplicate, visible in the source, and stay
+  // silent. It reports more-than-one rather than value-lost, so two equal
+  // values still raise it.
+  MULTIPLE_OPTION_SPELLINGS: 'MULTIPLE_OPTION_SPELLINGS',
   // one part positioned twice: an `[x=N;y=M]>` option and the `:x,y` suffix on
   // the same part are two spellings of one value, so the option wins and the
   // coordinate it overrides is reported. A glyph-level `[x=N]` is a different

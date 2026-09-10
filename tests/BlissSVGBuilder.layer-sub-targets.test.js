@@ -439,19 +439,25 @@ describe('BlissSVGBuilder sub-element targets', () => {
     });
 
     it('says nothing for a spelling the options pass does not curate', () => {
-      // `[grid;gridColor=blue]` paints nothing: the pass reads the key, escapes
-      // it and files it with the author's own, but the camelCase form is not
-      // curated vocabulary, so the grid stays grey and the key is emitted on the
-      // root verbatim. Naming it as displaced would report a collision that
-      // never happened.
-      //
-      // The spelling itself IS reported, by `MISPLACED_OPTION_SPELLING`, which
-      // is a statement about the key rather than about two values meeting on one
-      // attribute. Filtered out rather than counted, so this row keeps meaning
-      // "no collision" and would fail if the displacement report came back.
+      // `[grid;gridColour=blue]` paints nothing: nobody owns that spelling, so
+      // the pass reads the key, escapes it and files it with the author's own.
+      // The grid stays grey and the key is emitted on the root verbatim. Naming
+      // it as displaced would report a collision that never happened.
+      const builder = new BlissSVGBuilder('[grid;gridColour=blue;grid-line--stroke=red]||B291');
+      expect(builder.warnings).toHaveLength(0);
+      expect(builder.svgCode).toContain('gridColour="blue"');
+    });
+
+    it('names the curated option when the programmatic spelling is what was written', () => {
+      // The same input in the spelling the library DOES own. `gridColor` is
+      // resolved to `grid-color` on the way in, so the raw layer key displaces
+      // the curated option exactly as it displaces the kebab form, and the
+      // report names the spelling the bag stored.
       const builder = new BlissSVGBuilder('[grid;gridColor=blue;grid-line--stroke=red]||B291');
-      expect(builder.warnings.filter(w => w.code !== 'MISPLACED_OPTION_SPELLING')).toHaveLength(0);
-      expect(builder.svgCode).toContain('gridColor="blue"');
+      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
+
+      expect(warning.source).toBe('grid-color');
+      expect(builder.svgCode).not.toContain('gridColor');
     });
   });
 

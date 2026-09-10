@@ -11,12 +11,13 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   the DSL and from the object surface alike.
  * - A camelCase data attribute (`data-blissID`) keeping its case.
  * - A named option written in camelCase (`strokeWidth`, `gridSkyColor`) still
- *   translating to the kebab spelling the pipeline processes, ON THE
- *   PROGRAMMATIC surface, which is the only one that converts on the way in.
+ *   translating to the kebab spelling the pipeline processes.
  * - An already-kebab attribute name passing through unchanged.
  * - The same camelCase key on both surfaces, which is the contrast this file
- *   exists for: the options argument converts it and it curates, a bracket
- *   converts nothing and it is emitted verbatim.
+ *   exists for. It used to be an opposition: the options argument converted the
+ *   key and a bracket did not. Both now resolve a name the library or a standard
+ *   owns, so the contrast is between what is OWNED (converted on both surfaces)
+ *   and what is the author's (verbatim on both).
  *
  * Does NOT cover:
  * - The mechanism that makes the bracket rows above true, or the collisions it
@@ -66,27 +67,39 @@ describe('BlissSVGBuilder attribute name fidelity', () => {
   describe('when the same camelCase key is written on both surfaces', () => {
     // The contrast is the point, and it is what makes this file rather than
     // `option-namespace-split.test.js` the home for it: one spelling, two
-    // surfaces, opposite treatment. The options ARGUMENT converts on the way in
-    // and the key curates; a bracket converts nothing, so the same spelling is
-    // an author's attribute name and reaches the markup exactly as written,
-    // like preserveAspectRatio. The sibling file owns the mechanism and the
-    // collisions this separates; these two rows own the fidelity claim.
+    // surfaces. The two used to disagree, and now they agree, which is the
+    // stronger claim and the one worth pinning: whether a name is converted
+    // depends on WHO OWNS IT, never on which surface it arrived through. The
+    // sibling file owns the mechanism and the collisions; these rows own the
+    // fidelity claim.
     //
     // `strokeWidth` is the sharpest case and the reason the pair is written out
     // rather than assumed: it is the one key the library both computes and
     // publishes under another name, so a rename reaching the author's half
-    // leaves the bracket spelling half-working, setting stroke-width while
-    // computing nothing. Measured in that state: `<svg … stroke-width="1">`.
+    // leaves one surface half-working, setting stroke-width while computing
+    // nothing. Measured in that state: `<svg … stroke-width="1">` with the dot
+    // unchanged.
     it('converts it when it is the options argument', () => {
       const builder = new BlissSVGBuilder('B4', { strokeWidth: 1 });
       expect(builder.svgCode).toMatch(/<svg[^>]*\sstroke-width="1"/);
       expect(builder.svgCode).not.toContain('strokeWidth');
     });
 
-    it('emits it verbatim when it is written in a bracket', () => {
+    it('converts it in a bracket to exactly the same bytes', () => {
       const builder = new BlissSVGBuilder('[strokeWidth=1]||B4');
-      expect(builder.svgCode).toMatch(/<svg[^>]*\sstrokeWidth="1"/);
-      expect(builder.svgCode).not.toContain('stroke-width="1"');
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B4', { strokeWidth: 1 }).svgCode);
+      expect(builder.svgCode).not.toContain('strokeWidth');
+    });
+
+    it('leaves a name nobody owns verbatim on both surfaces alike', () => {
+      // The other half of "who owns it decides": an author's camelCase key is
+      // untouched wherever it is written, which is what the conversion above
+      // must not be allowed to generalize into.
+      const bracket = new BlissSVGBuilder('[myOwnAttr=1]||B291');
+      const argument = new BlissSVGBuilder('B291', { myOwnAttr: 1 });
+      expect(bracket.svgCode).toContain('myOwnAttr="1"');
+      expect(argument.svgCode).toBe(bracket.svgCode);
+      expect(bracket.svgCode).not.toContain('my-own-attr');
     });
   });
 

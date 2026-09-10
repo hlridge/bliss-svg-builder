@@ -340,6 +340,28 @@ Combine the options in one bracket instead: `[grid;grid-color=red]||B313`. At ch
 
 Brackets at *different* scopes are not duplicates and are valid: a character bracket followed by a part bracket (`[char][part]>CODE`) applies both, warning-free, as does `[global]||[word]|CODE`. The `>` is what marks the part scope, so it is what tells the two cases apart.
 
+### `MULTIPLE_OPTION_SPELLINGS`
+
+One option written twice in one bracket or one options object, under two spellings of the same name. **The last one you wrote is the one that applies; the other is named.** Spelling carries no meaning, so it cannot decide which value wins: position is all that is left.
+
+```
+[marginTop=3;margin-top=4]||B291    →  margin-top is 4; "marginTop=3" is named
+[margin-top=4;marginTop=3]||B291    →  margin-top is 3; "margin-top=4" is named
+[view-box=…;viewBox=…]||B291        →  the same rule for a name SVG owns
+[margin-top=3;margin-top=3]||B291   →  silent: one spelling written twice is a plain duplicate
+```
+
+It reports more-than-one rather than value-lost, so writing the same value twice still raises it.
+
+The same rule applies to an options object, where it matters most, because there is nothing in the source to show you that two keys met:
+
+```js
+new BlissSVGBuilder('B291', { marginTop: 3, 'margin-top': 4 })   // margin-top is 4
+new BlissSVGBuilder('B291', { ...defaults, marginTop: 3 })       // your override wins
+```
+
+The second line is why the last-written rule is the one that fits: spreading defaults and then overriding one of them is the ordinary way to build an options object, and an override has to beat the default it replaces however either of them was spelled.
+
 ### `MULTIPLE_POSITION_VALUES`
 
 One element positioned twice. A part option (`[x=N;y=M]>`) and the coordinate suffix (`CODE:x,y`) both place the part inside its character, so they are two spellings of one value. The option wins, and the value it overrides is named:

@@ -182,7 +182,11 @@ describe('BlissSVGBuilder kerning options', () => {
       ['[absolute-kerning=4]>B291', 'part', 'absolute-kerning=4'],
       ['[relative-kerning=3]|B291', 'group', 'relative-kerning=3'],
       ['[relative-kerning=3]||B291', 'global', 'relative-kerning=3'],
-      ['[relativeKerning=3]>B291', 'part', 'relativeKerning=3'],
+      // The refusal names the spelling the bag STORED, not the one that was
+      // typed: a curated name is resolved on ingest, so by the time a scope gate
+      // sees the key the written spelling is gone. Same rule a transient refusal
+      // already follows.
+      ['[relativeKerning=3]>B291', 'part', 'relative-kerning=3'],
       ['[relative-kerning]>B291', 'part', 'relative-kerning'],
     ])('reports and drops %s', (input, level, source) => {
       const b = new BlissSVGBuilder(input);

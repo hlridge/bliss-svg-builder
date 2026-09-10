@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isProgrammaticSpelling, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isProgrammaticSpelling, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -553,13 +553,23 @@ class BlissSVGBuilder {
     // String values are escaped here at the input boundary so downstream code can use them safely.
     // Numeric values pass through as-is — they're used for calculations, not SVG markup.
     //
-    // Two of those keys are a curated option in the spelling only the JavaScript
-    // entry points read, and both are reported HERE rather than at an emitter:
-    // this pass runs once per rebuild and reaches every scope, where the
-    // emitters run per render and are spread across two files. The key is left
-    // in the bag, so it still round-trips, re-warns on reparse and is emitted as
-    // written — a usable attribute name reaches the markup as typed, which is
-    // the pass-through rule and not an exception to it.
+    // Two kinds of key reach here meaning a curated option and not setting one,
+    // and both are reported HERE rather than at an emitter: this pass runs once
+    // per rebuild and reaches every scope, where the emitters run per render and
+    // are spread across two files. The key is left in the bag, so it still
+    // round-trips, re-warns on reparse and is emitted as written — a usable
+    // attribute name reaches the markup as typed, which is the pass-through rule
+    // and not an exception to it.
+    //
+    // The first kind is a whole option written as one JavaScript word
+    // (`autoVertical` for `crop=auto-vertical`), which is not a spelling of a
+    // name and so has nothing for ingest to resolve.
+    //
+    // The second is a curated option written in its programmatic spelling, and
+    // exactly one channel can still deliver one: a composition OBJECT is stored
+    // as it is given, where a bracket, the options argument and a definition's
+    // defaults all resolve the name on the way in. The report retires with that
+    // last exception.
     for (const [key, value] of Object.entries(rawOptions)) {
       if (KNOWN_OPTION_KEYS.has(key)) continue;
       const internalOnly = INTERNAL_ONLY_SPELLINGS.get(key);
@@ -573,7 +583,7 @@ class BlissSVGBuilder {
         const curated = camelToKebab(key);
         this.#warnings.push({
           code: WARNING_CODES.MISPLACED_OPTION_SPELLING,
-          message: `"${key}" is the programmatic spelling of "${curated}", which the JavaScript entry points read. Written as an option it is not curated, so it was emitted as written and sets nothing. Write "${curated}" instead.`,
+          message: `"${key}" is the programmatic spelling of "${curated}". A composition object is stored exactly as it is given, so the key was emitted as written and sets nothing. Write "${curated}" instead.`,
           source: key,
         });
       }
@@ -754,8 +764,12 @@ class BlissSVGBuilder {
 
     // Merge: defaults (lowest) < string options (middle) < overrides (highest)
     if (defaults || overrides) {
-      const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
-      const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
+      // Two bags with a defined precedence between them, so each is watched on
+      // its own: one option written once in `defaults` and once in `overrides`
+      // is a layering, not a collision.
+      const optionWarn = (warning) => (blissObj._parseWarnings ??= []).push(warning);
+      const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn) : {};
+      const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn) : {};
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
 
@@ -776,7 +790,7 @@ class BlissSVGBuilder {
         BlissSVGBuilder.#flagWordParts(parsed);
         return parsed;
       },
-      toRaw: (obj) => BlissSVGBuilder.#toRaw(obj),
+      toRaw: (obj) => BlissSVGBuilder.#toRaw(obj, (warning) => this.#mutationWarnings.push(warning)),
       clearStalePositioning: (node, ...incoming) =>
         BlissSVGBuilder.#clearStalePositioning(node, ...incoming),
       isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
@@ -816,8 +830,14 @@ class BlissSVGBuilder {
     }
   }
 
-  static #toRaw(obj) {
+  // `warn` is optional, and every caller that has a warnings route passes one:
+  // the constructor sends its reports down `_parseWarnings`, so they survive a
+  // rebuild exactly as a bracket's do, and the mutation surfaces send theirs to
+  // the mutation log, which is where a one-time loss belongs. A displaced value
+  // never reaches the tree, so nothing in the rebuilt composition records it.
+  static #toRaw(obj, warn) {
     const raw = {};
+    const noteSpelling = warn ? optionSpellingWatcher(warn) : () => {};
     for (const [key, value] of Object.entries(obj)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;
@@ -837,12 +857,10 @@ class BlissSVGBuilder {
         }
         continue;
       }
-      // A name the library curates is asked about FIRST, so a name shared with
-      // a standard (`stroke-width`, `color`) stays curated and keeps reaching
-      // the cascade that computes from it. Everything else asks whether a
-      // standard owns the name, and keeps the author's spelling when nobody
-      // does.
-      const storedKey = isNamedOptionKey(key) ? camelToKebab(key) : canonicalOptionKey(key);
+      // The same lookup the option bracket runs, so this channel and that one
+      // store one spelling of every name and nothing downstream learns a rule.
+      const storedKey = canonicalOptionKey(key);
+      noteSpelling(key, storedKey, value);
       if (typeof value === 'boolean') {
         raw[storedKey] = value;
       } else {
@@ -2318,8 +2336,9 @@ class BlissSVGBuilder {
     if (opts) {
       const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
       if (defaults || overrides) {
-        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults) : {};
-        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides) : {};
+        const optionWarn = (warning) => this.#mutationWarnings.push(warning);
+        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn) : {};
+        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn) : {};
         const merged = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
         // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
         // options:{} onto the group, which would be toJSON noise.
@@ -2434,7 +2453,7 @@ class BlissSVGBuilder {
     // #toRaw kebab-cases the keys and stringifies the values, matching how an
     // option written in a bracket arrives, and dropping object values that
     // structuredClone could not carry across a rebuild.
-    const raw = BlissSVGBuilder.#toRaw(opts ?? {});
+    const raw = BlissSVGBuilder.#toRaw(opts ?? {}, (warning) => this.#mutationWarnings.push(warning));
     this.#rawBlissObj.transientOptions = { ...(this.#rawBlissObj.transientOptions ?? {}), ...raw };
     this.#rebuild();
     return this;
@@ -3729,7 +3748,7 @@ class BlissSVGBuilder {
   static #toCuratedSpelling(defaultOptions) {
     const translated = {};
     for (const [key, value] of Object.entries(defaultOptions)) {
-      translated[isNamedOptionKey(key) ? camelToKebab(key) : canonicalOptionKey(key)] = value;
+      translated[canonicalOptionKey(key)] = value;
     }
     return translated;
   }

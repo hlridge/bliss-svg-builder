@@ -255,18 +255,28 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
       expect(standards.warnings).toEqual([]);
     });
 
-    // The lookup answers for a standard and stays silent about anything the
-    // library curates, so a curated name cannot be resolved to an attribute
-    // here and skip the curated cascade. `STROKE-WIDTH` and `COLOR` are the two
-    // that matter: they are the whole curated-and-SVG intersection written in a
-    // casing the curated vocabulary itself does not answer for, so the guard is
-    // the only thing holding them, and without a row here a lookup that asked
-    // "is the WRITTEN key curated" instead of "is the OWNER" passes the suite.
+    // A name the library curates is answered before a standard is consulted, so
+    // it reaches its own kebab spelling and the cascade that computes from it
+    // rather than the raw attribute it shares a name with.
     it.each([
-      'strokeWidth', 'stroke-width', 'STROKE-WIDTH',
-      'color', 'COLOR',
-      'marginTop', 'myOwnAttr', 'dataAttr',
-    ])('leaves %s for the curated vocabulary or the author', (key) => {
+      ['strokeWidth', 'stroke-width'],
+      ['stroke-width', 'stroke-width'],
+      ['color', 'color'],
+      ['marginTop', 'margin-top'],
+    ])('resolves %s to the curated spelling %s', (key, curated) => {
+      expect(canonicalOptionKey(key)).toBe(curated);
+    });
+
+    // `STROKE-WIDTH` and `COLOR` are the two that matter: they are the whole
+    // curated-and-SVG intersection written in a casing the curated vocabulary
+    // itself does not answer for, so the OWNER guard is the only thing holding
+    // them, and without a row here a lookup that asked "is the WRITTEN key
+    // curated" instead of "is the OWNER" passes the suite.
+    it.each(['STROKE-WIDTH', 'COLOR'])('leaves the miscased %s literal', (key) => {
+      expect(canonicalOptionKey(key)).toBe(key);
+    });
+
+    it.each(['myOwnAttr', 'dataAttr'])('leaves %s to the author', (key) => {
       expect(canonicalOptionKey(key)).toBe(key);
     });
 

@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, canonicalOptionKey, isLayerAttributeKey, serializeOptionValue } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, canonicalOptionKey, isLayerAttributeKey, optionSpellingWatcher, serializeOptionValue } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -414,7 +414,11 @@ export class BlissParser {
       && (restored.replace(QUOTED_SPAN, '').match(/\[/g) || []).length > 1;
   }
 
-  static #parseOptions(optionsString) {
+  // `warn` is optional because the entry points are not uniform: `parse` keeps
+  // a warnings array, and `parsePartString` is a public static that returns a
+  // part object and has no warnings route of its own. The silent default
+  // matches that entry point rather than hiding a hole.
+  static #parseOptions(optionsString, warn) {
     if (!optionsString) return;
 
     const bracketMatch = optionsString.match(BRACKET_EXTRACT_PATTERN);
@@ -426,21 +430,24 @@ export class BlissParser {
     if (!extractedContent) return;
 
     const parsedObject = Object.create(null);
+    const noteSpelling = warn ? optionSpellingWatcher(warn) : () => {};
 
     const regex = /([\w-]+)(?:\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^;]*))?/g;
     let match;
 
     while ((match = regex.exec(extractedContent)) !== null) {
       // Resolved HERE, where a bracket first becomes an options bag, so every
-      // gate, emitter and serializer downstream sees one spelling of a name a
-      // standard owns and none of them learns a rule. The scope gates read the
-      // bag this builds, which is what satisfies "canonicalize before the
-      // gates" by construction rather than by ordering discipline; the part
-      // path reaches this method without passing any gate at all.
-      const key = canonicalOptionKey(match[1].trim());
+      // gate, emitter and serializer downstream sees one spelling of a name the
+      // library or a standard owns and none of them learns a rule. The scope
+      // gates read the bag this builds, which is what satisfies "canonicalize
+      // before the gates" by construction rather than by ordering discipline;
+      // the part path reaches this method without passing any gate at all.
+      const writtenKey = match[1].trim();
+      const key = canonicalOptionKey(writtenKey);
 
       if (match[2] === undefined) {
         // Bare key (e.g., [grid]) — treat as boolean true
+        noteSpelling(writtenKey, key, true);
         parsedObject[key] = true;
       } else {
         let value = match[2].trim();
@@ -452,6 +459,7 @@ export class BlissParser {
           value = value.slice(1, -1).replace(/\\'/g, "'");
         }
 
+        noteSpelling(writtenKey, key, value);
         parsedObject[key] = value;
       }
     }
@@ -459,7 +467,10 @@ export class BlissParser {
     return parsedObject;
   }
 
-  static parsePartString(str, restoreFunction = (s) => s) {
+  // `warn` is passed by the parse path, which has a warnings array, and omitted
+  // by a definition expansion, which has none. A part bracket reports its
+  // option spellings on the first route and stays silent on the second.
+  static parsePartString(str, restoreFunction = (s) => s, warn) {
     const part = {};
 
     let optionsString, codeString;
@@ -467,7 +478,7 @@ export class BlissParser {
     if (match) {
       optionsString = match[1];
       codeString = match[2];
-      part.options = this.#parseOptions(restoreFunction(optionsString));
+      part.options = this.#parseOptions(restoreFunction(optionsString), warn);
     } else {
       codeString = str;
     }
@@ -509,6 +520,8 @@ export class BlissParser {
     inputString = inputString.trim();
     const result = {};
     const parseWarnings = [];
+    // The warnings route every option bracket in this parse reports through.
+    const warn = (warning) => parseWarnings.push(warning);
 
     // Parse a Blissymbolics string and convert it to an internal representation (BlissComposition)
     //Ex. 
@@ -640,7 +653,7 @@ export class BlissParser {
       // Gated like every other scope: a global-only key is at HOME here, but a
       // key bound to a lower scope (kerning) is as misplaced here as a global
       // key is down there.
-      result.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredGlobal), 'global') || {};
+      result.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredGlobal, warn), 'global') || {};
     } else {
       if (globalOptionsString && globalOptionsString.length > 0) {
         const restored = restorePlaceholders(globalOptionsString);
@@ -714,7 +727,7 @@ export class BlissParser {
               source: restoredBeforePipe,
             });
           }
-          group.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredBeforePipe), 'group');
+          group.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredBeforePipe, warn), 'group');
           groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
@@ -1040,11 +1053,19 @@ export class BlissParser {
             }
             const optionPrefix = current.match(OVERLAY_PART_OPTION_PATTERN);
             if (!optionPrefix) return current;
-            const parsed = BlissParser.#parseOptions(optionPrefix[1]) ?? {};
+            // This pass INSPECTS the bracket rather than ingesting it: when
+            // every key survives, the written text is returned untouched and
+            // parsed again for real downstream. So its option-spelling reports
+            // are buffered and released only on the branches that REWRITE the
+            // text, which are the last place the written spellings are visible.
+            // Passing them straight through would report a collapse twice.
+            const spellingReports = [];
+            const parsed = BlissParser.#parseOptions(optionPrefix[1], (w) => spellingReports.push(w)) ?? {};
             const keyCount = Object.keys(parsed).length;
             const kept = dropMisplacedGlobalKeys(parsed, 'part');
             const keptEntries = kept ? Object.entries(kept) : [];
             if (keptEntries.length === keyCount) return current;
+            parseWarnings.push(...spellingReports);
             if (keptEntries.length === 0) return optionPrefix[3];
             return `[${keptEntries.map(([k, v]) => v === true ? k : `${k}=${serializeOptionValue(v)}`).join(';')}]>${optionPrefix[3]}`;
           });
@@ -1763,7 +1784,7 @@ export class BlissParser {
           charBracketsSeen++;
           if (charBracketsSeen === 1) {
             const parsedOptions = dropMisplacedGlobalKeys(
-              this.#parseOptions(restorePlaceholders(charMatch[1])), 'character');
+              this.#parseOptions(restorePlaceholders(charMatch[1]), warn), 'character');
             bracketKerning = kerningOptionEntries(parsedOptions);
             // Merge only when something remains: a bracket fully emptied by the
             // gate (or written empty) must not leave an options: {} artifact on
@@ -1849,7 +1870,7 @@ export class BlissParser {
               twoPartPartString = partMatch[2];
             }
             twoPartPartString = head + twoPartPartString;
-            const part = this.parsePartString(twoPartPartString, restorePlaceholders);
+            const part = this.parsePartString(twoPartPartString, restorePlaceholders, warn);
             if (part.options) {
               part.options = dropMisplacedGlobalKeys(part.options, 'part');
               if (!part.options) delete part.options;
