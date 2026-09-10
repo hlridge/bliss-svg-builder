@@ -186,6 +186,24 @@ describe('BlissSVGBuilder object-input options', () => {
       expect(b.warnings).toEqual([]);
     });
 
+    it("treats one node's two bags as two bags as well", () => {
+      // The row above splits the two spellings across two LEVELS, which a
+      // watcher pooled per NODE would still keep apart. This one puts them in
+      // the two bags of a single node, which is the case that tells a per-bag
+      // watcher from a per-node one. The transient bag wins the paint, as an
+      // overlay must.
+      const b = build({
+        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }],
+                              options: { strokeWidth: 1 },
+                              transientOptions: { 'stroke-width': 2 } }] }],
+      });
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toBe(build({
+        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }],
+                              transientOptions: { 'stroke-width': 2 } }] }],
+      }).svgCode);
+    });
+
     it('reports once per bag that holds both spellings', () => {
       const b = build({
         options: { strokeWidth: 1, 'stroke-width': 2 },
