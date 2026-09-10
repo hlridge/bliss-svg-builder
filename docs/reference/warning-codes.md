@@ -550,21 +550,24 @@ A transient option written on a space is a different case and reports `MISPLACED
 
 ### `MISPLACED_OPTION_SPELLING`
 
-A named option written in its camelCase spelling in a hand-built composition **object**, which is the one channel stored exactly as it is given. There the key is not a named option at all: it lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), so it is emitted exactly as typed and sets nothing. Everywhere else either spelling reaches the option and nothing is reported.
+One of two internal names written where an option goes: `autoVertical`, which means `crop=auto-vertical`, and `cropCompact`, which means `crop=compact`. Neither is a *spelling* of an option name, so there is nothing to resolve either one to. Written as an option the key lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), is emitted exactly as typed and sets nothing, and the warning names the option that works.
 
-```js
-new BlissSVGBuilder({ options: { marginTop: 3 }, groups: [/* … */] });
-// warns; the margin is not applied and the root carries marginTop="3"
-new BlissSVGBuilder({ options: { 'margin-top': 3 }, groups: [/* … */] });
-new BlissSVGBuilder('[marginTop=3]||B291');    // silent: a bracket takes either spelling
-new BlissSVGBuilder('B291', { marginTop: 3 }); // silent, and so does everything else
+```
+[autoVertical]||B291    →  warns; write [crop=auto-vertical]
+[cropCompact]||B291     →  warns; write [crop=compact]
 ```
 
-Two internal names are reported in a bracket as well, and they name a whole option instead of a key: `[autoVertical]` points at `crop=auto-vertical`, and `[cropCompact]` at `crop=compact`. Neither is a spelling of an option *name*, so there is nothing to resolve them to. Both still work in the JavaScript entry points.
+Both keep working in the JavaScript entry points, where camelCase is the expected spelling:
+
+```js
+new BlissSVGBuilder('B291', { autoVertical: true });   // silent; crops
+```
+
+A curated option written in its camelCase spelling is **not** this warning. Every input resolves the name, so `[marginTop=3]`, `new BlissSVGBuilder('B291', { marginTop: 3 })` and `new BlissSVGBuilder({ options: { marginTop: 3 }, groups: [/* … */] })` all set the margin and say nothing. Writing the same name twice under two spellings is [`MULTIPLE_OPTION_SPELLINGS`](#multiple-option-spellings).
 
 The key is kept rather than dropped, so it round-trips through `toString()` and reports again on a reparse. It is reported once per place it was written, at every level, since each is a separate key that does nothing.
 
-This is about the library's own [named options](/reference/options-quick-reference) only. An attribute name SVG or ARIA owns is a separate rule: casing and hyphenation carry no meaning in one of those, so `view-box`, `viewbox` and `viewBox` all reach `viewBox`, and the owner's spelling is what comes back. A name nobody owns is yours and is emitted exactly as you typed it.
+An attribute name SVG or ARIA owns follows the same principle: casing and hyphenation carry no meaning in one of those, so `view-box`, `viewbox` and `viewBox` all reach `viewBox`, and the owner's spelling is what comes back. A name nobody owns is yours and is emitted exactly as you typed it.
 
 ## Illegal Operands
 

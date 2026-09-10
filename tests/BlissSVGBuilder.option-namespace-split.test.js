@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
-import { PUBLICATION_MAP, KNOWN_OPTION_KEYS, camelToKebab, isProgrammaticSpelling } from '../src/lib/bliss-constants.js';
+import { PUBLICATION_MAP } from '../src/lib/bliss-constants.js';
 
 /**
  * Pins the namespace separation: the library's computed values and the author's
@@ -12,19 +12,18 @@ import { PUBLICATION_MAP, KNOWN_OPTION_KEYS, camelToKebab, isProgrammaticSpellin
  * on a dot grew its radius 7.75x, `[marginTop=3]` concatenated a string into the
  * viewBox height, and `[cropTop=5]` threw outright. None of it was reported.
  *
- * A bracket, the options argument and a definition's defaults now all resolve a
- * curated name on the way in, so those three channels can no longer deliver a
- * camelCase key to the options pass at all: `[strokeWidth=1]` IS the option and
- * sets it. A composition OBJECT is the one channel left that stores a bag
- * exactly as it is given, so it is where the separation is still observable and
- * where `MISPLACED_OPTION_SPELLING` still has something to report.
+ * EVERY channel now resolves a curated name on the way in, a composition object
+ * last, so none of them can deliver a camelCase curated key to the options pass:
+ * `[strokeWidth=1]` IS the option and sets it. The four poisonings are therefore
+ * unreachable rather than merely separated, and the report that named them,
+ * `MISPLACED_OPTION_SPELLING`, is down to the two spellings that name a whole
+ * option rather than a name. What the split still holds is the reverse
+ * direction: the author's own keys stay the author's, at every depth, and never
+ * meet the computed bag.
  *
  * Covers:
- * - The four measured poisonings above, each asked of object input, where a
- *   camelCase key still reaches the pass verbatim: the key is filed with the
- *   author's own and computes nothing, while the library's value stands.
- * - The same four inputs asked of a bracket, where the name is now resolved and
- *   the option computes, byte-identically to its curated spelling.
+ * - The four measured poisonings asked of a bracket, where the name is resolved
+ *   and the option computes, byte-identically to its curated spelling.
  * - The reverse direction: a curated key written in its curated (kebab)
  *   spelling is untouched by the split, and the two names the library both
  *   computes AND publishes (`color` -> `stroke`, `strokeWidth` -> `stroke-width`)
@@ -49,19 +48,25 @@ import { PUBLICATION_MAP, KNOWN_OPTION_KEYS, camelToKebab, isProgrammaticSpellin
  *   single top-level row passes with four of them still wrong.
  * - The serializers, which snapshot the authoring tree before the options pass
  *   runs and must therefore never see the second bag.
- * - The report the separation makes possible, `MISPLACED_OPTION_SPELLING`: every
- *   curated option's camel spelling raises it on object input, once per place it
- *   was written, at every scope; a name the library does not curate never does;
- *   and the reported key is still EMITTED, because it is a usable attribute name.
  * - The two internal names with no curated twin (`autoVertical`, `cropCompact`),
  *   which the generic rule cannot see and a two-entry lookup handles instead.
- *   These are the only spellings a BRACKET still reports, because they name a
+ *   These are the only spellings anything still reports, because they name a
  *   whole option rather than a name, so there is nothing for ingest to resolve.
  *
  * Does NOT cover:
- * - What the resolved camelCase spelling now does on the converting channels
- *   (the derived render and `toString()` rows, the collapse when both spellings
- *   are written at once), which is `BlissSVGBuilder.option-spelling.test.js`.
+ * - What a curated option's camelCase spelling now does on a composition
+ *   object, which used to be this file's opening block and is
+ *   `BlissSVGBuilder.object-input-options.test.js`. Retired from here with it:
+ *   the derived sweep asserting each camel spelling REPORTS (the same
+ *   derivation now asserts each one computes), the four poisoning rows homed on
+ *   that channel, and the direct pin on `isProgrammaticSpelling`, whose
+ *   predicate was deleted with the arm it fed.
+ * - The two report filters that were homed on object input for as long as it
+ *   was the only channel carrying an unresolved camel key. Nothing can deliver
+ *   one now, so canonicalizing inside those filters no longer changes any
+ *   output; their bracket rows below are what keeps them honest.
+ * - The collapse when both spellings are written at once, and the `toString()`
+ *   rows, which are `BlissSVGBuilder.option-spelling.test.js`.
  * - Option VALUE validation, which is `BlissSVGBuilder.option-value-gate.test.js`.
  * - The same question asked of a definition's `defaultOptions`, which is a
  *   programmatic surface and therefore translates rather than reports, see
@@ -71,220 +76,64 @@ import { PUBLICATION_MAP, KNOWN_OPTION_KEYS, camelToKebab, isProgrammaticSpellin
 const render = (input, opts) => (opts ? new BlissSVGBuilder(input, opts) : new BlissSVGBuilder(input));
 const dotPath = (b) => b.svgCode.match(/<path[^>]*d="([^"]*)"/)[1];
 const viewBox = (b) => b.svgCode.match(/viewBox="[^"]*"/)[0];
-// The report these inputs now raise. Filtered out of the rows that mean "this
-// spelling computes nothing", so each of those keeps stating that one thing.
+// The one report a written option key still raises, kept apart from the rest so
+// a row asserting silence about everything else stays readable.
 const SPELLING_REPORT = 'MISPLACED_OPTION_SPELLING';
 const warningsBesidesSpelling = (b) => b.warnings.filter((w) => w.code !== SPELLING_REPORT);
 const spellingReports = (b) => b.warnings.filter((w) => w.code === SPELLING_REPORT);
 
-// The one input channel that stores an options bag exactly as it is given, so
-// the only one where a camelCase curated key still reaches the options pass.
+// A composition object with a document-scope options bag, shaped the way
+// `toJSON()` emits one.
 const objectInput = (options, codeName = 'B291') => ({
   groups: [{ glyphs: [{ codeName, parts: [{ codeName }] }] }],
   options,
 });
-const objectGlyphInput = (options, codeName = 'B291') => ({
-  groups: [{ glyphs: [{ codeName, parts: [{ codeName }], options }] }],
-});
-
-// Every curated option with a camelCase spelling distinct from its kebab one,
-// DERIVED rather than listed: a curated option added later is covered the day it
-// lands, where a hand-written list would silently stop being the whole set.
-const CURATED_CAMEL_SPELLINGS = [...KNOWN_OPTION_KEYS]
-  .filter((key) => key.includes('-'))
-  .map((key) => key.replace(/-(.)/g, (_, letter) => letter.toUpperCase()));
-
-// The single-word half of the same vocabulary: one spelling serves both
-// channels, so there is nothing to report and nothing to translate.
-const SINGLE_WORD_OPTIONS = [...KNOWN_OPTION_KEYS].filter((key) => !key.includes('-'));
 
 describe('BlissSVGBuilder option namespace split', () => {
-  describe('when a curated option is written in its programmatic spelling on object input', () => {
-    it('does not poison the dot geometry it never set', () => {
-      // The literal default rather than a second build of the same input: two
-      // builds move together under a change to the default itself, and nothing
-      // else in the suite pins this number. Measured before the split: r=2.58325
-      // against this r=0.20825, 7.75x the radius the option it looks like gives.
-      expect(dotPath(render(objectGlyphInput({ strokeWidth: 1 }, 'B4'))))
-        .toBe('M-0.20825,16a0.20825,0.20825 0 1,1 0.4165,0a0.20825,0.20825 0 1,1 -0.4165,0');
-    });
-
-    it('emits it verbatim, rather than under the name it publishes', () => {
-      // `strokeWidth` is the one spelling that is BOTH an author's key and a key
-      // of the publication map, so a rename applied to the keys being emitted
-      // rather than to the published walk caught it and left it half-working:
-      // setting stroke-width while computing nothing. Measured in that state:
-      // root `stroke-width="1"`, no camel attribute, and a paint that changed.
-      const svg = render(objectGlyphInput({ strokeWidth: 1 })).svgCode;
-      expect(svg).toMatch(/<g[^>]*\sstrokeWidth="1"/);
-      expect(svg).not.toContain('stroke-width="1"');
-    });
-
-    it('does not poison the viewBox by string concatenation', () => {
-      // Measured before the split: viewBox="-0.75 -3 9.5 2030.75", from
-      // 20 + '3' + 0.75 read as string concatenation.
-      expect(viewBox(render(objectInput({ marginTop: 3 })))).toBe('viewBox="-0.75 -0.75 9.5 21.5"');
-    });
-
-    // These two threw `num.toFixed is not a function` until the output-side
-    // finiteness check landed, because the string reached arithmetic written for
-    // the computed number. The check turned the throw into a report, so what is
-    // left to fix is the report itself: it announces a picture size the author
-    // never asked for, from a key that should have computed nothing.
-    it('does not crop from the programmatic spelling, or report that it tried', () => {
-      let b;
-      expect(() => { b = render(objectInput({ cropTop: 5 })); return b.svgCode; }).not.toThrow();
-      expect(viewBox(b)).toBe('viewBox="-0.75 -0.75 9.5 21.5"');
+  describe('when a composition object carries a curated option', () => {
+    // This channel stored a bag exactly as it was given for as long as any did,
+    // so it was where a camelCase curated key could still reach the options
+    // pass, land beside the value the library had computed under that name, and
+    // be reported. It resolves the name on ingest now, so the poisonings are
+    // unreachable rather than separated and the report has nothing to say here.
+    // What survives is the separation itself, which is what these rows state.
+    it("keeps the author's own key out of the computed values", () => {
+      // A name nobody owns is emitted as typed, and the curated option written
+      // beside it still computes. One bag would put them in each other's way.
+      const b = render(objectInput({ myOwnAttr: 'blue', 'stroke-width': 2 }));
+      expect(b.svgCode).toContain('myOwnAttr="blue"');
+      expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="2"/);
       expect(warningsBesidesSpelling(b)).toEqual([]);
     });
 
-    it('does not size the root from the programmatic spelling, or report that it tried', () => {
-      let b;
-      expect(() => { b = render(objectInput({ svgHeight: 200 })); return b.svgCode; }).not.toThrow();
-      expect(b.svgCode).toContain('width="57" height="129"');
-      expect(warningsBesidesSpelling(b)).toEqual([]);
-    });
-
-    it('leaves the grid alone where the camel spelling used to paint it', () => {
-      // gridSkyColor has an internal camel twin, so it painted by accident:
-      // measured before the split, the sky line carried stroke="blue".
-      const svg = render(objectInput({ grid: true, gridSkyColor: 'blue' })).svgCode;
-      expect(svg).not.toContain('stroke="blue"');
-      // and the key itself is now an ordinary authored one, emitted as typed.
-      expect(svg).toContain('gridSkyColor="blue"');
-    });
-
-    // Three reports name written option keys back to the author, and all three
-    // filter the written list through the curated geometry sets. Canonicalizing
-    // that list was right while one bag carried both spellings; with two bags it
-    // makes each report name a key that computes nothing, so the author is told
-    // to remove or reduce something that was never doing anything. On the
-    // converting channels the question no longer arises, because the key really
-    // does size the picture by the time a report reads it. Here it still arises,
-    // and these are the rows that keep the filters honest.
-    it('is not reported as displaced when the viewBox is written by hand', () => {
-      // Measured before the fix: MULTIPLE_GEOMETRY_VALUES, source "marginTop",
-      // announcing that the hand-written viewBox replaced a value this key never
-      // produced. The kebab twin IS displaced and still reports, in
-      // `layer-attributes.test.js`.
-      const b = render(objectInput({ marginTop: 3, viewBox: '0 0 10 10' }));
-      expect(warningsBesidesSpelling(b)).toEqual([]);
-      expect(b.svgCode).toContain('viewBox="0 0 10 10"');
-    });
-
-    it('is not named among the values to reduce when a curated option overflows', () => {
-      // The second call site of the same conversion. This report exists to say
-      // WHICH written options to reduce, so a key that sizes nothing is worse
-      // than noise here. Measured before the fix: source "margin, marginTop".
-      // `margin` alone overflows; the camel key rides along.
-      const b = render(objectInput({ margin: 1e308, marginTop: 3 }));
-      expect(warningsBesidesSpelling(b).map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
-      expect(warningsBesidesSpelling(b)[0].source).toBe('margin');
-    });
-
-    it('does not make the overflow report name an option when the content is what overflowed', () => {
-      // The second arm of the same filter, and a different observable outcome:
-      // above it is removed from a list that stays non-empty, here removing it
-      // empties the list, and the message BRANCHES on that. The overflow comes
-      // from a position at element scope, which no builder-scope set can see, so
-      // there is nothing to drop and the report has to say so. Measured before
-      // the fix: `"marginTop" works out to a picture size...`, which named a key
-      // that sizes nothing AND claimed options had been dropped. The kebab twin
-      // is the control and still takes the named branch.
-      const overflowing = (options) => ({
-        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291', x: 1e308 }] }] }],
-        options,
-      });
-      const overflow = (b) => b.warnings.find((w) => w.code === 'OUT_OF_RANGE_COMPUTED_GEOMETRY');
-      const camel = render(overflowing({ marginTop: 3 }));
-      const kebab = render(overflowing({ 'margin-top': 3 }));
-
-      expect(overflow(camel).source).toBe('');
-      expect(overflow(camel).message).toContain('The content works out to');
-      expect(overflow(kebab).source).toBe('margin-top');
-    });
-
-    it('does not collide with the attribute a curated option publishes', () => {
-      // Two spellings of one attribute collide and report; a camel key and a
-      // `root--` key are two different attributes and must not. This row is the
-      // absence of a warning, so it is the one that notices the rename coming
-      // back. In a bracket the same input DOES collide now, because there the
-      // camel key IS the curated option; that half is pinned below.
+    it('collides with the attribute it publishes, exactly as a bracket does', () => {
+      // While the key was inert this was the row that noticed a rename coming
+      // back, and the absence of a warning was the point. `strokeWidth` IS the
+      // curated option on this channel now, so it is the ordinary
+      // curated-versus-named-target collision and the two surfaces agree.
       const b = render(objectInput({ strokeWidth: 2, 'root--stroke-width': 3 }));
-      expect(warningsBesidesSpelling(b)).toEqual([]);
+      expect(b.warnings.map((w) => w.code)).toEqual(['MULTIPLE_ATTRIBUTE_VALUES']);
+      expect(b.warnings[0].source).toBe('stroke-width');
       expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="3"/);
-      expect(b.svgCode).toMatch(/\sstrokeWidth="2"/);
+      expect(b.svgCode).not.toContain('strokeWidth');
     });
 
-    // Everything above pins that the spelling does NOTHING on this channel. The
-    // rows below pin that the library says so, which is the whole point of
-    // separating the bags: before it, the key landed on a computed value and the
-    // damage was silent.
-    it('has a spelling to test in each derived list', () => {
-      // Both lists are DERIVED, and an `it.each` over an empty array generates
-      // no rows and reports success. Membership rather than a count: a count
-      // fails the day a legitimate option is added, which is the one thing the
-      // derivation exists to absorb.
-      expect(CURATED_CAMEL_SPELLINGS).toEqual(expect.arrayContaining(['strokeWidth', 'marginTop', 'gridSkyColor']));
-      expect(SINGLE_WORD_OPTIONS).toEqual(expect.arrayContaining(['margin', 'crop', 'grid']));
-    });
-
-    it.each(CURATED_CAMEL_SPELLINGS)('reports %s, naming the spelling that works', (camel) => {
-      const misplaced = spellingReports(render(objectInput({ [camel]: 1 })));
-      expect(misplaced).toHaveLength(1);
-      expect(misplaced[0].source).toBe(camel);
-      expect(misplaced[0].message).toContain(`"${camel}"`);
-      expect(misplaced[0].message).toContain(`"${camelToKebab(camel)}"`);
-    });
-
-    it.each(SINGLE_WORD_OPTIONS)('says nothing about %s, which spells the same both ways', (key) => {
-      expect(spellingReports(render(objectInput({ [key]: 1 })))).toEqual([]);
-    });
-
-    it('reports a hand-authored transient key, which merges into the same bag', () => {
-      // `setTransientOptions` resolves the name, so only object input can put a
-      // camel key in this channel. It merges into the node's options before the
-      // pass runs, which is exactly why one report site covers it.
-      const b = render({ groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }],
-                                              transientOptions: { strokeWidth: 2 } }] }] });
-      expect(spellingReports(b)).toHaveLength(1);
-    });
-
-    it('reports at element scope, where the key is equally inert', () => {
-      // The report site is the options pass, which reaches every scope; a
-      // document-level bag would pass on its own with the lower scopes silent.
-      expect(spellingReports(render(objectGlyphInput({ strokeWidth: 1 })))).toHaveLength(1);
-    });
-
-    it('reports once per place it was written, not once per name', () => {
+    it('reports the one spelling left once per place it was written', () => {
       // Two scopes are two written keys and two inert values. A report keyed by
       // NAME would collapse these into one and leave the second site unnamed.
+      // `autoVertical` carries the row because it names a whole option rather
+      // than a name, which is the only kind of spelling still reported.
       const b = render({ groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }],
-                                              options: { strokeWidth: 2 } }] }],
-                         options: { strokeWidth: 1 } });
+                                              options: { autoVertical: true } }] }],
+                         options: { autoVertical: true } });
       expect(spellingReports(b)).toHaveLength(2);
+      expect(spellingReports(b)[0].source).toBe('autoVertical');
     });
 
     it('still emits the reported key, because it is a usable attribute name', () => {
       // Reported AND emitted, not reported and dropped. The pass-through rule is
-      // that a well-formed attribute name is emitted as typed, and this is one;
-      // MISPLACED_CONTAINER_ATTRIBUTE is the precedent, where the value is
-      // emitted where it was asked for and the report names what works instead.
-      // UNKNOWN_LAYER drops its key, but only because `foo--x` is not a usable
-      // attribute name at all, so it is the wrong precedent to reach for here.
-      expect(render(objectInput({ marginTop: 3 })).svgCode).toContain('marginTop="3"');
-    });
-
-    it('answers no for the curated spelling itself, which nothing in the render path asks', () => {
-      // The predicate's first clause is unreachable at its only call site: the
-      // emission loop skips a curated key before it gets there. It stays because
-      // the predicate is exported under a name that claims a standalone meaning,
-      // and `stroke-width` is not the programmatic spelling of anything. Pinned
-      // directly because behaviour cannot see it: a mutant deleting the clause
-      // survives the whole suite, which is the belt-and-braces shape where
-      // exactly one half is load-bearing at a time.
-      expect(isProgrammaticSpelling('stroke-width')).toBe(false);
-      expect(isProgrammaticSpelling('strokeWidth')).toBe(true);
+      // that a well-formed attribute name is emitted as typed, and this is one.
+      expect(render(objectInput({ autoVertical: true })).svgCode).toContain('autoVertical="true"');
     });
   });
 

@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isProgrammaticSpelling, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -553,23 +553,22 @@ class BlissSVGBuilder {
     // String values are escaped here at the input boundary so downstream code can use them safely.
     // Numeric values pass through as-is — they're used for calculations, not SVG markup.
     //
-    // Two kinds of key reach here meaning a curated option and not setting one,
-    // and both are reported HERE rather than at an emitter: this pass runs once
-    // per rebuild and reaches every scope, where the emitters run per render and
-    // are spread across two files. The key is left in the bag, so it still
-    // round-trips, re-warns on reparse and is emitted as written — a usable
+    // ONE kind of key reaches here meaning a curated option and not setting one:
+    // a whole option written as a single JavaScript word (`autoVertical` for
+    // `crop=auto-vertical`). It is not a spelling of a NAME, so ingest has
+    // nothing to resolve and only the surfaces that document the shorthand read
+    // it. Reported HERE rather than at an emitter: this pass runs once per
+    // rebuild and reaches every scope, where the emitters run per render and are
+    // spread across two files. The key is left in the bag, so it still
+    // round-trips, re-warns on reparse and is emitted as written; a usable
     // attribute name reaches the markup as typed, which is the pass-through rule
     // and not an exception to it.
     //
-    // The first kind is a whole option written as one JavaScript word
-    // (`autoVertical` for `crop=auto-vertical`), which is not a spelling of a
-    // name and so has nothing for ingest to resolve.
-    //
-    // The second is a curated option written in its programmatic spelling, and
-    // exactly one channel can still deliver one: a composition OBJECT is stored
-    // as it is given, where a bracket, the options argument and a definition's
-    // defaults all resolve the name on the way in. The report retires with that
-    // last exception.
+    // A curated option written in its PROGRAMMATIC spelling was reported here
+    // too, for as long as one channel could still deliver such a key. Object
+    // input was that channel and now resolves the name on the way in like the
+    // rest, so nothing can reach this loop under a curated camelCase name and
+    // the arm that said so is retired.
     for (const [key, value] of Object.entries(rawOptions)) {
       if (KNOWN_OPTION_KEYS.has(key)) continue;
       const internalOnly = INTERNAL_ONLY_SPELLINGS.get(key);
@@ -577,13 +576,6 @@ class BlissSVGBuilder {
         this.#warnings.push({
           code: WARNING_CODES.MISPLACED_OPTION_SPELLING,
           message: `"${key}" is the programmatic spelling of the "${internalOnly}" option, which the JavaScript entry points read. Written as an option it is not curated, so it was emitted as written and sets nothing. Write "${internalOnly}" instead.`,
-          source: key,
-        });
-      } else if (isProgrammaticSpelling(key)) {
-        const curated = camelToKebab(key);
-        this.#warnings.push({
-          code: WARNING_CODES.MISPLACED_OPTION_SPELLING,
-          message: `"${key}" is the programmatic spelling of "${curated}". A composition object is stored exactly as it is given, so the key was emitted as written and sets nothing. Write "${curated}" instead.`,
           source: key,
         });
       }
@@ -708,6 +700,22 @@ class BlissSVGBuilder {
       ? BlissParser.parse(input)
       : structuredClone(input);
 
+    // A composition object was the last channel that stored an options bag
+    // exactly as it was given, so it is the last one where a name still has to
+    // be resolved. Done HERE, on the clone and before anything else reads the
+    // tree, so every gate, emitter and serializer downstream sees the one
+    // spelling a bracket and the options argument already store.
+    //
+    // Before `expandParts`, so only the bags the CALLER wrote are touched: a
+    // definition's own defaults are resolved where they are declared, and
+    // walking them again would put this task's blame on a bag it never read.
+    if (typeof input !== 'string') {
+      BlissSVGBuilder.#canonicalizeAuthoredBags(
+        blissObj,
+        (warning) => (blissObj._parseWarnings ??= []).push(warning),
+      );
+    }
+
     // For object input (from toJSON), re-expand any parts that were stripped
     if (typeof input !== 'string') {
       BlissParser.expandParts(blissObj);
@@ -828,6 +836,58 @@ class BlissSVGBuilder {
     if (node.options && keys.some(key => Object.hasOwn(KERNING_OPTION_KEYS, key))) {
       for (const key of Object.keys(KERNING_OPTION_KEYS)) delete node.options[key];
     }
+  }
+
+  // Every options bag inside a composition object, resolved in place. The whole
+  // tree is walked rather than the root alone because a bag can sit at any of
+  // five levels and each one is a bag the caller wrote: a document-level row
+  // passes with the other four still verbatim.
+  //
+  // A hand-authored transient bag is walked too. `setTransientOptions` resolves
+  // the name itself, so a composition object is the only way an unresolved key
+  // reaches that channel, and it merges into the node's options before the
+  // options pass runs.
+  static #canonicalizeAuthoredBags(node, warn) {
+    for (const bag of ['options', 'transientOptions']) {
+      if (node[bag]) node[bag] = BlissSVGBuilder.#canonicalizeAuthoredBag(node[bag], warn);
+    }
+    for (const level of ['groups', 'glyphs', 'parts']) {
+      for (const child of node[level] ?? []) BlissSVGBuilder.#canonicalizeAuthoredBags(child, warn);
+    }
+  }
+
+  // One bag, watched on its own so two bags each holding one spelling stay a
+  // layering rather than a collision.
+  //
+  // The same lookup `#parseOptions` and `#toRaw` run, and NAMES are all it
+  // touches. `#toRaw` also stringifies a value and drops one it cannot use, and
+  // this does neither, because those two are what let the value gate see a
+  // `null` or a `[5]` on this channel and refuse it by name. Converging on
+  // `#toRaw` would trade four reports for silence, which is the wrong direction
+  // for a task about making names work.
+  //
+  // It also does not expand the two internal-only shorthands. `autoVertical`
+  // means `crop=auto-vertical`, a whole option rather than a name, and `crop` is
+  // global-only, so expanding it in a bag below the document would replace a
+  // report with a key that is silently inert. The surfaces that document the
+  // shorthand read it; a stored composition is not one of them, since nothing
+  // the library serializes ever contains one.
+  //
+  // The two kerning names are resolved here like any other curated option, even
+  // though this is the one channel where such a key may be the PARSER's rather
+  // than the author's: `toJSON()` stores a kerned character as `relativeKerning`.
+  // Measured, resolving it costs nothing, because the kerning resolver reads
+  // either spelling and the name is promoted back on the way out, so a round
+  // trip is byte-identical and `toJSON()` deep-equal either way.
+  static #canonicalizeAuthoredBag(bag, warn) {
+    const canonical = {};
+    const noteSpelling = optionSpellingWatcher(warn);
+    for (const [key, value] of Object.entries(bag)) {
+      const storedKey = canonicalOptionKey(key);
+      noteSpelling(key, storedKey, value);
+      canonical[storedKey] = value;
+    }
+    return canonical;
   }
 
   // `warn` is optional, and every caller that has a warnings route passes one:
@@ -1479,19 +1539,16 @@ class BlissSVGBuilder {
     });
     // All three sets below match the spelling AS WRITTEN, with no camelCase
     // canonicalization, because each answers "did this key produce that value"
-    // and the options pass dispatches on the kebab spelling alone. The two
-    // channels that COMPUTE from camelCase, the options argument and
-    // `setTransientOptions`, both pass through `#toRaw`, which kebab-cases on
-    // the way in, so such a key has stopped being camelCase before it reaches
-    // here. A bracket and a hand-written options object keep the spelling, and
-    // there it is an author's key: it lands in the second bag, is emitted as
-    // typed and shapes nothing. Canonicalizing here names such a key as
-    // displaced, or as a value to reduce, on the strength of work it never did.
+    // and the options pass dispatches on the curated spelling alone.
     //
-    // Object input is NOT a third converting channel: it is cloned verbatim, so
-    // a rebuild normalizes nothing. It is safe for the opposite reason, that the
-    // converting channels kebab-case BEFORE serializing, so the only camelCase a
-    // `toJSON()` can carry is the inert kind it was handed.
+    // Every channel that can deliver an options bag resolves a curated name on
+    // the way in: a bracket through `#parseOptions`, the options argument and
+    // the mutation setters through `#toRaw`, a definition's defaults through
+    // `#toCuratedSpelling`, and a composition object through the ingest walk.
+    // So a key still spelled in camelCase by the time it reaches here is a name
+    // nobody owns: it lands in the second bag, is emitted as typed and shapes
+    // nothing. Canonicalizing here would name such a key as displaced, or as a
+    // value to reduce, on the strength of work it never did.
     const writtenGeometryOptions = writtenKeys.filter(key => GEOMETRY_OPTION_KEYS.has(key));
     // The wider set, for the overflow report below: `svg-height` and the three
     // spacings never shape the viewBox, so they are absent above, but each can

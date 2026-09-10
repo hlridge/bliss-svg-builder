@@ -305,22 +305,6 @@ export const isNamedOptionKey = (key) => {
 };
 
 /**
- * True for a curated option written in the spelling only the JavaScript entry
- * points read: the kebab form is a curated option, and this key is not that
- * form. Such a key reaches an options bag as an ordinary attribute name, so it
- * is emitted as written and sets nothing.
- *
- * Deliberately NOT `isNamedOptionKey`, which also answers for the two kerning
- * names. The parser writes `relativeKerning` into the options bag itself,
- * promoted there from `[relative-kerning=N]` or an `RK:`/`AK:` marker, so at the
- * point this is asked a promoted key and a written one are the same key and
- * nothing here could tell them apart. The bracket spelling of kerning is judged
- * at the parser instead, where the written form is still visible.
- */
-export const isProgrammaticSpelling = (key) =>
-  !KNOWN_OPTION_KEYS.has(key) && KNOWN_OPTION_KEYS.has(camelToKebab(key));
-
-/**
  * An ARIA name written the way JavaScript spells things. Matched by pattern
  * rather than by list, which is what keeps it from going stale as ARIA grows:
  * every state and property is `aria-` followed by ONE lowercase token with no
@@ -418,9 +402,13 @@ export const optionSpellingWatcher = (warn) => {
  * the consumer reads.
  *
  * `camelToKebab` gives `auto-vertical` and `crop-compact`, neither of which is
- * an option, so `isProgrammaticSpelling` above cannot see these two and its
- * message would name a key that does not exist. A lookup, because there is no
- * rule that derives `crop=compact` from `cropCompact`.
+ * an option, so `canonicalOptionKey` cannot see these two and any rule derived
+ * from the curated vocabulary would name a key that does not exist. A lookup,
+ * because there is no rule that derives `crop=compact` from `cropCompact`.
+ *
+ * That is also why these two are the last spellings anything still reports:
+ * each names a whole option rather than a name, so resolving names on ingest
+ * left them with nothing to resolve.
  *
  * Not a general "did you mean" mechanism, which is ruled out: these are names
  * the library itself uses, so nothing is being guessed about what was meant.

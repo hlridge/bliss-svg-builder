@@ -256,14 +256,19 @@ describe('BlissSVGBuilder transient options', () => {
       expect(b.warnings.find(w => w.code === 'MISPLACED_TRANSIENT_OPTION').source).toBe('x');
     });
 
-    it('refuses the camelCase spelling that only object input can deliver', () => {
-      // the setter canonicalizes to kebab, so the camel entries in the refused
-      // set exist for this path alone
+    it('refuses the camelCase spelling on object input under the stored name too', () => {
+      // Object input used to store this bag verbatim, so the refusal named the
+      // camel spelling and the camel entries in the refused set were reached
+      // from this path alone. That channel resolves a curated name on ingest
+      // now, kerning included, so the refusal names `relative-kerning` exactly
+      // as it does for the setter two rows above. The camel entries stay in the
+      // refused set: they are what a key would be matched against if any future
+      // surface stored one, and the set is cheaper to keep whole than to prune.
       const b = new BlissSVGBuilder({
         groups: [{ glyphs: [{ parts: [{ codeName: 'B291', transientOptions: { relativeKerning: 3 } }] }] }],
       });
 
-      expect(b.warnings.some(w => w.code === 'MISPLACED_TRANSIENT_OPTION' && w.source === 'relativeKerning')).toBe(true);
+      expect(b.warnings.some(w => w.code === 'MISPLACED_TRANSIENT_OPTION' && w.source === 'relative-kerning')).toBe(true);
     });
 
     it('leaves a normal kerning value untouched when a transient one is refused', () => {
