@@ -154,6 +154,68 @@ describe('BlissSVGBuilder option namespace split', () => {
       expect(svg).toContain('gridSkyColor="blue"');
     });
 
+    // Three reports name written option keys back to the author, and all three
+    // filter the written list through the curated geometry sets. Canonicalizing
+    // that list was right while one bag carried both spellings; with two bags it
+    // makes each report name a key that computes nothing, so the author is told
+    // to remove or reduce something that was never doing anything. On the
+    // converting channels the question no longer arises, because the key really
+    // does size the picture by the time a report reads it. Here it still arises,
+    // and these are the rows that keep the filters honest.
+    it('is not reported as displaced when the viewBox is written by hand', () => {
+      // Measured before the fix: MULTIPLE_GEOMETRY_VALUES, source "marginTop",
+      // announcing that the hand-written viewBox replaced a value this key never
+      // produced. The kebab twin IS displaced and still reports, in
+      // `layer-attributes.test.js`.
+      const b = render(objectInput({ marginTop: 3, viewBox: '0 0 10 10' }));
+      expect(warningsBesidesSpelling(b)).toEqual([]);
+      expect(b.svgCode).toContain('viewBox="0 0 10 10"');
+    });
+
+    it('is not named among the values to reduce when a curated option overflows', () => {
+      // The second call site of the same conversion. This report exists to say
+      // WHICH written options to reduce, so a key that sizes nothing is worse
+      // than noise here. Measured before the fix: source "margin, marginTop".
+      // `margin` alone overflows; the camel key rides along.
+      const b = render(objectInput({ margin: 1e308, marginTop: 3 }));
+      expect(warningsBesidesSpelling(b).map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      expect(warningsBesidesSpelling(b)[0].source).toBe('margin');
+    });
+
+    it('does not make the overflow report name an option when the content is what overflowed', () => {
+      // The second arm of the same filter, and a different observable outcome:
+      // above it is removed from a list that stays non-empty, here removing it
+      // empties the list, and the message BRANCHES on that. The overflow comes
+      // from a position at element scope, which no builder-scope set can see, so
+      // there is nothing to drop and the report has to say so. Measured before
+      // the fix: `"marginTop" works out to a picture size...`, which named a key
+      // that sizes nothing AND claimed options had been dropped. The kebab twin
+      // is the control and still takes the named branch.
+      const overflowing = (options) => ({
+        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291', x: 1e308 }] }] }],
+        options,
+      });
+      const overflow = (b) => b.warnings.find((w) => w.code === 'OUT_OF_RANGE_COMPUTED_GEOMETRY');
+      const camel = render(overflowing({ marginTop: 3 }));
+      const kebab = render(overflowing({ 'margin-top': 3 }));
+
+      expect(overflow(camel).source).toBe('');
+      expect(overflow(camel).message).toContain('The content works out to');
+      expect(overflow(kebab).source).toBe('margin-top');
+    });
+
+    it('does not collide with the attribute a curated option publishes', () => {
+      // Two spellings of one attribute collide and report; a camel key and a
+      // `root--` key are two different attributes and must not. This row is the
+      // absence of a warning, so it is the one that notices the rename coming
+      // back. In a bracket the same input DOES collide now, because there the
+      // camel key IS the curated option; that half is pinned below.
+      const b = render(objectInput({ strokeWidth: 2, 'root--stroke-width': 3 }));
+      expect(warningsBesidesSpelling(b)).toEqual([]);
+      expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="3"/);
+      expect(b.svgCode).toMatch(/\sstrokeWidth="2"/);
+    });
+
     // Everything above pins that the spelling does NOTHING on this channel. The
     // rows below pin that the library says so, which is the whole point of
     // separating the bags: before it, the key landed on a computed value and the

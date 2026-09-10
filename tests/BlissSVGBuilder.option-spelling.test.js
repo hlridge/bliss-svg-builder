@@ -243,6 +243,54 @@ describe('BlissSVGBuilder option spelling', () => {
       expect(render('B291', { marginTop: 3 }).warnings).toEqual([]);
       expect(render('B291', { 'margin-top': 3 }).warnings).toEqual([]);
     });
+
+    it('names the displaced key rather than a value it never had', () => {
+      // A bare key is stored as `true`, so the displaced one is named the way it
+      // was written. Without this the report reads `"marginTop=true"`, a string
+      // the author cannot find in their own input.
+      const b = render('[marginTop;margin-top=4]||B291');
+      expect(codes(b)).toEqual(['MULTIPLE_OPTION_SPELLINGS']);
+      expect(b.warnings[0].source).toBe('marginTop');
+    });
+  });
+
+  describe('when two spellings arrive through a mutation call', () => {
+    // One row per warnings sink, because each is a separate wiring of the same
+    // watcher and a sink dropped from one of them reads as covered. The three
+    // sinks are the handle route (`mutationCtx.toRaw`, shared by every handle
+    // opts method), the builder's transient channel, and the group builder.
+    it.each([
+      ['a handle setter', (b) => b.glyph(0).setOptions({ marginTop: 3, 'margin-top': 4 })],
+      ['the transient channel', (b) => b.setTransientOptions({ marginTop: 3, 'margin-top': 4 })],
+      ['a new group', (b) => b.addGroup('B4', { marginTop: 3, 'margin-top': 4 })],
+      ['a new character', (b) => b.addGlyph('B4', { marginTop: 3, 'margin-top': 4 })],
+    ])('reports the displaced spelling from %s', (_where, mutate) => {
+      const b = render('B291');
+      mutate(b);
+      expect(codes(b)).toEqual(['MULTIPLE_OPTION_SPELLINGS']);
+      expect(b.warnings[0].source).toBe('marginTop=3');
+    });
+
+    it('records one report per call rather than one per builder', () => {
+      // A displaced value never reaches the tree, so no rebuild can re-derive
+      // it: these live in the mutation log, which is not reset by a rebuild.
+      // Two calls are two displacements and two reports, which is what that log
+      // is for; collapsing them would hide the second lost value.
+      const b = render('B291');
+      b.setTransientOptions({ marginTop: 3, 'margin-top': 4 });
+      b.setTransientOptions({ marginTop: 5, 'margin-top': 6 });
+      expect(b.warnings.map((w) => w.source)).toEqual(['marginTop=3', 'marginTop=5']);
+    });
+
+    it('says nothing when two calls each write one spelling', () => {
+      // Two calls are two bags, so there is no collision to report even though
+      // the second value replaces the first. The control that keeps the row
+      // above from passing on a per-builder accumulator.
+      const b = render('B291');
+      b.setTransientOptions({ marginTop: 3 });
+      b.setTransientOptions({ 'margin-top': 4 });
+      expect(b.warnings).toEqual([]);
+    });
   });
 
   describe('when kerning is written the way JavaScript spells it', () => {
