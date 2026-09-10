@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, DOCUMENT_DEFINING_ATTRIBUTES, LIBRARY_OWNED_ROOT_ATTRIBUTES, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isProgrammaticSpelling, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, isProgrammaticSpelling, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -643,7 +643,7 @@ class BlissSVGBuilder {
         // it lands, so the guard reaches every scope rather than the root
         // alone. Global scope is judged in the split loop below instead, on
         // the name actually emitted, since an alias there can rename the key.
-        if (!isTopLevel && DOCUMENT_DEFINING_ATTRIBUTES.has(name)) {
+        if (!isTopLevel && isDocumentDefiningAttribute(name)) {
           this.#warnings.push({
             code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
             message: reservedAttributeMessage(name),
@@ -832,11 +832,16 @@ class BlissSVGBuilder {
         }
         continue;
       }
-      const kebabKey = isNamedOptionKey(key) ? camelToKebab(key) : key;
+      // A name the library curates is asked about FIRST, so a name shared with
+      // a standard (`stroke-width`, `color`) stays curated and keeps reaching
+      // the cascade that computes from it. Everything else asks whether a
+      // standard owns the name, and keeps the author's spelling when nobody
+      // does.
+      const storedKey = isNamedOptionKey(key) ? camelToKebab(key) : canonicalOptionKey(key);
       if (typeof value === 'boolean') {
-        raw[kebabKey] = value;
+        raw[storedKey] = value;
       } else {
-        raw[kebabKey] = String(value);
+        raw[storedKey] = String(value);
       }
     }
     return raw;
@@ -1650,7 +1655,7 @@ class BlissSVGBuilder {
         // layer, so that guard exists here and nowhere else. The library's own
         // root stamp is the third case, and collides with nothing one level
         // down, so it is left alone here.
-        if (DOCUMENT_DEFINING_ATTRIBUTES.has(target.attribute)) {
+        if (isDocumentDefiningAttribute(target.attribute)) {
           this.#warnings.push({
             code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
             message: reservedAttributeMessage(target.attribute),
@@ -1691,7 +1696,7 @@ class BlissSVGBuilder {
           // into the same set the bare keys build, which is what lets the
           // geometry displacement report and the root's attribute merge see it
           // without knowing it arrived prefixed.
-          if (LIBRARY_OWNED_ROOT_ATTRIBUTES.has(target.attribute)) {
+          if (isLibraryOwnedRootAttribute(target.attribute)) {
             this.#warnings.push({
               code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
               message: reservedAttributeMessage(target.attribute),
@@ -1706,7 +1711,7 @@ class BlissSVGBuilder {
         continue;
       }
       if (!isSafeAttributeName(key)) continue;
-      if (DOCUMENT_DEFINING_ATTRIBUTES.has(attrName) || LIBRARY_OWNED_ROOT_ATTRIBUTES.has(attrName)) {
+      if (isDocumentDefiningAttribute(attrName) || isLibraryOwnedRootAttribute(attrName)) {
         this.#warnings.push({
           code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
           message: reservedAttributeMessage(attrName),
@@ -2442,6 +2447,10 @@ class BlissSVGBuilder {
     if (!bag) return this;
     for (const key of keys) {
       delete bag[camelToKebab(key)];
+      // The spelling ingest stored it under, which for a name a standard owns
+      // is neither the written one nor its kebab form: `view-box` is stored as
+      // `viewBox`, and camelToKebab leaves `view-box` alone.
+      delete bag[canonicalOptionKey(key)];
       delete bag[key];
     }
     if (Object.keys(bag).length === 0) delete this.#rawBlissObj.transientOptions;
@@ -3715,7 +3724,7 @@ class BlissSVGBuilder {
   static #toCuratedSpelling(defaultOptions) {
     const translated = {};
     for (const [key, value] of Object.entries(defaultOptions)) {
-      translated[isNamedOptionKey(key) ? camelToKebab(key) : key] = value;
+      translated[isNamedOptionKey(key) ? camelToKebab(key) : canonicalOptionKey(key)] = value;
     }
     return translated;
   }

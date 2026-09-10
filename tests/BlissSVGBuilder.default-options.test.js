@@ -100,15 +100,20 @@ describe('BlissSVGBuilder defaultOptions', () => {
         .toBe(new BlissSVGBuilder('DOPTPAIRB').svgCode.replace(/DOPTPAIRB/g, 'X'));
     });
 
-    it('leaves a name the library does not curate in the spelling it was written', () => {
-      // `strokeDasharray` is not ours in either spelling, so translating it
-      // would be a guess. The same rule protects `preserveAspectRatio`, which is
-      // genuinely camelCase in SVG and would be destroyed by a blanket kebab.
+    it('resolves a name a standard owns and leaves the author their own', () => {
+      // `strokeDasharray` is not ours, but it is not nobody's either: SVG owns
+      // `stroke-dasharray` in a fixed spelling, so this is a lookup and not the
+      // guess a blanket kebab would be. `preserveAspectRatio` is what makes the
+      // difference visible, being genuinely camelCase in SVG and therefore
+      // already its owner's spelling; `myOwnAttr` is the case where there is
+      // nobody to look up and the author's spelling stands.
       defineTracked({ DOPTRAW: { type: 'glyph', codeString: 'B291',
-                                 defaultOptions: { strokeDasharray: '1 1', preserveAspectRatio: 'none' } } });
+                                 defaultOptions: { strokeDasharray: '1 1', preserveAspectRatio: 'none', myOwnAttr: '2' } } });
       const svg = new BlissSVGBuilder('DOPTRAW').svgCode;
-      expect(svg).toContain('strokeDasharray="1 1"');
+      expect(svg).toContain('stroke-dasharray="1 1"');
       expect(svg).toContain('preserveAspectRatio="none"');
+      expect(svg).toContain('myOwnAttr="2"');
+      expect(svg).not.toContain('strokeDasharray');
     });
 
     it('translates a kerning name, which the report side deliberately does not judge', () => {

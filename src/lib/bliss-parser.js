@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, isLayerAttributeKey, serializeOptionValue } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, canonicalOptionKey, isLayerAttributeKey, serializeOptionValue } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -431,7 +431,13 @@ export class BlissParser {
     let match;
 
     while ((match = regex.exec(extractedContent)) !== null) {
-      const key = match[1].trim();
+      // Resolved HERE, where a bracket first becomes an options bag, so every
+      // gate, emitter and serializer downstream sees one spelling of a name a
+      // standard owns and none of them learns a rule. The scope gates read the
+      // bag this builds, which is what satisfies "canonicalize before the
+      // gates" by construction rather than by ordering discipline; the part
+      // path reaches this method without passing any gate at all.
+      const key = canonicalOptionKey(match[1].trim());
 
       if (match[2] === undefined) {
         // Bare key (e.g., [grid]) — treat as boolean true

@@ -18,6 +18,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - `data-generator` NOT refused below the root, where the name collides with
  *   nothing and is an ordinary data attribute the author set.
  * - The refused key surviving `toString()` and reporting again on reparse.
+ * - Both reserved names refused in any casing, since an SVG placed inline in an
+ *   HTML page has its attribute names lowercased by the HTML parser, which
+ *   turns a written `XMLNS` into a real second namespace declaration.
  *
  * Does NOT cover:
  * - The three layer spellings (`content--xmlns` and its siblings), which the
@@ -101,6 +104,47 @@ describe('BlissSVGBuilder document namespace', () => {
 
       expect(builder.toString()).toContain('xmlns=http://example.com');
       expect(codes(new BlissSVGBuilder(builder.toString()))).toContain('RESERVED_ATTRIBUTE_NAME');
+    });
+  });
+
+  describe('when a reserved name is written in another casing', () => {
+    // An SVG served as its own file keeps `XMLNS` distinct from `xmlns` and the
+    // name is merely dead; the same markup pasted into an HTML page is
+    // lowercased by the parser and the declaration becomes real. Judging the
+    // name case-insensitively is what makes the guard hold on both routes.
+    it.each([
+      ['the root', '[XMLNS=http://example.com]||B291', 'XMLNS'],
+      ['a character', '[XMLNS=http://example.com]B291', 'XMLNS'],
+      ['the root, mixed case', '[Xmlns=http://example.com]||B291', 'Xmlns'],
+    ])('refuses the namespace declaration on %s', (_scope, input, written) => {
+      const builder = new BlissSVGBuilder(input);
+
+      expect(builder.svgCode).not.toContain(`${written}=`);
+      expect(builder.svgCode).not.toContain('http://example.com');
+      expect(namespaceCount(builder.svgCode)).toBe(1);
+      expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
+    });
+
+    it('refuses it from the options argument too', () => {
+      const builder = new BlissSVGBuilder('B291', { XMLNS: 'http://example.com' });
+
+      expect(builder.svgCode).not.toContain('XMLNS=');
+      expect(namespaceCount(builder.svgCode)).toBe(1);
+      expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
+    });
+
+    it('refuses the library stamp on the root in another casing', () => {
+      const builder = new BlissSVGBuilder('[DATA-GENERATOR=me]||B291');
+
+      expect(builder.svgCode).not.toContain('DATA-GENERATOR=');
+      expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
+    });
+
+    it('still leaves the stamp alone below the root in any casing', () => {
+      const builder = new BlissSVGBuilder('[DATA-GENERATOR=me]B291');
+
+      expect(builder.svgCode).toContain('DATA-GENERATOR="me"');
+      expect(codes(builder)).not.toContain('RESERVED_ATTRIBUTE_NAME');
     });
   });
 

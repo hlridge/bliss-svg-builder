@@ -4,6 +4,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+import { svgAttributeSpelling } from "./bliss-svg-attribute-names.js";
+
 // Replaced at build time by Vite's define (also available in Vitest and VitePress).
 // Falls back to empty string when imported outside Vite (e.g. bare Node).
 export const LIB_VERSION = typeof __LIB_VERSION__ !== 'undefined' ? __LIB_VERSION__ : '';
@@ -161,6 +163,21 @@ export const LAYER_TARGETS = new Set(
 export const DOCUMENT_DEFINING_ATTRIBUTES = new Set(['xmlns']);
 
 /**
+ * Whether a written name IS one of the two reserved names, judged without
+ * regard to casing.
+ *
+ * A file served as SVG keeps `XMLNS` distinct from `xmlns`, so the miscased
+ * spelling would merely be dead there. The same markup pasted into an HTML
+ * page is a different story: the HTML parser lowercases every attribute name,
+ * so `XMLNS="…"` becomes a real second namespace declaration on the page it
+ * was written into, and `DATA-GENERATOR` overwrites the provenance stamp. The
+ * guards judge the name rather than the spelling, or they hold on one of the
+ * two routes this library's output takes.
+ */
+export const isDocumentDefiningAttribute = (name) =>
+  DOCUMENT_DEFINING_ATTRIBUTES.has(String(name).toLowerCase());
+
+/**
  * Names the library owns ON THE ROOT and nowhere else, on the rule that the
  * user owns statements about the PICTURE and the library owns statements about
  * ITSELF. `data-generator` is the provenance stamp, and a stamp anyone can
@@ -170,6 +187,10 @@ export const DOCUMENT_DEFINING_ATTRIBUTES = new Set(['xmlns']);
  * so it is left alone there.
  */
 export const LIBRARY_OWNED_ROOT_ATTRIBUTES = new Set(['data-generator']);
+
+/** Whether a written name is the root stamp, judged like the set above. */
+export const isLibraryOwnedRootAttribute = (name) =>
+  LIBRARY_OWNED_ROOT_ATTRIBUTES.has(String(name).toLowerCase());
 
 /**
  * The written options whose whole job is to compute the root's `viewBox`. When
@@ -298,6 +319,54 @@ export const isNamedOptionKey = (key) => {
  */
 export const isProgrammaticSpelling = (key) =>
   !KNOWN_OPTION_KEYS.has(key) && KNOWN_OPTION_KEYS.has(camelToKebab(key));
+
+/**
+ * An ARIA name written the way JavaScript spells things. Matched by pattern
+ * rather than by list, which is what keeps it from going stale as ARIA grows:
+ * every state and property is `aria-` followed by ONE lowercase token with no
+ * internal hyphen, so the remainder is lowercased whole rather than hyphenated
+ * at its capitals. Hyphenating would invent `aria-value-now`,
+ * `aria-labelled-by` and `aria-has-popup`, none of which exist.
+ *
+ * The capital after `aria` is what makes the pattern safe to apply without a
+ * list: it is the camelCase boundary, so `arialFont` is not claimed.
+ */
+const ARIA_PROGRAMMATIC_NAME = /^aria[A-Z]/;
+
+/**
+ * The spelling an option key is stored and emitted under: the owner's, when a
+ * standard owns the name in a fixed spelling, and the key exactly as written
+ * when nobody does. Casing and hyphenation carry no meaning in a name a
+ * standard owns, so `view-box`, `viewbox` and `VIEWBOX` all reach `viewBox`.
+ *
+ * Three kinds of key are deliberately returned untouched.
+ *
+ * A `<target>--attribute` key means its attribute LITERALLY, which is the one
+ * way to demand a name the library would otherwise resolve. Skipping the whole
+ * key also keeps a prefix from being read as part of a name: stripping the
+ * dashes from `content--script-type` would otherwise land on SVG's
+ * `contentScriptType`.
+ *
+ * A name the LIBRARY curates belongs to the curated vocabulary, which resolves
+ * it, computes from it, and publishes it under whatever attribute it means. A
+ * standard sharing the name changes nothing, so `strokeWidth` must not be
+ * quietly turned into the raw attribute `stroke-width` here and skip the
+ * cascade that owns it.
+ *
+ * A name nobody owns is the author's, and an author's name is never rewritten.
+ */
+export const canonicalOptionKey = (key) => {
+  // A name the library will refuse is not a name it renames. Resolution exists
+  // to make a written name work, so it buys nothing on a name that can never be
+  // emitted, and it costs the author the ability to find in their own input the
+  // spelling the refusal names. This is what keeps the eighteen event handlers
+  // in the vocabulary inert in BOTH directions rather than merely unemitted.
+  if (!isSafeAttributeName(key)) return key;
+  if (isLayerAttributeKey(key)) return key;
+  if (ARIA_PROGRAMMATIC_NAME.test(key)) return `aria-${key.slice(4).toLowerCase()}`;
+  const owner = svgAttributeSpelling(key);
+  return owner === undefined || isNamedOptionKey(owner) ? key : owner;
+};
 
 /**
  * The two internal option names with no curated kebab spelling of their own, and

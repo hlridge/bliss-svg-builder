@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { camelToKebab, WARNING_CODES } from "./bliss-constants.js";
+import { camelToKebab, canonicalOptionKey, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
@@ -1455,6 +1455,10 @@ export class ElementHandle {
     for (const key of keys) {
       const kebab = camelToKebab(key);
       delete node.options[kebab];
+      // The spelling ingest stored it under, which for a name a standard owns
+      // is neither the written one nor its kebab form: `view-box` is stored as
+      // `viewBox`, and camelToKebab leaves `view-box` alone.
+      delete node.options[canonicalOptionKey(key)];
       delete node.options[key];
     }
     // Clean up empty options object
@@ -1504,6 +1508,7 @@ export class ElementHandle {
     if (!node?.transientOptions) return this;
     for (const key of keys) {
       delete node.transientOptions[camelToKebab(key)];
+      delete node.transientOptions[canonicalOptionKey(key)];
       delete node.transientOptions[key];
     }
     if (Object.keys(node.transientOptions).length === 0) {

@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, DOCUMENT_DEFINING_ATTRIBUTES, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -172,7 +172,7 @@ export class BlissElement {
         // it, so those paths stop being SVG and nothing draws them. The
         // builder reports it once per rebuild; here it is only kept out of the
         // markup.
-        if (DOCUMENT_DEFINING_ATTRIBUTES.has(key)) continue;
+        if (isDocumentDefiningAttribute(key)) continue;
         // vector-effect is non-inherited; capture it for relocation onto paths
         if (key === 'vector-effect') { vectorEffect = value; continue; }
         if (key === 'pointer-events') hasPointerEvents = true;

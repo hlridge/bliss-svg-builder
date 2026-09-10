@@ -83,6 +83,17 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
 
       expect(rootTag(builder.svgCode)).toContain('xmlns="http://www.w3.org/2000/svg"');
     });
+
+    // The prefix suspends name RESOLUTION, never the guards, and the guard is
+    // judged case-insensitively because an SVG pasted into an HTML page has its
+    // attribute names lowercased there, turning XMLNS into a real declaration.
+    it('refuses it behind a prefix in another casing', () => {
+      const builder = new BlissSVGBuilder('[content--XMLNS=http://example.com]||B291');
+
+      expect(builder.svgCode).not.toContain('XMLNS=');
+      expect(builder.svgCode).not.toContain('http://example.com');
+      expect(codes(builder)).toContain('RESERVED_ATTRIBUTE_NAME');
+    });
   });
 
   describe('when a layer key names the library stamp the root carries', () => {
