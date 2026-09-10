@@ -270,11 +270,12 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
       expect(canonicalOptionKey(key)).toBe(key);
     });
 
-    // Whether either of these should COMPUTE is class 1's question ("a curated
-    // name works in either casing"), which the DSL does not answer until the
-    // curated vocabulary canonicalizes there. Until then the shipped answer is
-    // that they stay the author's own attribute, and this row is what makes a
-    // change to that deliberate rather than incidental.
+    // RULED by the contract's §2, and it is a deliberate asymmetry rather than
+    // an unfinished edge: a name a STANDARD owns takes "any casing or
+    // hyphenation", while a name the LIBRARY curates takes "either casing",
+    // meaning the two spellings it publishes (kebab in the DSL, camelCase in
+    // JavaScript) and not an arbitrary one. So these two stay the author's own
+    // attribute permanently. Do not file it as a gap for a later task to close.
     it.each([
       ['STROKE-WIDTH', '2', 'stroke-width="0.5"'],
       ['COLOR', 'red', 'stroke="#000000"'],
