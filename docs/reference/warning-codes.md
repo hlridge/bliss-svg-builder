@@ -550,20 +550,21 @@ A transient option written on a space is a different case and reports `MISPLACED
 
 ### `MISPLACED_OPTION_SPELLING`
 
-A named option written in its camelCase spelling somewhere that reads the kebab-case one. The JavaScript entry points take camelCase (`{ marginTop: 3 }`); a DSL bracket and a hand-written object-input `options` bag take `margin-top`. Written the other way round the key is not a named option at all: it lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), so it is emitted exactly as typed and sets nothing.
+A named option written in its camelCase spelling in a hand-built composition **object**, which is the one channel stored exactly as it is given. There the key is not a named option at all: it lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), so it is emitted exactly as typed and sets nothing. Everywhere else either spelling reaches the option and nothing is reported.
 
 ```js
-new BlissSVGBuilder('[marginTop=3]||B291');
+new BlissSVGBuilder({ options: { marginTop: 3 }, groups: [/* … */] });
 // warns; the margin is not applied and the root carries marginTop="3"
-new BlissSVGBuilder('[margin-top=3]||B291');   // the bracket spelling
-new BlissSVGBuilder('B291', { marginTop: 3 }); // the JavaScript spelling
+new BlissSVGBuilder({ options: { 'margin-top': 3 }, groups: [/* … */] });
+new BlissSVGBuilder('[marginTop=3]||B291');    // silent: a bracket takes either spelling
+new BlissSVGBuilder('B291', { marginTop: 3 }); // silent, and so does everything else
 ```
 
-Two internal names are reported the same way and name a whole option instead of a key, because they have no bracket spelling of their own: `[autoVertical]` points at `crop=auto-vertical`, and `[cropCompact]` at `crop=compact`. Both still work in the JavaScript entry points.
+Two internal names are reported in a bracket as well, and they name a whole option instead of a key: `[autoVertical]` points at `crop=auto-vertical`, and `[cropCompact]` at `crop=compact`. Neither is a spelling of an option *name*, so there is nothing to resolve them to. Both still work in the JavaScript entry points.
 
 The key is kept rather than dropped, so it round-trips through `toString()` and reports again on a reparse. It is reported once per place it was written, at every level, since each is a separate key that does nothing.
 
-This is about the library's own [named options](/reference/options-quick-reference) only. A pass-through attribute is never renamed in either direction, so write it the way SVG spells it: `preserveAspectRatio` is genuinely camelCase and `stroke-dasharray` genuinely hyphenated.
+This is about the library's own [named options](/reference/options-quick-reference) only. An attribute name SVG or ARIA owns is a separate rule: casing and hyphenation carry no meaning in one of those, so `view-box`, `viewbox` and `viewBox` all reach `viewBox`, and the owner's spelling is what comes back. A name nobody owns is yours and is emitted exactly as you typed it.
 
 ## Illegal Operands
 
