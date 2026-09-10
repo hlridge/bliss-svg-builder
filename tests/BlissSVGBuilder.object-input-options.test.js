@@ -259,6 +259,43 @@ describe('BlissSVGBuilder object-input options', () => {
     });
   });
 
+  describe('when a value the option cannot use reaches an ungated name', () => {
+    // KNOWN DEFECT, pinned as CURRENT behaviour rather than fixed here, and
+    // scheduled as task N4b of the attribute-naming implementation plan.
+    //
+    // The numeric half of the value gate refuses all four of these kinds and
+    // names the option; the string half does not exist, so the value is
+    // stringified into the shipped document instead. Measured across 14 names,
+    // 32 of 56 combinations leak, including `color="null"` on a rendered symbol
+    // and a wrong accessible name in `aria-label`.
+    //
+    // It is NOT fixed by dropping the value on the way in: this pass resolves
+    // names and cannot know that `true` is right for `grid` and wrong for
+    // `color`, and it runs upstream of the gate, so refusing here would replace
+    // twelve well-worded refusals with one generic one.
+    //
+    // This row goes red the day the gate grows its string half. Rewrite it then;
+    // do not delete it.
+    it.each([
+      ['an object', { a: 1 }, 'stroke="[object Object]"'],
+      ['an array', [1, 2], 'stroke="1,2"'],
+      ['a null', null, 'stroke="null"'],
+      ['undefined', undefined, 'stroke="undefined"'],
+    ])('still stringifies %s into the markup', (_kind, value, leaked) => {
+      const b = build(atDocument({ color: value }));
+      expect(b.svgCode).toContain(leaked);
+      expect(b.warnings).toEqual([]);
+    });
+
+    it('refuses the same value where the numeric gate can see it', () => {
+      // The control, and the reason the fix belongs in the gate: the gate
+      // already does the right thing wherever it reaches.
+      const b = build(atDocument({ 'stroke-width': { a: 1 } }));
+      expect(b.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.svgCode).not.toContain('[object Object]');
+    });
+  });
+
   describe('when the library itself hands an object to the constructor', () => {
     // `splitAt` builds the right half by passing a raw tree back through the
     // constructor, so a DSL composition reaches the object-input branch without
