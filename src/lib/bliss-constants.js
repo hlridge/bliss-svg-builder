@@ -898,6 +898,98 @@ export const judgeNumericOptionValue = (key, rawValue) => {
 };
 
 /**
+ * The curated options that are SWITCHES rather than values. Each is read by
+ * identity against `true`, so every other value means "off" and the ordinary
+ * way to turn one off is to write something that is not `true`. Judging their
+ * values would report on that.
+ */
+export const BOOLEAN_OPTION_KEYS = new Set(['center', 'grid', 'error-placeholder']);
+
+/**
+ * A kerning name in any of its four spellings, kebab or camel. Derived from the
+ * kebab pair rather than listed, the same way `isNamedOptionKey` reads them.
+ *
+ * The two kerning options are NUMBERS with a gate of their own
+ * (MALFORMED_KERNING_VALUE), but they are absent from `KNOWN_OPTION_KEYS`
+ * because the parser promotes them instead of dispatching on them, so the text
+ * gate below would otherwise claim them and tell an author that a numeric
+ * option needs a text value.
+ */
+const isKerningOptionKey = (key) => KERNING_OPTION_SPELLINGS.has(camelToKebab(key));
+
+/**
+ * The curated options whose value reaches the document as TEXT, derived rather
+ * than listed: everything in the curated vocabulary that is neither a number
+ * nor a switch nor `key`, which names the element rather than anything in the
+ * markup. Deriving it is what makes the sweep in
+ * `BlissSVGBuilder.text-option-values.test.js` cover an option added later on
+ * the day it lands, and it puts a new option in the GATED half by default,
+ * which is the safe direction to be wrong in.
+ */
+export const TEXT_OPTION_KEYS = new Set(
+  [...KNOWN_OPTION_KEYS].filter((key) => (
+    !NUMERIC_OPTION_POLICY.has(key) && !BOOLEAN_OPTION_KEYS.has(key) && key !== 'key'
+  ))
+);
+
+/**
+ * True for a key whose value the library will write into the document as text.
+ * A name the library does not curate at all is one of these too: it is emitted
+ * as the author typed it, so whatever it carries becomes attribute text.
+ */
+export const isTextValuedOptionKey = (key) => (
+  !isKerningOptionKey(key)
+  && (TEXT_OPTION_KEYS.has(key) || !KNOWN_OPTION_KEYS.has(key))
+);
+
+/**
+ * Judges one written value for a text-valued option, the string half of the
+ * same gate `judgeNumericOptionValue` is the numeric half of. Same two arms and
+ * no third: the value is refused, in which case the option falls back exactly
+ * as if it had never been written, or it is honoured exactly as written.
+ *
+ * Only four kinds are refused, and none of them has a text form the author
+ * meant. Everything else primitive is honoured, INCLUDING a boolean: a bare key
+ * in a bracket (`[myOwnAttr]`) arrives as `true`, so refusing booleans would
+ * refuse the DSL's own shorthand.
+ *
+ * Without it, all four were stringified straight into the shipped document:
+ * `{color: null}` painted `stroke="null"` on the symbol and
+ * `{'aria-label': {}}` shipped `[object Object]` as an accessible name, both in
+ * silence. Only object input can deliver such a value, because the DSL produces
+ * strings and `#toRaw` drops these four in front of the other channels.
+ *
+ * Returns null when the value is honoured, so the caller assigns it; otherwise
+ * the warning to report, and the caller assigns nothing.
+ */
+export const judgeTextOptionValue = (key, rawValue) => {
+  if (!isTextValuedOptionKey(key)) return null;
+  // The null test is redundant on purpose, and measured so: `typeof null` is
+  // 'object', so the test below already catches it. It is written out because
+  // the rule is "non-primitive, null or undefined" and leaning on that quirk
+  // would hide a third of the rule behind a JavaScript wart.
+  const writable = rawValue !== null && rawValue !== undefined
+    && typeof rawValue !== 'object' && typeof rawValue !== 'function' && typeof rawValue !== 'symbol';
+  if (writable) return null;
+  // Shown as it was given, not as it coerced: `[1,2]` reads as a list, where
+  // the coerced form reads as the string "1,2" and hides why it was refused.
+  // `JSON.stringify` answers undefined for the kinds it cannot represent, which
+  // is what the String() fallback is for.
+  const shown = JSON.stringify(rawValue) ?? String(rawValue);
+  // An option the library curates has a value of its own to fall back to; a
+  // name it does not curate has none, so the honest thing to say about it is
+  // that nothing is emitted under it at all.
+  const tail = KNOWN_OPTION_KEYS.has(key)
+    ? 'so it was ignored: the option keeps the value it would have had without it.'
+    : 'so it was dropped and will not be emitted.';
+  return {
+    code: WARNING_CODES.INVALID_OPTION_VALUE,
+    message: `"${key}" needs a text value and ${shown} is not one, ${tail}`,
+    source: `${key}=${String(rawValue)}`,
+  };
+};
+
+/**
  * Maps semantic indicator types to their root B-codes.
  * When overriding indicators, the semantic root is preserved by default
  * unless the new indicators include a semantic indicator or strip-semantic (!) is used.

@@ -45,6 +45,9 @@ import {
  *   the table that is written at four scopes and feeds path geometry.
  * - The camelCase namespace collision, see
  *   `BlissSVGBuilder.option-namespace-split.test.js`.
+ * - The STRING half of the same gate, which refuses a value nothing can write
+ *   as text on a name the numeric table does not list, see
+ *   `BlissSVGBuilder.text-option-values.test.js`.
  */
 
 const render = (dsl) => new BlissSVGBuilder(dsl);

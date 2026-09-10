@@ -45,7 +45,10 @@ import { KNOWN_OPTION_KEYS } from '../src/lib/bliss-constants.js';
  * - Which spelling `toJSON()` gives back, which is a separate question from what
  *   it accepts, see `BlissSVGBuilder.json-output.test.js`.
  * - Option VALUE validation (ranges, clamps), see
- *   `BlissSVGBuilder.option-value-gate.test.js`.
+ *   `BlissSVGBuilder.option-value-gate.test.js` for the numeric half and
+ *   `BlissSVGBuilder.text-option-values.test.js` for the string half. The rows
+ *   here pin only that this channel DELIVERS such a value to the gate, since it
+ *   is the one channel that can.
  */
 
 const build = (input) => new BlissSVGBuilder(input);
@@ -277,37 +280,38 @@ describe('BlissSVGBuilder object-input options', () => {
     });
   });
 
-  describe('when a value the option cannot use reaches an ungated name', () => {
-    // KNOWN DEFECT, pinned as CURRENT behaviour rather than fixed here, and
-    // scheduled as task N4b of the attribute-naming implementation plan.
+  describe('when a value the option cannot use reaches a name the gate reads', () => {
+    // These four used to be stringified into the shipped document instead:
+    // `stroke="[object Object]"`, `stroke="null"`, and a wrong accessible name
+    // wherever `aria-label` carried one. Measured across 14 names, 32 of 56
+    // combinations leaked, and the numeric half of the gate was the only thing
+    // refusing any of them.
     //
-    // The numeric half of the value gate refuses all four of these kinds and
-    // names the option; the string half does not exist, so the value is
-    // stringified into the shipped document instead. Measured across 14 names,
-    // 32 of 56 combinations leak, including `color="null"` on a rendered symbol
-    // and a wrong accessible name in `aria-label`.
+    // The string half now covers the rest, and it lives where the option is
+    // DISPATCHED rather than at ingest: resolving names cannot know that `true`
+    // is right for `grid` and wrong for `color`, and ingest sits upstream of the
+    // numeric half, so refusing there would replace twelve well-worded refusals
+    // with one generic one.
     //
-    // It is NOT fixed by dropping the value on the way in: this pass resolves
-    // names and cannot know that `true` is right for `grid` and wrong for
-    // `color`, and it runs upstream of the gate, so refusing here would replace
-    // twelve well-worded refusals with one generic one.
-    //
-    // This row goes red the day the gate grows its string half. Rewrite it then;
-    // do not delete it.
+    // The gate itself is pinned in `BlissSVGBuilder.text-option-values.test.js`,
+    // which sweeps the curated vocabulary. These rows stay here because object
+    // input is the one channel that can DELIVER such a value: the DSL produces
+    // strings, and `#toRaw` drops all four in front of the other entry points.
     it.each([
-      ['an object', { a: 1 }, 'stroke="[object Object]"'],
-      ['an array', [1, 2], 'stroke="1,2"'],
-      ['a null', null, 'stroke="null"'],
-      ['undefined', undefined, 'stroke="undefined"'],
-    ])('still stringifies %s into the markup', (_kind, value, leaked) => {
+      ['an object', { a: 1 }, '[object Object]'],
+      ['an array', [1, 2], '1,2'],
+      ['a null', null, 'null'],
+      ['undefined', undefined, 'undefined'],
+    ])('refuses %s rather than stringifying it into the markup', (_kind, value, coerced) => {
       const b = build(atDocument({ color: value }));
-      expect(b.svgCode).toContain(leaked);
-      expect(b.warnings).toEqual([]);
+      expect(b.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.svgCode).not.toContain(`stroke="${coerced}"`);
+      expect(b.svgCode).toBe(build(atDocument({})).svgCode);
     });
 
     it('refuses the same value where the numeric gate can see it', () => {
-      // The control, and the reason the fix belongs in the gate: the gate
-      // already does the right thing wherever it reaches.
+      // The control that says the two halves agree rather than one having
+      // displaced the other: the numeric half still owns its own names.
       const b = build(atDocument({ 'stroke-width': { a: 1 } }));
       expect(b.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
       expect(b.svgCode).not.toContain('[object Object]');

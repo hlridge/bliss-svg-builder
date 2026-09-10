@@ -101,11 +101,11 @@ B313/RK:x/B431         →  renders both characters, default spacing
 
 ## Values Out of Range
 
-Every option that takes a number follows one rule: the value you write is either used exactly as written or refused and reported. Nothing is quietly substituted. When a value is refused, nothing is written in its place, so the option falls back to what it would have been if you had never written it.
+Every option follows one rule: the value you write is either used exactly as written or refused and reported. Nothing is quietly substituted. When a value is refused, nothing is written in its place, so the option falls back to what it would have been if you had never written it.
 
 ### `INVALID_OPTION_VALUE`
 
-A numeric option given something that is not a number.
+A value the option cannot use. Either something that is not a number where a number is needed, or something with no text form at all where the value is written into the picture.
 
 ```
 [crop-top=aut0]||B291        →  warns, the picture is not cropped
@@ -115,6 +115,8 @@ A numeric option given something that is not a number.
 ```
 
 The last two are the cases worth knowing about: writing the key with no value at all is refused too. A bare `[margin]` used to set a margin of 1 and `[margin=]` a margin of 0, neither of which you asked for.
+
+The second kind only reaches the library from JavaScript, since a value written in a bracket is always text. An object, an array, a `null` or an `undefined` handed to an option that writes text used to be put into the picture as whatever JavaScript made of it: `{ color: null }` painted `stroke="null"`, and an object given to `svg-title` or `aria-label` arrived as `[object Object]`. Those are refused now, and the option falls back the same way a refused number does.
 
 ### `OUT_OF_RANGE_OPTION_VALUE`
 

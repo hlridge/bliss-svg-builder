@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -188,6 +188,25 @@ class BlissSVGBuilder {
   #mutationWarnings = [];
   #generation = 0;
 
+  // One options bag with every refused text value reported and removed. The bag
+  // is copied rather than edited, and only when something was actually refused,
+  // so the caller's own tree is never reshaped by a pass that only judges.
+  // The copy is defensive rather than load-bearing, and measured so: the one
+  // caller replaces the bag it passed in on the next line, so editing in place
+  // diverges on nothing constructible today. It stays because a second caller
+  // would not know that.
+  #withoutRefusedTextValues(rawOptions) {
+    let kept = rawOptions;
+    for (const [key, value] of Object.entries(rawOptions)) {
+      const refusal = judgeTextOptionValue(key, value);
+      if (!refusal) continue;
+      this.#warnings.push(refusal);
+      if (kept === rawOptions) kept = { ...rawOptions };
+      delete kept[key];
+    }
+    return kept;
+  }
+
   // Processes raw options (kebab-case) into two bags that cannot collide.
   //
   // `processed` holds what the library computed, under internal camelCase names;
@@ -205,6 +224,21 @@ class BlissSVGBuilder {
   #processOptions(rawOptions = {}, addBuilderDefaults = false) {
     const processed = {};
     const authored = {};
+
+    // The string half of the value gate, run before the dispatch below so a
+    // refused value is simply not there when its own branch looks for it: the
+    // option falls back exactly as if it had never been written, which is the
+    // same shape the numeric half already has. One sweep rather than one call
+    // per branch, because the names it covers are DERIVED (every curated option
+    // that is neither a number nor a switch, plus every name the library does
+    // not curate at all) and a per-branch edit is a list somebody has to keep.
+    //
+    // It runs HERE, where the option is dispatched, and not at ingest, because
+    // whether a value is legal depends on which option it is: `true` is right
+    // for `grid` and wrong for `color`. Ingest resolves names and knows none of
+    // that, and it sits upstream of the numeric half, so refusing there would
+    // replace that half's well-worded refusals with one generic one.
+    rawOptions = this.#withoutRefusedTextValues(rawOptions);
 
     // stroke-width: honoured exactly as written, or refused and reported. The
     // old 0.1-1.5 clamp was what made the raw value unreachable: a name the
