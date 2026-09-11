@@ -6,27 +6,37 @@
 
 // --- Options ---
 
-/** Known option keys accepted by BlissSVGBuilder (kebab-case). */
+/**
+ * Known option keys accepted by BlissSVGBuilder, named the way JavaScript
+ * writes them.
+ *
+ * Spelling carries no meaning: the library accepts either casing of one of its
+ * own options on every channel and resolves the two to one option. These rows
+ * are camelCase because that is the spelling `toJSON()` publishes and the one a
+ * JavaScript caller writes; the kebab spelling a DSL bracket carries still
+ * typechecks, falling back to the index signature below and losing only the
+ * inline hint and the value type.
+ */
 export interface BlissOptions {
   // Stroke and spacing
-  'stroke-width'?: number;
-  'dot-extra-width'?: number;
-  'sdot-extra-width'?: number;
-  'dot-width'?: number;
-  'sdot-width'?: number;
-  'char-space'?: number;
-  'word-space'?: number;
-  'external-glyph-space'?: number;
+  strokeWidth?: number;
+  dotExtraWidth?: number;
+  sdotExtraWidth?: number;
+  dotWidth?: number;
+  sdotWidth?: number;
+  charSpace?: number;
+  wordSpace?: number;
+  externalGlyphSpace?: number;
 
   // Margins (builder-level)
   margin?: number;
-  'margin-top'?: number;
-  'margin-bottom'?: number;
-  'margin-left'?: number;
-  'margin-right'?: number;
+  marginTop?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
 
   // Sizing
-  'min-width'?: number;
+  minWidth?: number;
   center?: boolean;
 
   // Positioning (element-level, not builder-level). `x` at part scope is the
@@ -35,59 +45,63 @@ export interface BlissOptions {
   // The two kerning options are the `RK:`/`AK:` markers written as options.
   x?: number;
   y?: number;
-  'relative-kerning'?: number;
-  'absolute-kerning'?: number;
+  relativeKerning?: number;
+  absoluteKerning?: number;
 
   // Cropping (builder-level)
   crop?: number | 'auto' | 'auto-vertical' | 'compact';
-  'crop-top'?: number | 'auto';
-  'crop-bottom'?: number | 'auto';
-  'crop-left'?: number | 'auto';
-  'crop-right'?: number | 'auto';
+  cropTop?: number | 'auto';
+  cropBottom?: number | 'auto';
+  cropLeft?: number | 'auto';
+  cropRight?: number | 'auto';
 
   // Grid (builder-level)
   grid?: boolean;
-  'grid-color'?: string;
-  'grid-major-color'?: string;
-  'grid-medium-color'?: string;
-  'grid-minor-color'?: string;
-  'grid-sky-color'?: string;
-  'grid-earth-color'?: string;
-  'grid-stroke-width'?: number;
-  'grid-major-stroke-width'?: number;
-  'grid-medium-stroke-width'?: number;
-  'grid-minor-stroke-width'?: number;
-  'grid-sky-stroke-width'?: number;
-  'grid-earth-stroke-width'?: number;
+  gridColor?: string;
+  gridMajorColor?: string;
+  gridMediumColor?: string;
+  gridMinorColor?: string;
+  gridSkyColor?: string;
+  gridEarthColor?: string;
+  gridStrokeWidth?: number;
+  gridMajorStrokeWidth?: number;
+  gridMediumStrokeWidth?: number;
+  gridMinorStrokeWidth?: number;
+  gridSkyStrokeWidth?: number;
+  gridEarthStrokeWidth?: number;
 
   // Colors and background
   color?: string;
   background?: string;
-  'background-top'?: string;
-  'background-mid'?: string;
-  'background-bottom'?: string;
+  backgroundTop?: string;
+  backgroundMid?: string;
+  backgroundBottom?: string;
 
   // Text and metadata
   text?: string;
-  'svg-desc'?: string;
-  'svg-title'?: string;
-  'svg-height'?: number;
+  svgDesc?: string;
+  svgTitle?: string;
+  svgHeight?: number;
 
   // Error handling
-  'error-placeholder'?: boolean;
+  errorPlaceholder?: boolean;
 
-  // SVG pass-through attributes (any key not in the known set), emitted with
-  // the name written verbatim. At global scope a bare key lands on the root
-  // <svg>; `<target>--<attribute>` lands on the elements carrying that class,
-  // where a target is any class the library writes minus the `bliss-` prefix
-  // and the key splits at the LAST `--` (`'grid-line--sky--stroke-dasharray': 2`).
-  // At element scope the key lands on that element's own <g>; a target prefix
-  // has nothing to name there, so it is dropped, reported with
-  // `MISPLACED_LAYER_OPTION` when it was written in a DSL bracket and dropped
-  // in silence on the object-input and transient surfaces. Includes `boolean`
-  // so the boolean options (`grid`,
-  // `center`, `error-placeholder`) conform to the index signature; without it
-  // `tsc` rejects this interface.
+  // SVG pass-through attributes: any key not in the known set. A name an SVG or
+  // ARIA standard owns is emitted under that owner's spelling whichever way it
+  // was written (`strokeDasharray` and `stroke-dasharray` both set
+  // `stroke-dasharray`); a name nobody owns is emitted exactly as written, and a
+  // `<target>--` key is always literal. At global scope a bare key lands on the
+  // root <svg>; `<target>--<attribute>` lands on the elements carrying that
+  // class, where a target is any class the library writes minus the `bliss-`
+  // prefix and the key splits at the LAST `--`
+  // (`'grid-line--sky--stroke-dasharray': 2`). At element scope the key lands on
+  // that element's own <g>; a target prefix has nothing to name there, so it is
+  // dropped, reported with `MISPLACED_LAYER_OPTION` when it was written in a DSL
+  // bracket and dropped in silence on the object-input and transient surfaces.
+  // Includes `boolean` so the boolean options (`grid`, `center`,
+  // `errorPlaceholder`) conform to the index signature; without it `tsc` rejects
+  // this interface. It is also what keeps the kebab spelling of a curated option
+  // compiling after those rows moved to camelCase.
   [key: string]: string | number | boolean | undefined;
 }
 
@@ -707,7 +721,15 @@ export interface DefinitionMetadata {
  * library's own options the way a bracket carries them.
  */
 export interface BlissJSON {
-  options?: Record<string, string | boolean>;
+  /**
+   * A value keeps the type it was authored with. The options argument and a DSL
+   * bracket both arrive as text, so they publish strings; a composition object
+   * is stored as written, so `{ marginTop: 1 }` comes back as `1` rather than
+   * `"1"`; a switch stays boolean. The type is stable across round trips in
+   * either direction, so nothing silently converts. Narrow on `typeof` before
+   * using a value as text.
+   */
+  options?: Record<string, string | number | boolean>;
   /**
    * Transient options: values that reach the rendered SVG and never reach
    * `toString()` or `toJSON()`. Accepted on INPUT at any level, and by design
@@ -717,7 +739,7 @@ export interface BlissJSON {
    */
   transientOptions?: Record<string, string | number | boolean>;
   groups: Array<{
-    options?: Record<string, string | boolean>;
+    options?: Record<string, string | number | boolean>;
     transientOptions?: Record<string, string | number | boolean>;
     /**
      * Word-level indicator overlay (the DSL `;;` form): stored on the word and
@@ -727,7 +749,7 @@ export interface BlissJSON {
     wordIndicators?: { codes: string[]; stripSemantic: boolean };
     glyphs?: Array<{
       codeName?: string;
-      options?: Record<string, string | boolean>;
+      options?: Record<string, string | number | boolean>;
       transientOptions?: Record<string, string | number | boolean>;
       isHeadGlyph?: boolean;
       /**
@@ -743,7 +765,7 @@ export interface BlissJSON {
       isIndicator?: boolean;
       parts?: Array<{
         codeName: string;
-        options?: Record<string, string | boolean>;
+        options?: Record<string, string | number | boolean>;
         transientOptions?: Record<string, string | number | boolean>;
         /** Present (true) only on an indicator part. */
         isIndicator?: boolean;
