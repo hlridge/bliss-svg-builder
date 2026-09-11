@@ -180,6 +180,20 @@ describe('the attribute naming contract', () => {
       expect(optionKeys(render('B291', { x: 5 }).toJSON())).toEqual(['x']);
     });
 
+    it.each([
+      ['[margin-top=1;data-a=2]||B291', ['marginTop', 'data-a']],
+      ['[data-a=2;margin-top=1]||B291', ['data-a', 'marginTop']],
+    ])('keeps %s in the order it was written', (input, expected) => {
+      // Bag order is the order the attributes are emitted in, so a publication
+      // that reorders repaints the SVG the moment its own output is read back:
+      // `data-a="1" data-b="2"` and the reverse are different bytes. The
+      // round-trip rows below catch that only through byte equality, which pins
+      // it by accident rather than by claim. Renaming a key must therefore leave
+      // it where it was, which is why one curated name shares each bag with one
+      // of the author's.
+      expect(Object.keys(render(input).toJSON().options)).toEqual(expected);
+    });
+
     it('keeps the stored spelling in deep output', () => {
       // Deep output feeds `toString()` and `merge()`, which re-ingest it as DSL
       // text and as a raw tree. Publishing there moves the DSL serializer with

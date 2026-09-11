@@ -113,9 +113,23 @@ describe('BlissSVGBuilder element keys', () => {
       const userJson = new BlissSVGBuilder('[key=foo]|B291').toJSON();
       expect(userJson.key).toBeUndefined();
       expect(userJson.groups[0].key).toBeUndefined();
-      if (userJson.groups[0].options) {
-        expect(userJson.groups[0].options.key).toBeUndefined();
-      }
+    });
+
+    // `key` is an ordinary bracket option on the way in, so it lands in the
+    // options bag at whatever scope it was written and a SEPARATE strip removes
+    // it from each of the four. Two of those strips were held up by nothing
+    // until this row (document and part; the other two were caught incidentally
+    // by unrelated files), and the assertion this replaces covered one scope and
+    // sat inside an `if`, so it also passed when the bag was absent. An
+    // unstripped key publishes as authoring data and re-enters the next build as
+    // element identity.
+    it.each([
+      ['document', '[key=foo]||B291', (json) => json.options],
+      ['word', '[key=foo]|B291', (json) => json.groups[0].options],
+      ['character', '[key=foo]B291', (json) => json.groups[0].glyphs[0].options],
+      ['part', '[key=foo]>B291;B81', (json) => json.groups[0].glyphs[0].parts[0].options],
+    ])('strips a %s-scope key from the published options bag', (_scope, input, bagOf) => {
+      expect(bagOf(new BlissSVGBuilder(input).toJSON())).toEqual({});
     });
   });
 
