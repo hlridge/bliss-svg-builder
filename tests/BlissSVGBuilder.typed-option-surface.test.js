@@ -74,6 +74,13 @@ const declaredOptionTypes = () =>
     ),
   );
 
+// Every string literal any row declares, as [option, literal] pairs. These are
+// the values a union promises are legal beyond its plain `number`/`string`.
+const declaredStringLiterals = () =>
+  [...declaredOptionTypes()].flatMap(([option, members]) =>
+    [...members].filter((member) => member.startsWith("'")).map((member) => [option, member.slice(1, -1)]),
+  );
+
 // The value type each option actually takes, derived from the runtime families
 // the value gate partitions the vocabulary into. `INTERNAL_OPTIONS` carries the
 // positions and the kerning markers, all numeric.
@@ -180,6 +187,35 @@ describe('BlissSVGBuilder typed option surface', () => {
     it('covers every declared row by one of the value gate families', () => {
       const typed = new Set(expectedOptionTypes().map(([option]) => option));
       expect(declaredOptionRows().filter((row) => !typed.has(row))).toEqual([]);
+    });
+
+    it.each(declaredStringLiterals())('accepts %s = %s, the literal it declares', (option, literal) => {
+      // asserting the family type is not enough on its own: a union is free to
+      // list a literal the library refuses, and `crop?: … | 'sideways'` passed
+      // every row above plus `tsc` while the value gate reported
+      // INVALID_OPTION_VALUE on it
+      const built = new BlissSVGBuilder('B291', { [option]: literal });
+      expect(built.warnings.map((warning) => warning.code)).toEqual([]);
+    });
+
+    it('finds the declared literals it claims to check, so the sweep cannot go vacuous', () => {
+      expect(declaredStringLiterals().length).toBeGreaterThan(4);
+    });
+
+    it('gives the four crop sides one literal vocabulary between them', () => {
+      // the sweep above catches a literal the library REFUSES; the reverse, a
+      // legal literal dropped from a union, has no runtime authority to derive
+      // from, because the crop keywords are inline comparisons in the builder
+      // rather than an exported set. Siblings holding each other is what is
+      // available without restating that vocabulary here: editing one row and
+      // not its three twins goes red. Dropping the same literal from all four
+      // stays invisible, and that is stated rather than hidden.
+      const types = declaredOptionTypes();
+      const sides = ['cropTop', 'cropBottom', 'cropLeft', 'cropRight'].map((side) =>
+        [...types.get(side)].sort().join(' | '),
+      );
+      expect(new Set(sides).size).toBe(1);
+      expect(sides[0]).toContain("'auto'");
     });
   });
 
