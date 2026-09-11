@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, programmaticOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -3205,9 +3205,23 @@ class BlissSVGBuilder {
     // round-trip does not re-emit a warning for an offender already dropped.
     delete obj._parseWarnings;
 
+    // Publish the library's own vocabulary under the spelling JavaScript writes.
+    // Default output is the authoring shape a caller reads, edits and hands
+    // back, so it is JavaScript's view of the composition. `deep` output is
+    // consumed by toString() and merge(), which are the DSL's view and the
+    // internal one, and both keep the stored spelling: publishing there would
+    // move the DSL serializer with it.
+    const publishOptionSpellings = (node) => {
+      if (options.deep || !node.options) return;
+      node.options = Object.fromEntries(
+        Object.entries(node.options).map(([key, value]) => [programmaticOptionKey(key), value])
+      );
+    };
+
     // Strip keys from all levels (keys are runtime identity, not composition data)
     delete obj.key;
     if (obj.options) delete obj.options.key;
+    publishOptionSpellings(obj);
     // Transient options render and never serialize: that is the whole contract
     // of the channel, so the strip happens at every level it can appear on,
     // ungated by `deep` (merge() re-ingests deep output, which would otherwise
@@ -3250,6 +3264,7 @@ class BlissSVGBuilder {
           }
           if (!options.deep) delete part._aliasCodeName;
           if (part.options) delete part.options.key;
+          publishOptionSpellings(part);
           // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
           if (part.codeName?.startsWith('XTXT_')) {
             part.codeName = 'X' + part.codeName.slice(5);
@@ -3273,6 +3288,7 @@ class BlissSVGBuilder {
         delete group.key;
         delete group.transientOptions;
         if (group.options) delete group.options.key;
+        publishOptionSpellings(group);
 
         // R14: flattenIndicators bakes the word-level overlay onto the head as
         // character-level parts and drops the field, reproducing the pre-overlay
@@ -3306,6 +3322,7 @@ class BlissSVGBuilder {
             delete glyph.key;
             delete glyph.transientOptions;
             if (glyph.options) delete glyph.options.key;
+            publishOptionSpellings(glyph);
             if (glyph.parts) stripParts(glyph.parts);
 
             // Did this glyph ever have an identity code? Read it BEFORE the

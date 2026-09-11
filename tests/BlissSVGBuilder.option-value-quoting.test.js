@@ -74,7 +74,7 @@ describe('BlissSVGBuilder option-value quoting', () => {
       // as [svg-title="a] and the title became '"a' (backlog gate case)
       const b = new BlissSVGBuilder('[svg-title="a]b"]||B291');
       expect(b.warnings).toEqual([]);
-      expect(b.toJSON().options['svg-title']).toBe('a]b');
+      expect(b.toJSON().options.svgTitle).toBe('a]b');
       expect(b.toString()).toBe('[svg-title="a]b"]||B291');
     });
 
@@ -99,14 +99,14 @@ describe('BlissSVGBuilder option-value quoting', () => {
 
     it('preserves leading whitespace in a quoted value across the round-trip', () => {
       const b = new BlissSVGBuilder('[svg-title=" hi"]||B291');
-      expect(b.toJSON().options['svg-title']).toBe(' hi');
+      expect(b.toJSON().options.svgTitle).toBe(' hi');
       expect(b.toString()).toBe('[svg-title=" hi"]||B291');
-      expect(new BlissSVGBuilder(b.toString()).toJSON().options['svg-title']).toBe(' hi');
+      expect(new BlissSVGBuilder(b.toString()).toJSON().options.svgTitle).toBe(' hi');
     });
 
     it('re-emits a pipe-bearing value quoted so it stays one value', () => {
       const b = new BlissSVGBuilder('[svg-title="a|b"]||B291');
-      expect(b.toJSON().options['svg-title']).toBe('a|b');
+      expect(b.toJSON().options.svgTitle).toBe('a|b');
       expect(b.toString()).toBe('[svg-title="a|b"]||B291');
     });
 
@@ -318,9 +318,9 @@ describe('BlissSVGBuilder option-value quoting', () => {
       // at the following ] (external review of ce80c1b, note 3)
       const b = new BlissSVGBuilder("[svg-title='it\\'s ] okay']||B291");
       expect(b.warnings).toEqual([]);
-      expect(b.toJSON().options['svg-title']).toBe("it's ] okay");
+      expect(b.toJSON().options.svgTitle).toBe("it's ] okay");
       expect(b.toString()).toBe('[svg-title="it\'s ] okay"]||B291');
-      expect(new BlissSVGBuilder(b.toString()).toJSON().options['svg-title']).toBe("it's ] okay");
+      expect(new BlissSVGBuilder(b.toString()).toJSON().options.svgTitle).toBe("it's ] okay");
     });
 
     it('round-trips an escaped double quote next to a quoted ]', () => {

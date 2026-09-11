@@ -695,6 +695,16 @@ export interface DefinitionMetadata {
  *
  * A word the parser rejects outright (a malformed `;;` word indicator) is
  * dropped from `groups` entirely; its parse warning is the only trace.
+ *
+ * Option keys come back under their owner's spelling: one of the library's own
+ * options in the camelCase spelling JavaScript writes (`strokeWidth`,
+ * `marginTop`), a name a standard owns in the spelling that standard publishes
+ * (`viewBox`, `stroke-dasharray`, `aria-label`), and a name nobody owns exactly
+ * as it was written. A `<target>--attribute` key means its attribute literally
+ * and is never rewritten. Either spelling is accepted back on input, so this
+ * object round-trips through the constructor whichever way it was authored.
+ * `toString()` is the DSL's view of the same composition and spells the
+ * library's own options the way a bracket carries them.
  */
 export interface BlissJSON {
   options?: Record<string, string | boolean>;
@@ -1092,7 +1102,8 @@ export declare class BlissSVGBuilder {
    * `deep` keeps nested sub-parts and all definition-derived metadata (consumed
    * by `toString()`/`merge()`); the default output omits those (they are
    * re-derived from the code on reconstruction) and is the authoring shape
-   * described by {@link BlissJSON}.
+   * described by {@link BlissJSON}, whose option keys use each name's owner
+   * spelling.
    */
   toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean }): BlissJSON;
 

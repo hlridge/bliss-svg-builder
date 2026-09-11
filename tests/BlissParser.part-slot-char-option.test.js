@@ -483,7 +483,9 @@ describe('BlissParser part-slot character options', () => {
       expect(codes('[color=red][fill=blue][stroke-width=2]>B291')).toEqual(['MULTIPLE_OPTION_BRACKETS']);
       const glyph = b.toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(glyph.options).toEqual({ color: 'red' });
-      expect(glyph.parts[0].options).toEqual({ 'stroke-width': '2' });
+      // Published under the camelCase spelling, which is what the serializer
+      // gives a curated option however the bracket spelled it.
+      expect(glyph.parts[0].options).toEqual({ strokeWidth: '2' });
     });
 
     it('names the middle bracket it drops instead of losing it silently', () => {

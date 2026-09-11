@@ -364,9 +364,12 @@ describe('builder.addElement()', () => {
       defaults: { color: 'gray' },
       overrides: { 'stroke-width': '0.5' }
     });
+    // Written in the kebab spelling and read back in the camelCase one: an
+    // option is one name however it is spelled, and published output is
+    // JavaScript's view of the composition.
     const opts = b.toJSON().groups[1].options;
     expect(opts?.color).toBe('gray');
-    expect(opts?.['stroke-width']).toBe('0.5');
+    expect(opts?.strokeWidth).toBe('0.5');
   });
 
   it('works on an empty builder', () => {
@@ -579,7 +582,7 @@ describe('builder.replaceElement()', () => {
     });
     const opts = b.toJSON().groups[0].options;
     expect(opts?.color).toBe('gray');
-    expect(opts?.['stroke-width']).toBe('0.5');
+    expect(opts?.strokeWidth).toBe('0.5');
   });
 });
 

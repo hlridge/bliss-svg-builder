@@ -1356,9 +1356,12 @@ describe('BlissSVGBuilder.Mutation.SetOptionsFormat', () => {
       defaults: { 'stroke-width': '0.5' },
       overrides: { color: 'green' }
     });
+    // Written in the kebab spelling and read back in the camelCase one: an
+    // option is one name however it is spelled, and published output is
+    // JavaScript's view of the composition.
     const opts = b.toJSON().groups[0].glyphs[0].options;
     expect(opts.color).toBe('green');
-    expect(opts['stroke-width']).toBe('0.5');
+    expect(opts.strokeWidth).toBe('0.5');
   });
 
   it('returns this for chaining', () => {
@@ -1391,7 +1394,7 @@ describe('BlissSVGBuilder.Mutation.FlatOptions', () => {
       b.glyph(0).setOptions({ defaults: { 'stroke-width': '0.5' } });
       const opts = b.toJSON().groups[0].glyphs[0].options;
       expect(opts.color).toBe('red');
-      expect(opts['stroke-width']).toBe('0.5');
+      expect(opts.strokeWidth).toBe('0.5');
     });
   });
 

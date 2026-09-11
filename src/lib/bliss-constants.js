@@ -281,6 +281,18 @@ export const escapeHtml = (str) => String(str)
  */
 export const camelToKebab = (str) => str.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
 
+/**
+ * Converts a kebab-case string to camelCase.
+ * e.g., stroke-width → strokeWidth, grid-sky-color → gridSkyColor
+ * Single-word keys (color, grid, margin) pass through unchanged.
+ *
+ * The inverse of camelToKebab over the curated vocabulary, which is the only
+ * vocabulary either one is applied to: both directions are lossy on a name with
+ * digits or consecutive capitals, and the library's own option names have
+ * neither.
+ */
+const kebabToCamel = (str) => str.replace(/-(.)/g, (_, letter) => letter.toUpperCase());
+
 // The long-form kerning options are curated vocabulary too, but they are absent
 // from KNOWN_OPTION_KEYS because that set lists what #processOptions dispatches
 // on, and kerning is promoted by the parser instead. Their canonical spelling is
@@ -359,6 +371,41 @@ export const canonicalOptionKey = (key) => {
   // a curated owner and no curated spelling of its own, and stays literal.
   return owner === undefined || isNamedOptionKey(owner) ? key : owner;
 };
+
+/**
+ * The spelling an option key is PUBLISHED under, which is the mirror of
+ * `canonicalOptionKey` rather than a second opinion on it.
+ *
+ * Storage is kebab for the library's own vocabulary, because that is the
+ * spelling a bracket carries and the one the options pass dispatches on.
+ * Publication is camelCase, because published output is JavaScript's view of a
+ * composition and camelCase is how JavaScript spells a name. The DSL's view
+ * keeps the kebab spelling, which is why the two serializers differ on purpose.
+ *
+ * Only the library's own vocabulary moves. A name a standard owns is already
+ * stored under its owner's spelling, and rewriting `stroke-dasharray` or
+ * `aria-label` into our house style would claim a name we do not own; an
+ * author's name is never rewritten at all.
+ *
+ * `canonicalOptionKey`'s three refusals need no counterpart here, because none
+ * of the three can reach the curated test: a `<target>--attribute` key keeps its
+ * `--` through `camelToKebab`, and no curated option contains one; and the names
+ * the safety gate refuses are event handlers and namespaced names, which the
+ * curated vocabulary has none of.
+ *
+ * Resolving the stored key through `camelToKebab` first is DEFENSIVE and
+ * changes no answer: for the kebab form to be a curated name at all, every
+ * capital in the key must already sit at one of that name's hyphens, and a
+ * hyphen written before a capital doubles into `--`, which no curated name
+ * carries. It is kept because it states the rule, publish the canonical form of
+ * this name, rather than resting on `kebabToCamel` happening to be the identity
+ * on a key that is already camelCase. Storage is not always the kebab spelling:
+ * a bracket's kerning option is promoted onto the character under the camelCase
+ * one while the options argument stores the kebab one, and those are one name.
+ */
+export const programmaticOptionKey = (key) => (
+  isNamedOptionKey(key) ? kebabToCamel(camelToKebab(key)) : key
+);
 
 /**
  * Watches one options bag being filled and reports when two spellings of one
