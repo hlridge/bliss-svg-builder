@@ -85,33 +85,29 @@ const declaredStringLiterals = () =>
 // the value gate partitions the vocabulary into. `INTERNAL_OPTIONS` carries the
 // positions and the kerning markers, all numeric.
 const expectedOptionTypes = () => {
+  // `key` sits outside all three gate families on purpose: it is identity
+  // rather than a value that reaches the picture, so the value gate has nothing
+  // to judge. It still takes a string, and the typed surface has to say so.
   const families = [
     [[...NUMERIC_OPTION_POLICY.keys(), ...INTERNAL_OPTIONS], 'number'],
     [[...BOOLEAN_OPTION_KEYS], 'boolean'],
-    [[...TEXT_OPTION_KEYS], 'string'],
+    [[...TEXT_OPTION_KEYS, 'key'], 'string'],
   ];
   // `INTERNAL_OPTIONS` holds both spellings of each kerning name, which resolve
   // to one row, so the pairs are deduped rather than asserted twice.
   return [
     ...new Map(
       families.flatMap(([keys, type]) =>
-        keys.map(programmaticOptionKey).filter((key) => key !== 'key').map((key) => [key, type]),
+        keys.map(programmaticOptionKey).map((option) => [option, type]),
       ),
     ),
   ];
 };
 
 // Every option name the library curates or reserves, under the spelling the
-// contract gives JavaScript. `key` is excluded on purpose: it is honoured only
-// as word identity, means nothing at the other three scopes, and is stripped
-// from both serializers, so advertising it on the typed surface would teach a
-// name the library does not promise. Listed as an open vocabulary question in
-// `backlog.md`, not as a gap here.
-const expectedOptionRows = () => {
-  const rows = new Set([...KNOWN_OPTION_KEYS, ...INTERNAL_OPTIONS].map(programmaticOptionKey));
-  rows.delete('key');
-  return [...rows].sort();
-};
+// contract gives JavaScript.
+const expectedOptionRows = () =>
+  [...new Set([...KNOWN_OPTION_KEYS, ...INTERNAL_OPTIONS].map(programmaticOptionKey))].sort();
 
 // The value-type union of every `options?: Record<string, …>` inside
 // `BlissJSON`, one entry per scope a published bag can sit at.
@@ -168,9 +164,17 @@ describe('BlissSVGBuilder typed option surface', () => {
       expect(declaredOptionRows().filter((row) => row.includes('-'))).toEqual([]);
     });
 
-    it('leaves `key` out, which is a deliberate exclusion and not a missing row', () => {
+    it('declares `key`, which a handle honours as element identity', () => {
+      // the first pass hid `key` on the grounds that it is stripped from both
+      // serializers, and that was wrong: `BlissOptions` types `setOptions` on a
+      // handle, where it really does name the element `getElementByKey()` finds
       expect(KNOWN_OPTION_KEYS.has('key')).toBe(true);
-      expect(declaredOptionRows()).not.toContain('key');
+      expect(declaredOptionRows()).toContain('key');
+
+      const built = new BlissSVGBuilder('B291');
+      built.glyph(0).setOptions({ key: 'subject' });
+      expect(built.getElementByKey('subject')).toBeTruthy();
+      expect(built.warnings).toEqual([]);
     });
   });
 

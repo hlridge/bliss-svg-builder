@@ -86,6 +86,13 @@ export interface BlissOptions {
   // Error handling
   errorPlaceholder?: boolean;
 
+  // Element identity: the name `getElementByKey()` finds this element by. Set it
+  // on a handle (`setOptions({ key: 'subject' })`), in a composition object, or
+  // in a DSL bracket at element scope. It is identity rather than appearance, so
+  // it changes nothing about the picture and is not published by either
+  // serializer; written at document scope it names nothing and is dropped.
+  key?: string;
+
   // SVG pass-through attributes: any key not in the known set. A name an SVG or
   // ARIA standard owns is emitted under that owner's spelling whichever way it
   // was written (`strokeDasharray` and `stroke-dasharray` both set
