@@ -5,6 +5,7 @@ import { BlissSVGBuilder } from '../src/index.js';
 import {
   KNOWN_OPTION_KEYS,
   INTERNAL_OPTIONS,
+  INTERNAL_ONLY_SPELLINGS,
   NUMERIC_OPTION_POLICY,
   BOOLEAN_OPTION_KEYS,
   TEXT_OPTION_KEYS,
@@ -59,19 +60,26 @@ const readInterfaceBody = (name) => {
   return found[1];
 };
 
-// Declared property names of `BlissOptions`. The index signature is written
-// `[key: string]:` and carries no `?`, so it never enters this list.
+// One row of `BlissOptions`: its name and its declared type. Written tolerantly
+// on purpose, because a reader that pins FORMATTING rather than MEANING reports
+// a defect when somebody runs a formatter. `?\s*:` survives `strokeWidth? :`,
+// and `[\s\S]` lets a union wrap onto further lines. The index signature is
+// written `[key: string]:` with no `?`, so it never matches.
+const OPTION_ROW = /^[^\S\n]*'?([A-Za-z_$][\w$-]*)'?\?\s*:\s*([\s\S]*?);/gm;
+
+// Declared property names of `BlissOptions`.
 const declaredOptionRows = () =>
-  [...readInterfaceBody('BlissOptions').matchAll(/^\s*'?([A-Za-z_$][\w$-]*)'?\?:/gm)].map((m) => m[1]);
+  [...readInterfaceBody('BlissOptions').matchAll(OPTION_ROW)].map((m) => m[1]);
 
 // Declared value type of each row, as the set of its union members. A row
-// carrying string literals (`crop`) keeps them as members, so a test can ask
-// whether `number` is among them without caring what else is.
+// carrying string literals (`crop`) keeps them as members, each normalized to
+// single quotes so the quoting style cannot change what is covered.
 const declaredOptionTypes = () =>
   new Map(
-    [...readInterfaceBody('BlissOptions').matchAll(/^\s*'?([A-Za-z_$][\w$-]*)'?\?:\s*([^;]+);/gm)].map(
-      (m) => [m[1], new Set(m[2].split('|').map((member) => member.trim()))],
-    ),
+    [...readInterfaceBody('BlissOptions').matchAll(OPTION_ROW)].map((m) => [
+      m[1],
+      new Set(m[2].split('|').map((member) => member.trim().replace(/^"(.*)"$/, "'$1'"))),
+    ]),
   );
 
 // Every string literal any row declares, as [option, literal] pairs. These are
@@ -80,6 +88,19 @@ const declaredStringLiterals = () =>
   [...declaredOptionTypes()].flatMap(([option, members]) =>
     [...members].filter((member) => member.startsWith("'")).map((member) => [option, member.slice(1, -1)]),
   );
+
+// The literals `crop` must declare, derived rather than restated. The two
+// internal-only shorthands each name one (`autoVertical` means
+// `crop=auto-vertical`), and `'auto'` is the value its four sides take, so the
+// bulk option accepts everything a side does.
+const requiredCropLiterals = () => [
+  ...new Set([
+    ...[...INTERNAL_ONLY_SPELLINGS.values()].map((expansion) => expansion.split('=')[1]),
+    ...[...declaredOptionTypes().get('cropTop')]
+      .filter((member) => member.startsWith("'"))
+      .map((member) => member.slice(1, -1)),
+  ]),
+];
 
 // The value type each option actually takes, derived from the runtime families
 // the value gate partitions the vocabulary into. `INTERNAL_OPTIONS` carries the
@@ -90,7 +111,7 @@ const expectedOptionTypes = () => {
   // to judge. It still takes a string, and the typed surface has to say so.
   const families = [
     [[...NUMERIC_OPTION_POLICY.keys(), ...INTERNAL_OPTIONS], 'number'],
-    [[...BOOLEAN_OPTION_KEYS], 'boolean'],
+    [[...BOOLEAN_OPTION_KEYS, ...INTERNAL_ONLY_SPELLINGS.keys()], 'boolean'],
     [[...TEXT_OPTION_KEYS, 'key'], 'string'],
   ];
   // `INTERNAL_OPTIONS` holds both spellings of each kerning name, which resolve
@@ -104,10 +125,21 @@ const expectedOptionTypes = () => {
   ];
 };
 
-// Every option name the library curates or reserves, under the spelling the
-// contract gives JavaScript.
+// Every option name a JavaScript caller can write, under the spelling the
+// contract gives JavaScript. THREE registries, not two: the curated vocabulary,
+// the internal positions and kerning markers, and the two shorthands that stand
+// for a whole option rather than for a name. The third is the one a first pass
+// misses, and missing it is not neutral here, because the row set is asserted as
+// an EXACT set: leaving it out does not merely fail to require those rows, it
+// forbids them.
 const expectedOptionRows = () =>
-  [...new Set([...KNOWN_OPTION_KEYS, ...INTERNAL_OPTIONS].map(programmaticOptionKey))].sort();
+  [
+    ...new Set(
+      [...KNOWN_OPTION_KEYS, ...INTERNAL_OPTIONS, ...INTERNAL_ONLY_SPELLINGS.keys()].map(
+        programmaticOptionKey,
+      ),
+    ),
+  ].sort();
 
 // The value-type union of every `options?: Record<string, …>` inside
 // `BlissJSON`, one entry per scope a published bag can sit at.
@@ -164,6 +196,20 @@ describe('BlissSVGBuilder typed option surface', () => {
       expect(declaredOptionRows().filter((row) => row.includes('-'))).toEqual([]);
     });
 
+    it.each([...INTERNAL_ONLY_SPELLINGS])('declares %s, which really does mean %s', (shorthand, expansion) => {
+      // the shipped `warning-codes.md` teaches `{ autoVertical: true }` as the
+      // JavaScript form, so the type has to carry it; a DSL bracket reports
+      // MISPLACED_OPTION_SPELLING for the same name, which is the documented
+      // split rather than an inconsistency
+      expect(declaredOptionRows()).toContain(shorthand);
+
+      const [option, value] = expansion.split('=');
+      const viaShorthand = new BlissSVGBuilder('B291', { [shorthand]: true });
+      expect(viaShorthand.svgCode).toBe(new BlissSVGBuilder('B291', { [option]: value }).svgCode);
+      expect(viaShorthand.svgCode).not.toBe(new BlissSVGBuilder('B291').svgCode);
+      expect(viaShorthand.warnings).toEqual([]);
+    });
+
     it('declares `key`, which a handle honours as element identity', () => {
       // the first pass hid `key` on the grounds that it is stripped from both
       // serializers, and that was wrong: `BlissOptions` types `setOptions` on a
@@ -179,13 +225,28 @@ describe('BlissSVGBuilder typed option surface', () => {
   });
 
   describe('when comparing each declared value type to the value the option takes', () => {
-    it.each(expectedOptionTypes())('declares %s as taking a %s', (option, type) => {
+    it.each(expectedOptionTypes())('declares %s as taking exactly a %s', (option, type) => {
       // pins the TYPE of each row and not only its name: a row respelled
       // correctly but typed `strokeWidth?: string` passes every naming row
       // above and `tsc` too, while telling a caller that a valid number is a
       // type error. The families come from the value gate's own partition, so
       // an option added later is typed the day it lands.
-      expect([...declaredOptionTypes().get(option)]).toContain(type);
+      //
+      // EXACTNESS, not membership. Asking only whether the family type is
+      // AMONG the members let a row be WIDENED without anything noticing, and a
+      // widened numeric row is a lie the runtime contradicts: `marginTop` typed
+      // `number | string` compiles `{marginTop: 'fat'}`, which reports
+      // INVALID_OPTION_VALUE and draws nothing.
+      //
+      // Only a NUMERIC row may carry literals beside its family type, and each
+      // is checked against the library by the sweep below. A switch or a text
+      // option may not, because the value gate accepts anything for those, so
+      // the sweep cannot tell a real keyword from an invented one: `grid` typed
+      // `boolean | 'auto'` renders in silence, and the declaration would be the
+      // only thing claiming `'auto'` means something.
+      const members = [...declaredOptionTypes().get(option)];
+      const literals = type === 'number' ? members.filter((member) => member.startsWith("'")) : [];
+      expect([...members].sort()).toEqual([type, ...literals].sort());
     });
 
     it('covers every declared row by one of the value gate families', () => {
@@ -204,6 +265,14 @@ describe('BlissSVGBuilder typed option surface', () => {
 
     it('finds the declared literals it claims to check, so the sweep cannot go vacuous', () => {
       expect(declaredStringLiterals().length).toBeGreaterThan(4);
+    });
+
+    it.each(requiredCropLiterals())('keeps %s among the literals crop declares', (literal) => {
+      // `crop` has no sibling to hold it, so dropping one of its own keywords
+      // used to be invisible. These two come from the shorthand registry, whose
+      // entries expand to `crop=auto-vertical` and `crop=compact`, and the third
+      // is whatever its four sides take, so none of them is restated here.
+      expect([...declaredOptionTypes().get('crop')]).toContain(`'${literal}'`);
     });
 
     it('gives the four crop sides one literal vocabulary between them', () => {

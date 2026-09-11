@@ -48,8 +48,14 @@ export interface BlissOptions {
   relativeKerning?: number;
   absoluteKerning?: number;
 
-  // Cropping (builder-level)
+  // Cropping (builder-level). `autoVertical` and `cropCompact` are JavaScript
+  // shorthands for a whole option rather than spellings of a name, so they work
+  // here and on the other JavaScript entry points and are reported with
+  // `MISPLACED_OPTION_SPELLING` in a DSL bracket or a composition object, where
+  // `crop=auto-vertical` and `crop=compact` are what to write.
   crop?: number | 'auto' | 'auto-vertical' | 'compact';
+  autoVertical?: boolean;
+  cropCompact?: boolean;
   cropTop?: number | 'auto';
   cropBottom?: number | 'auto';
   cropLeft?: number | 'auto';
