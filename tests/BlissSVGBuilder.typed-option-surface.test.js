@@ -5,6 +5,9 @@ import { BlissSVGBuilder } from '../src/index.js';
 import {
   KNOWN_OPTION_KEYS,
   INTERNAL_OPTIONS,
+  NUMERIC_OPTION_POLICY,
+  BOOLEAN_OPTION_KEYS,
+  TEXT_OPTION_KEYS,
   programmaticOptionKey,
 } from '../src/lib/bliss-constants.js';
 
@@ -60,6 +63,36 @@ const readInterfaceBody = (name) => {
 // `[key: string]:` and carries no `?`, so it never enters this list.
 const declaredOptionRows = () =>
   [...readInterfaceBody('BlissOptions').matchAll(/^\s*'?([A-Za-z_$][\w$-]*)'?\?:/gm)].map((m) => m[1]);
+
+// Declared value type of each row, as the set of its union members. A row
+// carrying string literals (`crop`) keeps them as members, so a test can ask
+// whether `number` is among them without caring what else is.
+const declaredOptionTypes = () =>
+  new Map(
+    [...readInterfaceBody('BlissOptions').matchAll(/^\s*'?([A-Za-z_$][\w$-]*)'?\?:\s*([^;]+);/gm)].map(
+      (m) => [m[1], new Set(m[2].split('|').map((member) => member.trim()))],
+    ),
+  );
+
+// The value type each option actually takes, derived from the runtime families
+// the value gate partitions the vocabulary into. `INTERNAL_OPTIONS` carries the
+// positions and the kerning markers, all numeric.
+const expectedOptionTypes = () => {
+  const families = [
+    [[...NUMERIC_OPTION_POLICY.keys(), ...INTERNAL_OPTIONS], 'number'],
+    [[...BOOLEAN_OPTION_KEYS], 'boolean'],
+    [[...TEXT_OPTION_KEYS], 'string'],
+  ];
+  // `INTERNAL_OPTIONS` holds both spellings of each kerning name, which resolve
+  // to one row, so the pairs are deduped rather than asserted twice.
+  return [
+    ...new Map(
+      families.flatMap(([keys, type]) =>
+        keys.map(programmaticOptionKey).filter((key) => key !== 'key').map((key) => [key, type]),
+      ),
+    ),
+  ];
+};
 
 // Every option name the library curates or reserves, under the spelling the
 // contract gives JavaScript. `key` is excluded on purpose: it is honoured only
@@ -134,6 +167,22 @@ describe('BlissSVGBuilder typed option surface', () => {
     });
   });
 
+  describe('when comparing each declared value type to the value the option takes', () => {
+    it.each(expectedOptionTypes())('declares %s as taking a %s', (option, type) => {
+      // pins the TYPE of each row and not only its name: a row respelled
+      // correctly but typed `strokeWidth?: string` passes every naming row
+      // above and `tsc` too, while telling a caller that a valid number is a
+      // type error. The families come from the value gate's own partition, so
+      // an option added later is typed the day it lands.
+      expect([...declaredOptionTypes().get(option)]).toContain(type);
+    });
+
+    it('covers every declared row by one of the value gate families', () => {
+      const typed = new Set(expectedOptionTypes().map(([option]) => option));
+      expect(declaredOptionRows().filter((row) => !typed.has(row))).toEqual([]);
+    });
+  });
+
   describe('when reading the open index signature', () => {
     it('keeps the index signature that lets a kebab key still compile', () => {
       // the flip changes which spelling gets an inline hint, not which
@@ -145,8 +194,13 @@ describe('BlissSVGBuilder typed option surface', () => {
   });
 
   describe('when comparing BlissJSON.options to what toJSON() publishes', () => {
-    it('declares exactly the value types the library publishes', () => {
-      expect(declaredJsonValueUnions()[0].split(' | ')).toEqual(publishedValueTypes());
+    it('declares exactly the value types the library publishes, at every scope', () => {
+      // every scope, not the first one: reading a single union let a narrowing
+      // at any scope but the document pass, and the document one is index 0
+      // only by the order the interface happens to be written in
+      for (const union of declaredJsonValueUnions()) {
+        expect(union.split(' | ')).toEqual(publishedValueTypes());
+      }
     });
 
     it('publishes a number, which is the type the declaration used to omit', () => {
