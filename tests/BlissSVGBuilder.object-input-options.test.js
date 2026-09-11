@@ -233,6 +233,13 @@ describe('BlissSVGBuilder object-input options', () => {
     });
 
     it('resolves the name of a numeric value without reshaping the value', () => {
+      // OPEN DECISION, and this row is its tripwire. `BlissJSON.options` is
+      // declared `Record<string, string | boolean>` in `src/index.d.ts`, so the
+      // number published here contradicts the type. The options argument
+      // stringifies the same value; this channel does not. Whichever way the
+      // typed surface settles it, widening the type or stringifying the value,
+      // the change meets this row first. Do not relax the assertion to
+      // accommodate a stringified value without settling the type with it.
       const camel = build(atDocument({ marginTop: 3 }));
       expect(camel.svgCode).toBe(build(atDocument({ 'margin-top': 3 })).svgCode);
       expect(Object.values(camel.toJSON().options)).toEqual([3]);
