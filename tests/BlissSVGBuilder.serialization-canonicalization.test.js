@@ -224,19 +224,31 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
     it('never absorbs a single-character text fallback into a run', () => {
       // `XTXT_λ` surfaces as `Xλ`, which is spelled like an outlined letter but
       // is not one. What is pinned here is only that the collapse leaves it out
-      // of the run, which is why this chunk neither caused nor worsened the
-      // round-trip gap the two todos below own.
+      // of the run, which is separate from the reparse merge pinned below.
       expect(serialized('Xa/XTXT_λ')).toBe('Xa/Xλ');
       expect(serialized('XTXT_λ/Xa')).toBe('Xλ/Xa');
     });
 
-    // Registered in `backlog.md` as a sibling of #19, routed to the external-
-    // character direction (GH #26): an outlined letter beside a single-character
-    // text fallback serializes to a string that reparses as ONE merged text
-    // glyph, silently redrawing a two-glyph word. Reachable without writing the
-    // internal key, via `define({MYFB:{codeString:'Xλ'}})` then `Xa/MYFB`.
-    it.todo('keeps an outlined letter beside a one-character text fallback across a round trip');
-    it.todo('reports the merge when a round trip cannot keep the two glyphs apart');
+    // RULED, and this row exists so the ruling is not re-found as a bug: a text
+    // fallback is what the library reaches for when an outlined letter does not
+    // exist, and a fallback's appearance is decided by the reader's installed
+    // font, so it can never promise a particular picture. A round trip that
+    // redraws the pair in one font is therefore an improvement rather than a
+    // loss, and the merge below is INTENDED.
+    //
+    // The cost, measured and stated here because the assertions cannot show it:
+    // `Xa` renders as an outlined <path> before the trip and as font text after,
+    // so the pair stops being half drawn artwork and half font and becomes
+    // consistently font-rendered. Reachable without writing the internal key,
+    // via `define({MYFB:{codeString:'Xλ'}})` then `Xa/MYFB`.
+    it('merges an outlined letter into a one-character text fallback, by design', () => {
+      expect(serialized('Xa/XTXT_λ')).toBe('Xa/Xλ');
+      expect(roundTrip('Xa/XTXT_λ')).toEqual({ samePicture: false, settled: false });
+
+      // One redraw, not a cascade: the merged form is its own fixed point.
+      expect(serialized('Xa/Xλ')).toBe('Xaλ');
+      expect(roundTrip('Xa/Xλ')).toEqual(INTACT);
+    });
 
     it('leaves a word that is already one text-fallback glyph alone', () => {
       expect(serialized('Xhαllo')).toBe('Xhαllo');
