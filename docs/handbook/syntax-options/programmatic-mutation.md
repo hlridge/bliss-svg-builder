@@ -233,7 +233,7 @@ Remove specific options by key:
 builder.glyph(0).removeOptions('color');
 ```
 
-Either spelling of a key removes the option, whichever way it was set, so `removeOptions('strokeWidth')` clears a `stroke-width` and `removeOptions('stroke-dasharray')` clears a `strokeDasharray`.
+Either spelling removes a name the library or a standard owns, whichever way it was set, so `removeOptions('strokeWidth')` clears a `stroke-width` and `removeOptions('stroke-dasharray')` clears a `strokeDasharray`. A name of your own has no second spelling to resolve to, so remove it under the name you set it with.
 
 ### Transient Options
 
