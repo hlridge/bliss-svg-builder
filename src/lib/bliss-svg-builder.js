@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, programmaticOptionKey, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -2576,8 +2576,9 @@ class BlissSVGBuilder {
   }
 
   /**
-   * Removes transient option keys from the whole SVG. Both spellings of a key
-   * are removed, since the bag stores whatever spelling reached it.
+   * Removes transient option keys from the whole SVG. A name the library or a
+   * standard owns is removed under either spelling; a name of your own is
+   * removed under exactly the spelling you set it with.
    *
    * @param {...string} keys - Option keys to remove
    * @returns {this}
@@ -2586,12 +2587,7 @@ class BlissSVGBuilder {
     const bag = this.#rawBlissObj.transientOptions;
     if (!bag) return this;
     for (const key of keys) {
-      delete bag[camelToKebab(key)];
-      // The spelling ingest stored it under, which for a name a standard owns
-      // is neither the written one nor its kebab form: `view-box` is stored as
-      // `viewBox`, and camelToKebab leaves `view-box` alone.
-      delete bag[canonicalOptionKey(key)];
-      delete bag[key];
+      deleteOptionByName(bag, key);
     }
     if (Object.keys(bag).length === 0) delete this.#rawBlissObj.transientOptions;
     this.#rebuild();

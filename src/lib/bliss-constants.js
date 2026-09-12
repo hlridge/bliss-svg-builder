@@ -408,6 +408,35 @@ export const programmaticOptionKey = (key) => (
 );
 
 /**
+ * Removes one option name from a bag, by READING the name the way ingest wrote
+ * it rather than by converting it. A name the library or a standard owns goes
+ * under either spelling; a name nobody owns goes under exactly the spelling the
+ * caller wrote.
+ *
+ * Hyphenating every key is what this replaces, and it deleted attributes the
+ * caller had not named: `dataBlissId` and `data-bliss-id` are two different
+ * names, both can be live at once, and their coexistence is deliberately silent,
+ * so the extra deletion was invisible from outside. A `<target>--name` key was
+ * wrong the same way, since the prefix suspends conversion by design.
+ *
+ * The two lookups this repeats are the two a name can be STORED under, so
+ * between them they are exhaustive and neither needs a guard of its own:
+ *
+ * - `canonicalOptionKey` is the spelling ingest stores, which is kebab for the
+ *   library's vocabulary and the owner's for a name a standard owns.
+ * - `programmaticOptionKey` is the camelCase spelling, which character scope
+ *   promotes a kerning option to. That makes kerning the one curated name whose
+ *   stored key is not the kebab one, and the kebab spelling used to miss it.
+ *
+ * On a name nobody owns both lookups are the identity, so the pair collapses to
+ * the one key the caller named, which is the whole point.
+ */
+export const deleteOptionByName = (bag, key) => {
+  delete bag[canonicalOptionKey(key)];
+  delete bag[programmaticOptionKey(key)];
+};
+
+/**
  * Watches one options bag being filled and reports when two spellings of one
  * name land on the same key. Resolution is what makes the collision invisible:
  * before it, both spellings survived side by side and the reader could see

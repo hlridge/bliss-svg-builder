@@ -550,7 +550,11 @@ export declare class ElementHandle {
    */
   setOptions(opts: BlissOptions | OptionLayers): this;
 
-  /** Removes specific option keys from this element. */
+  /**
+   * Removes specific option keys from this element. A name the library or a
+   * standard owns is removed in either spelling; a name of your own is removed
+   * under exactly the spelling you set it with.
+   */
   removeOptions(...keys: string[]): this;
 
   /**
@@ -573,7 +577,10 @@ export declare class ElementHandle {
    */
   setTransientOptions(opts: BlissOptions): this;
 
-  /** Removes specific transient option keys from this element. */
+  /**
+   * Removes specific transient option keys from this element, reading a name
+   * exactly as `removeOptions` reads it.
+   */
   removeTransientOptions(...keys: string[]): this;
 }
 
@@ -1154,7 +1161,11 @@ export declare class BlissSVGBuilder {
    */
   setTransientOptions(opts: BlissOptions): this;
 
-  /** Removes transient option keys from the whole SVG, in either spelling. */
+  /**
+   * Removes transient option keys from the whole SVG. A name the library or a
+   * standard owns is removed in either spelling; a name of your own is removed
+   * under exactly the spelling you set it with.
+   */
   removeTransientOptions(...keys: string[]): this;
 
   // --- Static: definition management ---

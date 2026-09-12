@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { camelToKebab, canonicalOptionKey, WARNING_CODES } from "./bliss-constants.js";
+import { deleteOptionByName, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
@@ -1453,13 +1453,7 @@ export class ElementHandle {
     const node = this.#nodeRef;
     if (!node?.options) return this;
     for (const key of keys) {
-      const kebab = camelToKebab(key);
-      delete node.options[kebab];
-      // The spelling ingest stored it under, which for a name a standard owns
-      // is neither the written one nor its kebab form: `view-box` is stored as
-      // `viewBox`, and camelToKebab leaves `view-box` alone.
-      delete node.options[canonicalOptionKey(key)];
-      delete node.options[key];
+      deleteOptionByName(node.options, key);
     }
     // Clean up empty options object
     if (Object.keys(node.options).length === 0) {
@@ -1497,9 +1491,8 @@ export class ElementHandle {
     return this;
   }
 
-  // Both spellings are deleted, like removeOptions: the bag stores keys as they
-  // arrived (kebab from a setter, either spelling from object input) and the
-  // normalization that would unify them happens later, on the render copy.
+  // A name is read the same way `removeOptions` reads it, so an owned name goes
+  // under either spelling and a name nobody owns goes under the one written.
   removeTransientOptions(...keys) {
     this.#assertReachable();
     // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
@@ -1507,9 +1500,7 @@ export class ElementHandle {
     const node = this.#nodeRef;
     if (!node?.transientOptions) return this;
     for (const key of keys) {
-      delete node.transientOptions[camelToKebab(key)];
-      delete node.transientOptions[canonicalOptionKey(key)];
-      delete node.transientOptions[key];
+      deleteOptionByName(node.transientOptions, key);
     }
     if (Object.keys(node.transientOptions).length === 0) {
       delete node.transientOptions;
