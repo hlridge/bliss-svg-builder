@@ -24,7 +24,7 @@ Where a pass-through attribute lands depends on the level you set it at. A **glo
 
 ### Which name is emitted
 
-Casing and hyphenation carry no meaning inside a name that already has an owner, so there is nothing worth preserving there, and every reason to hand back the one spelling that works:
+Write one of these names either way and it is the same name, because casing and hyphenation are not what tells two of them apart. What comes back is its owner's spelling:
 
 | What you write | Who owns the name | What comes back |
 |---|---|---|

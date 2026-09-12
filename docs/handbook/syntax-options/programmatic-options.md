@@ -131,7 +131,7 @@ All options from the [Options Quick Reference](/reference/options-quick-referenc
 
 **Either column works, on either surface.** `{ marginTop: 3 }` and `{ 'margin-top': 3 }` set the same margin, and so does `[marginTop=3]||` in a string. Each surface hands the option back in its own spelling, whichever way you typed it: `toString()` writes `[margin-top=3]||`, `toJSON()` writes `marginTop`. Write one option twice under two spellings and the last one wins, with the other reported as [`MULTIPLE_OPTION_SPELLINGS`](/reference/warning-codes#multiple-option-spellings), which is what makes `{ ...defaults, marginTop: 3 }` behave the way you would expect when `defaults` holds a `'margin-top'`.
 
-An [SVG pass-through attribute](/handbook/syntax-options/svg-pass-through) follows the same principle under a different owner. A name SVG or ARIA defines is accepted in any casing and emitted under that standard's spelling; a name of your own is emitted exactly as you typed it, so write it the way you want to read it, in quotes when it contains a dash:
+An [SVG pass-through attribute](/handbook/syntax-options/svg-pass-through) follows the same principle under a different owner. A name SVG or ARIA defines is accepted in either spelling and emitted under that standard's own; a name of your own is emitted exactly as you typed it, so write it the way you want to read it, in quotes when it contains a dash:
 
 ```js
 new BlissSVGBuilder('B313', { strokeDasharray: 5 });              // emits stroke-dasharray="5"
