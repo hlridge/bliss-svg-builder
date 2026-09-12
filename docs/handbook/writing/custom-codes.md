@@ -227,7 +227,7 @@ The rules keep definitions portable and unambiguous:
 - **`isIndicator` is glyph-only.** The flag marks a `type: 'glyph'` definition as a compound indicator; setting it on a bare alias, shape, or external glyph is rejected. Indicator-ness still rides through an unflagged bare alias whose target is itself an indicator (`{ codeString: 'B81' }`).
 - **Word codeStrings carry no internal coordinates.** In a `/`-spanning codeString, apply positions at the use site (`MYWORD:2,0`) instead. Kerning markers (`RK:-2`, `AK:1`) are spacing, not coordinates, and are allowed. Single-character codeStrings keep their coordinate freedom (see below).
 - **Spaces spell out as `//` or explicit space codes.** The top-level shorthand `SP` normalizes to `//` when stored.
-- **`defaultOptions` keys must be valid option names**, and cannot include canvas-wide global-only options like `margin` or `grid` (they configure the whole SVG and would be inert on a definition).
+- **`defaultOptions` keys must be valid option names**, and cannot include canvas-wide global-only options like `margin` or `grid` (they configure the whole SVG and would be inert on a definition). A key is read here exactly as it is anywhere else, so `{ strokeWidth: 2 }` and `{ 'stroke-width': 2 }` are one option, and a name SVG or ARIA owns is stored under that standard's spelling: `{ strokeDasharray: '2 1' }` sets `stroke-dasharray` and `{ ariaLabel: 'water' }` sets `aria-label`. See [which name is emitted](/handbook/syntax-options/svg-pass-through#which-name-is-emitted).
 
 `patchDefinition()` enforces the same rules and validates before applying, so a rejected patch changes nothing.
 

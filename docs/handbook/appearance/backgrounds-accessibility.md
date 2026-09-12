@@ -76,6 +76,12 @@ For inline SVGs, you can also add `aria-label` directly on the surrounding HTML 
 const builder = new BlissSVGBuilder('[role=img;aria-label=Feeling]||B313');
 ```
 
+The same pair works from JavaScript, where `ariaLabel` is the spelling that reads naturally and reaches `aria-label` just the same:
+
+```js
+const builder = new BlissSVGBuilder('B313', { role: 'img', ariaLabel: 'Feeling' });
+```
+
 ## Fixed Height
 
 Set an explicit pixel height with `svg-height`. The width is auto-calculated to maintain the aspect ratio.

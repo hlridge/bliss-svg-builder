@@ -100,7 +100,7 @@ const builder = new BlissSVGBuilder('[color=blue]||B313', {
 
 ## Option Format
 
-Options use **camelCase** keys with native JavaScript types, not the kebab-case strings used in DSL syntax.
+Options use **camelCase** keys with native JavaScript types. The DSL spells the same options with dashes, and each surface accepts both spellings, so the difference is house style rather than a rule: camelCase is what reads naturally in JavaScript, dashes are what read naturally in a string.
 
 ### Key Mapping
 
@@ -129,14 +129,19 @@ Options use **camelCase** keys with native JavaScript types, not the kebab-case 
 
 All options from the [Options Quick Reference](/reference/options-quick-reference) are supported, with the same validation as the DSL form: the spacing and dot-sizing options take any width a renderer can draw, and a value that is not a number, or is negative, is refused and reported rather than quietly replaced.
 
-**The camelCase-to-kebab conversion applies to these named options and to nothing else.** An [SVG pass-through attribute](/handbook/syntax-options/svg-pass-through) is emitted under exactly the name you write, so write it the way SVG spells it, in quotes when it contains a dash:
+**Either column works, on either surface.** `{ marginTop: 3 }` and `{ 'margin-top': 3 }` set the same margin, and so does `[marginTop=3]||` in a string. Each surface hands the option back in its own spelling, whichever way you typed it: `toString()` writes `[margin-top=3]||`, `toJSON()` writes `marginTop`. Write one option twice under two spellings and the last one wins, with the other reported as [`MULTIPLE_OPTION_SPELLINGS`](/reference/warning-codes#multiple-option-spellings), which is what makes `{ ...defaults, marginTop: 3 }` behave the way you would expect when `defaults` holds a `'margin-top'`.
+
+An [SVG pass-through attribute](/handbook/syntax-options/svg-pass-through) follows the same principle under a different owner. A name SVG or ARIA defines is accepted in any casing and emitted under that standard's spelling; a name of your own is emitted exactly as you typed it, so write it the way you want to read it, in quotes when it contains a dash:
 
 ```js
-new BlissSVGBuilder('B313', { 'stroke-dasharray': 5 });   // emits stroke-dasharray="5"
-new BlissSVGBuilder('B313', { preserveAspectRatio: 'xMidYMid' }); // emits it unchanged
+new BlissSVGBuilder('B313', { strokeDasharray: 5 });              // emits stroke-dasharray="5"
+new BlissSVGBuilder('B313', { 'stroke-dasharray': 5 });           // the same attribute
+new BlissSVGBuilder('B313', { preserveAspectRatio: 'xMidYMid' }); // emits preserveAspectRatio, SVG's own spelling
+new BlissSVGBuilder('B313', { ariaLabel: 'Feeling' });            // emits aria-label="Feeling"
+new BlissSVGBuilder('B313', { dataBlissId: 7 });                  // yours: emits dataBlissId="7"
 ```
 
-Guessing where the dashes go would be right for the table above, where the library owns both spellings, and wrong for every SVG attribute that is genuinely camelCase.
+The library is not guessing where the dashes go; it recognizes the name. That is why `strokeDasharray` can reach `stroke-dasharray` while `preserveAspectRatio` keeps its capitals, and why a name nobody owns is left exactly as you wrote it.
 
 The last four position a single element rather than the canvas, so they belong on the element that carries them, through `setOptions()` or the opts argument of `addGlyph`/`insertPart`/`replaceGlyph` and the rest of that family. They mean exactly what the DSL spelling of the same value means, and they serialize to it:
 

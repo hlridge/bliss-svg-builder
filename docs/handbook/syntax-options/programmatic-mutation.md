@@ -223,7 +223,7 @@ builder.glyph(0).setOptions({ color: 'red' });
 builder.group(0).setOptions({ strokeWidth: 0.6 });
 ```
 
-Options use camelCase keys, the same keys as [programmatic options](/handbook/syntax-options/programmatic-options).
+Options use camelCase keys, the same keys as [programmatic options](/handbook/syntax-options/programmatic-options), and the hyphenated spelling works here too.
 
 ### Removing Options
 
@@ -232,6 +232,8 @@ Remove specific options by key:
 ```js
 builder.glyph(0).removeOptions('color');
 ```
+
+Either spelling of a key removes the option, whichever way it was set, so `removeOptions('strokeWidth')` clears a `stroke-width` and `removeOptions('stroke-dasharray')` clears a `strokeDasharray`.
 
 ### Transient Options
 

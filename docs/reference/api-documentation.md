@@ -38,7 +38,7 @@ const styled = new BlissSVGBuilder('B313', {
 });
 ```
 
-Options use camelCase keys and native JS types. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules. A non-object `options` argument (a string, number, boolean, or array) throws a `TypeError`; `null` and `undefined` mean "no options" (see [error handling](#error-handling)).
+Options use camelCase keys and native JS types, and the hyphenated spelling a DSL string uses is accepted here too. See [Programmatic Options](/handbook/syntax-options/programmatic-options) for the full key mapping and precedence rules, and [which name is emitted](/handbook/syntax-options/svg-pass-through#which-name-is-emitted) for how a pass-through attribute is spelled. A non-object `options` argument (a string, number, boolean, or array) throws a `TypeError`; `null` and `undefined` mean "no options" (see [error handling](#error-handling)).
 
 ### Round-trip from toJSON()
 
@@ -125,6 +125,8 @@ const obj = builder.toJSON();
 //   ]
 // }
 ```
+
+Every `options` bag in that object uses the spelling its owner publishes, whichever way you wrote the option: camelCase for the library's own options (`marginTop`), the standard's own spelling for a name SVG or ARIA defines (`viewBox`, `stroke-dasharray`, `aria-label`), and exactly what you typed for a name of your own. The library's own options are the only ones the two serializations spell differently: `toString()` writes them with dashes, which is how you would type them in a string. Both spellings are read back, so a snapshot saved under the older keys still loads and draws the same picture.
 
 By default, nested sub-parts are stripped for a cleaner structure. Each part keeps its `codeName`, position (`x`, `y`), and metadata (`isIndicator`, `width`) but no internal rendering tree. The constructor re-expands parts automatically when given an object, so round-trips work without `deep`:
 

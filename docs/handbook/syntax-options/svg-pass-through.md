@@ -4,11 +4,11 @@ Any option that Bliss SVG Builder doesn't recognize as a built-in option is pass
 
 ## How It Works
 
-The builder maintains a set of known option keys (`color`, `stroke-width`, `margin`, `grid`, etc.). When you set an option that isn't in this set, it passes through to the SVG output as-is.
+The builder maintains a set of known option keys (`color`, `stroke-width`, `margin`, `grid`, etc.). When you set an option that isn't in this set, it passes through to the SVG output as an attribute.
 
 Where a pass-through attribute lands depends on the level you set it at. A **global** option goes on the root `<svg>` element, so it covers the whole picture: the artwork, and the paper and grid if you have switched them on. Anything inside that sets its own value for that attribute keeps it, which is what the prefixed spellings further down are for. A **word**, **character**, or **part** option goes on a `<g>` that wraps just that word, character, or part.
 
-The name you write is the name that is emitted, exactly as you typed it. That matters for the SVG attributes spelled in camelCase, such as `preserveAspectRatio` and `gradientUnits`, and for your own `data-` attributes.
+**A name the library or a standard owns works in either casing and comes back in its owner's spelling. A name nobody owns comes back exactly as you wrote it.** So `preserveAspectRatio` comes out as `preserveAspectRatio` whether you write it that way, as `preserve-aspect-ratio`, or all in lower case, while a `data-` attribute of your own is emitted letter for letter as you typed it.
 
 ```
 [opacity=0.5]||B313
@@ -21,6 +21,21 @@ The name you write is the name that is emitted, exactly as you typed it. That ma
 ```
 
 <Demo code="[stroke-dasharray=2,1]||B313" title="stroke-dasharray passes through" />
+
+### Which name is emitted
+
+Casing and hyphenation carry no meaning inside a name that already has an owner, so there is nothing worth preserving there, and every reason to hand back the one spelling that works:
+
+| What you write | Who owns the name | What comes back |
+|---|---|---|
+| `stroke-width` or `strokeWidth`, `margin-top` or `marginTop` | the library, as a [named option](/reference/options-quick-reference) | the option itself, whichever way you spelled it. `toString()` writes it back as `[stroke-width=…]` and `toJSON()` as `strokeWidth` |
+| `viewBox`, `view-box` or `viewbox`; `strokeDasharray` or `stroke-dasharray`; `ariaLabel` or `aria-label` | SVG or ARIA | the standard's own spelling, in the markup and in both serializations: `viewBox`, `stroke-dasharray`, `aria-label` |
+| `data-attr`, `dataAttr`, `myOwnAttr` | you | exactly what you typed, everywhere, never converted |
+| `root--view-box`, `content--color` | nobody, because the prefix suspends all of the above | the name after the last `--`, meant literally, on the part you named: a raw `view-box`, a raw `color` |
+
+The casing or hyphenation you choose is never reported. Nothing is lost by the choice either: the value applies exactly as you meant it, and your own `toString()` shows you which spelling it settled on. Some libraries do warn here, React among them when a DOM attribute looks misspelled, and this one deliberately does not. Write one name twice under two spellings and the last one you wrote is the one that applies, with the other reported as [`MULTIPLE_OPTION_SPELLINGS`](/reference/warning-codes#multiple-option-spellings).
+
+The SVG names this covers are the ones SVG defines for the elements the library draws: `<svg>`, `<g>`, `<path>`, `<rect>`, `<text>`, `<a>`, `<title>`, `<desc>` and `<style>`. A name from elsewhere in SVG has nothing in the picture to sit on, so it counts as one of your own and is emitted as typed: `[gradientUnits=userSpaceOnUse]||` emits `gradientUnits`, and `[gradient-units=userSpaceOnUse]||` emits `gradient-units`.
 
 ## Targeting One Part of the Picture
 
@@ -65,7 +80,11 @@ Compare that with the unprefixed spelling, which fades the grid and the artwork 
 
 The prefixed form is a raw channel: the attribute name is emitted exactly as written, and it goes where you sent it, with no interpretation. That is what makes `content--color` reach the real `color` attribute, where the plain `color` option is a friendlier name for `stroke`. It is also why the two spellings of `vector-effect` do different things: written plain, the library knows it only works on the shapes themselves and moves it down onto the character paths, while `root--vector-effect` writes it on the root `<svg>`, where it has no effect, because naming a target asks for a place and not for a result.
 
+Being raw, it is the one channel where [the naming rule](#which-name-is-emitted) does not run, so it is also how you ask for a spelling that rule would otherwise settle for you. `[root--view-box=0 0 5 5]||` puts a literal `view-box` on the root, beside the real `viewBox` the library computed, and the two sit there as the different attributes they are.
+
 A target prefix only means something at global scope, since these parts belong to the document as a whole. Written on a word, character or part it is dropped: reported when you wrote it in a bracket, and in silence when it arrived through object input or `setTransientOptions`. A prefix that matches no class the library writes, such as `foo--x`, is reported too, and nothing is emitted for it.
+
+Those two facts have one consequence worth stating outright. A literal spelling can be asked for at global scope and nowhere else: on a word, character or part, a name SVG or ARIA owns arrives under its owner's spelling and there is no way to insist on another, because the only channel that would have carried one is refused there. Nothing you would want is lost, since the spelling you are denied is a misspelling no renderer acts on. The exception worth naming is SVG's own `color`, which is a real attribute rather than a misspelling and which the friendlier `color` option occupies at every scope. Set it through `style` instead, which passes through untouched: `[style=color:red]B313` puts `style="color:red"` on that character's group.
 
 Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, or markup that reads as a working link and is not one, so two names are refused behind a prefix, each reported:
 
