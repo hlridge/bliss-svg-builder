@@ -229,19 +229,25 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('XTXT_λ/Xa')).toBe('Xλ/Xa');
     });
 
-    // RULED, and this row exists so the ruling is not re-found as a bug: a text
-    // fallback is what the library reaches for when an outlined letter does not
-    // exist, and a fallback's appearance is decided by the reader's installed
-    // font, so it can never promise a particular picture. A round trip that
-    // redraws the pair in one font is therefore an improvement rather than a
-    // loss, and the merge below is INTENDED.
+    // RULED 2026-09-12, and the ruling is about DIRECTION, which is why this is
+    // pinned rather than left as two todos. Drawn outlines are the good outcome:
+    // both letters rendered is best, one rendered and one font text is the middle,
+    // both font text is the worst. A text fallback is only what the library
+    // reaches for when no outline exists.
     //
-    // The cost, measured and stated here because the assertions cannot show it:
-    // `Xa` renders as an outlined <path> before the trip and as font text after,
-    // so the pair stops being half drawn artwork and half font and becomes
-    // consistently font-rendered. Reachable without writing the internal key,
+    // The round trip below therefore moves the pair the WRONG WAY, from the
+    // middle to the worst, and the cost is stated here because the assertions
+    // cannot show it: `Xa` is an outlined <path> before the trip and font text
+    // after, so the pair goes from one path plus one <text> to zero paths and a
+    // single <text> reading "aλ". Reachable without writing the internal key,
     // via `define({MYFB:{codeString:'Xλ'}})` then `Xa/MYFB`.
-    it('merges an outlined letter into a one-character text fallback, by design', () => {
+    //
+    // Low priority and deliberately NOT 1.1.0's: the whole font and external-
+    // character direction gets looked over after 1.1.0, and this belongs with it.
+    // The trap this pin exists to catch is a "fix" that makes the round trip
+    // stable by accepting the merge, since that settles it in the wrong
+    // direction. The two todos below are the acceptance criteria, in order.
+    it('currently merges an outlined letter into a one-character text fallback', () => {
       expect(serialized('Xa/XTXT_λ')).toBe('Xa/Xλ');
       expect(roundTrip('Xa/XTXT_λ')).toEqual({ samePicture: false, settled: false });
 
@@ -249,6 +255,9 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('Xa/Xλ')).toBe('Xaλ');
       expect(roundTrip('Xa/Xλ')).toEqual(INTACT);
     });
+
+    it.todo('keeps an outlined letter beside a one-character text fallback across a round trip');
+    it.todo('reports the merge when a round trip cannot keep the two glyphs apart');
 
     it('leaves a word that is already one text-fallback glyph alone', () => {
       expect(serialized('Xhαllo')).toBe('Xhαllo');
