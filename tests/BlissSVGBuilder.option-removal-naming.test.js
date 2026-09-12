@@ -165,6 +165,45 @@ describe('BlissSVGBuilder option removal naming', () => {
     });
   });
 
+  describe('when there is nothing to remove', () => {
+    it('leaves an element that has no options of its own alone', () => {
+      const builder = new BlissSVGBuilder('B291');
+      const untouched = builder.svgCode;
+
+      builder.glyph(0).removeOptions('strokeWidth');
+
+      expect(builder.svgCode).toBe(untouched);
+    });
+
+    it('leaves an element that has no transient options alone', () => {
+      const builder = new BlissSVGBuilder('B291');
+      const untouched = builder.svgCode;
+
+      builder.glyph(0).removeTransientOptions('strokeWidth');
+
+      expect(builder.svgCode).toBe(untouched);
+    });
+
+    it('leaves a whole SVG that has no transient options alone', () => {
+      const builder = new BlissSVGBuilder('B291');
+      const untouched = builder.svgCode;
+
+      builder.removeTransientOptions('strokeWidth');
+
+      expect(builder.svgCode).toBe(untouched);
+    });
+
+    it('drops the options bag entirely once its last key goes', () => {
+      const builder = new BlissSVGBuilder('B291');
+      builder.glyph(0).setOptions({ strokeWidth: 3 });
+      expect(builder.toJSON().groups[0].glyphs[0]).toHaveProperty('options');
+
+      builder.glyph(0).removeOptions('strokeWidth');
+
+      expect(builder.toJSON().groups[0].glyphs[0]).not.toHaveProperty('options');
+    });
+  });
+
   describe('when a standard owns the name', () => {
     it.each(['viewBox', 'view-box', 'VIEWBOX'])('removes an element option named as %s', (named) => {
       const builder = new BlissSVGBuilder('B291');

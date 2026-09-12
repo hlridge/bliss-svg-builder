@@ -2589,6 +2589,9 @@ class BlissSVGBuilder {
     for (const key of keys) {
       deleteOptionByName(bag, key);
     }
+    // Housekeeping, and deliberately unpinned for the reason the element-level
+    // twin records: an empty transient bag is indistinguishable from an absent
+    // one on every public surface, because transient options never serialize.
     if (Object.keys(bag).length === 0) delete this.#rawBlissObj.transientOptions;
     this.#rebuild();
     return this;

@@ -1502,6 +1502,10 @@ export class ElementHandle {
     for (const key of keys) {
       deleteOptionByName(node.transientOptions, key);
     }
+    // Housekeeping, and deliberately unpinned: a transient bag never
+    // serializes, so an empty one is indistinguishable from an absent one on
+    // every public surface. Measured, not assumed. It stays so the authoring
+    // structure does not accumulate empty bags, not because anything reads it.
     if (Object.keys(node.transientOptions).length === 0) {
       delete node.transientOptions;
     }
