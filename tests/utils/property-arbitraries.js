@@ -81,8 +81,21 @@ const globalBracketArb = fc.oneof(
   fc.integer({ min: 1, max: 30 }).map((v) => `[min-width=${v}]`),
 );
 
-const coordValueArb = fc.constantFrom(-3, -2, -1.5, -1, 1, 1.5, 2, 3);
+// Zero is in the pool deliberately. An axis written as `0` is EXPLICIT, and an
+// axis left out is unset; the two coincide for any element whose own default
+// position is 0, which is everything except an indicator. Leaving zero out hid
+// that distinction from every property in this suite.
+const coordValueArb = fc.constantFrom(-3, -2, -1.5, -1, 0, 1, 1.5, 2, 3);
 const kernValueArb = fc.constantFrom(-2, -1.5, -1, 1, 1.5, 2, 3);
+
+// A written coordinate names ONE axis or both, and all three shapes are legal
+// DSL: `:x,y`, `:x` (y unset) and `:,y` (x unset). Generating only the pair kept
+// the half forms out of every property here.
+const coordSuffixArb = fc.oneof(
+  fc.tuple(coordValueArb, coordValueArb).map(([x, y]) => `:${x},${y}`),
+  coordValueArb.map((x) => `:${x}`),
+  coordValueArb.map((y) => `:,${y}`),
+);
 
 // ==== Structural arbitraries (built inside-out) ====
 
@@ -91,11 +104,10 @@ const kernValueArb = fc.constantFrom(-2, -1.5, -1, 1, 1.5, 2, 3);
 const partArb = fc.record({
   option: fc.option(elementBracketArb, { nil: undefined }),
   shape: fc.constantFrom(...PART_SHAPES),
-  coords: fc.option(fc.tuple(coordValueArb, coordValueArb), { nil: undefined }),
+  coords: fc.option(coordSuffixArb, { nil: undefined }),
 }).map(({ option, shape, coords }) => {
   const prefix = option ? `${option}>` : '';
-  const suffix = coords ? `:${coords[0]},${coords[1]}` : '';
-  return `${prefix}${shape}${suffix}`;
+  return `${prefix}${shape}${coords ?? ''}`;
 });
 
 // A glyph: optional option prefix, a base, zero or more shape parts, and an
@@ -104,11 +116,18 @@ const glyphArb = fc.record({
   option: fc.option(elementBracketArb, { nil: undefined }),
   base: fc.constantFrom(...BASE_CODES),
   parts: fc.array(partArb, { minLength: 0, maxLength: 2 }),
-  indicator: fc.option(fc.constantFrom(...CHAR_INDICATORS), { nil: undefined }),
+  // The indicator may carry a coordinate of its own. It is the ONLY element in
+  // the pool whose default position is not 0, so it is the only one that can
+  // tell an unset axis from an explicit zero; without a coordinate here the
+  // distinction is unreachable from this generator.
+  indicator: fc.option(fc.record({
+    code: fc.constantFrom(...CHAR_INDICATORS),
+    coords: fc.option(coordSuffixArb, { nil: undefined }),
+  }), { nil: undefined }),
 }).map(({ option, base, parts, indicator }) => {
   let s = (option ?? '') + base;
   for (const p of parts) s += `;${p}`;
-  if (indicator) s += `;${indicator}`;
+  if (indicator) s += `;${indicator.code}${indicator.coords ?? ''}`;
   return s;
 });
 
