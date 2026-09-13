@@ -1464,6 +1464,13 @@ export class ElementHandle {
       // spelling lands on the same field with no option behind it. The axis is
       // read off the bag rather than off the caller's spelling, so removal goes
       // on learning names from one place.
+      //
+      // The inner recheck keeps this method correct on its own terms: an axis is
+      // cleared only if the delete really took it. Nothing outside can observe
+      // that clause, because the rebuild below re-promotes every axis the bag
+      // still holds, so a premature clear heals before anyone sees it. It stays
+      // anyway, since without it this method is correct only for as long as that
+      // rebuild is.
       const carried = ['x', 'y'].filter(axis => axis in node.options);
       deleteOptionByName(node.options, key);
       for (const axis of carried) {
