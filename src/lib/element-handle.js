@@ -1453,7 +1453,22 @@ export class ElementHandle {
     const node = this.#nodeRef;
     if (!node?.options) return this;
     for (const key of keys) {
+      // A position option is promoted to a numeric x/y on the node beside the
+      // bag, and that promoted field is what the render and toJSON() read, so
+      // deleting the bag key alone left the position live and made the two
+      // serializers disagree: toString() reported it gone while the picture and
+      // the JSON still carried it.
+      //
+      // Clearing is gated on the bag having carried the axis a moment ago,
+      // which is what leaves a coordinate written as `CODE:x,y` untouched: that
+      // spelling lands on the same field with no option behind it. The axis is
+      // read off the bag rather than off the caller's spelling, so removal goes
+      // on learning names from one place.
+      const carried = ['x', 'y'].filter(axis => axis in node.options);
       deleteOptionByName(node.options, key);
+      for (const axis of carried) {
+        if (!(axis in node.options)) delete node[axis];
+      }
     }
     // Clean up empty options object
     if (Object.keys(node.options).length === 0) {
