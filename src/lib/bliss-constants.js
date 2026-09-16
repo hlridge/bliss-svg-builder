@@ -738,10 +738,12 @@ export const WARNING_CODES = Object.freeze({
   // an indicator part that precedes default-positioned content in a glyph's
   // part list: an indicator is only meaningful in the trailing indicator run
   // (BASE;INDICATOR), so the misplaced indicator is dropped from render and
-  // serialization while the character still renders. Content explicitly
-  // positioned at a non-origin `:x,y` does not convict a preceding indicator
-  // (a compound indicator's decomposed anatomy must round-trip), and neither
-  // does an unclassifiable part (unknown code, error node).
+  // serialization while the character still renders. Content the author
+  // explicitly positioned does not convict a preceding indicator (a compound
+  // indicator's decomposed anatomy must round-trip); that asks whether an axis
+  // was WRITTEN, not whether its value is non-zero, so `:0,0` carries the
+  // exemption and `:,`, which writes no axis, does not. Neither does an
+  // unclassifiable part (unknown code, error node).
   MISPLACED_INDICATOR_PART: 'MISPLACED_INDICATOR_PART',
   // a curated option written in the spelling only the JavaScript entry points
   // read (`[marginTop=3]`, or a hand-authored `{ marginTop: 3 }` options bag).
