@@ -16,6 +16,9 @@ import { BlissSVGBuilder } from '../src/index';
  * - The warning quotes the axes the author actually wrote, one slot each, so a
  *   half coordinate (`:3`, `:,3`) is reported as written rather than padded out
  *   to a pair with a zero nobody typed.
+ * - Whether the warning fires at all asks the same question: a written origin
+ *   (`:0,0`, `:0`, `:,0`) is a position the author stated, so dropping it warns
+ *   like any other, while `:,` writes no axis and drops nothing.
  * - An option on a space at every scope (word `[o]|`, character `[o]`, part
  *   `[o]>`): dropped + warned; no empty styled `<g>` is emitted.
  * - A global-only option key (`[grid]|QSP`) keeps the space's identity too, but
@@ -62,8 +65,7 @@ describe('BlissSVGBuilder space decoration', () => {
     });
 
     it('renders a coordinate-bearing space identically to the bare space and warns', () => {
-      // pins the coordinate no longer stretches the bounding box at an edge, AND
-      // that a non-zero coordinate still warns (distinct from the :0,0 no-op).
+      // pins the coordinate no longer stretches the bounding box at an edge
       const b = new BlissSVGBuilder('QSP:5,0');
       expect(b.svgCode).toBe(new BlissSVGBuilder('QSP').svgCode);
       expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
@@ -88,10 +90,26 @@ describe('BlissSVGBuilder space decoration', () => {
         .toEqual([{ code: SPACE_DECORATION, source }]);
     });
 
-    it('drops an explicit zero coordinate without warning', () => {
-      // `:0,0` is a no-op coordinate, normalized away like content's `:0,0`; the
-      // identity is still preserved (QSP, not //), but nothing meaningful drops.
-      const b = new BlissSVGBuilder('QSP:0,0');
+    it.each([
+      ['QSP:0,0', ':0,0'],
+      ['QSP:0,', ':0'],
+      ['QSP:,0', ':,0'],
+      ['QSP:0', ':0'],
+    ])('drops the written origin in %s and warns %s', (dsl, source) => {
+      // A written `0` is a position the author stated, not an absent one, so
+      // losing it is as visible as losing any other. These rows asserted
+      // silence until the warning started asking whether an axis was written
+      // rather than whether its value was non-zero.
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe('QSP');
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source }]);
+    });
+
+    it('leaves a coordinate that wrote no axis alone and warns nothing', () => {
+      // `:,` fills neither slot, so nothing was written and nothing dropped:
+      // the guard against the presence rule widening to an absent position.
+      const b = new BlissSVGBuilder('QSP:,');
       expect(b.toString()).toBe('QSP');
       expect(b.warnings).toEqual([]);
     });
@@ -193,6 +211,13 @@ describe('BlissSVGBuilder space decoration', () => {
       expect(b.toString()).toBe('QSP');
       expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
         .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }]);
+    });
+
+    it('drops a written origin supplied through object input and warns', () => {
+      const b = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'QSP', x: 0 }] }] }] });
+      expect(b.toString()).toBe('QSP');
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source: ':0' }]);
     });
 
     it('drops a coordinate supplied through addGroup', () => {

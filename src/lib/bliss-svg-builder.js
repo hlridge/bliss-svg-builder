@@ -1113,11 +1113,15 @@ class BlissSVGBuilder {
           touched = true;
         }
         if (part.x !== undefined || part.y !== undefined) {
+          // Presence, not value: a written `0` is a position the author stated,
+          // so it is dropped here like any other and is reported like any
+          // other. Asking whether the value was non-zero instead let `QSP:0,0`
+          // lose a written position in silence. A form that writes neither axis
+          // (`QSP:,`) never reaches here, so there is nothing to report.
           const source = BlissSVGBuilder.#positionSuffix(part.x, part.y);
-          const meaningful = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0;
           delete part.x;
           delete part.y;
-          if (meaningful) warnSpaceDrop('coordinate', source);
+          warnSpaceDrop('coordinate', source);
           touched = true;
         }
         // Re-flag for identity even when nothing survived to strip: a space that
