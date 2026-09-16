@@ -2992,7 +2992,7 @@ class BlissSVGBuilder {
           // Custom composite shape (has codeString, no getPath)
           const def = blissElementDefinitions[part.codeName];
           if (def?.isShape && def.codeString && !def.getPath) {
-            return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
+            return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y, hasX, hasY);
           }
         }
         // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
@@ -3615,8 +3615,25 @@ class BlissSVGBuilder {
   // pair-only reader treats a half coordinate as unparseable and returns the
   // part unchanged, which silently discards the parent offset belonging to it
   // and moves the part on reload.
-  static #decomposeCodeString(codeString, offsetX, offsetY) {
+  //
+  // forceX/forceY carry whether the CALLER's own position wrote that axis, and
+  // they exist because an offset is a number and therefore cannot say it.
+  // Whether they apply turns on what the codeString is:
+  //
+  //   one part  -> an ALIAS HOP. When the definition exists at parse time the
+  //                parser merges it away, so the use-site position becomes that
+  //                part's own written position and a written `0` must survive.
+  //                Honour the caller.
+  //   many parts -> a real COMPOSITE. Its own token does not survive
+  //                decomposition, so its position reaches the parts only as a
+  //                fold, and a zero fold moves nothing and leaves no trace.
+  //                Ignore the caller, which is what the merged path also does.
+  //
+  // Getting this split wrong is observable: the two paths then answer
+  // differently for the same input depending only on WHEN define() ran.
+  static #decomposeCodeString(codeString, offsetX, offsetY, forceX = false, forceY = false) {
     const parts = codeString.split(';');
+    const isAliasHop = parts.length === 1;
     return parts.map(part => {
       const posMatch = part.match(/^([^:]+)(?::(-?[\d.]+)?(?:,(-?[\d.]+)?)?)?$/);
       if (!posMatch) return part;
@@ -3628,8 +3645,16 @@ class BlissSVGBuilder {
       // offset moves it: that offset has to land somewhere, and this function
       // cannot know the layout default it would otherwise be added to. The same
       // approximation, applied per axis, that the part emitter makes.
-      const hasX = writtenX !== undefined || offsetX !== 0;
-      const hasY = writtenY !== undefined || offsetY !== 0;
+      // A PURE RENAME is the only shape the parser merges away, and merging is
+      // what makes the use-site position the part's own rather than a fold. One
+      // part, no position of its own, no options: `{codeString:'C8'}` merges to
+      // a bare `C8` node carrying the use-site position, while `'C8:2'` keeps a
+      // node of its own and takes that position as a fold.
+      const isPureRename = isAliasHop
+        && writtenX === undefined && writtenY === undefined
+        && !code.includes('>') && !code.includes('[');
+      const hasX = writtenX !== undefined || offsetX !== 0 || (isPureRename && forceX);
+      const hasY = writtenY !== undefined || offsetY !== 0 || (isPureRename && forceY);
       const x = (writtenX ?? 0) + offsetX;
       const y = (writtenY ?? 0) + offsetY;
 
@@ -3637,10 +3662,10 @@ class BlissSVGBuilder {
       if (!builtInCodes.has(code)) {
         const def = blissElementDefinitions[code];
         if (def?.isShape && def.codeString && !def.getPath) {
-          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
+          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y, hasX, hasY);
         }
         if (def?.isBlissGlyph && def.codeString) {
-          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y);
+          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y, hasX, hasY);
         }
       }
 
