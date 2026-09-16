@@ -2852,6 +2852,20 @@ class BlissSVGBuilder {
     return '';
   }
 
+  /**
+   * The number in one coordinate slot, or undefined when the slot was empty.
+   *
+   * The reading half of #positionSuffix, for the one caller that parses a
+   * position back out of text. An unusable slot reads as unwritten rather than
+   * as NaN, because a NaN would be added to an offset and emitted as a
+   * coordinate, putting `:NaN` into a saved composition.
+   */
+  static #coordinateSlot(text) {
+    if (text === undefined) return undefined;
+    const value = parseFloat(text);
+    return Number.isFinite(value) ? value : undefined;
+  }
+
   /** Creates a default space group for insertion between words */
   static #makeSpaceGroup() {
     return { glyphs: [{ parts: [{ codeName: 'TSP' }] }] };
@@ -3587,15 +3601,32 @@ class BlissSVGBuilder {
 
   // Recursively decompose a codeString to built-in codes, adjusting coordinates.
   // Used by toString() for portable output of custom shapes and glyphs.
+  //
+  // This reads a position the way the part emitter writes one: per axis, and by
+  // whether the axis was written rather than by whether it happens to be zero.
+  //
+  // The reader must accept every spelling the DSL accepts (`:x,y`, `:x`, `:,y`,
+  // `:x,`, `:,`), because a definition's codeString is text a human wrote. A
+  // pair-only reader treats a half coordinate as unparseable and returns the
+  // part unchanged, which silently discards the parent offset belonging to it
+  // and moves the part on reload.
   static #decomposeCodeString(codeString, offsetX, offsetY) {
     const parts = codeString.split(';');
     return parts.map(part => {
-      const posMatch = part.match(/^([^:]+)(?::(-?[\d.]+),(-?[\d.]+))?$/);
+      const posMatch = part.match(/^([^:]+)(?::(-?[\d.]+)?(?:,(-?[\d.]+)?)?)?$/);
       if (!posMatch) return part;
 
       const [, code, xStr, yStr] = posMatch;
-      const x = (parseFloat(xStr) || 0) + offsetX;
-      const y = (parseFloat(yStr) || 0) + offsetY;
+      const writtenX = BlissSVGBuilder.#coordinateSlot(xStr);
+      const writtenY = BlissSVGBuilder.#coordinateSlot(yStr);
+      // An axis is emitted when the definition wrote it, OR when a non-zero
+      // offset moves it: that offset has to land somewhere, and this function
+      // cannot know the layout default it would otherwise be added to. The same
+      // approximation, applied per axis, that the part emitter makes.
+      const hasX = writtenX !== undefined || offsetX !== 0;
+      const hasY = writtenY !== undefined || offsetY !== 0;
+      const x = (writtenX ?? 0) + offsetX;
+      const y = (writtenY ?? 0) + offsetY;
 
       // Recursively decompose custom composite shapes
       if (!builtInCodes.has(code)) {
@@ -3608,8 +3639,7 @@ class BlissSVGBuilder {
         }
       }
 
-      if (x === 0 && y === 0) return code;
-      return `${code}:${x},${y}`;
+      return `${code}${BlissSVGBuilder.#positionSuffix(hasX ? x : undefined, hasY ? y : undefined)}`;
     }).join(';');
   }
 
