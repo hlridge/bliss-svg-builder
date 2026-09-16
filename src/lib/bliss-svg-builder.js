@@ -2890,6 +2890,19 @@ class BlissSVGBuilder {
         // a truthy literal-`undefined` string; drop it before decoration. It
         // already warned UNKNOWN_CODE at parse. (F3.)
         if (!part.codeName) return '';
+        // Presence, not value: an axis nobody wrote is unset, not zero. An
+        // unset axis leaves the part wherever it sits on its own, which is the
+        // origin for an ordinary shape but a computed placement for an
+        // indicator, so filling in a `0` the author never wrote reloads as a
+        // different picture. The two questions are asked separately from here.
+        //
+        // A non-zero parent offset forces a value either way: when a nested
+        // composite decomposes, an unset axis would have to be emitted as that
+        // part's own default plus the offset, and only the layout knows the
+        // default. Approximated as 0, which is exact for every ordinary part
+        // and off by the anchor placement for an indicator.
+        const hasX = part.x !== undefined || offsetX !== 0;
+        const hasY = part.y !== undefined || offsetY !== 0;
         const x = (part.x ?? 0) + offsetX;
         const y = (part.y ?? 0) + offsetY;
         // Under preserve a BASE-slot custom name with `;`-siblings still
@@ -2944,9 +2957,11 @@ class BlissSVGBuilder {
         let str = part.codeName.startsWith('XTXT_')
           ? 'X' + part.codeName.slice(5)
           : part.codeName;
-        if (x !== 0 || y !== 0) {
-          str += `:${x},${y}`;
-        }
+        // One slot per written axis. A part with neither takes no suffix, and
+        // `:x,` is emitted as `:x`, the shorter spelling of the same thing.
+        if (hasX && hasY) str += `:${x},${y}`;
+        else if (hasX) str += `:${x}`;
+        else if (hasY) str += `:,${y}`;
         // Prefix part-level options with [opts]> syntax (skip the position
         // keys, already emitted as the coordinate suffix above)
         const optPrefix = serializeOptions(part.options, PART_POSITION_KEYS);
