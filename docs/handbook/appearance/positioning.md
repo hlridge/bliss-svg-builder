@@ -17,11 +17,13 @@ Coordinates are in grid units. See [Grid Basics](/handbook/appearance/grid-basic
 ### Coordinate Variations
 
 ```
-CODE        → x=0, y=0 (both default)
-CODE:x,y    → explicit position
-CODE:x      → y defaults to 0
-CODE:,y     → x defaults to 0
+CODE        → no position set
+CODE:x,y    → sets both
+CODE:x      → sets x only
+CODE:,y     → sets y only
 ```
+
+An axis you don't set keeps the position the element would have had anyway, which for ordinary shapes is 0.
 
 <Demo code="[grid]||C8" title="C8 (defaults to 0,0)" />
 
@@ -62,6 +64,13 @@ Override anchor-based positioning with explicit coordinates. Since indicators ar
 <Demo code="B431;B81" display-code="[grid]||B431;B81" title="Anchor-positioned" before="[grid;min-width=16]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:7,0;VL10:7,0;VL10:7,10;HL2:7,20;VL10:9,0;VL10:9,10" />
 
 <Demo code="[margin-bottom=2.75]||B431;B81:2,2" display-code="[grid]||B431;B81:2,2" title="B81:2,2 (box at y=2, ink appears at y=6)" before="[grid;min-width=16;margin-bottom=2.75]||[color=red;stroke-width=0.16;stroke-dasharray=2,1]|HL2:2,2;VL10:2,2;VL10:2,12;HL2:2,22;VL10:4,2;VL10:4,12;[stroke-width=0.5]>DOT:2,2;[stroke-dasharray=none]>DL4-1N:3,1;[stroke-dasharray=none]>DL4-1N:3,5" annotations='[{"x":0,"y":1.2,"text":"(2,2)","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":1.2,"text":"y=2","style":{"fill":"red","fontSize":"1.5"}},{"x":7.3,"y":5.2,"text":"y=6","style":{"fill":"red","fontSize":"1.5"}}]' />
+
+For an indicator, not setting an axis and setting it to `0` are different instructions, because an unset indicator is positioned for you:
+
+```
+B291;B86       the indicator is placed for you, centered over its base
+B291;B86:0,0   you placed it, at the base's left edge
+```
 
 Use manual positioning when:
 - The anchor point doesn't produce the desired result
@@ -132,7 +141,7 @@ builder.glyph(0).part(1).setOptions({ x: 2, y: 10 });
 builder.glyph(0).addPart('DOT', { x: 2, y: 10 });
 ```
 
-Both spellings position the part inside its character, so they are two ways of saying one thing. Write both and the **option wins**, and the coordinate it overrides is reported ([`MULTIPLE_POSITION_VALUES`](/reference/warning-codes)). The output settles on the coordinate: `[x=2]>DOT` comes back from `toString()` as `DOT:2,0`.
+Both spellings position the part inside its character, so they are two ways of saying one thing. Write both and the **option wins**, and the coordinate it overrides is reported ([`MULTIPLE_POSITION_VALUES`](/reference/warning-codes)). The output settles on the coordinate: `[x=2]>DOT` comes back from `toString()` as `DOT:2`.
 
 ### Character-level x is leading blank
 

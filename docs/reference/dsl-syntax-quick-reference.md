@@ -20,7 +20,7 @@ Single separators work within a word (`/` between characters, `;` between the pa
 
 Because `;` targets one glyph, it has no meaning on a code that expands to a whole word (a predefined multi-character code): there is no single character for the indicator to land on, so it is dropped with a `MISPLACED_CHARACTER_INDICATOR` warning and the word still renders. Use `;;` there instead.
 
-Within one character, indicators come last: `base;base;indicator;indicator`. An indicator written before base content has no meaning in Bliss, so it is dropped with a `MISPLACED_INDICATOR_PART` warning and the rest of the character renders: `B86;B291` renders as `B291`. Parts you explicitly position at a non-origin `:x,y` are hand-placed artwork and never trigger this.
+Within one character, indicators come last: `base;base;indicator;indicator`. An indicator written before base content has no meaning in Bliss, so it is dropped with a `MISPLACED_INDICATOR_PART` warning and the rest of the character renders: `B86;B291` renders as `B291`. Parts you explicitly position are hand-placed artwork and never trigger this.
 
 A space (`TSP`, `QSP`, or the default `SP` that `//` expands to) separates words and is not a shape a character can be composed from: written in a `;`-slot it is dropped with a `MISPLACED_SPACE` warning (any coordinate or option on it drops too) and the rest of the character renders. For a positionable blank inside a character, use `ZSA` instead.
 
@@ -91,10 +91,12 @@ A dropped option does not come back: `toString()` re-emits only what actually ap
 
 | Syntax | Meaning |
 |--------|---------|
-| `CODE` | Position (0,0) |
-| `CODE:x,y` | Position (x,y) |
-| `CODE:x` | Position (x,0) |
-| `CODE:,y` | Position (0,y) |
+| `CODE` | No position set |
+| `CODE:x,y` | Sets both |
+| `CODE:x` | Sets x only |
+| `CODE:,y` | Sets y only |
+
+An axis you don't set keeps the position the element would have had anyway, which for ordinary shapes is 0.
 
 ## Word Separator Internals
 

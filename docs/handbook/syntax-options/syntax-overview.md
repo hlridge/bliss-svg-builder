@@ -51,11 +51,13 @@ More specific scopes override broader ones. See [Options System](/handbook/synta
 Position shapes with `:x,y` after the code:
 
 ```
-CODE        → x=0, y=0 (defaults)
-CODE:x,y    → explicit position
-CODE:x      → y defaults to 0
-CODE:,y     → x defaults to 0
+CODE        → no position set
+CODE:x,y    → sets both
+CODE:x      → sets x only
+CODE:,y     → sets y only
 ```
+
+An axis you don't set keeps the position the element would have had anyway, which for ordinary shapes is 0.
 
 See [Positioning](/handbook/appearance/positioning) for full details.
 

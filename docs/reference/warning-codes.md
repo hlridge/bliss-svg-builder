@@ -306,7 +306,9 @@ B86;B291               →  renders B291, indicator dropped
 B291;B86;C8            →  renders B291;C8, indicator dropped
 ```
 
-Write the indicators last instead: `B291;C8;B86`. Two things never trigger this warning: content you explicitly position at a non-origin coordinate (`B86;SDOT:3,4` is hand-placed artwork and is kept as written), and an unknown code after the indicator (it may later resolve to an indicator, so the sequence is kept).
+Write the indicators last instead: `B291;C8;B86`. Two things never trigger this warning: content you explicitly position (`B86;SDOT:3,4` is hand-placed artwork and is kept as written), and an unknown code after the indicator (it may later resolve to an indicator, so the sequence is kept).
+
+Any axis you write counts as positioning it, including a zero, so `B86;SDOT:0,0` and `B86;SDOT:0` are kept as written too. Content that sets no axis at all is not hand-placed, so `B86;C8` and `B86;C8:,` still report.
 
 ### `MISPLACED_SPACE`
 
