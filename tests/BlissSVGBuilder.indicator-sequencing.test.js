@@ -14,11 +14,13 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   warning payload (code/source/message) and reading order.
  * - Valid forms unchanged: trailing run, all-indicator stack, standalone
  *   indicator, trailing run behind the last base.
- * - The explicit-position exemption: content at a non-origin `:x,y` does not
+ * - The explicit-position exemption: content the author positioned does not
  *   convict a preceding indicator (compound-indicator decomposed anatomy must
- *   round-trip); `:0,0` counts as default-positioned because serialization
- *   drops it, so an origin coordinate cannot carry the exemption across a
- *   round-trip.
+ *   round-trip). The exemption asks whether an axis was WRITTEN, not whether
+ *   its value is non-zero, so `:0,0` carries it too; a part that wrote no axis
+ *   at all is still a witness. The spellings that check the axis-presence rule
+ *   exhaustively live in
+ *   `BlissSVGBuilder.position-presence-serialization.test.js`.
  * - Uncertainty retention: an indicator followed only by an unknown code is
  *   kept (the unknown-code retention contract), while a known witness before
  *   the unknown still convicts.
@@ -93,10 +95,10 @@ describe('BlissSVGBuilder indicator sequencing', () => {
       expect(misplacedWarnings(b).map((w) => w.source)).toEqual(['B86:1,2']);
     });
 
-    it('treats an explicit :0,0 as default-positioned', () => {
-      // :0,0 never re-emits from toString, so an origin coordinate cannot be
-      // the hand-positioned exemption without breaking round-trip stability
-      const b = new BlissSVGBuilder('B86;B291:0,0');
+    it('convicts an indicator before a part that wrote no axis at all', () => {
+      // `:,` fills neither slot, so the follower is default-positioned and is
+      // a witness, the same as the bare `B86;B291` above
+      const b = new BlissSVGBuilder('B86;B291:,');
       expect(b.toString()).toBe('B291');
       expect(misplacedWarnings(b).map((w) => w.source)).toEqual(['B86']);
     });
@@ -148,6 +150,16 @@ describe('BlissSVGBuilder indicator sequencing', () => {
       // still hand-placed
       const b = new BlissSVGBuilder('B86;C8:2');
       expect(b.toString()).toBe('B86;C8:2,0');
+      expect(b.warnings).toHaveLength(0);
+    });
+
+    it('keeps an indicator before artwork the author positioned at the origin', () => {
+      // pins presence over value: the author wrote both axes, and a written
+      // axis survives serialization, so the exemption round-trips. This row
+      // asserted the opposite until the emitter started writing what the
+      // author wrote rather than what was non-zero
+      const b = new BlissSVGBuilder('B86;B291:0,0');
+      expect(b.toString()).toBe('B86;B291:0,0');
       expect(b.warnings).toHaveLength(0);
     });
 

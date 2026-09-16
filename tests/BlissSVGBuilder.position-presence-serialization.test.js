@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
@@ -24,12 +24,12 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   rendered position whether that origin is written or not.
  * - The `[x=N;y=M]>` option channel and the `:x,y` coordinate channel emitting
  *   one string for one position.
- *
- * Does NOT cover:
  * - The parent-offset approximation when a nested composite decomposes: an
  *   unset axis under a non-zero offset is emitted as a value, because the
  *   serializer cannot compute the layout default it would have to add the
- *   offset to. Nothing pins it yet; it lands with the coupled call sites.
+ *   offset to. Applied per axis, so a zero offset leaves its axis unwritten.
+ *
+ * Does NOT cover:
  * - The preserve path's own copies of the presence test, see
  *   `BlissSVGBuilder.custom-definition-serialization.test.js` (a preserved
  *   name shedding a coordinate) and `BlissSVGBuilder.typed-name-preserve.test.js`
@@ -152,5 +152,46 @@ describe('BlissSVGBuilder part position presence', () => {
       expect(b.toString()).toBe('B291;B86:3,5');
       expect(b.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
     });
+  });
+
+  describe('when a nested composite decomposes under a parent position', () => {
+    // Decomposition adds the parent's position to every inner part, and an
+    // axis the inner part never wrote cannot stay unwritten once something is
+    // added to it: the emitted number would have to be that part's own default
+    // plus the offset, and only the layout knows the default. The serializer
+    // approximates it as 0, which is exact for every ordinary part. Asked per
+    // axis, so the half that has no offset keeps its presence.
+    const customCodes = [];
+    afterEach(() => {
+      for (const code of customCodes) {
+        try { BlissSVGBuilder.removeDefinition(code); } catch {}
+      }
+      customCodes.length = 0;
+    });
+
+    // C8 writes no axis, C2 writes x only, so one fixture shows both halves.
+    const defineNestedShape = () => {
+      customCodes.push('OFFSH');
+      BlissSVGBuilder.define({ OFFSH: { type: 'shape', codeString: 'C8;C2:3' } });
+    };
+
+    it.each([
+      ['B291;OFFSH:5,5', 'B291;C8:5,5;C2:8,5'],
+      ['B291;OFFSH:5',   'B291;C8:5;C2:8'],
+      ['B291;OFFSH:,5',  'B291;C8:,5;C2:3,5'],
+    ])('writes an unwritten axis as a value under the offset in %s', (dsl, expected) => {
+      defineNestedShape();
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe(expected);
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it.each(['B291;OFFSH', 'B291;OFFSH:0,0', 'B291;OFFSH:0'])(
+      'leaves an unwritten axis unwritten when its offset is zero, in %s', (dsl) => {
+        defineNestedShape();
+        const b = new BlissSVGBuilder(dsl);
+        expect(b.toString()).toBe('B291;C8;C2:3');
+        expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+      });
   });
 });

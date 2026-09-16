@@ -1303,12 +1303,14 @@ class BlissSVGBuilder {
   // the warn+drop model of MISPLACED_HEAD_MARKER and
   // MISPLACED_SPACE_DECORATION, while the character still renders. Three
   // deliberate exemptions:
-  //  1. Content explicitly positioned at a non-origin `:x,y` does not convict
-  //     a preceding indicator: a compound indicator's decomposed serialization
+  //  1. Content the author explicitly positioned does not convict a preceding
+  //     indicator: a compound indicator's decomposed serialization
   //     (`B86;SDOT:3,4`) is hand-placed anatomy and must round-trip
-  //     (composition portability). An origin `:0,0` counts as
-  //     default-positioned because serialization drops it, so it could not
-  //     carry the exemption across a round-trip.
+  //     (composition portability). "Explicitly positioned" asks whether an
+  //     axis was WRITTEN, not whether its value is non-zero, so `:0,0`, `:0,`,
+  //     `:,0` and `:0` carry the exemption too: serialization keeps a written
+  //     axis whatever its value, so the exemption survives a round-trip. A
+  //     part that wrote no axis at all (`C8`, `C8:,`) is still a witness.
   //  2. A part whose nature is uncertain (unknown code awaiting a definition,
   //     or a malformed error node) is no witness: the character already
   //     fail-renders, and dropping on uncertainty would destroy input the
@@ -1328,7 +1330,7 @@ class BlissSVGBuilder {
         for (let i = parts.length - 1; i >= 1 && lastWitness === -1; i--) {
           const p = parts[i];
           if (p.isIndicator === true || p.error) continue;
-          if ((p.x ?? 0) !== 0 || (p.y ?? 0) !== 0) continue;
+          if (p.x !== undefined || p.y !== undefined) continue;
           if ((p.codeName && blissElementDefinitions[p.codeName]) || p.parts?.length > 0) {
             lastWitness = i;
           }
@@ -3680,19 +3682,29 @@ class BlissSVGBuilder {
 
   // Canonical `;`-joined token form of a glyph's top-level parts (an
   // `[opts]>` prefix via the shared serializeOptions emitter, codeName, and
-  // a non-origin :x,y suffix), for comparison against a definition's
-  // written codeString. Returns null when any part carries state this form
-  // cannot express (nested parts, an error), so the caller falls back to
-  // decomposed output.
+  // one coordinate slot per written axis), for comparison against a
+  // definition's written codeString. Returns null when any part carries state
+  // this form cannot express (nested parts, an error), so the caller falls
+  // back to decomposed output.
+  //
+  // The suffix must be spelled exactly as serializeParts spells it, because
+  // the result is compared against text a human wrote in a definition: asking
+  // whether an axis is non-zero rather than whether it was written loses a
+  // definition written `B291;C8:0,0`, and always emitting the pair form loses
+  // one written `B291;C8:3`. Both mismatches read as "this glyph is not a
+  // clean instance of its definition" and silently drop the author's name.
   static #canonicalGlyphParts(parts) {
     if (!Array.isArray(parts) || parts.length === 0) return null;
     const tokens = [];
     for (const part of parts) {
       if (!part.codeName || part.parts || part.error || part.errorCode) return null;
       const optPrefix = serializeOptions(part.options);
-      const x = part.x ?? 0;
-      const y = part.y ?? 0;
-      const token = x !== 0 || y !== 0 ? `${part.codeName}:${x},${y}` : part.codeName;
+      const hasX = part.x !== undefined;
+      const hasY = part.y !== undefined;
+      let token = part.codeName;
+      if (hasX && hasY) token += `:${part.x},${part.y}`;
+      else if (hasX) token += `:${part.x}`;
+      else if (hasY) token += `:,${part.y}`;
       tokens.push(optPrefix ? `${optPrefix}>${token}` : token);
     }
     return tokens.join(';');

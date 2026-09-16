@@ -18,9 +18,16 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   target's delta) instead of keeping a stale written name.
  * - Glyph-level toJSON restore, public no-leak in both modes, re-ingest
  *   round-trips, object-input parity, mutation and merge survival.
+ * - Anatomy spelled with a zero or half coordinate: the consult's token has to
+ *   match the way toString spells a position, or a clean instance reads as a
+ *   diverged one and loses its name.
  * - Built-in, letter-alias, and multi-code-shorthand guardrails.
  *
  * Does NOT cover:
+ * - Anatomy written in a spelling toString normalizes away (`C8:3,` becomes
+ *   `C8:3`, `C8:,` becomes `C8`): the consult compares against the codeString
+ *   as written, so such a definition never matches and keeps decomposing.
+ *   Pre-existing, and narrower now than before the axis-presence change.
  * - Bare aliases to BUILT-IN targets at character level (the part-level
  *   side channel), see `BlissSVGBuilder.char-alias-preserve.test.js`.
  * - `type: 'glyph'` identity and indicator-delta mechanics, see
@@ -238,6 +245,27 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       defineAndTrack({ MYSHOP: { type: 'shape', codeString: '[color=red]>C8' } });
       const decorated = new BlissSVGBuilder('MYSHOP').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(decorated.codeName).toBe('MYSHOP');
+    });
+
+    it('restores the name over an anatomy written with a zero or half coordinate', () => {
+      // the coordinate sibling of the options canonicalizer above: the consult
+      // compares a token per part against the definition's written codeString,
+      // so it must spell a coordinate exactly as toString does. Asking whether
+      // an axis is non-zero loses a definition written `:0,0`, and always
+      // spelling the pair form loses one written `:3`; either mismatch reads
+      // as "not a clean instance" and silently drops the author's name
+      defineAndTrack({
+        PPZERO: { type: 'glyph', codeString: 'B291;C8:0,0' },
+        PPHALF: { type: 'glyph', codeString: 'B291;C8:3' },
+        ALZERO: { codeString: 'PPZERO' },
+        ALHALF: { codeString: 'PPHALF' },
+      });
+      for (const code of ['PPZERO', 'PPHALF', 'ALZERO', 'ALHALF']) {
+        const b = new BlissSVGBuilder(code);
+        const json = b.toJSON({ preserve: true });
+        expect(json.groups[0].glyphs[0].codeName).toBe(code);
+        expect(new BlissSVGBuilder(json).svgCode).toBe(b.svgCode);
+      }
     });
 
     it('leaks no glyph-level recording in either public mode', () => {
