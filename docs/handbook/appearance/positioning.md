@@ -67,10 +67,9 @@ Override anchor-based positioning with explicit coordinates. Since indicators ar
 
 For an indicator, not setting an axis and setting it to `0` are different instructions, because an unset indicator is positioned for you:
 
-```
-B291;B86       the indicator is placed for you, centered over its base
-B291;B86:0,0   you placed it, at the base's left edge
-```
+<Demo code="[grid]||B291;B86" title="B291;B86 (placed for you, centered over its base)" />
+
+<Demo code="[grid]||B291;B86:0,0" title="B291;B86:0,0 (you placed it, at the base's left edge)" />
 
 Use manual positioning when:
 - The anchor point doesn't produce the desired result
