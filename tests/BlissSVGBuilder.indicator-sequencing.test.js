@@ -162,9 +162,10 @@ describe('BlissSVGBuilder indicator sequencing', () => {
 
     it('keeps an indicator before artwork positioned on one axis only', () => {
       // pins the OR in the meaningful-coordinate check: an x without a y is
-      // still hand-placed
+      // still hand-placed, and it survives serialization as the half form the
+      // author wrote rather than being padded out to a pair
       const b = new BlissSVGBuilder('B86;C8:2');
-      expect(b.toString()).toBe('B86;C8:2,0');
+      expect(b.toString()).toBe('B86;C8:2');
       expect(b.warnings).toHaveLength(0);
     });
 

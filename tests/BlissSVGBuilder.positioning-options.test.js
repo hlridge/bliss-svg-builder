@@ -38,6 +38,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Part-level coordinates (`B291:2,3`, `[x=2]>B291`), which position a part
  *   inside its glyph and follow the coordinate-ownership rule; see
  *   `BlissParser.coordinate-options.test.js`.
+ * - The axis-presence spelling rule across all ten written coordinate forms,
+ *   which decides how many slots a serialized position carries; see
+ *   `BlissSVGBuilder.position-presence-serialization.test.js`.
  */
 
 const inkXs = (builder) =>
@@ -221,10 +224,14 @@ describe('BlissSVGBuilder positioning options', () => {
     // one spelling: the coordinate, which is the one a part written without an
     // option already uses. At glyph scope `[x=N]` is the only spelling there is,
     // so it stays a bracket.
+    //
+    // The coordinate carries one slot per axis the author actually named, so a
+    // one-axis option becomes a one-axis coordinate (`:2`, `:,3`) rather than a
+    // pair padded with a zero nobody wrote.
     it.each([
-      ['[x=2]>S8;C8', 'S8:2,0;C8'],
-      ['[y=3]>B291', 'B291:0,3'],
-      ['[color=red;x=2]>B291', '[color=red]>B291:2,0'],
+      ['[x=2]>S8;C8', 'S8:2;C8'],
+      ['[y=3]>B291', 'B291:,3'],
+      ['[color=red;x=2]>B291', '[color=red]>B291:2'],
       ['[x=5;y=10]>B291:3,7', 'B291:5,10'],
       ['[x=5]B291', '[x=5]B291'],
     ])('writes the position once: %s', (input, expected) => {
@@ -280,7 +287,7 @@ describe('BlissSVGBuilder positioning options', () => {
       // The option beats the value written beside it, and says which value it
       // displaced, exactly as it does for the DSL spelling of the same thing.
       const built = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B291', x: 3, options: { x: 5 } }] }] }] });
-      expect(built.toString()).toBe('B291:5,0');
+      expect(built.toString()).toBe('B291:5');
       expect(built.warnings.map(w => w.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
     });
 

@@ -280,7 +280,7 @@ describe('BlissSVGBuilder space invariant', () => {
       // corpus-blessed ZSA anchor composition (ZSA;B291:2 is a real fixture).
       const b = new BlissSVGBuilder('ZSA;B291:2');
       expect(b.toJSON().groups).toHaveLength(1);
-      expect(b.toString()).toBe('ZSA;B291:2,0');
+      expect(b.toString()).toBe('ZSA;B291:2');
       const reparsed = new BlissSVGBuilder(b.toString());
       expect(reparsed.svgCode).toBe(b.svgCode);
     });

@@ -305,9 +305,13 @@ describe('BlissParser option placement', () => {
     });
 
     it('keeps a y-only coordinate on a glyph unchanged', () => {
+      // the rows above compare RENDERED output, where `:,2` and `:0,2` are
+      // interchangeable because an unset x resolves to 0 anyway; this one
+      // compares the SERIALIZED string, where they are not, since writing an
+      // axis and leaving it unset are different instructions
       const b = build('B291:,2');
       expect(b.warnings).toEqual([]);
-      expect(b.toString()).toBe('B291:0,2');
+      expect(b.toString()).toBe('B291:,2');
     });
   });
 

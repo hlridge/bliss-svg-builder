@@ -20,7 +20,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *
  * Covers:
  * - All three element scopes, each of which has its own promotion site.
- * - The two axes independently, and the half position that leaves behind.
+ * - The two axes independently, and the half position that leaves behind,
+ *   spelled with one slot per axis that is still set (`B291:,3`, not
+ *   `B291:0,3`): the surviving axis is reported, the cleared one is not
+ *   re-spelled as a zero.
  * - A written coordinate surviving a removal aimed at the option channel.
  * - `[x=5]>`, the part-scope DSL form, which is the one route where a promoted
  *   position and a written coordinate share a slot.
@@ -32,6 +35,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Does NOT cover:
  * - Which position value WINS when both channels are written, see
  *   `BlissParser.coordinate-options.test.js`.
+ * - The axis-presence spelling rule itself, across all ten written coordinate
+ *   forms, which is what decides how many slots survive a removal; see
+ *   `BlissSVGBuilder.position-presence-serialization.test.js`.
  * - How a removal reads an option NAME, see
  *   `BlissSVGBuilder.option-removal-naming.test.js`.
  * - The transient channel, which refuses a position outright with
@@ -82,7 +88,7 @@ describe('BlissSVGBuilder position option removal', () => {
     // coordinate channel share a single slot.
     it('clears a part position the DSL wrote as [x=5]>', () => {
       const builder = new BlissSVGBuilder('[x=5]>B291');
-      expect(builder.toString()).toBe('B291:5,0');
+      expect(builder.toString()).toBe('B291:5');
 
       builder.part(0).removeOptions('x');
 
@@ -137,24 +143,27 @@ describe('BlissSVGBuilder position option removal', () => {
 
       builder.part(0).removeOptions('x');
 
-      expect(builder.toString()).toBe('B291:0,3');
+      expect(builder.toString()).toBe('B291:,3');
       const reparsed = new BlissSVGBuilder(builder.toString());
-      expect(reparsed.toString()).toBe('B291:0,3');
+      expect(reparsed.toString()).toBe('B291:,3');
       expect(reparsed.svgCode).toBe(builder.svgCode);
     });
   });
 
   describe('when the parser already resolved a position collision', () => {
-    // The option beat the coordinate at parse time and the displaced `:5,0` left
-    // the model then, not at removal time, so there is nothing to fall back to.
-    it('leaves no position at all, and the displaced coordinate does not return', () => {
+    // The option beat the coordinate's x at parse time and the displaced `5`
+    // left the model then, not at removal time, so there is nothing to fall
+    // back to. The y is a different story: the author wrote `:5,0`, so the 0 in
+    // the y slot is a value they typed and no option ever contested it. Clearing
+    // the option therefore leaves `:,0` standing rather than nothing at all.
+    it('clears only the axis the option owned, and the displaced coordinate does not return', () => {
       const builder = new BlissSVGBuilder('[x=3]>B291:5,0');
       expect(builder.warnings.map((warning) => warning.code)).toEqual(['MULTIPLE_POSITION_VALUES']);
       expect(builder.toString()).toBe('B291:3,0');
 
       builder.part(0).removeOptions('x');
 
-      expect(builder.toString()).toBe('B291');
+      expect(builder.toString()).toBe('B291:,0');
       expect(builder.svgCode).toBe(render('B291'));
       expect(builder.svgCode).not.toBe(render('B291:5,0'));
     });

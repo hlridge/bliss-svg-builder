@@ -397,7 +397,7 @@ describe('BlissParser X-codes', () => {
       // two spellings cannot see it. Also pins that ^ and : end the token; if
       // either left the boundary set the whole run would fail as one code
       expect(new BlissSVGBuilder('Xab^').toString()).toBe('Xa/Xb^');
-      expect(new BlissSVGBuilder('Xab:5').toString()).toBe('Xa/Xb:5,0');
+      expect(new BlissSVGBuilder('Xab:5').toString()).toBe('Xa/Xb:5');
       expect(new BlissSVGBuilder('Xab^').warnings).toEqual([]);
     });
   });

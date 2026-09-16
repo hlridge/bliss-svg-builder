@@ -168,7 +168,7 @@ describe('BlissSVGBuilder space as a part', () => {
 
     it('keeps a positioned ZSA part', () => {
       const b = new BlissSVGBuilder('B313;ZSA:10');
-      expect(b.toString()).toBe('B313;ZSA:10,0');
+      expect(b.toString()).toBe('B313;ZSA:10');
       expect(b.warnings).toHaveLength(0);
     });
   });
