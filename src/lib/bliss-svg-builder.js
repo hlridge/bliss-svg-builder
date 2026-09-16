@@ -1113,7 +1113,7 @@ class BlissSVGBuilder {
           touched = true;
         }
         if (part.x !== undefined || part.y !== undefined) {
-          const source = `:${part.x ?? 0},${part.y ?? 0}`;
+          const source = BlissSVGBuilder.#positionSuffix(part.x, part.y);
           const meaningful = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0;
           delete part.x;
           delete part.y;
@@ -1280,8 +1280,7 @@ class BlissSVGBuilder {
         if (remainderCount > 0 && !knownRemainder) continue;
         for (const i of misplaced) {
           const p = parts[i];
-          const coords = p.x !== undefined || p.y !== undefined ? `:${p.x ?? 0},${p.y ?? 0}` : '';
-          const source = `${p.codeName}${coords}`;
+          const source = `${p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
           this.#mutationWarnings.push({
             code: WARNING_CODES.MISPLACED_SPACE,
             message: `A space is a word separator, not a character part, so "${source}" was dropped.`,
@@ -1342,8 +1341,7 @@ class BlissSVGBuilder {
         }
         for (const i of misplaced) {
           const p = parts[i];
-          const coords = p.x !== undefined || p.y !== undefined ? `:${p.x ?? 0},${p.y ?? 0}` : '';
-          const source = `${p.codeName}${coords}`;
+          const source = `${p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
           this.#mutationWarnings.push({
             code: WARNING_CODES.MISPLACED_INDICATOR_PART,
             message: `An indicator can only follow its base parts at the end of a character (BASE;INDICATOR), so "${source}" was dropped.`,
@@ -2831,6 +2829,25 @@ class BlissSVGBuilder {
     return repr;
   }
 
+  /**
+   * Spells a part position the way the model holds it: one slot per axis the
+   * author wrote, and no suffix at all when neither was. `:x,y`, `:x` (the
+   * shorter spelling of `:x,`), `:,y`, or ''.
+   *
+   * Every place that names a position in text shares this, because they are all
+   * read back as DSL: the serializer's output is reparsed, the canonical token
+   * is compared against a codeString a human wrote, and a warning's `source` is
+   * the author's own text quoted back. Filling an unwritten axis with a `0`
+   * states a position nobody asked for, which on an indicator is a different
+   * picture and in a warning is a different input than the one that failed.
+   */
+  static #positionSuffix(x, y) {
+    if (x !== undefined && y !== undefined) return `:${x},${y}`;
+    if (x !== undefined) return `:${x}`;
+    if (y !== undefined) return `:,${y}`;
+    return '';
+  }
+
   /** Creates a default space group for insertion between words */
   static #makeSpaceGroup() {
     return { glyphs: [{ parts: [{ codeName: 'TSP' }] }] };
@@ -2959,11 +2976,7 @@ class BlissSVGBuilder {
         let str = part.codeName.startsWith('XTXT_')
           ? 'X' + part.codeName.slice(5)
           : part.codeName;
-        // One slot per written axis. A part with neither takes no suffix, and
-        // `:x,` is emitted as `:x`, the shorter spelling of the same thing.
-        if (hasX && hasY) str += `:${x},${y}`;
-        else if (hasX) str += `:${x}`;
-        else if (hasY) str += `:,${y}`;
+        str += BlissSVGBuilder.#positionSuffix(hasX ? x : undefined, hasY ? y : undefined);
         // Prefix part-level options with [opts]> syntax (skip the position
         // keys, already emitted as the coordinate suffix above)
         const optPrefix = serializeOptions(part.options, PART_POSITION_KEYS);
@@ -3687,7 +3700,7 @@ class BlissSVGBuilder {
   // this form cannot express (nested parts, an error), so the caller falls
   // back to decomposed output.
   //
-  // The suffix must be spelled exactly as serializeParts spells it, because
+  // The suffix comes from the shared emitter rather than a local copy, because
   // the result is compared against text a human wrote in a definition: asking
   // whether an axis is non-zero rather than whether it was written loses a
   // definition written `B291;C8:0,0`, and always emitting the pair form loses
@@ -3699,12 +3712,7 @@ class BlissSVGBuilder {
     for (const part of parts) {
       if (!part.codeName || part.parts || part.error || part.errorCode) return null;
       const optPrefix = serializeOptions(part.options);
-      const hasX = part.x !== undefined;
-      const hasY = part.y !== undefined;
-      let token = part.codeName;
-      if (hasX && hasY) token += `:${part.x},${part.y}`;
-      else if (hasX) token += `:${part.x}`;
-      else if (hasY) token += `:,${part.y}`;
+      const token = `${part.codeName}${BlissSVGBuilder.#positionSuffix(part.x, part.y)}`;
       tokens.push(optPrefix ? `${optPrefix}>${token}` : token);
     }
     return tokens.join(';');

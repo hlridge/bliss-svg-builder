@@ -13,6 +13,9 @@ import { BlissSVGBuilder } from '../src/index';
  * Covers:
  * - Standalone QSP/TSP with a coordinate: dropped + warned, identity kept, and
  *   the svg round-trip becomes true (the reported `QSP:1,2` -> `//` loss).
+ * - The warning quotes the axes the author actually wrote, one slot each, so a
+ *   half coordinate (`:3`, `:,3`) is reported as written rather than padded out
+ *   to a pair with a zero nobody typed.
  * - An option on a space at every scope (word `[o]|`, character `[o]`, part
  *   `[o]>`): dropped + warned; no empty styled `<g>` is emitted.
  * - A global-only option key (`[grid]|QSP`) keeps the space's identity too, but
@@ -70,6 +73,19 @@ describe('BlissSVGBuilder space decoration', () => {
     it('makes a coordinate-bearing space round-trip its svg', () => {
       expect(roundTripsSvg('QSP:1,2')).toBe(true);
       expect(roundTripsSvg('TSP:1,2')).toBe(true);
+    });
+
+    it.each([
+      ['QSP:3,', ':3'],
+      ['QSP:3', ':3'],
+      ['QSP:,3', ':,3'],
+      ['QSP:3,0', ':3,0'],
+      ['QSP:0,3', ':0,3'],
+    ])('quotes only the axes %s wrote, as %s', (dsl, source) => {
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe('QSP');
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
+        .toEqual([{ code: SPACE_DECORATION, source }]);
     });
 
     it('drops an explicit zero coordinate without warning', () => {

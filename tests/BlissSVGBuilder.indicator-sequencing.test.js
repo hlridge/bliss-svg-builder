@@ -11,7 +11,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  * Covers:
  * - DSL drops: leading indicator, mid-sequence indicator, multiple drops,
- *   warning payload (code/source/message) and reading order.
+ *   warning payload (code/source/message) and reading order. The dropped
+ *   source quotes the axes the author wrote, one slot each (`B86:3`,
+ *   `B86:,3`), rather than padding a half coordinate out to a pair.
  * - Valid forms unchanged: trailing run, all-indicator stack, standalone
  *   indicator, trailing run behind the last base.
  * - The explicit-position exemption: content the author positioned does not
@@ -93,6 +95,19 @@ describe('BlissSVGBuilder indicator sequencing', () => {
       const b = new BlissSVGBuilder('B86:1,2;B291');
       expect(b.toString()).toBe('B291');
       expect(misplacedWarnings(b).map((w) => w.source)).toEqual(['B86:1,2']);
+    });
+
+    it.each([
+      ['B86:3,;B291', 'B86:3'],
+      ['B86:3;B291', 'B86:3'],
+      ['B86:,3;B291', 'B86:,3'],
+      ['B86:0,0;B291', 'B86:0,0'],
+      ['B86:0;B291', 'B86:0'],
+      ['B86:,0;B291', 'B86:,0'],
+    ])('quotes only the axes %s wrote, as %s', (dsl, source) => {
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe('B291');
+      expect(misplacedWarnings(b).map((w) => w.source)).toEqual([source]);
     });
 
     it('convicts an indicator before a part that wrote no axis at all', () => {

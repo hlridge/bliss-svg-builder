@@ -16,7 +16,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * Covers:
  * - DSL drops: trailing, leading, and mid-sequence space parts; multiple drops
  *   in reading order; warning payload (code/source/message); the coordinate
- *   suffix in the dropped source.
+ *   suffix in the dropped source, spelled with one slot per axis the author
+ *   wrote (`QSP:3`, `QSP:,3`) rather than padded out to a pair.
  * - The chunk-6 tail: a part option on a space part (`B313;[color=red]>QSP`)
  *   drops with its carrier instead of surviving silently.
  * - Render effect: a far-positioned space part no longer widens the canvas.
@@ -94,6 +95,19 @@ describe('BlissSVGBuilder space as a part', () => {
       const b = new BlissSVGBuilder('B313;QSP:3,4');
       expect(b.toString()).toBe('B313');
       expect(spaceWarnings(b).map((w) => w.source)).toEqual(['QSP:3,4']);
+    });
+
+    it.each([
+      ['B313;QSP:3,', 'QSP:3'],
+      ['B313;QSP:3', 'QSP:3'],
+      ['B313;QSP:,3', 'QSP:,3'],
+      ['B313;QSP:0,0', 'QSP:0,0'],
+      ['B313;QSP:0', 'QSP:0'],
+      ['B313;QSP:,0', 'QSP:,0'],
+    ])('quotes only the axes %s wrote, as %s', (dsl, source) => {
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe('B313');
+      expect(spaceWarnings(b).map((w) => w.source)).toEqual([source]);
     });
 
     it('narrows the canvas when a far-positioned space part is dropped', () => {
