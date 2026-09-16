@@ -2838,12 +2838,17 @@ class BlissSVGBuilder {
    * author wrote, and no suffix at all when neither was. `:x,y`, `:x` (the
    * shorter spelling of `:x,`), `:,y`, or ''.
    *
-   * Every place that names a position in text shares this, because they are all
-   * read back as DSL: the serializer's output is reparsed, the canonical token
-   * is compared against a codeString a human wrote, and a warning's `source` is
-   * the author's own text quoted back. Filling an unwritten axis with a `0`
-   * states a position nobody asked for, which on an indicator is a different
-   * picture and in a warning is a different input than the one that failed.
+   * Every place in this class that names a position in text shares this,
+   * because they are all read back as DSL: the serializer's output is
+   * reparsed, the canonical token is compared against a codeString a human
+   * wrote, and a warning's `source` is the author's own text quoted back.
+   * Filling an unwritten axis with a `0` states a position nobody asked for,
+   * which on an indicator is a different picture and in a warning is a
+   * different input than the one that failed.
+   *
+   * `BlissElement.toString()` is a second, older serializer that still spells
+   * the padded pair. It is deliberately not counted above: it is internal, on
+   * no exported path, so nothing it writes reaches a saved composition.
    */
   static #positionSuffix(x, y) {
     if (x !== undefined && y !== undefined) return `:${x},${y}`;
