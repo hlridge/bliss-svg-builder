@@ -7,9 +7,9 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
 
 /**
  * Pins the value gate as a MATRIX rather than as a sample: every gated numeric
- * option, every value a number cannot carry, every surface that can write one.
- * The sibling files pin the rule; this one pins that no key and no surface is
- * an exception to it.
+ * option, every SCALAR value a number cannot carry, every surface that can
+ * write one. The sibling files pin the rule; this one pins that no key and no
+ * surface is an exception to it.
  *
  * The whole table is derived from `NUMERIC_OPTION_POLICY`, so an option added
  * to the vocabulary is covered on every surface the day it lands, and an
@@ -34,8 +34,11 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
  *   `setOptions`, `setTransientOptions`) on the five keys that are legal at
  *   element scope.
  * - A LEGAL value on every key: the six composition surfaces draw one picture
- *   between them, byte for byte, and warn nothing. A refusal matrix alone
+ *   between them, byte for byte, and warn nothing, and the four element
+ *   surfaces do the same for the five keys they accept. A refusal matrix alone
  *   passes against a build where nothing is honoured anywhere.
+ * - Zero, which is the boundary the length arm reads and the one value no
+ *   other row here writes.
  * - That every carrier below can actually fail: two legal values render
  *   differently on it, so a row written on it is not asserting a difference
  *   that can never appear.
@@ -54,11 +57,18 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
  * - The string half of the gate, see `BlissSVGBuilder.text-option-values.test.js`.
  * - How a written NAME is resolved and republished, see
  *   `BlissSVGBuilder.attribute-naming-contract.test.js`.
- * - A global-only key written at element scope, which is silently kept and
- *   re-emitted on the mutation surfaces while a bracket reports
- *   `MISPLACED_GLOBAL_OPTION`. That divergence is chunk C14's, not this
- *   gate's, which is why the element-scope rows below are scoped to the five
- *   keys both kinds of surface accept.
+ * - A value no scalar can express: an object, an array, a `null` or an
+ *   `undefined`. Those are the one class where the surfaces genuinely differ,
+ *   because the options argument drops them before any gate exists while a
+ *   composition object refuses them, and that split is pinned as deliberate in
+ *   `BlissSVGBuilder.option-value-gate.test.js`.
+ * - A global-only key written at element scope. A REFUSED value is reported
+ *   there like anywhere else, which is why the rows below can be written at
+ *   all; but a LEGAL one is silently kept and re-emitted on the mutation
+ *   surfaces, where a bracket reports `MISPLACED_GLOBAL_OPTION`. That
+ *   divergence belongs to the scope gate rather than to this one, and it is
+ *   why the element-scope rows are scoped to the five keys every element
+ *   surface accepts.
  */
 
 // A composition each key demonstrably acts on, plus whatever else has to be
@@ -261,6 +271,17 @@ describe('BlissSVGBuilder option value matrix', () => {
     });
   });
 
+  describe('when zero is written on a gated key', () => {
+    it.each(GATED_KEYS)('%s accepts it, because the refusal is below zero and not at it', (key) => {
+      // pins the boundary itself: the length arm reads `written < 0`, and
+      // nothing else in this file writes a zero, so `<= 0` would otherwise
+      // pass every row here (hand-applied 2026-09-18).
+      const zero = { js: 0, dsl: '=0' };
+      const reported = Object.values(across(COMPOSITION_SURFACES, key, zero)).flatMap((c) => c.codes);
+      expect(reported).toEqual([]);
+    });
+  });
+
   describe('when a value at the top of the double range is written', () => {
     it.each(GATED_KEYS)('%s never refuses it, because the table carries no upper bound', (key) => {
       // pins the seven removed ceilings as a property of the whole vocabulary:
@@ -279,6 +300,15 @@ describe('BlissSVGBuilder option value matrix', () => {
       expect(distinctPictures(COMPOSITION_SURFACES, key, value)).toHaveLength(1);
       expect(across(COMPOSITION_SURFACES, key, value)).toEqual(
         sameOnEvery(COMPOSITION_SURFACES, { picture: 'moved', codes: [], sources: [] })
+      );
+    });
+
+    it.each(ELEMENT_SCOPE_KEYS)('%s draws one picture from every element surface too', (key) => {
+      const [, high] = legalPairFor(key);
+      const value = { js: high, dsl: `=${high}` };
+      expect(distinctPictures(ELEMENT_SURFACES, key, value)).toHaveLength(1);
+      expect(across(ELEMENT_SURFACES, key, value)).toEqual(
+        sameOnEvery(ELEMENT_SURFACES, { picture: 'moved', codes: [], sources: [] })
       );
     });
 
