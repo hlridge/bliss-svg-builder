@@ -235,6 +235,8 @@ builder.glyph(0).removeOptions('color');
 
 Either spelling removes a name the library or a standard owns, whichever way it was set, so `removeOptions('strokeWidth')` clears a `stroke-width` and `removeOptions('stroke-dasharray')` clears a `strokeDasharray`. A name of your own has no second spelling to resolve to, so remove it under the name you set it with. Its two spellings are two attributes, and removing one leaves the other: after `setOptions({ dataBlissId: 7, 'data-bliss-id': 8 })` both are live, and `removeOptions('dataBlissId')` clears only the one it names.
 
+Naming `x` or `y` removes a position, and a position has a second spelling that is not an option at all: a part's `CODE:x,y` coordinate. Both are cleared, since they are [one value](/handbook/appearance/positioning#one-value-two-spellings).
+
 ### Transient Options
 
 Sometimes a value belongs to what is on screen rather than to the composition itself: a highlight on the character the user has selected, the index an editor needs on each part to work out what was clicked, a display width so a one-symbol board is not drawn tiny. None of that should end up in the string the user copies, shares or saves.

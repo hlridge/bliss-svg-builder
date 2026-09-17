@@ -158,6 +158,43 @@ Word and global scope (`[x=N]|`, `[x=N]||`) are a third thing again: there `x` m
 
 This is also what tells `[x=N]` apart from [kerning](/handbook/writing/spacing#kerning): `AK:`/`RK:` widen the gap the **previous** character leaves, while `[x=N]` fills the character that carries it. Write both and they add up.
 
+### One value, two spellings
+
+A position is one value, and which spelling wrote it does not show anywhere you can read it, change it or save it.
+
+**Clearing it takes the axis name, whichever spelling wrote it:**
+
+```js
+const builder = new BlissSVGBuilder('C8:0,8;DOT:2');
+builder.part(1).removeOptions('x');
+builder.toString();   // 'C8:0,8;DOT'
+
+// the same call on 'C8:0,8;[x=2]>DOT' gives the same answer
+```
+
+Removal reaches only the element you call it on, so clearing a character's `x` leaves a coordinate on a part inside that character standing.
+
+**On the way out the position is written in one form.** The number is normalized, and the position leads its bracket whatever order you typed it in:
+
+| you write | `toString()` gives back |
+|---|---|
+| `[x=5.0]B291` | `[x=5]B291` |
+| `[x=+5]B291` | `[x=5]B291` |
+| `[x=.5]B291` | `[x=0.5]B291` |
+| `[color=red;x=5]B291` | `[x=5;color=red]B291` |
+
+The picture is the same in every case. If you compare stored text against fresh output, expect these differences.
+
+**In a saved composition the position sits beside the element, not in its options:**
+
+```js
+new BlissSVGBuilder('[x=5]B291').toJSON();
+// { options: {},
+//   groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }], x: 5, codeName: 'B291' }] }] }
+```
+
+Read `x` and `y` beside the element; there is no `options.x` to read. An axis you never wrote is absent, and a `0` you did write is a position like any other, so the two are not the same thing.
+
 ## Zero-Sized Anchor (ZSA)
 
 `ZSA` is an invisible element that occupies no space, but occupies a position respected by auto-cropping behavior.
