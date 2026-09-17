@@ -173,6 +173,27 @@ describe('BlissSVGBuilder position option removal', () => {
     });
   });
 
+  describe('when several names are removed in one call', () => {
+    // pins that every key is processed, not just the first: the axis branch
+    // sits inside the loop, so stopping after it leaves later names standing.
+    it('takes off a position and an ordinary option together', () => {
+      const builder = new BlissSVGBuilder('[color=red]>B291:5,0');
+
+      builder.part(0).removeOptions('x', 'color');
+
+      expect(builder.toString()).toBe('B291:,0');
+      expect(builder.svgCode).toBe(render('B291:,0'));
+    });
+
+    it('takes off an ordinary option and a position in the other order', () => {
+      const builder = new BlissSVGBuilder('[color=red]>B291:5,0');
+
+      builder.part(0).removeOptions('color', 'x');
+
+      expect(builder.toString()).toBe('B291:,0');
+    });
+  });
+
   describe('when the composition was saved and reloaded first', () => {
     // `[x=2]>DOT` saves as `DOT:2`, so the position is a coordinate on reload.
     // The identical call used to work on the fresh composition and be a silent
