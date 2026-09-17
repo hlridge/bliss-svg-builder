@@ -743,6 +743,16 @@ export interface DefinitionMetadata {
  * object round-trips through the constructor whichever way it was authored.
  * `toString()` is the DSL's view of the same composition and spells the
  * library's own options the way a bracket carries them.
+ *
+ * A position is published as `x`/`y` beside the element that carries it, at the
+ * scope that wrote it, and never inside that element's options bag. Every way
+ * of authoring one converges here: a `CODE:x,y` coordinate (the spelling only a
+ * part has), an `[x=N]` bracket, an `x` field on the element, and an `x` inside
+ * its options. An axis is present when it was written and absent when it was
+ * not, so a written `0` is a position and `undefined` means no position; the
+ * two axes are independent. An options bag left holding nothing but a position
+ * is omitted rather than published empty, except on the composition itself,
+ * which always carries a bag.
  */
 export interface BlissJSON {
   /**
@@ -762,9 +772,15 @@ export interface BlissJSON {
    * below.
    */
   transientOptions?: Record<string, string | number | boolean>;
+  /** The composition's own position (the `[x=N]||` scope). */
+  x?: number;
+  y?: number;
   groups: Array<{
     options?: Record<string, string | number | boolean>;
     transientOptions?: Record<string, string | number | boolean>;
+    /** The word's own position (the `[x=N]|` scope). */
+    x?: number;
+    y?: number;
     /**
      * Word-level indicator overlay (the DSL `;;` form): stored on the word and
      * resolved onto the head glyph at render. Present in default output (kept
@@ -775,6 +791,9 @@ export interface BlissJSON {
       codeName?: string;
       options?: Record<string, string | number | boolean>;
       transientOptions?: Record<string, string | number | boolean>;
+      /** The character's own position (the `[x=N]` scope, `x` being its leading blank). */
+      x?: number;
+      y?: number;
       isHeadGlyph?: boolean;
       /**
        * Classification metadata, present only on a glyph that has no `codeName`
@@ -795,6 +814,7 @@ export interface BlissJSON {
         isIndicator?: boolean;
         /** Rendered indicator width; present only on an indicator part. */
         width?: number;
+        /** The part's position inside its character (the `CODE:x,y` scope). */
         x?: number;
         y?: number;
         /**
@@ -1127,7 +1147,11 @@ export declare class BlissSVGBuilder {
    * separator (`H//QSP/H`, not `H/TSP/QSP/H`), and consecutive single external
    * letters are written as one word (`Xhello`, not `Xh/Xe/Xl/Xl/Xo`). An
    * element that diverges stays explicit, and the rendered result is the same
-   * either way.
+   * either way. A position is likewise written one way whichever spelling
+   * authored it: the number is normalized (`[x=5.0]` and `[x=+5]` come back as
+   * `[x=5]`) and it takes the first slot in its bracket. Output is therefore not
+   * a byte-copy of the input; compare a round trip against `toString()` output,
+   * not against stored text.
    *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the

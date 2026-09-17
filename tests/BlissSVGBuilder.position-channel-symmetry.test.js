@@ -14,8 +14,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *
  * Covers:
  * - Every spelling each scope accepts, asserted on the DSL text, on the
- *   exported composition, on removal by name, on replacement by name, and on
- *   the rendered SVG.
+ *   exported composition (both halves: no copy in the options bag, and the
+ *   value beside the element), on removal by name, on replacement by name, and
+ *   on the rendered SVG.
  * - A position written as a direct field on the composition object, which used
  *   to render and never serialize, so a save and reload lost it in silence.
  * - A position on a space, reported exactly once whichever spelling carried it,
@@ -136,6 +137,18 @@ describe('BlissSVGBuilder position channel symmetry', () => {
         expect(bag?.x).toBeUndefined();
         expect(bag?.y).toBeUndefined();
         expect(bag).toEqual(table.node(table.entries[names[0]]().toJSON()).options);
+      });
+
+      it.each(names)('%s exports the position beside the element', (name) => {
+        // The complement of the row above, and the claim the typed surface makes
+        // to a consumer reading a position out of an exported composition. The
+        // bag being empty would also hold if the position had been lost, and
+        // `toString()` alone cannot tell the two apart because it can rebuild
+        // the text from either channel, so this asks for the field by name at
+        // every scope. The pair is asserted together so a failure shows which
+        // axis went; the values are the ones every table's `canonical` spells.
+        const node = table.node(table.entries[name]().toJSON());
+        expect({ x: node.x, y: node.y }).toEqual({ x: 5, y: 0 });
       });
 
       it.each(names)('%s draws the same picture', (name) => {
