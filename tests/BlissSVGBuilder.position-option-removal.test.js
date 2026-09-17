@@ -2,21 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins that removing a position option removes the position: the numeric x/y
- * the layout reads is cleared alongside the bag key, and cleared ONLY when the
- * bag really carried that axis.
+ * Pins that naming an axis removes the position, whichever spelling wrote it:
+ * the numeric x/y the layout reads is cleared at this element's own scope,
+ * and a part coordinate goes the same way an `[x=5]` option does.
  *
- * A position written as `[x=5]` is stored twice. The bag keeps the option and
- * the parser promotes a numeric `x` onto the node beside it, and that promoted
- * field is what the render and `toJSON()` read. Removal used to delete the bag
- * key alone, so the two serializers disagreed: `toString()` reported the
- * position gone while the picture and the JSON still carried it, and saving a
- * composition through the DSL and saving it through JSON gave different
- * compositions.
+ * A position has two spellings that address the same part, the `[x=5]>` option
+ * and the `:x,y` suffix, and both land on one numeric field. That field is what
+ * the render and `toJSON()` read. Removal used to delete the option key alone,
+ * so the two serializers disagreed: `toString()` reported the position gone
+ * while the picture and the JSON still carried it. Removal then learned to
+ * clear the field, but only when an option had been behind it, which made the
+ * answer depend on which serializer the composition had last been saved
+ * through. A position is one value however it was entered, so removal now goes
+ * on the name alone.
  *
- * The guard is what stops the fix overreaching. A part coordinate written as
- * `B291:5,0` lands on the same numeric field with no option behind it, so
- * clearing that field unconditionally would eat a position nobody named.
+ * Scope is the one thing that still limits the reach, and it is a different
+ * question from spelling. A handle clears the position on its OWN node, so
+ * clearing a character's x never reaches a coordinate on a part beneath it.
  *
  * Covers:
  * - All three element scopes, each of which has its own promotion site.
@@ -24,7 +26,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   spelled with one slot per axis that is still set (`B291:,3`, not
  *   `B291:0,3`): the surviving axis is reported, the cleared one is not
  *   re-spelled as a zero.
- * - A written coordinate surviving a removal aimed at the option channel.
+ * - A written coordinate going under a removal that names its axis.
+ * - The same call answering the same before and after a `toString()` round
+ *   trip, which is the asymmetry that motivated the one-value ruling.
  * - `[x=5]>`, the part-scope DSL form, which is the one route where a promoted
  *   position and a written coordinate share a slot.
  * - Removal after the parser has already resolved a `MULTIPLE_POSITION_VALUES`
@@ -99,16 +103,16 @@ describe('BlissSVGBuilder position option removal', () => {
   });
 
   describe('when a position was written as a coordinate', () => {
-    // pins the guard itself: the two near-misses that clear the field whenever
-    // the caller names an axis, or whenever the NODE carries one, both eat this
-    // coordinate and are killed here and nowhere else.
-    it('leaves it standing when the bag never carried that axis', () => {
+    // A coordinate and an option are two spellings of one value, so naming the
+    // axis takes it off either. The sibling option is left standing, which is
+    // what keeps this from reading as "removal clears the whole part".
+    it('clears it even though no option ever carried that axis', () => {
       const builder = new BlissSVGBuilder('[color=red]>B291:5,0');
 
       builder.part(0).removeOptions('x');
 
-      expect(builder.toString()).toBe('[color=red]>B291:5,0');
-      expect(builder.svgCode).toBe(render('[color=red]>B291:5,0'));
+      expect(builder.toString()).toBe('[color=red]>B291:,0');
+      expect(builder.svgCode).toBe(render('[color=red]>B291:,0'));
     });
 
     it('leaves it standing when the coordinate sits under a glyph the caller is clearing', () => {
@@ -169,6 +173,25 @@ describe('BlissSVGBuilder position option removal', () => {
     });
   });
 
+  describe('when the composition was saved and reloaded first', () => {
+    // `[x=2]>DOT` saves as `DOT:2`, so the position is a coordinate on reload.
+    // The identical call used to work on the fresh composition and be a silent
+    // no-op on the reloaded one, which made "can I undo this" depend on which
+    // serializer the composition had been through.
+    it('answers the same before and after a toString round-trip', () => {
+      const fresh = new BlissSVGBuilder('[x=2]>DOT');
+      expect(fresh.toString()).toBe('DOT:2');
+      const reloaded = new BlissSVGBuilder(fresh.toString());
+
+      fresh.part(0).removeOptions('x');
+      reloaded.part(0).removeOptions('x');
+
+      expect(fresh.toString()).toBe('DOT');
+      expect(reloaded.toString()).toBe('DOT');
+      expect(reloaded.svgCode).toBe(fresh.svgCode);
+    });
+  });
+
   describe('when the axis is named another way', () => {
     it.each(['x', 'X'])('clears the position under %s, which a standard owns in either casing', (named) => {
       const builder = new BlissSVGBuilder('B291/B291');
@@ -177,6 +200,18 @@ describe('BlissSVGBuilder position option removal', () => {
       builder.glyph(1).removeOptions(named);
 
       expect(builder.svgCode).toBe(render('B291/B291'));
+    });
+
+    // pins the axis test itself: removal reaches a field on the node now, so
+    // without that test every node field a caller can name is deletable, and
+    // codeName is the one that costs the element its identity.
+    it.each(['codeName', 'parts'])('leaves the element intact under %s, which names its anatomy rather than an option', (named) => {
+      const builder = new BlissSVGBuilder('B291;C8');
+
+      builder.part(0).removeOptions(named);
+
+      expect(builder.toString()).toBe('B291;C8');
+      expect(builder.svgCode).toBe(render('B291;C8'));
     });
 
     it.each(['position', 'data-x'])('leaves the position alone under %s, which names nothing the element carries', (named) => {

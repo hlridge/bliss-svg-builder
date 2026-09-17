@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { deleteOptionByName, WARNING_CODES } from "./bliss-constants.js";
+import { canonicalOptionKey, deleteOptionByName, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
@@ -1451,34 +1451,36 @@ export class ElementHandle {
     // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
-    if (!node?.options) return this;
+    if (!node) return this;
     for (const key of keys) {
-      // A position option is promoted to a numeric x/y on the node beside the
-      // bag, and that promoted field is what the render and toJSON() read, so
-      // deleting the bag key alone left the position live and made the two
-      // serializers disagree: toString() reported it gone while the picture and
-      // the JSON still carried it.
+      // A position is ONE value with two spellings, the `[x=N]` option and a
+      // part's `CODE:x,y` coordinate, and which one entered it is not
+      // observable afterwards. Naming an axis therefore takes the position off
+      // whichever spelling wrote it. Both land on the promoted numeric field,
+      // and that field is what the render and toJSON() read, so it is the thing
+      // that has to go; an option key beside it goes with the ordinary deletion
+      // below.
       //
-      // Clearing is gated on the bag having carried the axis a moment ago,
-      // which is what leaves a coordinate written as `CODE:x,y` untouched: that
-      // spelling lands on the same field with no option behind it. The axis is
-      // read off the bag rather than off the caller's spelling, so removal goes
-      // on learning names from one place.
+      // This mirrors the clear that SETTING a position already does without
+      // consulting the bag, so the two directions agree. Gating on the bag
+      // instead made removal work only until the composition had been saved
+      // through the string serializer and reloaded, which spells a part
+      // position as a coordinate.
       //
-      // The inner recheck keeps this method correct on its own terms: an axis is
-      // cleared only if the delete really took it. Nothing outside can observe
-      // that clause, because the rebuild below re-promotes every axis the bag
-      // still holds, so a premature clear heals before anyone sees it. It stays
-      // anyway, since without it this method is correct only for as long as that
-      // rebuild is.
-      const carried = ['x', 'y'].filter(axis => axis in node.options);
-      deleteOptionByName(node.options, key);
-      for (const axis of carried) {
-        if (!(axis in node.options)) delete node[axis];
-      }
+      // The name is resolved before the axis test so `X` and `x` behave alike,
+      // and the test is what keeps this off every other field the node carries:
+      // without it, `removeOptions('codeName')` would delete the element's own
+      // identity.
+      //
+      // Scope is a separate question and is unchanged: the node is this
+      // handle's own, so clearing a character's x never reaches a coordinate on
+      // a part beneath it.
+      const resolved = canonicalOptionKey(key);
+      if (resolved === 'x' || resolved === 'y') delete node[resolved];
+      if (node.options) deleteOptionByName(node.options, key);
     }
     // Clean up empty options object
-    if (Object.keys(node.options).length === 0) {
+    if (node.options && Object.keys(node.options).length === 0) {
       delete node.options;
     }
     this.#ctx.rebuild();

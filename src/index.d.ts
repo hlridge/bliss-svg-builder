@@ -554,6 +554,10 @@ export declare class ElementHandle {
    * Removes specific option keys from this element. A name the library or a
    * standard owns is removed in either spelling; a name of your own is removed
    * under exactly the spelling you set it with.
+   *
+   * Naming `x` or `y` removes the position, whichever spelling wrote it: a
+   * part's `CODE:x,y` coordinate and an `[x=N]` option are two spellings of one
+   * value. Only this element's own position, never one on an element below it.
    */
   removeOptions(...keys: string[]): this;
 
