@@ -76,6 +76,25 @@ function serializeOptions(opts, skipKeys) {
   return `[${parts.join(';')}]`;
 }
 
+// The bracket a word, a character or the composition itself serializes to,
+// position included. Those three levels have no coordinate spelling, so the
+// `[x=N]` option is the only way a position can be written there, while the
+// value itself lives on the promoted numeric field: a position handed in as a
+// field on the composition object has no bag entry to emit from, and used to
+// render and then vanish the moment the composition was written out.
+//
+// The position takes a fixed leading slot rather than the one it was typed in,
+// which is the same canonicalization a part's coordinate suffix already does:
+// the bracket then reads the same however the position arrived, which is the
+// whole point, and a field-entered position has no typed slot to inherit.
+function serializeOptionsWithPosition(node, skipKeys) {
+  const position = {};
+  if (node?.x !== undefined) position.x = node.x;
+  if (node?.y !== undefined) position.y = node.y;
+  if (Object.keys(position).length === 0) return serializeOptions(node?.options, skipKeys);
+  return serializeOptions({ ...position, ...node.options }, skipKeys);
+}
+
 // The anchor-attribute family, mirroring the two anchorAttrNames sets inside
 // BlissElement (keep all three in sync: a name added there but not here would
 // leak onto the content <g>). At global scope these travel through the level-0 <a> wrap
@@ -1089,9 +1108,8 @@ class BlissSVGBuilder {
       const pureSpace = BlissSVGBuilder.#isRawSpaceGroup(group);
       let groupStripped = false;
       if (pureSpace) {
-        const repr = BlissSVGBuilder.#dropSpaceOptions(group.options);
+        const repr = BlissSVGBuilder.#dropSpaceDecorations(group);
         if (repr) {
-          if (Object.keys(group.options).length === 0) delete group.options;
           warnSpaceDrop('option', repr);
           groupStripped = true;
         }
@@ -1099,17 +1117,16 @@ class BlissSVGBuilder {
       for (const glyph of group.glyphs) {
         if (!BlissSVGBuilder.#isSpaceGlyphNode(glyph)) continue;
         let touched = groupStripped;
-        const glyphRepr = BlissSVGBuilder.#dropSpaceOptions(glyph.options);
+        const glyphRepr = BlissSVGBuilder.#dropSpaceDecorations(glyph);
         if (glyphRepr) {
-          if (Object.keys(glyph.options).length === 0) delete glyph.options;
           warnSpaceDrop('option', glyphRepr);
           touched = true;
         }
         const part = glyph.parts[0];
-        const partRepr = BlissSVGBuilder.#dropSpaceOptions(part.options);
-        if (partRepr) {
+        const partEntries = BlissSVGBuilder.#dropSpaceOptionEntries(part.options);
+        if (partEntries.length) {
           if (Object.keys(part.options).length === 0) delete part.options;
-          warnSpaceDrop('option', partRepr);
+          warnSpaceDrop('option', `[${partEntries.join(';')}]`);
           touched = true;
         }
         if (part.x !== undefined || part.y !== undefined) {
@@ -2820,17 +2837,46 @@ class BlissSVGBuilder {
 
   /**
    * Removes every non-internal option (a styling decoration) from a space's
-   * options object and returns a `[k=v;…]` representation of what was dropped,
-   * or null if there was nothing to drop. Kerning and the runtime key are
-   * spared. Mutates `options` in place.
+   * options object and returns the `k=v` entries that were dropped, as the
+   * author wrote them. Kerning and the runtime key are spared. Mutates
+   * `options` in place; taking an emptied bag away is the caller's, since only
+   * the caller knows whether anything else is still to come out of it.
    */
-  static #dropSpaceOptions(options) {
-    if (!options) return null;
+  static #dropSpaceOptionEntries(options) {
+    if (!options) return [];
     const keys = Object.keys(options).filter(k => !BlissSVGBuilder.#SPACE_KEPT_OPTION_KEYS.has(k));
-    if (keys.length === 0) return null;
-    const repr = '[' + keys.map(k => (options[k] === true ? k : `${k}=${options[k]}`)).join(';') + ']';
+    const entries = keys.map(k => (options[k] === true ? k : `${k}=${options[k]}`));
     for (const k of keys) delete options[k];
-    return repr;
+    return entries;
+  }
+
+  /**
+   * Everything a space at word or character scope was decorated with, in one
+   * `[k=v;…]` text, taken off both spellings a decoration can arrive in: the
+   * options bag and the promoted position field. Returns null when there was
+   * nothing to drop. Mutates `node` in place.
+   *
+   * One written decoration is one report, so the two channels share a
+   * representation instead of each raising its own: `[x=5;color=red]TSP` is one
+   * bracket the author typed, and splitting it in half because the position
+   * travels on a different channel would describe our storage rather than their
+   * input. The position leads, the slot the serializer gives it, so the text
+   * quoted back is the text the serializer would have written.
+   *
+   * A word and a character have no `:x,y` suffix, which is why this reports the
+   * option spelling while the part arm reports a coordinate: each level is
+   * quoted back in a spelling that level actually has.
+   */
+  static #dropSpaceDecorations(node) {
+    const entries = [];
+    for (const axis of ['x', 'y']) {
+      if (node[axis] === undefined) continue;
+      entries.push(`${axis}=${node[axis]}`);
+      delete node[axis];
+    }
+    entries.push(...BlissSVGBuilder.#dropSpaceOptionEntries(node.options));
+    if (node.options && Object.keys(node.options).length === 0) delete node.options;
+    return entries.length ? `[${entries.join(';')}]` : null;
   }
 
   /**
@@ -3133,7 +3179,7 @@ class BlissSVGBuilder {
       }
 
       // Prefix glyph-level options (skip internal kerning keys)
-      const optPrefix = serializeOptions(glyph.options, GLYPH_INTERNAL_KEYS);
+      const optPrefix = serializeOptionsWithPosition(glyph, GLYPH_INTERNAL_KEYS);
       result.push(optPrefix + code);
       return result;
     }
@@ -3208,7 +3254,7 @@ class BlissSVGBuilder {
         groupStr += ';;' + (stripSemantic ? '!' : '') + codes.join(';');
       }
       // Prefix group-level options with [opts]| syntax
-      const groupOptPrefix = serializeOptions(group.options);
+      const groupOptPrefix = serializeOptionsWithPosition(group);
       if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
       if (groupStr === '') continue; // bare content-empty: no segment, run stays open
       flushSpaceRun();
@@ -3231,7 +3277,7 @@ class BlissSVGBuilder {
     if (result.endsWith('/') && !result.endsWith('//')) result = result.slice(0, -1);
 
     // Prefix global options with [opts]|| syntax
-    const globalOptPrefix = serializeOptions(obj.options);
+    const globalOptPrefix = serializeOptionsWithPosition(obj);
     if (globalOptPrefix) result = `${globalOptPrefix}||${result}`;
 
     return result;

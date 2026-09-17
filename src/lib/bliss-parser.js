@@ -274,6 +274,7 @@ export function extractPositionFromOptions(obj, parseWarnings, level = 3) {
   if (!obj.options) return;
   const inline = { x: obj.x, y: obj.y };
   const overridden = [];
+  let promoted = false;
   for (const axis of ['x', 'y']) {
     if (obj.options[axis] === undefined) continue;
     const written = obj.options[axis];
@@ -291,7 +292,26 @@ export function extractPositionFromOptions(obj, parseWarnings, level = 3) {
     }
     if (inline[axis] !== undefined && inline[axis] !== value) overridden.push(axis);
     obj[axis] = value;
+    // The promoted field is the position, and a copy left behind in the bag is
+    // a residual: it makes the exported composition differ by the spelling that
+    // entered it, it hides the position from removal by name at part scope, and
+    // it gets a space's one written decoration reported twice. Cleared here,
+    // where the promotion happens, so every call site inherits it.
+    delete obj.options[axis];
+    promoted = true;
   }
+  // Leave the bag looking the way this level's bags look when nobody wrote an
+  // option, so the export cannot be read backwards into how the position was
+  // written. Measured on both input channels: a word, a character and a part
+  // carry no bag at all until something is in one, while a COMPOSITION always
+  // carries one, empty or not. So an emptied bag is removed at the three inner
+  // levels and kept at the outermost, where removing it is what would make the
+  // export depend on the spelling.
+  //
+  // Only a bag this function emptied, and only on the path that MOVED a key: a
+  // refused axis above is dropped the way every other bad option is dropped,
+  // and those leave the bag as they found it.
+  if (promoted && level > 0 && Object.keys(obj.options).length === 0) delete obj.options;
   if (overridden.length === 0 || !parseWarnings) return;
   const scope = POSITION_SCOPE_NAMES[Math.min(level, 3)];
   const ignored = level >= 3

@@ -176,8 +176,13 @@ describe('the attribute naming contract', () => {
         expect(optionKeys(render(`[${key}=3]||B291`).toJSON())).toEqual([key]);
       });
 
-    it('leaves position alone, which is stored under a name nobody curates', () => {
-      expect(optionKeys(render('B291', { x: 5 }).toJSON())).toEqual(['x']);
+    it('leaves a hyphenated name of the author\'s alone, through the object channel', () => {
+      // The carrier was `x` until a position stopped being kept in the bag at
+      // all. A hyphenated name that belongs to nobody is the sharper
+      // replacement: it is the shape a rule keyed on hyphens rather than on the
+      // vocabulary would rewrite, and the author's names covered elsewhere are
+      // either camelCase or `data-` prefixed, which such a rule could spare.
+      expect(optionKeys(render('B291', { 'my-own-attr': 5 }).toJSON())).toEqual(['my-own-attr']);
     });
 
     it.each([
