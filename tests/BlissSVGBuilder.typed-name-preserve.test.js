@@ -22,6 +22,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   match the way toString spells a position, or a clean instance reads as a
  *   diverged one and loses its name.
  * - Built-in, letter-alias, and multi-code-shorthand guardrails.
+ * - One GATED DEFERRAL, asserting the wrong answer on purpose: an anatomy that
+ *   spells its position as an OPTION (`[x=2]>S8`) loses the alias name that the
+ *   same anatomy spelled as a coordinate (`S8:2`) keeps. Both rows sit together
+ *   so the asymmetry is visible; see the comment on them before touching either.
  *
  * Does NOT cover:
  * - Anatomy written in a spelling toString normalizes away (`C8:3,` becomes
@@ -155,6 +159,49 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       const emitted = b.toString({ preserve: true });
       expect(emitted).toBe('ALSHOP');
       expect(new BlissSVGBuilder(emitted).svgCode).toBe(b.svgCode);
+    });
+
+    // GATED DEFERRAL. This row asserts the CURRENT, WRONG answer, so the gap
+    // cannot be believed fixed while it is still live: when this row goes red,
+    // the fix has landed, and the move is to invert it and close the backlog
+    // row it guards ("Two emitters disagree about a part's position spelling").
+    //
+    // Acceptance criterion: a bare alias onto a glyph defined `[x=2]>S8` keeps
+    // its written name through BOTH preserve surfaces.
+    //
+    // Mechanism: the written-name consult compares the glyph's serialized parts
+    // against the definition's codeString as a raw string, so a definition
+    // matches only when the serializer writes it back the way it was spelled.
+    // Every other option does, which is what the `[color=red]>C8` row above
+    // shows. A position is the exception, and it is the only one: an option is
+    // one of its two spellings and the serializer always emits the other, so
+    // `[x=2]>S8` is compared against `S8:2`, and a clean instance reads as a
+    // diverged one. Closing it means canonicalizing BOTH sides through one
+    // emitter rather than comparing text, which is a design call, and it belongs
+    // with the other preserve-path position work rather than here.
+    it('loses the written name over a position-option anatomy, the deferred gap', () => {
+      defineAndTrack({ GLX: { type: 'glyph', codeString: '[x=2]>S8' } });
+      defineAndTrack({ ALX: { codeString: 'GLX' } });
+      const b = new BlissSVGBuilder('ALX');
+      expect(b.toString()).toBe('S8:2');
+      expect(b.toString({ preserve: true })).toBe('GLX'); // wanted: 'ALX'
+      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('GLX'); // wanted: 'ALX'
+      // The render survives either way, which is why this is a name loss rather
+      // than a broken composition, and why it is deferrable at all.
+      expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps that same anatomy name when the definition spells the position as a coordinate', () => {
+      // The positive control for the row above: one composition, one render,
+      // two answers to "does my name survive", decided by nothing but how the
+      // DEFINITION spelled its position. Without this row the gap reads as a
+      // limit on decorated anatomy instead of the spelling asymmetry it is.
+      defineAndTrack({ GLC: { type: 'glyph', codeString: 'S8:2' } });
+      defineAndTrack({ ALC: { codeString: 'GLC' } });
+      const b = new BlissSVGBuilder('ALC');
+      expect(b.toString()).toBe('S8:2');
+      expect(b.toString({ preserve: true })).toBe('ALC');
+      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('ALC');
     });
 
     it('keeps the outermost written name through an alias chain', () => {
