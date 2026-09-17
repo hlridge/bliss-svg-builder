@@ -190,28 +190,52 @@ describe('BlissSVGBuilder position channel symmetry', () => {
     });
   });
 
+  describe('when a position shares a bracket with another option', () => {
+    // The position takes the first slot whatever order it was typed in, so a
+    // bracket cannot be read backwards into how the position arrived: one
+    // written as a field on the composition object has no typed slot to
+    // inherit, and there is nowhere else to put it that keeps the two the same.
+    it.each([
+      ['character', '[color=red;x=5]B291', '[x=5;color=red]B291'],
+      ['word', '[color=red;x=5]|B291', '[x=5;color=red]|B291'],
+      ['composition', '[color=red;x=5]||B291', '[x=5;color=red]||B291'],
+    ])('leads with it in a %s bracket', (_scope, written, expected) => {
+      expect(new BlissSVGBuilder(written).toString()).toBe(expected);
+      expect(new BlissSVGBuilder(expected).toString()).toBe(expected);
+    });
+  });
+
   describe('when a space carries a position', () => {
-    const spaceWord = (extra) => ({
+    const spaceWord = (group) => ({
       groups: [
         { glyphs: [{ parts: [{ codeName: 'B291' }] }] },
-        { glyphs: [{ parts: [{ codeName: 'TSP' }] }], ...extra },
+        group,
         { glyphs: [{ parts: [{ codeName: 'B291' }] }] },
       ],
     });
-
-    it.each([
+    const spaces = [
       ['an option', 'B291/[x=5]TSP/B291'],
-      ['a field', spaceWord({ x: 5 })],
-    ])('reports %s exactly once and drops it', (_how, input) => {
+      ['a field on the word', spaceWord({ glyphs: [{ parts: [{ codeName: 'TSP' }] }], x: 5 })],
+      ['a field on the character', spaceWord({ glyphs: [{ parts: [{ codeName: 'TSP' }], x: 5 }] })],
+    ];
+
+    it.each(spaces)('reports %s exactly once and drops it', (_how, input) => {
       const b = new BlissSVGBuilder(input);
       expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_SPACE_DECORATION']);
       expect(b.toString()).toBe('B291//B291');
     });
 
-    it.each([
-      ['an option', 'B291/[x=5]TSP/B291'],
-      ['a field', spaceWord({ x: 5 })],
-    ])('quotes %s back in the spelling a word has', (_how, input) => {
+    it.each(spaces)('takes %s off the exported composition too', (_how, input) => {
+      // The report says the position was dropped. A node that kept it would
+      // contradict its own warning, and the saved composition would raise the
+      // warning again every time it was loaded. Neither shows up in the DSL
+      // text, which never spells a space's options at all.
+      const group = new BlissSVGBuilder(input).toJSON().groups[1];
+      expect(group.x).toBeUndefined();
+      expect(group.glyphs[0].x).toBeUndefined();
+    });
+
+    it.each(spaces)('quotes %s back in the spelling a word has', (_how, input) => {
       // A word has no `:x,y` suffix, so quoting one back would name a syntax
       // that does not exist at this scope. The part row below is the only one
       // whose scope owns the coordinate spelling.
