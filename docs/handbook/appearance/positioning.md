@@ -174,7 +174,7 @@ builder.toString();   // 'C8:0,8;DOT'
 
 Removal reaches only the element you call it on, so clearing a character's `x` leaves a coordinate on a part inside that character standing.
 
-**On the way out the position is written in one form.** The number is normalized, and the position leads its bracket whatever order you typed it in:
+**On the way out the position is written in one form.** The number is normalized, and the position leads the options in its bracket whatever order you typed them in:
 
 | you write | `toString()` gives back |
 |---|---|
@@ -182,8 +182,9 @@ Removal reaches only the element you call it on, so clearing a character's `x` l
 | `[x=+5]B291` | `[x=5]B291` |
 | `[x=.5]B291` | `[x=0.5]B291` |
 | `[color=red;x=5]B291` | `[x=5;color=red]B291` |
+| `[AK:5;x=3]B291` | `[5;x=3;AK]B291` |
 
-The picture is the same in every case. If you compare stored text against fresh output, expect these differences.
+The picture is the same in every case. If you compare stored text against fresh output, expect these differences. The last row is the one exception to "the position leads": a [kerning](/handbook/writing/spacing#kerning) value is a marker rather than an option, so it keeps its own place in front.
 
 **In a saved composition the position sits beside the element, not in its options:**
 

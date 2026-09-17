@@ -750,9 +750,11 @@ export interface DefinitionMetadata {
  * part has), an `[x=N]` bracket, an `x` field on the element, and an `x` inside
  * its options. An axis is present when it was written and absent when it was
  * not, so a written `0` is a position and `undefined` means no position; the
- * two axes are independent. An options bag left holding nothing but a position
- * is omitted rather than published empty, except on the composition itself,
- * which always carries a bag.
+ * two axes are independent. An options bag left holding nothing but a usable
+ * position is omitted rather than published empty, except on the composition
+ * itself, which always carries a bag. A bag emptied any other way is published
+ * as it stands, so a refused value (`[x=abc]`, an `INVALID_OPTION_VALUE` or
+ * `MALFORMED_COORDINATES` case) can leave `options: {}` behind.
  */
 export interface BlissJSON {
   /**
@@ -1149,9 +1151,10 @@ export declare class BlissSVGBuilder {
    * element that diverges stays explicit, and the rendered result is the same
    * either way. A position is likewise written one way whichever spelling
    * authored it: the number is normalized (`[x=5.0]` and `[x=+5]` come back as
-   * `[x=5]`) and it takes the first slot in its bracket. Output is therefore not
-   * a byte-copy of the input; compare a round trip against `toString()` output,
-   * not against stored text.
+   * `[x=5]`) and it leads the option keys in its bracket. A kerning value is not
+   * an option key and still precedes it (`[AK:5;x=3]` → `[5;x=3;AK]`). Output is
+   * therefore not a byte-copy of the input; compare a round trip against
+   * `toString()` output, not against stored text.
    *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the
