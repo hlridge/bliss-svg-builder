@@ -2960,14 +2960,6 @@ class BlissSVGBuilder {
     const obj = this.toJSON({ preserve: options.preserve, deep: true, flattenIndicators: options.flattenIndicators });
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
-    // A part's position has two spellings that address the same level, the
-    // `[x=N;y=M]>` option and the `:x,y` suffix, so the output settles on one:
-    // the coordinate, which a part written without an option already uses. The
-    // option keeps every other key. (Canonicalize within a level, preserve
-    // across levels: a GLYPH-level `[x=N]` is leading blank on the glyph, a
-    // different level with no coordinate spelling of its own, so it stays a
-    // bracket.)
-    const PART_POSITION_KEYS = new Set(['x', 'y']);
 
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
@@ -3045,10 +3037,18 @@ class BlissSVGBuilder {
         let str = part.codeName.startsWith('XTXT_')
           ? 'X' + part.codeName.slice(5)
           : part.codeName;
+        // A part's position has two spellings that address the same level, the
+        // `[x=N;y=M]>` option and the `:x,y` suffix, so the output settles on
+        // one: the coordinate, which a part written without an option already
+        // uses. The option bracket below keeps every other key, and needs
+        // nothing to hold an axis back, because the promotion that gives the
+        // coordinate its value takes the axis out of the bag in the same step.
+        // (Canonicalize within a level, preserve across levels: a glyph, a word
+        // and the composition have no coordinate spelling of their own, so a
+        // position at those levels stays a bracket.)
         str += BlissSVGBuilder.#positionSuffix(hasX ? x : undefined, hasY ? y : undefined);
-        // Prefix part-level options with [opts]> syntax (skip the position
-        // keys, already emitted as the coordinate suffix above)
-        const optPrefix = serializeOptions(part.options, PART_POSITION_KEYS);
+        // Prefix part-level options with [opts]> syntax
+        const optPrefix = serializeOptions(part.options);
         if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
       })

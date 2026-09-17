@@ -174,6 +174,22 @@ describe('BlissSVGBuilder position channel symmetry', () => {
     });
   });
 
+  describe('when a part is serialized with nothing skipping an axis in its bag', () => {
+    // The part serializer used to hand its options bag a skip-set for `x` and
+    // `y`, because the coordinate suffix had already emitted them. The set is
+    // gone: an axis never reaches a part's bag now, so there was nothing left
+    // for it to skip. What makes that deletion safe is not the deletion but
+    // this row, which pins the condition the set defended against. If an axis
+    // does return to a part's bag, the coordinate and an `[x=N]>` prefix both
+    // emit and the position doubles; this fails loudly first.
+    it.each(['B291;C8:5,0', 'B291;[x=5;y=0]>C8'])('carries no axis in its bag: %s', (input) => {
+      const part = new BlissSVGBuilder(input).toJSON().groups[0].glyphs[0].parts[1];
+      expect(Object.keys(part.options ?? {})).not.toContain('x');
+      expect(Object.keys(part.options ?? {})).not.toContain('y');
+      expect(new BlissSVGBuilder(input).toString()).toBe('B291;C8:5,0');
+    });
+  });
+
   describe('when a space carries a position', () => {
     const spaceWord = (extra) => ({
       groups: [
