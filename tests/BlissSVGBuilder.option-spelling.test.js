@@ -199,14 +199,36 @@ describe('BlissSVGBuilder option spelling', () => {
       // real, so the gate must not report as well. Its `toString()` still shows
       // both keys, which is what makes the double report reachable: a `;;`
       // overlay stores the bracket TEXT rather than a parsed bag.
-      ['when the gate keeps every key', 'B291;;[strokeWidth=1;stroke-width=2]>B81'],
+      ['when the gate keeps every key', 'B291;;[strokeWidth=1;stroke-width=2]>B81',
+        ['MULTIPLE_OPTION_SPELLINGS'], 'strokeWidth=1'],
       // Here the gate rewrites the bracket, so this is the last place the
       // written spellings exist and the report has to come from the gate.
-      ['when the gate drops one key', 'B291;;[strokeWidth=1;stroke-width=2;margin=1]>B81'],
-      ['when the gate empties the bracket', 'B291;;[marginTop=1;margin-top=2]>B81'],
-    ])('reports exactly once on a word indicator, %s', (_case, input) => {
-      const spellings = render(input).warnings.filter((w) => w.code === 'MULTIPLE_OPTION_SPELLINGS');
+      ['when the gate drops one key', 'B291;;[strokeWidth=1;stroke-width=2;margin=1]>B81',
+        ['MISPLACED_GLOBAL_OPTION', 'MULTIPLE_OPTION_SPELLINGS'], 'strokeWidth=1'],
+      ['when the gate empties the bracket', 'B291;;[marginTop=1;margin-top=2]>B81',
+        ['MISPLACED_GLOBAL_OPTION', 'MULTIPLE_OPTION_SPELLINGS'], 'marginTop=1'],
+      // Counting the report is not enough, and a mutation pass proved it: with
+      // only a length check, corrupting the released warning's `source`, its
+      // `message`, or the scope this gate judges keys at all pass the whole
+      // suite. The gate buffers its reports and releases them on the rewriting
+      // branches alone, so this is the one place their CONTENT is observable.
+    ])('reports exactly once on a word indicator, %s', (_case, input, expectedCodes, displaced) => {
+      const b = render(input);
+      const spellings = b.warnings.filter((w) => w.code === 'MULTIPLE_OPTION_SPELLINGS');
       expect(spellings).toHaveLength(1);
+      expect(spellings[0].source).toBe(displaced);
+      expect(spellings[0].message).toContain(`"${displaced}"`);
+      expect(codes(b)).toEqual(expectedCodes);
+    });
+
+    it('judges the overlay bracket at PART scope, not the scope above it', () => {
+      // The gate passes a scope name into the same key filter every bracket
+      // uses, and that name reaches the reader in the refusal text. Swapping it
+      // leaves the key set identical here, so nothing but the wording catches
+      // it: a `;`-part bracket is judged at part level and says so.
+      const b = render('B291;;[marginTop=1;margin-top=2]>B81');
+      const misplaced = b.warnings.find((w) => w.code === 'MISPLACED_GLOBAL_OPTION');
+      expect(misplaced.message).toContain('at part level');
     });
   });
 
