@@ -18,7 +18,7 @@ Spacing is measured between stroke centers, not between ink edges. This means ch
 
 | Option | Default | Range |
 |--------|---------|-------|
-| `char-space` | `2` | 0 - 10 |
+| `char-space` | `2` grid units | 0 or more |
 
 ## Word Spacing
 
@@ -34,7 +34,7 @@ Like `char-space`, `word-space` may benefit from adjustment when using a thicker
 
 | Option | Default | Range |
 |--------|---------|-------|
-| `word-space` | `8` | 0 - 20 |
+| `word-space` | `8` grid units | 0 or more |
 
 ## Automatic Spacing Adjustments
 
@@ -54,7 +54,7 @@ When using external glyphs (X-codes for [Latin & Cyrillic](/handbook/writing/lat
 
 | Option | Default | Range |
 |--------|---------|-------|
-| `external-glyph-space` | `0.8` | 0 - 3 |
+| `external-glyph-space` | `0.8` grid units | 0 or more |
 
 ## Kerning
 
@@ -123,9 +123,11 @@ Note: When automatic kerning is added in a future version, existing `RK` adjustm
 
 | Option | Default | Range | Description |
 |--------|---------|-------|-------------|
-| `word-space` | `8` | 0 - 20 | Space between words (`//`) |
-| `char-space` | `2` | 0 - 10 | Space between characters (`/`) |
-| `external-glyph-space` | `0.8` | 0 - 3 | Space for external glyphs |
+| `word-space` | `8` grid units | 0 or more | Space between words (`//`) |
+| `char-space` | `2` grid units | 0 or more | Space between characters (`/`) |
+| `external-glyph-space` | `0.8` grid units | 0 or more | Space for external glyphs |
+
+All three draw the value you write, at any spacing from 0 up. A spacing nothing can draw is refused instead: a negative one or an infinity reports [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value), and a value that is not a number, including the key written with no value, reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value). Nothing is written in place of a refused value, so the spacing keeps its default.
 
 | Kerning Code | Syntax | Option spelling | Description |
 |--------------|--------|-----------------|-------------|

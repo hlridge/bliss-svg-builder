@@ -148,7 +148,7 @@ Only a size that cannot be written down is refused. A merely enormous one is you
 
 Every option that sizes the picture is dropped together, since the overflow belongs to the result rather than to any one of them, and `source` names the ones you wrote, comma-separated.
 
-Some of it cannot be repaired that way, and those cases are reported rather than fixed. A spacing (`char-space`, `word-space`, `external-glyph-space`), a glyph position, or a kerning value widens the composition itself, which is measured before the size is judged, so there is no sizing option to drop. Where none of them was written at all, `source` is empty and the message says so; the fix is to write a smaller value.
+Some of it cannot be repaired that way, and those cases are reported rather than fixed. A spacing (`char-space`, `word-space`, `external-glyph-space`), a glyph position, or a kerning value widens the composition itself, which is measured before the size is judged, so there is no sizing option left to drop and the picture still carries the size that overflowed. A spacing is named in `source` all the same, because it is the value to reduce. A position or a kerning value belongs to one element rather than to the canvas, so there is nothing for `source` to name and it is empty. Either way the fix is to write a smaller value.
 
 ## Misplaced Tokens
 
