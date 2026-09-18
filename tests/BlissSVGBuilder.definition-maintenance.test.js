@@ -410,18 +410,18 @@ describe('BlissSVGBuilder definition maintenance', () => {
       expect(def.char).toBe('α');
     });
 
-    it('returns { patched: true } on a successful patch', () => {
+    it('returns { patched: true, warnings: [] } on a successful patch', () => {
       const code = trackCode('PATCHRET1');
       BlissSVGBuilder.define({ [code]: { codeString: 'H', type: 'glyph' } });
       const result = BlissSVGBuilder.patchDefinition(code, { width: 6 });
-      expect(result).toEqual({ patched: true });
+      expect(result).toEqual({ patched: true, warnings: [] });
     });
 
-    it('returns { patched: true } when called with an empty changes object', () => {
+    it('returns { patched: true, warnings: [] } when called with an empty changes object', () => {
       const code = trackCode('PATCHEMPTY1');
       BlissSVGBuilder.define({ [code]: { codeString: 'H', type: 'glyph' } });
       const result = BlissSVGBuilder.patchDefinition(code, {});
-      expect(result).toEqual({ patched: true });
+      expect(result).toEqual({ patched: true, warnings: [] });
     });
 
     it('removes defaultOptions from the definition when patched to null', () => {

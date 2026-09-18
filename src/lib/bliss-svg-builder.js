@@ -3955,7 +3955,7 @@ class BlissSVGBuilder {
 
   // ── Private define helpers ──────────────────────────────────────
 
-  static #defineShape(code, definition, options = {}) {
+  static #defineShape(code, definition, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
     const hasGetPath = typeof definition?.getPath === 'function';
@@ -4023,7 +4023,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
 
@@ -4041,10 +4041,24 @@ class BlissSVGBuilder {
   // reasons. The guard's error must name the spelling the caller typed, or it
   // tells them to fix a key they never wrote; and translating first could not
   // smuggle anything past it anyway, since it already tests both spellings.
-  static #toCuratedSpelling(defaultOptions) {
+  //
+  // The collapse is reported here for the same reason it is reported at every
+  // other ingest site: two spellings of one name meeting in one bag lose a
+  // value, and the rule is that the loss is never silent. This bag had no route
+  // out until now, so `define()` and `patchDefinition()` grew one rather than
+  // folding the report into `errors`, which would claim the definition was
+  // refused when it is registered and usable. The report names the code because
+  // one `define()` call can carry many, and the caller otherwise cannot tell
+  // which definition the displaced value came from.
+  static #toCuratedSpelling(defaultOptions, code, warnings) {
     const translated = {};
+    const noteSpelling = warnings
+      ? optionSpellingWatcher((w) => warnings.push({ ...w, message: `"${code}": ${w.message}` }))
+      : () => {};
     for (const [key, value] of Object.entries(defaultOptions)) {
-      translated[canonicalOptionKey(key)] = value;
+      const stored = canonicalOptionKey(key);
+      noteSpelling(key, stored, value);
+      translated[stored] = value;
     }
     return translated;
   }
@@ -4094,7 +4108,7 @@ class BlissSVGBuilder {
     }
   }
 
-  static #defineGlyph(code, definition, options = {}) {
+  static #defineGlyph(code, definition, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
     if (typeof definition?.codeString !== 'string' || definition.codeString.trim().length === 0) {
@@ -4167,7 +4181,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
 
@@ -4178,7 +4192,7 @@ class BlissSVGBuilder {
     blissElementDefinitions[code] = entry;
   }
 
-  static #defineExternalGlyph(code, definition, options = {}) {
+  static #defineExternalGlyph(code, definition, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
     if (typeof definition?.getPath !== 'function') {
@@ -4212,7 +4226,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
 
@@ -4280,7 +4294,7 @@ class BlissSVGBuilder {
     return false;
   }
 
-  static #defineBare(code, definition, options = {}) {
+  static #defineBare(code, definition, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
     if (typeof definition?.codeString !== 'string' || definition.codeString.trim().length === 0) {
@@ -4341,7 +4355,7 @@ class BlissSVGBuilder {
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
-        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot);
+        entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
 
@@ -4372,7 +4386,7 @@ class BlissSVGBuilder {
    * @returns {{ defined: string[], skipped: string[], errors: string[] }}
    */
   static define(definitions, options = {}) {
-    const result = { defined: [], skipped: [], errors: [] };
+    const result = { defined: [], skipped: [], errors: [], warnings: [] };
 
     if (!definitions || typeof definitions !== 'object') {
       return result;
@@ -4401,17 +4415,17 @@ class BlissSVGBuilder {
         }
 
         if (type === 'glyph') {
-          BlissSVGBuilder.#defineGlyph(code, definition, options);
+          BlissSVGBuilder.#defineGlyph(code, definition, options, result.warnings);
         } else if (type === 'shape') {
-          BlissSVGBuilder.#defineShape(code, definition, options);
+          BlissSVGBuilder.#defineShape(code, definition, options, result.warnings);
         } else if (type === 'externalGlyph') {
-          BlissSVGBuilder.#defineExternalGlyph(code, definition, options);
+          BlissSVGBuilder.#defineExternalGlyph(code, definition, options, result.warnings);
         } else if (typeof definition?.getPath === 'function' && typeof definition?.char === 'string') {
-          BlissSVGBuilder.#defineExternalGlyph(code, definition, options);
+          BlissSVGBuilder.#defineExternalGlyph(code, definition, options, result.warnings);
         } else if (typeof definition?.getPath === 'function') {
-          BlissSVGBuilder.#defineShape(code, definition, options);
+          BlissSVGBuilder.#defineShape(code, definition, options, result.warnings);
         } else if (typeof definition?.codeString === 'string') {
-          BlissSVGBuilder.#defineBare(code, definition, options);
+          BlissSVGBuilder.#defineBare(code, definition, options, result.warnings);
         } else {
           result.errors.push(`"${code}": unable to detect definition type. Provide codeString, type+getPath+width+height (shape), or type+getPath+char (externalGlyph).`);
           continue;
@@ -4524,6 +4538,10 @@ class BlissSVGBuilder {
    * @throws {Error} If code is not defined, is built-in, or changes are invalid
    */
   static patchDefinition(code, changes) {
+    // Same channel as define()'s, for the same reason: a patched
+    // defaultOptions bag can collapse two spellings of one name, and the
+    // displaced value must not vanish in silence here either.
+    const warnings = [];
     if (!BlissSVGBuilder.#ownsDefinition(code)) {
       throw new Error(`patchDefinition("${code}"): code is not defined.`);
     }
@@ -4658,7 +4676,7 @@ class BlissSVGBuilder {
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, defaultOptionsSnapshot);
       }
-      changes = { ...changes, defaultOptions: BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot) };
+      changes = { ...changes, defaultOptions: BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings) };
     }
 
     // Apply changes
@@ -4680,7 +4698,7 @@ class BlissSVGBuilder {
       }
     }
 
-    return { patched: true };
+    return { patched: true, warnings };
   }
 
   /**

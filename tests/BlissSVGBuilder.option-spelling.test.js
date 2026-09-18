@@ -342,4 +342,67 @@ describe('BlissSVGBuilder option spelling', () => {
       expect(b.toString()).toBe('B99/RK:4/B291');
     });
   });
+
+  describe("when a definition's defaultOptions carries both spellings", () => {
+    // The last channel of the twelve to get the report, and the close-gate
+    // review is what found it silent. `define()` had no warnings channel at
+    // all, so the displaced value vanished with nothing said anywhere: not on a
+    // builder built from the definition, and not in define()'s own result. The
+    // rule is "one name written twice in one BAG", and defaultOptions is a bag.
+    const defineOnce = (() => {
+      let n = 0;
+      // define() refuses a code it already holds, so a reused name would make
+      // every row after the first measure the FIRST definition and report a
+      // false pass. Unique per call.
+      return (defaultOptions) => {
+        n += 1;
+        const code = `SPELLCHK${n}`;
+        return { code, result: BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B291', defaultOptions } }) };
+      };
+    })();
+
+    it('reports the displaced spelling in the define result', () => {
+      const { result } = defineOnce({ strokeWidth: 1, 'stroke-width': 2 });
+      expect(result.errors).toEqual([]);
+      expect(result.warnings.map((w) => w.code)).toEqual(['MULTIPLE_OPTION_SPELLINGS']);
+      expect(result.warnings[0].source).toBe('strokeWidth=1');
+      expect(result.warnings[0].message).toContain('"strokeWidth=1"');
+    });
+
+    it('still registers the definition and lets the last written value win', () => {
+      // The value half always worked; it is the report half that was missing,
+      // so the fix must not turn a usable definition into a refused one.
+      const { code, result } = defineOnce({ strokeWidth: 1, 'stroke-width': 2 });
+      expect(result.defined).toContain(code);
+      const b = render(code);
+      const widths = [...b.svgCode.matchAll(/stroke-width="([^"]*)"/g)].map((m) => m[1]);
+      expect(widths).toContain('2');
+      expect(widths).not.toContain('1');
+    });
+
+    it('names the code, because one call can define many', () => {
+      // A second curated pair, and deliberately not the stroke one: only five
+      // curated options are legal in defaultOptions at all (stroke-width and
+      // the four dot widths), the rest being global-only keys this bag refuses
+      // outright, so a row written with `marginTop` would be measuring the
+      // refusal rather than the collapse.
+      const { code, result } = defineOnce({ dotWidth: 1, 'dot-width': 2 });
+      expect(result.warnings.map((w) => w.code)).toEqual(['MULTIPLE_OPTION_SPELLINGS']);
+      expect(result.warnings[0].message).toContain(code);
+      expect(result.warnings[0].source).toBe('dotWidth=1');
+    });
+
+    it('reports from patchDefinition too, which shares the same bag', () => {
+      const { code } = defineOnce({ strokeWidth: 2 });
+      const patched = BlissSVGBuilder.patchDefinition(code, { defaultOptions: { strokeWidth: 1, 'stroke-width': 2 } });
+      expect(patched.patched).toBe(true);
+      expect(patched.warnings.map((w) => w.code)).toEqual(['MULTIPLE_OPTION_SPELLINGS']);
+      expect(patched.warnings[0].source).toBe('strokeWidth=1');
+    });
+
+    it('stays silent when one name is written once', () => {
+      const { result } = defineOnce({ strokeWidth: 2, strokeDasharray: '2 2' });
+      expect(result.warnings).toEqual([]);
+    });
+  });
 });

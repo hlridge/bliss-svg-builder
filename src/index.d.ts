@@ -705,6 +705,15 @@ export interface DefineResult {
   defined: string[];
   skipped: string[];
   errors: string[];
+  /**
+   * Non-fatal reports about definitions that WERE registered, so this is never
+   * a reason to treat the call as failed; `errors` is. Currently carries
+   * `MULTIPLE_OPTION_SPELLINGS` when one `defaultOptions` bag writes one option
+   * under two spellings: the last value written wins and the displaced one is
+   * named here. Each message is prefixed with the code it came from, since one
+   * call can define many.
+   */
+  warnings: Warning[];
 }
 
 /** Frozen metadata returned by `BlissSVGBuilder.getDefinition()`. */
@@ -1251,7 +1260,7 @@ export declare class BlissSVGBuilder {
    *   a patch that would turn an already-referenced code into an indicator; or a
    *   global-only `defaultOptions` key.
    */
-  static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true };
+  static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true; warnings: Warning[] };
 }
 
 /**

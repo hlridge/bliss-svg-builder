@@ -264,7 +264,7 @@ describe('BlissSVGBuilder define hardening', () => {
       const code = trackCode('PBGLYPH2');
       BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'C8' } });
       const result = BlissSVGBuilder.patchDefinition(code, { codeString: 'B86;SDOT:3,4', isIndicator: true });
-      expect(result).toEqual({ patched: true });
+      expect(result).toEqual({ patched: true, warnings: [] });
       expect(BlissSVGBuilder.getDefinition(code).isIndicator).toBe(true);
     });
 

@@ -1312,6 +1312,20 @@ do not rely on the definition API for that.
 
 Pass `{ overwrite: true }` as the second argument to replace existing custom codes. Without it, existing codes are added to `skipped`. Built-in definitions cannot be overwritten (matching `patchDefinition` and `removeDefinition`): replacing one would change what existing compositions render in this instance only, so such an entry lands in `errors` instead.
 
+### Warnings
+
+`define()` also returns a `warnings` array. It reports definitions that WERE registered, so it is never a reason to treat the call as failed; a refusal is an `errors` entry. Today it carries one code, `MULTIPLE_OPTION_SPELLINGS`: one `defaultOptions` bag writing a single option under both of its spellings. The last value written wins and the displaced one is named, with the code it came from, since one call can define many.
+
+```js
+const result = BlissSVGBuilder.define({
+  MYCHAR: { type: 'glyph', codeString: 'B291', defaultOptions: { strokeWidth: 1, 'stroke-width': 2 } }
+});
+
+result.defined;              // ['MYCHAR'] — registered, and the width is 2
+result.warnings[0].code;     // 'MULTIPLE_OPTION_SPELLINGS'
+result.warnings[0].source;   // 'strokeWidth=1' — the value that lost
+```
+
 ## Query API
 
 Static methods for inspecting registered definitions.
@@ -1353,7 +1367,7 @@ BlissSVGBuilder.patchDefinition('MYCHAR', {
 });
 ```
 
-Returns `{ patched: true }` on success. Only properties valid for the definition's type are accepted. Built-in definitions cannot be patched.
+Returns `{ patched: true, warnings }` on success, where `warnings` is the same array `define()` returns and is empty when there is nothing to report. Only properties valid for the definition's type are accepted. Built-in definitions cannot be patched.
 
 Allowed properties by type:
 - **glyph**: `codeString`, `anchorOffsetX`, `anchorOffsetY`, `width`, `isIndicator`, `shrinksPrecedingWordSpace`, `kerningRules`, `defaultOptions`
