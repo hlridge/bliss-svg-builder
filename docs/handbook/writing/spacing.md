@@ -103,7 +103,7 @@ B313/[absolute-kerning=0]B1103      (same as B313/AK:0/B1103)
 builder.glyph(1).setOptions({ relativeKerning: -1 });
 ```
 
-All three spellings draw the same picture, and the output settles on the short one: `[relative-kerning=-1]` comes back from `toString()` as `RK:-1`.
+All three spellings draw the same picture for any value you would write by hand, and the output settles on the short one: `[relative-kerning=-1]` comes back from `toString()` as `RK:-1`. The one value they disagree on is exponent notation: `RK:1e3` is not a spelling the marker reads, so it is dropped with a [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value) warning, where `[relative-kerning=1e3]` applies. Write `1000`.
 
 Kerning is the gap before a **character**, so the option belongs on one. Written at part, word or global scope it is dropped with a [`MISPLACED_KERNING_OPTION`](/reference/warning-codes) warning and the content renders unchanged.
 
@@ -127,7 +127,7 @@ Note: When automatic kerning is added in a future version, existing `RK` adjustm
 | `char-space` | `2` grid units | 0 or more | Space between characters (`/`) |
 | `external-glyph-space` | `0.8` grid units | 0 or more | Space for external glyphs |
 
-All three draw the value you write, at any spacing from 0 up. A spacing nothing can draw is refused instead: a negative one or an infinity reports [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value), and a value that is not a number, including the key written with no value, reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value). Nothing is written in place of a refused value, so the spacing keeps its default.
+All three draw the value you write, at any spacing from 0 up. A spacing nothing can draw is refused instead: a negative one or an infinity reports [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value), and a value that is not a number, including the key written with no value, reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value). Nothing is written in place of a refused value, so the spacing keeps its default. One case is refused without a report: a `null` or `undefined` passed in an options object is [dropped on the way in](/handbook/syntax-options/programmatic-options#edge-cases) and never reaches the option to be judged.
 
 | Kerning Code | Syntax | Option spelling | Description |
 |--------------|--------|-----------------|-------------|

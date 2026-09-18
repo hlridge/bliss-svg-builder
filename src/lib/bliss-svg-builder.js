@@ -1966,14 +1966,23 @@ class BlissSVGBuilder {
       // alone, so it widens the composition from ELEMENT scope, where this
       // builder-scope set cannot see it. Naming the options anyway printed an
       // empty pair of quotes and told the author to reduce nothing.
-      const written = `"${writtenSizeOptions.join('", "')}" works out to a picture size the SVG format cannot carry, `;
+      // Only the repaired arm may accuse the options it names. There, dropping
+      // them put the size back, so they demonstrably produced it. In the
+      // surviving arm they demonstrably did not, and one of them can be
+      // entirely innocent: `[char-space=2]||[x=1e308]>B291` names `char-space`
+      // at its own default, because the position that really caused it sits at
+      // element scope where this builder-scope set cannot see it. So that arm
+      // states the outcome, offers the names as somewhere to look, and names
+      // the other cause as well, which is the remedy the empty arm gives and
+      // which is otherwise unreachable the moment any size option is written.
+      const names = `"${writtenSizeOptions.join('", "')}"`;
       this.#warnings.push({
         code: WARNING_CODES.OUT_OF_RANGE_COMPUTED_GEOMETRY,
         message: writtenSizeOptions.length === 0
           ? `The content works out to a picture size the SVG format cannot carry, and no option that sizes the picture was written to drop. Reduce the positions or kerning that spread it until the width, height and viewBox come out finite.`
           : repaired
-            ? `${written}so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`
-            : `${written}and no option that sizes the picture could undo it, so the picture still carries that size. Reduce the values until the width, height and viewBox come out finite.`,
+            ? `${names} works out to a picture size the SVG format cannot carry, so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`
+            : `The picture works out to a size the SVG format cannot carry, and dropping the options that size it did not undo that, so the picture still carries that size. Reduce ${names}, or the positions and kerning that spread the composition, until the width, height and viewBox come out finite.`,
         source: writtenSizeOptions.join(', '),
       });
     }

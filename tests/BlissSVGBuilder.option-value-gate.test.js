@@ -720,13 +720,42 @@ describe('BlissSVGBuilder option value gate', () => {
       expect(b.warnings[0].message).toContain('the picture still carries that size');
     });
 
-    it('says the options were dropped when dropping them actually repaired the size', () => {
+    it.each([
+      ['a position', '[char-space=2]||[x=1e308]>B291'],
+      ['a kerning value', '[char-space=2]||B291/[absolute-kerning=1e308]B291'],
+    ])('does not accuse an innocent option when %s caused it', (_arm, input) => {
+      // The option named here is at its own default and did not cause
+      // anything: the position or the kerning sits at element scope, where the
+      // builder-scope set of written size options cannot see it, so the
+      // report names the only thing it can see. Naming it is settled. Telling
+      // the author it "works out to" the bad size is not, because following
+      // that advice does nothing: `[char-space=0]` leaves the width Infinite.
+      // So the surviving arm must state the outcome, not the cause, and must
+      // still offer the remedy that works.
+      const b = render(input);
+      expect(b.warnings[0].source).toBe('char-space');
+      expect(b.svgCode).toContain('width="Infinity"');
+      expect(b.warnings[0].message).not.toContain('"char-space" works out to');
+      expect(b.warnings[0].message).toContain('positions and kerning');
+    });
+
+    it.each([
+      ['no spacing written at all', '[margin=1e308]||B291', 'B291'],
+      ['an INNOCENT spacing written beside the guilty option', '[char-space=2;margin=1e308]||B291/B291', 'B291/B291'],
+    ])('says the options were dropped when dropping them repaired the size: %s', (_arm, input, bare) => {
       // The other side of the same branch, pinned here because nothing else
       // reads this message: a margin overflow IS repairable, the picture comes
-      // back at its default size, and the report should say so. A fix that
-      // told every caller the size survived would pass the rows above.
-      const b = render('[margin=1e308]||B291');
-      expect(b.svgCode).toBe(render('B291').svgCode);
+      // back at its default size, and the report should say so.
+      //
+      // The second arm is what stops the predicate being faked. A shortcut
+      // decidable from the written keys alone ("repaired unless a spacing was
+      // written") passes every other row in this file and the whole suite, and
+      // is wrong exactly here: the spacing is at its default and harmless, the
+      // margin is the overflow, and dropping it really does put the size back.
+      // Only asking the recomputed arithmetic separates the two.
+      const b = render(input);
+      expect(b.svgCode).toBe(render(bare).svgCode);
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
       expect(b.warnings[0].message).toContain('every option that sizes the picture was dropped');
       expect(b.warnings[0].message).not.toContain('still carries');
     });

@@ -93,7 +93,7 @@ The same code covers a position **option** whose value is not a number, at any s
 
 ### `MALFORMED_KERNING_VALUE`
 
-An `RK:`/`AK:` kerning marker with a non-numeric value. The marker is ignored; the characters render at normal spacing.
+An `RK:`/`AK:` kerning marker carrying a value the marker cannot read as a number. A plain decimal, positive or negative, is fine; exponent notation (`RK:1e3`) is not, and the option spelling takes it where the marker does not. The marker is ignored; the characters render at normal spacing.
 
 ```
 B313/RK:x/B431         →  renders both characters, default spacing
@@ -148,7 +148,7 @@ Only a size that cannot be written down is refused. A merely enormous one is you
 
 Every option that sizes the picture is dropped together, since the overflow belongs to the result rather than to any one of them, and `source` names the ones you wrote, comma-separated.
 
-Some of it cannot be repaired that way, and those cases are reported rather than fixed. A spacing (`char-space`, `word-space`, `external-glyph-space`), a glyph position, or a kerning value widens the composition itself, which is measured before the size is judged, so dropping the options that size the picture cannot undo it and the picture still carries the size that overflowed. A spacing is named in `source` all the same, because it is the value to reduce. A position or a kerning value belongs to one element rather than to the canvas, so there is nothing for `source` to name and it is empty. Either way the fix is to write a smaller value.
+Some of it cannot be repaired that way, and those cases are reported rather than fixed. A spacing (`char-space`, `word-space`, `external-glyph-space`), a glyph position, or a kerning value widens the composition itself, which is measured before the size is judged, so dropping the options that size the picture cannot undo it and the picture still carries the size that overflowed. A spacing is named in `source` all the same, since it is a value that sizes the picture and is therefore worth looking at. It is not a claim that it caused the overflow: a position or a kerning value belongs to one element rather than to the canvas, so nothing about it reaches `source`, and where one of those is the real cause the spacing beside it is named instead. Where no sizing option was written at all, `source` is empty. Either way the fix is to write a smaller value, whether that is the option named or the position or kerning that spread the composition.
 
 ## Misplaced Tokens
 
