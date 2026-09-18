@@ -1941,12 +1941,11 @@ class BlissSVGBuilder {
     // raised by construction like every other one. From the getter, this single
     // code would be absent until somebody read the markup, and would need its
     // own guard against piling up on a second read.
-    const geometry = this.#computeGeometry();
-    const carried = [
+    const carriedNumbers = (geometry) => [
       geometry.viewBoxX, geometry.viewBoxY, geometry.viewBoxWidth, geometry.viewBoxHeight,
       geometry.svgWidth, geometry.svgHeight,
     ];
-    if (!carried.every((value) => Number.isFinite(value))) {
+    if (!carriedNumbers(this.#computeGeometry()).every((value) => Number.isFinite(value))) {
       // Removing them IS the fallback: the getter's own `?? 0.75` and `?? 0`
       // then supply the defaults, so the picture comes out sized exactly as it
       // would have been had none of them been written, and `#computeGeometry`
@@ -1954,16 +1953,27 @@ class BlissSVGBuilder {
       // because it is baked into the composition long before the geometry can
       // be judged; the report is the whole remedy there.
       for (const key of COMPUTED_GEOMETRY_INPUTS) delete this.#processedOptions[key];
-      // Two triggers, and the second one names nothing. A glyph position or a
+      // Whether the drop WORKED is a different question from whether a size
+      // option was written, and only the first is any use to the author: a
+      // spacing is in `writtenSizeOptions` because it is a value to reduce,
+      // yet absent from the list just deleted, for the reason above. Asking
+      // the arithmetic is the only honest test. It costs one pure pass on a
+      // path that has already failed, and it stays right if the set of causes
+      // the fallback cannot answer ever changes.
+      const repaired = carriedNumbers(this.#computeGeometry()).every((value) => Number.isFinite(value));
+      // Three outcomes, and the one that names nothing leads. A glyph position or a
       // kerning value written as an OPTION (`[x=1e308]>B291`) gates on finite
       // alone, so it widens the composition from ELEMENT scope, where this
       // builder-scope set cannot see it. Naming the options anyway printed an
       // empty pair of quotes and told the author to reduce nothing.
+      const written = `"${writtenSizeOptions.join('", "')}" works out to a picture size the SVG format cannot carry, `;
       this.#warnings.push({
         code: WARNING_CODES.OUT_OF_RANGE_COMPUTED_GEOMETRY,
-        message: writtenSizeOptions.length > 0
-          ? `"${writtenSizeOptions.join('", "')}" works out to a picture size the SVG format cannot carry, so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`
-          : `The content works out to a picture size the SVG format cannot carry, and no option that sizes the picture was written to drop. Reduce the positions or kerning that spread it until the width, height and viewBox come out finite.`,
+        message: writtenSizeOptions.length === 0
+          ? `The content works out to a picture size the SVG format cannot carry, and no option that sizes the picture was written to drop. Reduce the positions or kerning that spread it until the width, height and viewBox come out finite.`
+          : repaired
+            ? `${written}so every option that sizes the picture was dropped. Reduce the values until the width, height and viewBox come out finite.`
+            : `${written}and no option that sizes the picture could undo it, so the picture still carries that size. Reduce the values until the width, height and viewBox come out finite.`,
         source: writtenSizeOptions.join(', '),
       });
     }

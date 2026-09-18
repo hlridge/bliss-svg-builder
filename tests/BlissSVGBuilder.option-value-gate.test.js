@@ -692,10 +692,43 @@ describe('BlissSVGBuilder option value gate', () => {
       // without the spacing the author wrote, which is a render-path change
       // with a duplicate-warning risk, spent on a value no one writes. The
       // report names the spacing and says to reduce it, which is the remedy.
+      //
+      // The message is asserted because it is the one thing here that CAN be
+      // wrong while the behaviour is right: the report must not claim the drop
+      // put the size back when the markup still carries the overflow.
       const b = render('[char-space=1e308]||B291/B291');
       expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
       expect(b.warnings[0].source).toBe('char-space');
       expect(b.svgCode).toContain('width="Infinity"');
+      expect(b.warnings[0].message).toContain('the picture still carries that size');
+      expect(b.warnings[0].message).not.toContain('was dropped');
+    });
+
+    it.each([
+      ['a spacing alone', '[word-space=1e308]||B291//B291', 'word-space'],
+      ['a spacing beside a sizing option', '[char-space=1e308;margin=2]||B291/B291', 'char-space, margin'],
+    ])('says the size survived the drop when it did: %s', (_arm, input, source) => {
+      // The second arm is the one that shows what the branch must ask. A margin
+      // IS a sizing option and IS dropped here, so a message keyed on "was a
+      // size option written" reports a repair; the markup still ships
+      // Infinity. The question the author needs answered is whether the drop
+      // worked, which only recomputing can tell.
+      const b = render(input);
+      expect(b.warnings.map((w) => w.code)).toEqual(['OUT_OF_RANGE_COMPUTED_GEOMETRY']);
+      expect(b.warnings[0].source).toBe(source);
+      expect(b.svgCode).toContain('width="Infinity"');
+      expect(b.warnings[0].message).toContain('the picture still carries that size');
+    });
+
+    it('says the options were dropped when dropping them actually repaired the size', () => {
+      // The other side of the same branch, pinned here because nothing else
+      // reads this message: a margin overflow IS repairable, the picture comes
+      // back at its default size, and the report should say so. A fix that
+      // told every caller the size survived would pass the rows above.
+      const b = render('[margin=1e308]||B291');
+      expect(b.svgCode).toBe(render('B291').svgCode);
+      expect(b.warnings[0].message).toContain('every option that sizes the picture was dropped');
+      expect(b.warnings[0].message).not.toContain('still carries');
     });
 
     it.each([
