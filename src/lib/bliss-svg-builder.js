@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
+import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
@@ -1454,20 +1454,27 @@ class BlissSVGBuilder {
   #normalizePositioningInvariant() {
     const raw = this.#rawBlissObj;
     const warnings = [];
+    // A position arrives on two channels, the promoted field and the options
+    // bag, and every scope reads both. Field first, and the order is
+    // load-bearing: see normalizePositionFields.
+    const normalize = (node, level) => {
+      normalizePositionFields(node, warnings);
+      extractPositionFromOptions(node, warnings, level);
+    };
     // Parts nest (a composite part carries its own), and the parser promotes at
     // every depth, so this does too: a nested part is reachable through the API
     // (`glyph(0).part(0).part(1)`), where any other option already works.
     const walkParts = (parts) => {
       for (const part of parts ?? []) {
-        extractPositionFromOptions(part, warnings);
+        normalize(part, 3);
         walkParts(part.parts);
       }
     };
-    extractPositionFromOptions(raw, warnings, 0);
+    normalize(raw, 0);
     for (const group of raw.groups ?? []) {
-      extractPositionFromOptions(group, warnings, 1);
+      normalize(group, 1);
       for (const glyph of group.glyphs ?? []) {
-        extractPositionFromOptions(glyph, warnings, 2);
+        normalize(glyph, 2);
         // Kerning attaches to a character: it is the gap before THIS glyph, and
         // no other level has a spelling for it. There are no markers on this
         // path, so every kerning value present was written as an option.
@@ -3000,6 +3007,13 @@ class BlissSVGBuilder {
         // part's own default plus the offset, and only the layout knows the
         // default. Approximated as 0, which is exact for every ordinary part
         // and off by the anchor placement for an indicator.
+        //
+        // The addition below is arithmetic only because the positioning
+        // invariant guarantees it: an axis on the authoring structure is a
+        // finite number or absent, whichever channel wrote it. Without that
+        // guarantee `+` concatenates, and a string `'3'` under a zero offset
+        // becomes `30`. Any new route that writes an axis belongs behind
+        // normalizePositionFields, not behind a second coercion here.
         const hasX = part.x !== undefined || offsetX !== 0;
         const hasY = part.y !== undefined || offsetY !== 0;
         const x = (part.x ?? 0) + offsetX;

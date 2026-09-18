@@ -261,6 +261,58 @@ export function kerningOptionEntries(options) {
 // whose message can talk about a coordinate.
 const POSITION_SCOPE_NAMES = ['composition', 'word', 'character', 'part'];
 
+// One reading of "can this be a coordinate?", shared by the two channels a
+// position arrives on so that the two cannot drift. A boolean and an empty
+// string are refused whatever Number() makes of them; everything else is
+// whatever Number() makes of it.
+const coordinateNumber = (written) => (
+  typeof written === 'boolean' || written === '' ? NaN : Number(written)
+);
+
+// Reads the promoted `x`/`y` FIELD. That field is the one route to a position
+// object input has and the DSL does not: a DSL coordinate is grammar-gated to
+// digits, so the field is a number by construction there and this is a no-op.
+// An object literal can put anything in it, while `x?: number` is what the
+// published declaration states at every scope, so this is that declaration
+// enforced at run time.
+//
+// Reading the value matters more than refusing it, because that half repairs a
+// corruption: the layout adds the parent offset with `+`, so a STRING axis was
+// concatenated rather than added and `{ codeName: 'ZSA', x: '3' }` drew at 30.
+// Going through the predicate the options channel already uses means every
+// route to a position agrees on what "3" means.
+//
+// Must run BEFORE extractPositionFromOptions, so a refused field is already
+// gone when an option at the same scope is compared against it: a value that
+// was never going to be used must not also be reported as one the option
+// displaced.
+export function normalizePositionFields(obj, parseWarnings) {
+  for (const axis of ['x', 'y']) {
+    const written = obj[axis];
+    if (written === undefined) continue;
+    const value = coordinateNumber(written);
+    if (Number.isFinite(value)) {
+      obj[axis] = value;
+      continue;
+    }
+    // Deleting is also what makes a rebuild idempotent: the next pass finds no
+    // field and cannot report the same value twice.
+    delete obj[axis];
+    // A field always carries a written value, so it is always quoted as
+    // `axis=value`. The options channel has a second spelling to account for (a
+    // bare `[x]`, stored as `true`) and reports that one as the axis alone.
+    const source = `${axis}=${String(written)}`;
+    // Not optional, unlike its neighbour: this runs from one call site, which
+    // always has somewhere to report to. A guard here would be a branch no test
+    // can reach.
+    parseWarnings.push({
+      code: WARNING_CODES.MALFORMED_COORDINATES,
+      message: `Malformed position "${source}"; the position is ignored.`,
+      source,
+    });
+  }
+}
+
 // Promotes `[x=N]` / `[y=N]` to the numeric x/y the layout reads. An option
 // OVERRIDES the positional shorthand it duplicates: on a part, `[x=N]>CODE`
 // and `CODE:x,y` address the same level, so they are two spellings of one
@@ -278,7 +330,7 @@ export function extractPositionFromOptions(obj, parseWarnings, level = 3) {
   for (const axis of ['x', 'y']) {
     if (obj.options[axis] === undefined) continue;
     const written = obj.options[axis];
-    const value = typeof written === 'boolean' || written === '' ? NaN : Number(written);
+    const value = coordinateNumber(written);
     if (!Number.isFinite(value)) {
       delete obj.options[axis];
       // A bare key is stored as `true`, so name it the way it was written.
