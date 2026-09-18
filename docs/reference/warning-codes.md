@@ -91,6 +91,14 @@ The same code covers a position **option** whose value is not a number, at any s
 [x]B313                →  warns: a bare key carries no value to position with
 ```
 
+And it covers an `x`/`y` written beside an element in a composition object, which is the third way to state a position. The value is read as a number where it can be, so a numeric string means the number it spells; anything that cannot be a coordinate is reported, the axis is dropped, and the rest of the composition renders:
+
+```js
+{ codeName: 'C8', x: '3' }     //  placed at 3, no warning
+{ codeName: 'C8', x: 'abc' }   //  warns "x=abc", renders C8 unmoved
+{ codeName: 'C8', x: true }    //  warns "x=true": a switch is not a position
+```
+
 ### `MALFORMED_KERNING_VALUE`
 
 An `RK:`/`AK:` kerning marker carrying a value the marker cannot read as a number. A plain decimal, positive or negative, is fine; exponent notation (`RK:1e3`) is not, and the option spelling takes it where the marker does not. The marker is ignored; the characters render at normal spacing.

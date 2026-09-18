@@ -1054,6 +1054,8 @@ Removes specific option keys:
 builder.glyph(0).removeOptions('color', 'strokeWidth');
 ```
 
+A key that is not a string throws a `TypeError`. Every key is read before any is removed, so a call that throws has changed nothing; naming no key at all asks for nothing and is not an error. The same holds for `removeTransientOptions`.
+
 ### Transient Options
 
 Transient options reach the rendered SVG and never reach `toString()` or `toJSON()`. Use them for anything that describes the current view rather than the composition: hit-test annotations an editor stamps onto each part, a selection highlight, or a display width that must not end up in the string a user saves or shares.
@@ -1494,7 +1496,7 @@ new BlissSVGBuilder(42);
 
 Unknown codes and invalid DSL do **not** throw. They appear in `warnings` (see above).
 
-ElementHandle mutation methods throw in two more misuse cases (documented at each method and in [Handle Lifetime](#handle-lifetime)): using a handle after its element has been removed (a stale handle), and passing a non-string `code` to a content mutation method (a `TypeError`; `applyIndicators` throws it too, though it accepts `null` as its deliberate empty indicator set). By contrast, the constructor does not throw on content: `new BlissSVGBuilder('H//C8')` renders the two words; its only throw is for a wrong input type (above). The mutation methods are deliberately stricter than the constructor, holding each call to one unit of content (next section).
+ElementHandle mutation methods throw in three more misuse cases (documented at each method and in [Handle Lifetime](#handle-lifetime)): using a handle after its element has been removed (a stale handle); passing a non-string `code` to a content mutation method (a `TypeError`; `applyIndicators` throws it too, though it accepts `null` as its deliberate empty indicator set); and handing an options method an argument of the wrong type, meaning a non-object `opts` to a setter or a non-string key to a removal (a `TypeError` naming the method, thrown before anything is changed). By contrast, the constructor does not throw on content: `new BlissSVGBuilder('H//C8')` renders the two words; its only throw is for a wrong input type (above). The mutation methods are deliberately stricter than the constructor, holding each call to one unit of content (next section).
 
 ### One unit per mutation call
 

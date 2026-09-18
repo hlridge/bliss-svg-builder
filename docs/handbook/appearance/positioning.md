@@ -196,6 +196,13 @@ new BlissSVGBuilder('[x=5]B291').toJSON();
 
 Read `x` and `y` beside the element; there is no `options.x` to read. An axis you never wrote is absent, and a `0` you did write is a position like any other, so the two are not the same thing.
 
+Writing one by hand is fine, and it is read the same way a bracket is read: a number, or a string that spells one. A value that cannot be a coordinate is reported with [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates), that axis is dropped, and the rest of the composition still draws.
+
+```js
+{ codeName: 'C8', x: '3' }     // placed at 3
+{ codeName: 'C8', x: 'abc' }   // warns, draws C8 unmoved
+```
+
 ## Zero-Sized Anchor (ZSA)
 
 `ZSA` is an invisible element that occupies no space, but occupies a position respected by auto-cropping behavior.
