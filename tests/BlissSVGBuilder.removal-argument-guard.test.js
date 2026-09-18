@@ -68,6 +68,16 @@ describe('BlissSVGBuilder removal argument guard', () => {
     });
   });
 
+  describe('when there is nothing to remove', () => {
+    it('refuses the key anyway, on both transient sites', () => {
+      // what a call is refused for is a property of the call, not of whether a
+      // bag happened to exist to look in
+      const builder = new BlissSVGBuilder('B291');
+      expect(() => builder.glyph(0).removeTransientOptions(5)).toThrow(TypeError);
+      expect(() => builder.removeTransientOptions(5)).toThrow(TypeError);
+    });
+  });
+
   describe('when a bad key sits beside a good one', () => {
     it('leaves the option the caller named alongside it untouched', () => {
       // regression: the refusal used to land mid-loop, so `color` was already

@@ -8,7 +8,7 @@ import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } f
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
-import { ElementHandle, assertCodeArg, assertOptsArg } from "./element-handle.js";
+import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
@@ -2631,6 +2631,9 @@ class BlissSVGBuilder {
    * @returns {this}
    */
   removeTransientOptions(...keys) {
+    // Ahead of the empty-bag return, so what the call is refused for does not
+    // depend on whether there happened to be anything to remove.
+    assertKeyArgs('removeTransientOptions', keys);
     const bag = this.#rawBlissObj.transientOptions;
     if (!bag) return this;
     for (const key of keys) {

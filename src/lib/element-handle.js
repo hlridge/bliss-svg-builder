@@ -27,6 +27,24 @@ export function assertOptsArg(method, opts) {
   }
 }
 
+// Shared arg guard for the removal family: a key is a name. Naming nothing is
+// not an error (`removeOptions()` asks for nothing and gets it), but a key that
+// is not a name is, and nullish is included rather than waved through the way
+// an opts arg waves it through: there is no "no key" to mean, and a silent
+// no-op would hide the caller's bug instead of showing it.
+//
+// Checks EVERY key before any is applied. The removal sites read the names one
+// at a time, so a guard inside that loop would refuse the second key after the
+// first had already been deleted, leaving the composition half-mutated by a
+// call that threw.
+export function assertKeyArgs(method, keys) {
+  for (const key of keys) {
+    if (typeof key !== 'string') {
+      throw new TypeError(`${method}() option names must be strings`);
+    }
+  }
+}
+
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
  * Survives `#rebuild()` because it holds a direct reference to the raw node,
@@ -1452,6 +1470,7 @@ export class ElementHandle {
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
     if (!node) return this;
+    assertKeyArgs('removeOptions', keys);
     for (const key of keys) {
       // A position is ONE value with two spellings, the `[x=N]` option and a
       // part's `CODE:x,y` coordinate, and which one entered it is not
@@ -1522,7 +1541,11 @@ export class ElementHandle {
     // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
-    if (!node?.transientOptions) return this;
+    if (!node) return this;
+    // Ahead of the empty-bag return, so what the call is refused for does not
+    // depend on whether there happened to be anything to remove.
+    assertKeyArgs('removeTransientOptions', keys);
+    if (!node.transientOptions) return this;
     for (const key of keys) {
       deleteOptionByName(node.transientOptions, key);
     }

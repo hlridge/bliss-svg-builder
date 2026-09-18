@@ -558,6 +558,11 @@ export declare class ElementHandle {
    * Naming `x` or `y` removes the position, whichever spelling wrote it: a
    * part's `CODE:x,y` coordinate and an `[x=N]` option are two spellings of one
    * value. Only this element's own position, never one on an element below it.
+   *
+   * Naming no key at all asks for nothing and is not an error. Every key is
+   * read before any is removed, so a call that throws has changed nothing.
+   *
+   * @throws {TypeError} If any key is not a string.
    */
   removeOptions(...keys: string[]): this;
 
@@ -584,6 +589,8 @@ export declare class ElementHandle {
   /**
    * Removes specific transient option keys from this element, reading a name
    * exactly as `removeOptions` reads it.
+   *
+   * @throws {TypeError} If any key is not a string.
    */
   removeTransientOptions(...keys: string[]): this;
 }
@@ -1205,6 +1212,8 @@ export declare class BlissSVGBuilder {
    * Removes transient option keys from the whole SVG. A name the library or a
    * standard owns is removed in either spelling; a name of your own is removed
    * under exactly the spelling you set it with.
+   *
+   * @throws {TypeError} If any key is not a string.
    */
   removeTransientOptions(...keys: string[]): this;
 
