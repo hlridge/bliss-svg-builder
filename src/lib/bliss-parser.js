@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, canonicalOptionKey, isLayerAttributeKey, optionSpellingWatcher, serializeOptionValue } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isLayerAttributeKey, serializeOptionValue } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -501,26 +501,17 @@ export class BlissParser {
     const extractedContent = bracketMatch[1];
     if (!extractedContent) return;
 
-    const parsedObject = Object.create(null);
-    const noteSpelling = warn ? optionSpellingWatcher(warn) : () => {};
+    const written = [];
 
     const regex = /([\w-]+)(?:\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^;]*))?/g;
     let match;
 
     while ((match = regex.exec(extractedContent)) !== null) {
-      // Resolved HERE, where a bracket first becomes an options bag, so every
-      // gate, emitter and serializer downstream sees one spelling of a name the
-      // library or a standard owns and none of them learns a rule. The scope
-      // gates read the bag this builds, which is what satisfies "canonicalize
-      // before the gates" by construction rather than by ordering discipline;
-      // the part path reaches this method without passing any gate at all.
       const writtenKey = match[1].trim();
-      const key = canonicalOptionKey(writtenKey);
 
       if (match[2] === undefined) {
         // Bare key (e.g., [grid]) — treat as boolean true
-        noteSpelling(writtenKey, key, true);
-        parsedObject[key] = true;
+        written.push([writtenKey, true]);
       } else {
         let value = match[2].trim();
 
@@ -531,10 +522,27 @@ export class BlissParser {
           value = value.slice(1, -1).replace(/\\'/g, "'");
         }
 
-        noteSpelling(writtenKey, key, value);
-        parsedObject[key] = value;
+        written.push([writtenKey, value]);
       }
     }
+
+    // Admitted HERE, where a bracket first becomes an options bag, so every
+    // gate, emitter and serializer downstream sees one spelling of a name the
+    // library or a standard owns and none of them learns a rule. The scope
+    // gates read the bag this builds, which is what satisfies "canonicalize
+    // before the gates" by construction rather than by ordering discipline;
+    // the part path reaches this method without passing any gate at all.
+    //
+    // The same stage every other entry point runs, though a bracket can only
+    // ever produce a string or the `true` of a bare key, so its value arm never
+    // refuses anything here. It runs anyway, because that is what makes the
+    // routes unable to drift apart rather than merely agreeing today.
+    //
+    // The bag has no prototype: a bracket key is `[\w-]+`, which can spell
+    // `__proto__`, and on a plain object that assignment would be swallowed
+    // instead of stored.
+    const parsedObject = Object.create(null);
+    for (const [key, value] of admitOptions(written, warn)) parsedObject[key] = value;
 
     return parsedObject;
   }

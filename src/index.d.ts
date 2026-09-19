@@ -16,6 +16,21 @@
  * JavaScript caller writes; the kebab spelling a DSL bracket carries still
  * typechecks, falling back to the index signature below and losing only the
  * inline hint and the value type.
+ *
+ * The value types are the rule the library applies at runtime rather than a
+ * narrowing of it, and it is one rule for every option here and every option
+ * added later. An option value has to be something with a text form, so a
+ * `null`, an `undefined` or anything that is not a primitive is refused on the
+ * way in: it reports `INVALID_OPTION_VALUE` and does not enter the composition,
+ * so it is absent from `toString()` and `toJSON()` and the picture is drawn as
+ * if it had never been written. This holds wherever the value came from: a
+ * composition object, the constructor's second argument, a mutation setter, or
+ * a definition's `defaultOptions`.
+ *
+ * A value that IS text but wrong for the option (`{ crop: 'nope' }`) is kept
+ * instead, because you can read it and correct it. It is reported, ignored when
+ * drawing, saved with the composition, and reported again each time that
+ * composition is loaded.
  */
 export interface BlissOptions {
   // Stroke and spacing

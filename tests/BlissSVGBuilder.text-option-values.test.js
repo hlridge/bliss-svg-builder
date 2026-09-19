@@ -15,17 +15,22 @@ import {
  * wrong accessible name, both in silence. Measured before the fix: 32 of 56
  * name-and-value combinations leaked.
  *
- * The gate sits where the option is DISPATCHED rather than at ingest, because
- * whether a value is legal depends on which option it is: `true` is right for
- * `grid` and wrong for `color`, and refusing at ingest would also sit upstream
- * of the numeric half and replace its twelve well-worded refusals with one
- * generic one.
+ * The gate is asked in two places and is one gate. The admission stage asks it
+ * at INGEST, so a value it refuses is gone before it can be stored and cannot
+ * be saved into the composition. The options pass asks it again where the
+ * option is DISPATCHED, as the backstop for the one kind of bag that never
+ * passes ingest: the built-in definitions' own defaults. Both ask the same
+ * judge, which is what keeps the answer specific to the option the value landed
+ * on, and what keeps the numeric half's twelve well-worded refusals rather than
+ * replacing them with one generic one.
  *
  * Covers:
  * - The four value kinds nothing can write as text (an object, an array, a
  *   null, an undefined) on a curated text option, on a name nobody curates and
  *   on a `<target>--attribute` key: reported, and the render proceeds without
  *   the option.
+ * - The two further kinds only a JavaScript channel can deliver, a function and
+ *   a symbol, which used to reach the document as their own source text.
  * - A sweep DERIVED from `TEXT_OPTION_KEYS` rather than listed, so a curated
  *   option added later is covered the day it lands.
  * - The values that stay honoured: a string, a number, a boolean and the empty
@@ -43,9 +48,8 @@ import {
  * Does NOT cover:
  * - The numeric half of the same gate, see
  *   `BlissSVGBuilder.option-value-gate.test.js`.
- * - `#toRaw` dropping the same four value kinds in silence on the JavaScript
- *   channels, which is a separate call and stays blessed by
- *   `BlissSVGBuilder.option-value-gate.test.js` for now.
+ * - What becomes of a refused value once it has been reported, and whether it
+ *   survives a save, see `BlissSVGBuilder.refused-value-retention.test.js`.
  * - Which SPELLING of a name is resolved on the way in, see
  *   `BlissSVGBuilder.object-input-options.test.js`.
  */
@@ -53,9 +57,10 @@ import {
 const build = (composition) => new BlissSVGBuilder(composition);
 const codes = (b) => b.warnings.map((w) => w.code);
 
-// A composition object shaped the way `toJSON()` emits one. Object input is the
-// only channel that can deliver these values: the DSL can only produce strings,
-// and `#toRaw` drops them in front of every other JavaScript entry point.
+// A composition object shaped the way `toJSON()` emits one. The DSL can only
+// produce strings, so object input and the JavaScript channels are the two that
+// can deliver these values at all; the rows at the end of this file are what
+// says the two now answer alike.
 const atDocument = (options) => ({ options, groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }] }] }] });
 const atCharacter = (options) => ({ groups: [{ glyphs: [{ codeName: 'B291', options, parts: [{ codeName: 'B291' }] }] }] });
 
@@ -359,14 +364,33 @@ describe('BlissSVGBuilder text option values', () => {
     });
   });
 
-  describe('when the same value arrives on a channel that filters first', () => {
-    it('still drops it in silence through the options argument', () => {
-      // The channel divergence this task deliberately does not converge:
-      // `#toRaw` drops all four kinds before any gate exists, so the option is
-      // genuinely unwritten there. Whether that stays blessed is its own call.
+  describe('when the same value arrives on a channel that converts it to text', () => {
+    it('refuses it through the options argument, as object input does', () => {
+      // The channel divergence the admission stage closed: this route dropped
+      // all four kinds before any gate existed, so one value was silent here
+      // and reported through a composition object, and a composition saved
+      // from one and reloaded through the other changed what it meant.
       const b = new BlissSVGBuilder('B291', { color: null });
-      expect(b.warnings).toEqual([]);
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
       expect(b.svgCode).not.toContain('stroke="null"');
+    });
+
+    it('refuses the two kinds only this channel can deliver', () => {
+      // Neither reaches object input, which clones what it is given, and the
+      // DSL cannot spell either. Both used to be converted with everything
+      // else, so the source text of a function was painted onto the symbol.
+      const b = new BlissSVGBuilder('B291', { color: () => 1, background: Symbol('x') });
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE', 'INVALID_OPTION_VALUE']);
+      expect(b.svgCode).not.toContain('=&gt;');
+      expect(b.svgCode).not.toContain('Symbol');
+    });
+
+    it('refuses a symbol on a numeric option without throwing on the way', () => {
+      // A template literal converting a symbol throws, and the refusal builds
+      // its `source` from the value it refused; unguarded, that throw escapes
+      // the constructor and the caller gets no picture and no diagnosis.
+      const b = new BlissSVGBuilder('B291/B291', { charSpace: Symbol('x') });
+      expect(b.warnings[0].source).toBe('char-space=Symbol(x)');
     });
 
     it('leaves the DSL untouched, which cannot spell these values at all', () => {

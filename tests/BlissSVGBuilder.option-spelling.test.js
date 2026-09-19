@@ -32,8 +32,10 @@ import { KNOWN_OPTION_KEYS } from '../src/lib/bliss-constants.js';
  *   the last written value winning and the displaced one named. The class-2
  *   pair is the row a curated-vocabulary-only implementation cannot pass.
  * - The controls that keep the report about SPELLING: one spelling written
- *   twice stays silent, and two author-owned names that merely look alike
- *   (`dataAttr` / `data-attr`) stay two separate attributes.
+ *   twice stays silent, two author-owned names that merely look alike
+ *   (`dataAttr` / `data-attr`) stay two separate attributes, and a spelling
+ *   whose value is refused on the way in displaces nothing, since it never
+ *   entered.
  * - Object spread, the idiom that decided the tie-break: an explicit camelCase
  *   override beats a kebab default spread in ahead of it.
  * - Kerning, which is curated vocabulary the parser promotes rather than
@@ -264,6 +266,19 @@ describe('BlissSVGBuilder option spelling', () => {
     it('says nothing for a single spelling, whichever one it is', () => {
       expect(render('B291', { marginTop: 3 }).warnings).toEqual([]);
       expect(render('B291', { 'margin-top': 3 }).warnings).toEqual([]);
+    });
+
+    it.each([
+      ['ahead of the value that survives', { 'stroke-width': null, strokeWidth: 5 }],
+      ['behind the value that survives', { strokeWidth: 5, 'stroke-width': null }],
+    ])('says nothing about a spelling whose value never entered, written %s', (_where, opts) => {
+      // A refused value is judged before the watcher sees it, so it displaces
+      // nothing and is named as displacing nothing. The second control is what
+      // makes that matter: the 5 is the width in force, so a collision report
+      // would name the value actually in force as the one that was ignored.
+      const b = render('B291', opts);
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.svgCode).toBe(render('B291', { 'stroke-width': 5 }).svgCode);
     });
 
     it('names the displaced key rather than a value it never had', () => {

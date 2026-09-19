@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, canonicalOptionKey, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, optionSpellingWatcher, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -214,10 +214,20 @@ class BlissSVGBuilder {
   // caller replaces the bag it passed in on the next line, so editing in place
   // diverges on nothing constructible today. It stays because a second caller
   // would not know that.
+  //
+  // A value the AUTHOR wrote no longer reaches it: the admission stage refuses
+  // that value where the composition is built, on every entry point, so by the
+  // time an option is dispatched the bag holds nothing this could refuse. What
+  // is left is the bags that never passed ingest, which are the library's own
+  // module data: the built-in definitions' `defaultOptions` (a `define()` call
+  // is admitted, the built-in table is written straight into the registry) and
+  // the error-placeholder parts. Both reach an author's composition, so the
+  // backstop is kept and the two gates are held to one rule by sharing the
+  // predicate and the name test below.
   #withoutRefusedTextValues(rawOptions) {
     let kept = rawOptions;
     for (const [key, value] of Object.entries(rawOptions)) {
-      if (BlissSVGBuilder.#nameIsAlreadyRefused(key)) continue;
+      if (optionNameIsAlreadyRefused(key)) continue;
       const refusal = judgeTextOptionValue(key, value);
       if (!refusal) continue;
       this.#warnings.push(refusal);
@@ -225,30 +235,6 @@ class BlissSVGBuilder {
       delete kept[key];
     }
     return kept;
-  }
-
-  // A key that will never carry a value, whatever was written in it, because a
-  // gate has already refused the NAME.
-  //
-  // The same rule `canonicalOptionKey` follows one pass earlier: a gate that
-  // exists to make a value usable buys nothing on a name that can never carry
-  // one. It also decides which of two reports an author gets when a key is
-  // wrong twice, and the name is the one worth having: told that `null` is not
-  // a text value, an author fixes the value and `nosuch--fill` is just as dead,
-  // where the name refusal hands them the list of targets that exist.
-  //
-  // Each arm names a report raised elsewhere for the same key: the safety gate
-  // and the reserved-name guard in #processAllOptions and the root split, the
-  // layer-key split loop, and the whole-option shorthands in the pass-through
-  // loop below.
-  static #nameIsAlreadyRefused(key) {
-    if (INTERNAL_ONLY_SPELLINGS.has(key)) return true;
-    const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
-    if (isLayerAttributeKey(key) && !target) return true;
-    const name = target ? target.attribute : key;
-    return !isSafeAttributeName(name)
-      || isDocumentDefiningAttribute(name)
-      || isLibraryOwnedRootAttribute(name);
   }
 
   // Processes raw options (kebab-case) into two bags that cannot collide.
@@ -778,17 +764,24 @@ class BlissSVGBuilder {
       ? BlissParser.parse(input)
       : structuredClone(input);
 
-    // A composition object was the last channel that stored an options bag
-    // exactly as it was given, so it is the last one where a name still has to
-    // be resolved. Done HERE, on the clone and before anything else reads the
-    // tree, so every gate, emitter and serializer downstream sees the one
-    // spelling a bracket and the options argument already store.
+    // A composition object stores an options bag exactly as it was given, so
+    // this is where it meets the admission stage. Done HERE, on the clone and
+    // before anything else reads the tree, so every gate, emitter and
+    // serializer downstream sees the one spelling a bracket and the options
+    // argument already store, and holds only values that can be saved again.
+    //
+    // The reports ride `_parseWarnings`, the channel that survives a rebuild.
+    // That is not cosmetic here: a refused value is DROPPED, so it leaves no
+    // trace in the rebuilt tree, and a report regenerated from the tree would
+    // vanish on the first mutation. It is also the honest channel for this
+    // route, since the bag arrived with the composition rather than through a
+    // later call.
     //
     // Before `expandParts`, so only the bags the CALLER wrote are touched: a
-    // definition's own defaults are resolved where they are declared, and
+    // definition's own defaults are admitted where they are declared, and
     // walking them again would put this task's blame on a bag it never read.
     if (typeof input !== 'string') {
-      BlissSVGBuilder.#canonicalizeAuthoredBags(
+      BlissSVGBuilder.#admitAuthoredBags(
         blissObj,
         (warning) => (blissObj._parseWarnings ??= []).push(warning),
       );
@@ -916,36 +909,35 @@ class BlissSVGBuilder {
     }
   }
 
-  // Every options bag inside a composition object, resolved in place. The whole
+  // Every options bag inside a composition object, admitted in place. The whole
   // tree is walked rather than the root alone because a bag can sit at any of
   // five levels and each one is a bag the caller wrote: a document-level row
   // passes with the other four still verbatim.
   //
-  // A hand-authored transient bag is walked too. `setTransientOptions` resolves
-  // the name itself, so a composition object is the only way an unresolved key
+  // A hand-authored transient bag is walked too. `setTransientOptions` admits
+  // its own bag, so a composition object is the only way an unadmitted key
   // reaches that channel, and it merges into the node's options before the
   // options pass runs.
-  static #canonicalizeAuthoredBags(node, warn) {
+  static #admitAuthoredBags(node, warn) {
     for (const bag of ['options', 'transientOptions']) {
-      if (node[bag]) node[bag] = BlissSVGBuilder.#canonicalizeAuthoredBag(node[bag], warn);
+      if (node[bag]) node[bag] = BlissSVGBuilder.#admitAuthoredBag(node[bag], warn);
     }
     for (const level of ['groups', 'glyphs', 'parts']) {
-      for (const child of node[level] ?? []) BlissSVGBuilder.#canonicalizeAuthoredBags(child, warn);
+      for (const child of node[level] ?? []) BlissSVGBuilder.#admitAuthoredBags(child, warn);
     }
   }
 
-  // One bag, watched on its own so two bags each holding one spelling stay a
+  // One bag, admitted on its own so two bags each holding one spelling stay a
   // layering rather than a collision.
   //
-  // The same lookup `#parseOptions` and `#toRaw` run, and NAMES are all it
-  // touches. `#toRaw` also stringifies a value and drops one it cannot use, and
-  // this does neither, because those two are what let the value gate see a
-  // `null` or a `[5]` on this channel and refuse it by name. Converging on
-  // `#toRaw` would trade four reports for silence, which is the wrong direction
-  // for a task about making names work.
+  // The admitted value keeps the TYPE the caller authored, which is what this
+  // channel does differently from `#toRaw`: a number stays a number here and
+  // becomes text there, so a composition object round-trips through `toJSON()`
+  // deep-equal. What the two channels no longer differ on is which values get
+  // in at all; that moved into the shared stage.
   //
-  // It also does not expand the two internal-only shorthands. `autoVertical`
-  // means `crop=auto-vertical`, a whole option rather than a name, and `crop` is
+  // It does not expand the two internal-only shorthands. `autoVertical` means
+  // `crop=auto-vertical`, a whole option rather than a name, and `crop` is
   // global-only, so expanding it in a bag below the document would replace a
   // report with a key that is silently inert. The surfaces that document the
   // shorthand read it; a stored composition is not one of them, since nothing
@@ -957,32 +949,44 @@ class BlissSVGBuilder {
   // Measured, resolving it costs nothing, because the kerning resolver reads
   // either spelling and the name is promoted back on the way out, so a round
   // trip is byte-identical and `toJSON()` deep-equal either way.
-  static #canonicalizeAuthoredBag(bag, warn) {
-    const canonical = {};
-    const noteSpelling = optionSpellingWatcher(warn);
-    for (const [key, value] of Object.entries(bag)) {
-      const storedKey = canonicalOptionKey(key);
-      noteSpelling(key, storedKey, value);
-      canonical[storedKey] = value;
-    }
-    return canonical;
+  static #admitAuthoredBag(bag, warn) {
+    const admitted = {};
+    for (const [key, value] of admitOptions(Object.entries(bag), warn)) admitted[key] = value;
+    return admitted;
   }
 
+  // The JavaScript channels: the constructor's options argument, the handle
+  // setters and `setTransientOptions`. Each value becomes the TEXT a bracket
+  // would have carried, which is what this channel does differently from a
+  // composition object; which values get in at all is the shared stage's call
+  // and no longer this one's.
+  //
   // `warn` is optional, and every caller that has a warnings route passes one:
   // the constructor sends its reports down `_parseWarnings`, so they survive a
   // rebuild exactly as a bracket's do, and the mutation surfaces send theirs to
-  // the mutation log, which is where a one-time loss belongs. A displaced value
-  // never reaches the tree, so nothing in the rebuilt composition records it.
+  // the mutation log, which is where a one-time loss belongs. Both channels
+  // survive a rebuild, which a refused value's report has to: it is dropped, so
+  // nothing in the rebuilt composition records it.
+  //
+  // The two drops below are what is left for this channel to decide, and both
+  // are silent because the stage has already reported everything it refused.
+  // What reaches them is what the stage deliberately ADMITS and this channel
+  // still cannot carry: a position or kerning value (exempt from the value gate
+  // because it reaches an emitter as geometry, and dropped here because it must
+  // survive a `structuredClone` across a rebuild), a switch turned off by
+  // writing something that is not `true`, and a key whose NAME a later pass
+  // refuses.
   static #toRaw(obj, warn) {
     const raw = {};
-    const noteSpelling = warn ? optionSpellingWatcher(warn) : () => {};
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of admitOptions(Object.entries(obj), warn)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;
       // Two internal names have no kebab twin for isNamedOptionKey to find, so
-      // they are translated by name to the option they mean. Same job the
-      // camelToKebab branch below does for the rest of the curated vocabulary,
-      // done by lookup because there is no rule to derive it from.
+      // they are translated by name to the option they mean. Same job
+      // `admitOptions` does for the rest of the curated vocabulary, done by
+      // lookup because there is no rule to derive it from. The lookup still
+      // finds them after that stage has run, for the same reason they need it:
+      // neither has a curated kebab spelling to be resolved to.
       //
       // The truthiness test is not decoration: both are boolean switches, so
       // translating unconditionally would turn `{ autoVertical: false }` INTO
@@ -995,14 +999,10 @@ class BlissSVGBuilder {
         }
         continue;
       }
-      // The same lookup the option bracket runs, so this channel and that one
-      // store one spelling of every name and nothing downstream learns a rule.
-      const storedKey = canonicalOptionKey(key);
-      noteSpelling(key, storedKey, value);
       if (typeof value === 'boolean') {
-        raw[storedKey] = value;
+        raw[key] = value;
       } else {
-        raw[storedKey] = String(value);
+        raw[key] = String(value);
       }
     }
     return raw;
@@ -4059,23 +4059,23 @@ class BlissSVGBuilder {
   // tells them to fix a key they never wrote; and translating first could not
   // smuggle anything past it anyway, since it already tests both spellings.
   //
-  // The collapse is reported here for the same reason it is reported at every
-  // other ingest site: two spellings of one name meeting in one bag lose a
-  // value, and the rule is that the loss is never silent. This bag had no route
-  // out until now, so `define()` and `patchDefinition()` grew one rather than
-  // folding the report into `errors`, which would claim the definition was
-  // refused when it is registered and usable. The report names the code because
-  // one `define()` call can carry many, and the caller otherwise cannot tell
-  // which definition the displaced value came from.
+  // A loss is reported here for the same reason it is reported at every other
+  // ingest site: a definition's defaults reach a composition as authored
+  // options, so a value refused there must be refused here too, and a value
+  // displaced by a second spelling of its name is gone just as quietly. This
+  // bag had no route out until the spelling report needed one, so `define()`
+  // and `patchDefinition()` grew one rather than folding the report into
+  // `errors`, which would claim the definition was refused when it is
+  // registered and usable. Both reports name the code because one `define()`
+  // call can carry many, and the caller otherwise cannot tell which definition
+  // the lost value came from.
   static #toCuratedSpelling(defaultOptions, code, warnings) {
     const translated = {};
-    const noteSpelling = warnings
-      ? optionSpellingWatcher((w) => warnings.push({ ...w, message: `"${code}": ${w.message}` }))
-      : () => {};
-    for (const [key, value] of Object.entries(defaultOptions)) {
-      const stored = canonicalOptionKey(key);
-      noteSpelling(key, stored, value);
-      translated[stored] = value;
+    const warn = warnings
+      ? (w) => warnings.push({ ...w, message: `"${code}": ${w.message}` })
+      : undefined;
+    for (const [key, value] of admitOptions(Object.entries(defaultOptions), warn)) {
+      translated[key] = value;
     }
     return translated;
   }

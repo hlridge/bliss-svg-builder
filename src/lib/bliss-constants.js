@@ -943,7 +943,13 @@ export const judgeNumericOptionValue = (key, rawValue) => {
   const policy = NUMERIC_OPTION_POLICY.get(key);
   if (!policy) return null;
   const tail = `so it was ignored: the ${policy.noun} keeps the value it would have had without it.`;
-  const source = rawValue === true ? key : `${key}=${rawValue}`;
+  // `String(...)` rather than interpolation, for the same reason
+  // `describeRefusedValue` guards its own conversion: a symbol throws when a
+  // template literal coerces it, and that throw would escape the constructor
+  // and leave a caller with no picture and no diagnosis instead of a refusal.
+  // The conversion is explicit, so it yields 'Symbol(x)' instead. Every other
+  // value converts identically either way.
+  const source = rawValue === true ? key : `${key}=${String(rawValue)}`;
   // Blank rather than absent: a bare key arrives as `true`, an empty value as
   // '', a quoted blank as whitespace, and an omitted one as null or undefined.
   // Number() turns every one of them into 0, so each would otherwise set a
@@ -1033,41 +1039,54 @@ export const isTextValuedOptionKey = (key) => (
 );
 
 /**
+ * True when a value has a text form the author meant, which is what makes it
+ * INPUT at all. Every primitive has one; `null`, `undefined` and everything
+ * that is not a primitive have none.
+ *
+ * A boolean counts, INCLUDING as a text value: a bare key in a bracket
+ * (`[myOwnAttr]`) arrives as `true`, so refusing booleans would refuse the
+ * DSL's own shorthand.
+ *
+ * The null test is redundant on purpose, and measured so: `typeof null` is
+ * 'object', so the object test already catches it. It is written out because
+ * the rule is "non-primitive, null or undefined" and leaning on that quirk
+ * would hide a third of the rule behind a JavaScript wart.
+ *
+ * Shared by the two gates that must agree on it: this is the whole test
+ * `judgeTextOptionValue` applies, and it is also what `admitOptions` asks
+ * before judging anything, since a value that IS text is input whether or not
+ * the option can use it.
+ */
+const hasAuthoredTextForm = (value) => (
+  value !== null && value !== undefined
+  && typeof value !== 'object' && typeof value !== 'function' && typeof value !== 'symbol'
+);
+
+/**
  * Judges one written value for a text-valued option, the string half of the
  * same gate `judgeNumericOptionValue` is the numeric half of. Same two arms and
  * no third: the value is refused, in which case the option falls back exactly
  * as if it had never been written, or it is honoured exactly as written.
  *
  * Nothing that is not a primitive is honoured, and neither is `null` or
- * `undefined`, because none of them has a text form the author meant. Every
- * other primitive is, INCLUDING a boolean: a bare key in a bracket
- * (`[myOwnAttr]`) arrives as `true`, so refusing booleans would refuse the
- * DSL's own shorthand.
+ * `undefined`, because none of them has a text form the author meant.
  *
- * Four of those kinds reach this gate; a function and a symbol are refused for
- * the same reason but are unreachable, since `structuredClone` rejects both in
- * the constructor and `#toRaw` drops them on every other channel. They are
- * written out anyway, so the rule reads as one rule rather than as a list of
- * the cases that happen to arrive today.
+ * All six kinds reach the gate, including a function and a symbol: a
+ * composition object cannot carry either, since `structuredClone` rejects both,
+ * but the constructor's options argument and the mutation setters can, and
+ * before `admitOptions` judged them they were stringified into the shipped
+ * document as `stroke="() =&gt; 1"` and `stroke="Symbol(x)"` in silence.
  *
- * Without it, all four were stringified straight into the shipped document:
- * `{color: null}` painted `stroke="null"` on the symbol and
- * `{'aria-label': {}}` shipped `[object Object]` as an accessible name, both in
- * silence. Only object input can deliver such a value, because the DSL produces
- * strings and `#toRaw` drops these four in front of the other channels.
+ * Without the gate, all of them were: `{color: null}` painted `stroke="null"`
+ * on the symbol and `{'aria-label': {}}` shipped `[object Object]` as an
+ * accessible name.
  *
  * Returns null when the value is honoured, so the caller assigns it; otherwise
  * the warning to report, and the caller assigns nothing.
  */
 export const judgeTextOptionValue = (key, rawValue) => {
   if (!isTextValuedOptionKey(key)) return null;
-  // The null test is redundant on purpose, and measured so: `typeof null` is
-  // 'object', so the test below already catches it. It is written out because
-  // the rule is "non-primitive, null or undefined" and leaning on that quirk
-  // would hide a third of the rule behind a JavaScript wart.
-  const writable = rawValue !== null && rawValue !== undefined
-    && typeof rawValue !== 'object' && typeof rawValue !== 'function' && typeof rawValue !== 'symbol';
-  if (writable) return null;
+  if (hasAuthoredTextForm(rawValue)) return null;
   const shown = describeRefusedValue(rawValue);
   // An option the library curates has a value of its own to fall back to; a
   // name it does not curate has none, so the honest thing to say about it is
@@ -1080,6 +1099,115 @@ export const judgeTextOptionValue = (key, rawValue) => {
     message: `"${key}" needs a text value and ${shown} is not one, ${tail}`,
     source: `${key}=${String(rawValue)}`,
   };
+};
+
+/**
+ * A key that will never carry a value, whatever was written in it, because a
+ * gate has already refused the NAME.
+ *
+ * The same rule `canonicalOptionKey` follows one pass earlier: a gate that
+ * exists to make a value usable buys nothing on a name that can never carry
+ * one. It also decides which of two reports an author gets when a key is
+ * wrong twice, and the name is the one worth having: told that `null` is not
+ * a text value, an author fixes the value and `nosuch--fill` is just as dead,
+ * where the name refusal hands them the list of targets that exist.
+ *
+ * Each arm names a report raised elsewhere for the same key: the safety gate
+ * and the reserved-name guard in the options pass and the root split, the
+ * layer-key split loop, and the whole-option shorthands in the pass-through
+ * loop.
+ *
+ * Shared by the two places that must not disagree about it. At ingest it is why
+ * such a key is ADMITTED whatever it holds: dropping the key would take the
+ * name refusal down with it, since that refusal is raised by a later pass over
+ * the bag and a dropped key is not in the bag. At render it is why the value
+ * gate skips the key it is about to refuse for its name instead.
+ */
+export const optionNameIsAlreadyRefused = (key) => {
+  if (INTERNAL_ONLY_SPELLINGS.has(key)) return true;
+  const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
+  if (isLayerAttributeKey(key) && !target) return true;
+  const name = target ? target.attribute : key;
+  return !isSafeAttributeName(name)
+    || isDocumentDefiningAttribute(name)
+    || isLibraryOwnedRootAttribute(name);
+};
+
+/**
+ * The refusal that keeps one written value OUT of the composition, or null when
+ * it goes in.
+ *
+ * One test decides it, and it is a test on the value's TYPE rather than on
+ * which option it was written on, so it governs every option that exists and
+ * every option added later with no list to maintain. A value with no text form
+ * the author meant is not input: it cannot be saved, cannot be read back and
+ * cannot be fixed by reading it, so it is reported once and does not enter.
+ * A value that IS text is input even when it is wrong for the option
+ * (`crop=nope`), because the author can read it and fix it, so it is kept and
+ * reported by the gate that knows what that option accepts.
+ *
+ * The judges are asked rather than the type test being reported directly, for
+ * two reasons. They word the refusal for the option it landed on, so a number
+ * option says it needs a number. And both returning null is what EXEMPTS
+ * position and kerning: those reach an emitter as geometry rather than as text
+ * and carry gates of their own, so `{x: [5]}` stays untouched here. Refusing it
+ * would report a drop that did not happen, since the position gate reads and
+ * honours that value.
+ */
+const admissionRefusal = (key, value) => {
+  if (hasAuthoredTextForm(value)) return null;
+  if (optionNameIsAlreadyRefused(key)) return null;
+  return judgeNumericOptionValue(key, value) ?? judgeTextOptionValue(key, value);
+};
+
+/**
+ * The one stage an options bag passes through on its way INTO a composition:
+ * the name is resolved, the value is judged, and what comes back is what the
+ * composition will hold.
+ *
+ * Every ingest route runs it FIRST and nothing else resolves an option name, so
+ * a route added later is judged whether or not its author knew this rule
+ * existed. Four routes each deciding for themselves is what this replaces: a
+ * composition object kept everything, the options argument and the mutation
+ * setters dropped four kinds in silence, and a definition's defaults kept
+ * everything, so one value saved through one channel and reloaded through
+ * another changed what it meant.
+ *
+ * Entries in and entries out, rather than a bag in and a bag out, because the
+ * routes differ in what they build and each still builds its own: the DSL's bag
+ * has no prototype on purpose (a bracket may spell `__proto__`, and a plain
+ * object built only to feed this stage would be a second place that bites), and
+ * the JavaScript channels convert each value to text on the way into theirs.
+ * What is shared is the judgement, which is the part that was drifting.
+ *
+ * The value is judged BEFORE the spelling is noted, so a value that never
+ * enters cannot be named as displacing another. `{strokeWidth: 5,
+ * 'stroke-width': null}` is why: the null is dropped and the 5 survives, so a
+ * collision report would say the 5 was ignored when it is the value in force.
+ *
+ * The drop does not depend on there being anywhere to report it. Every route
+ * with a warnings channel passes one; the one entry point without a channel
+ * (`parsePartString`) reads a DSL bracket, where values are always text and
+ * nothing is ever refused.
+ *
+ * @param {Iterable<[string, unknown]>} writtenEntries - keys as written, with their values
+ * @param {(warning: object) => void} [warn] - where to send a refusal
+ * @returns {Array<[string, unknown]>} the admitted entries, keys resolved
+ */
+export const admitOptions = (writtenEntries, warn) => {
+  const admitted = [];
+  const noteSpelling = warn ? optionSpellingWatcher(warn) : () => {};
+  for (const [writtenKey, value] of writtenEntries) {
+    const key = canonicalOptionKey(writtenKey);
+    const refusal = admissionRefusal(key, value);
+    if (refusal) {
+      warn?.(refusal);
+      continue;
+    }
+    noteSpelling(writtenKey, key, value);
+    admitted.push([key, value]);
+  }
+  return admitted;
 };
 
 /**

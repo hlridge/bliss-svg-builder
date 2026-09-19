@@ -197,21 +197,21 @@ describe('BlissSVGBuilder option value gate', () => {
     it.each([
       ['null', null], ['undefined', undefined], ['an empty list', []],
       ['a list holding a number', [5]], ['an object', {}],
-    ])('never sees %s in the constructor options, because #toRaw drops it first', (label, value) => {
-      // Pre-existing and deliberately untouched: #toRaw skips null, undefined
-      // and every object before the gate exists, so the option is genuinely
-      // unwritten and the render is right. There is nothing to report because
-      // nothing reached the option. Object input has no #toRaw in front of it,
-      // which is why the rows below expect a warning for the same values.
+    ])('refuses %s in the constructor options and says so', (label, value) => {
+      // All five were dropped one stage earlier and in silence, so the render
+      // was right and nothing was reported: the same value was a refusal
+      // through a composition object and a non-event here, and a composition
+      // saved from one and reloaded through the other changed what it meant.
+      // The admission stage reports the drop, so both channels answer alike.
       const builder = new BlissSVGBuilder('B291/B291', { charSpace: value });
       expect(builder.svgCode, label).toBe(unwritten());
-      expect(builder.warnings, label).toEqual([]);
+      expect(builder.warnings.map((w) => w.code), label).toEqual(['INVALID_OPTION_VALUE']);
     });
 
     it.each([
       ['false', false], ['null', null], ['a blank string', ' '],
       ['an empty list', []], ['a list holding a number', [5]],
-    ])('refuses %s in object input, which has no #toRaw filter in front of it', (label, value) => {
+    ])('refuses %s in object input', (label, value) => {
       const builder = objectInput(value);
       expect(builder.svgCode, label).toBe(unwritten());
       expect(builder.warnings.map((w) => w.code), label).toEqual(['INVALID_OPTION_VALUE']);
