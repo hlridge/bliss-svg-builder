@@ -127,7 +127,7 @@ Note: When automatic kerning is added in a future version, existing `RK` adjustm
 | `char-space` | `2` grid units | 0 or more | Space between characters (`/`) |
 | `external-glyph-space` | `0.8` grid units | 0 or more | Space for external glyphs |
 
-All three draw the value you write, at any spacing from 0 up. A spacing nothing can draw is refused instead: a negative one or an infinity reports [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value), and a value that is not a number, including the key written with no value, reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value). Nothing is written in place of a refused value, so the spacing keeps its default. One case is refused without a report: a `null` or `undefined` passed in an options object is [dropped on the way in](/handbook/syntax-options/programmatic-options#edge-cases) and never reaches the option to be judged.
+All three draw the value you write, at any spacing from 0 up. A spacing nothing can draw is refused instead: a negative one or an infinity reports [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value), and a value that is not a number, including the key written with no value, reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value). Nothing is written in place of a refused value, so the spacing keeps its default. A `null` or `undefined` passed in an options object is refused and reported too, and because neither can be written down, it is [left out of the composition](/handbook/syntax-options/options-system#values-from-javascript) rather than saved with it.
 
 | Kerning Code | Syntax | Option spelling | Description |
 |--------------|--------|-----------------|-------------|

@@ -126,7 +126,9 @@ The last two are the cases worth knowing about: writing the key with no value at
 
 The second kind only reaches the library from JavaScript, since a value written in a bracket is always text. An object, an array, a `null` or an `undefined` handed to an option that writes text used to be put into the picture as whatever JavaScript made of it: `{ color: null }` painted `stroke="null"`, and an object given to `svg-title` or `aria-label` arrived as `[object Object]`. Those are refused now, and the option falls back the same way a refused number does.
 
-Where you get the warning depends on how the value reaches the option. In a composition object, and in a definition's own default options, it reaches the option and is refused there. Passed as the builder's second argument or through `setOptions()`, a value of this kind is dropped on the way in and never reaches the option at all, so nothing is written and there is nothing to report.
+You get the same warning however the value reaches the option: in a composition object, as the builder's second argument, through `setOptions()`, or in a definition's own default options. It is reported once and is not stored, so it is absent from `toString()` and `toJSON()`, and a composition saved and reloaded draws the same picture.
+
+A value that *is* text but wrong for the option is kept instead, because you can read it and correct it. `[crop=nope]` is reported, ignored when drawing, saved with the composition, and reported again each time that composition is loaded.
 
 ### `OUT_OF_RANGE_OPTION_VALUE`
 

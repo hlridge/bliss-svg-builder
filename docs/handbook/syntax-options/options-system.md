@@ -71,6 +71,21 @@ builder.toString();
 
 One accepted limit: a value where a backslash sits directly next to a quote (the `a\"b` class, or a trailing backslash) does not survive the round-trip, because only `\"` and `\'` are unescaped on parse.
 
+### Values from JavaScript
+
+A bracket can only carry text, but a composition object, the builder's second argument, `setOptions()` and a definition's `defaultOptions` can carry anything JavaScript has. An option value has to be something with a text form, so a `null`, an `undefined`, or anything that is not a primitive (an object, an array, a function) is refused on the way in: it reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value) and is not stored, so it is absent from `toString()` and `toJSON()` and the picture is drawn as if you had never written it.
+
+A value that *is* text but wrong for the option is kept instead, because you can read it and correct it. It is reported, ignored when drawing, saved with the composition, and reported again each time that composition is loaded.
+
+```js
+const builder = new BlissSVGBuilder('B313', { color: null, crop: 'nope' });
+
+builder.warnings.length;   // 2, one for each
+builder.toString();        // '[crop=nope]||B313' — the null is gone, the typo is kept
+```
+
+Both draw the same picture as `B313` on its own, and reloading that saved string reports the typo again.
+
 ## Scope Levels
 
 Options can be applied at four levels, from broadest to most specific:

@@ -236,6 +236,6 @@ Recall the constructor signature: `new BlissSVGBuilder(input, { defaults, overri
 | `null` second parameter | No effect. Treated the same as omitting it |
 | Empty `defaults: {}` | No effect |
 | Empty `overrides: {}` | No effect |
-| `null`/`undefined` values in objects | Silently skipped |
+| `null`/`undefined` values in objects | [Refused and reported](/handbook/syntax-options/options-system#values-from-javascript); the option keeps the value it would have had |
 | Only `defaults` provided | No overrides applied |
 | Only `overrides` provided | No defaults applied |
