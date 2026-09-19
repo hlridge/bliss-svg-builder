@@ -160,6 +160,38 @@ describe('BlissSVGBuilder object-input position gate', () => {
     });
   });
 
+  describe('when the position decides another invariant', () => {
+    // An indicator written before ordinary content is dropped unless that content
+    // was positioned by hand. The gate runs first, so what counts as "positioned"
+    // is what survived it, and a refused axis takes the exemption with it.
+    const indicatorBeforePart = (x) => new BlissSVGBuilder({
+      groups: [{ glyphs: [{ parts: [{ codeName: 'B86' }, { codeName: 'C8', x }] }] }],
+    });
+
+    it('lets a coerced position keep the indicator before it', () => {
+      const builder = indicatorBeforePart('3');
+      expect(builder.toString()).toBe('B86;C8:3');
+      expect(codesOf(builder)).toEqual([]);
+    });
+
+    it('drops the indicator when the position was refused, and says both things', () => {
+      const builder = indicatorBeforePart('abc');
+      expect(builder.toString()).toBe('C8');
+      expect(codesOf(builder)).toEqual(['MALFORMED_COORDINATES', 'MISPLACED_INDICATOR_PART']);
+    });
+  });
+
+  describe('when the composition is rebuilt after the position was refused', () => {
+    it('reports the refusal once, not once per rebuild', () => {
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }, { codeName: 'ZSA', x: 'abc' }] }] }],
+      });
+      builder.glyph(0).setOptions({ color: 'red' });
+      expect(codesOf(builder)).toEqual(['MALFORMED_COORDINATES']);
+      expect(builder.toString()).toBe('[color=red]B291;ZSA');
+    });
+  });
+
   describe('when an option spells the same axis as the field', () => {
     it('lets a valid option override a valid field', () => {
       const builder = new BlissSVGBuilder({
