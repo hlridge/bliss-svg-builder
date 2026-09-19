@@ -27,7 +27,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.option-value-matrix.test.js`.
  * - The corners the shared predicate accepts as zero (`null`, `[]`, `' '`), a
  *   pre-existing looseness of the options channel this deliberately inherits
- *   rather than tightens (backlog: the option-value vocabulary).
+ *   rather than tightens; the option channel's own value rules live in
+ *   `BlissSVGBuilder.option-value-matrix.test.js`.
  * - A `Symbol` anywhere in the input object, which is refused by the structured
  *   clone the constructor runs before any gate sees it.
  * - How a position SERIALIZES once it is a number, see
@@ -64,11 +65,23 @@ const NO_AXIS = {
 
 const SCOPES = Object.keys(AT_SCOPE);
 
+// Where each scope keeps its position in a saved composition. Read to assert the
+// coerced TYPE: at the three outer scopes a string axis used to be emitted into
+// the bracket verbatim, so the serialized string looks identical either way and
+// only the saved value tells you whether the gate ran.
+const SAVED_X = {
+  composition: (json) => json.x,
+  word: (json) => json.groups[0].x,
+  character: (json) => json.groups[0].glyphs[0].x,
+  part: (json) => json.groups[0].glyphs[0].parts[1].x,
+};
+
 describe('BlissSVGBuilder object-input position gate', () => {
   describe('when a position arrives as a numeric string', () => {
     it.each(SCOPES)('%s scope reads it as the number it spells', (scope) => {
       const builder = written(scope, 'x', '3');
       expect(builder.toString()).toBe(X_IS_THREE[scope]);
+      expect(SAVED_X[scope](builder.toJSON())).toBe(3);
       expect(codesOf(builder)).toEqual([]);
     });
 
@@ -157,6 +170,31 @@ describe('BlissSVGBuilder object-input position gate', () => {
 
     it('keeps a written zero, which is a position rather than an absence', () => {
       expect(written('part', 'x', 0).toString()).toBe('B291;ZSA:0');
+    });
+  });
+
+  describe('when a DSL coordinate overflows what a number can hold', () => {
+    // The coordinate grammar takes any run of digits, and `Number()` of 309+ of
+    // them is Infinity, so the DSL can reach the gate after all. It used to
+    // serialize as `ZSA:Infinity,0`, which the same grammar cannot read back.
+    const manyNines = '9'.repeat(400);
+
+    it('refuses the axis instead of writing a number nothing can reload', () => {
+      const builder = new BlissSVGBuilder(`B291;ZSA:${manyNines},0`);
+      expect(builder.toString()).toBe('B291;ZSA:,0');
+      expect(codesOf(builder)).toEqual(['MALFORMED_COORDINATES']);
+    });
+
+    it('keeps the drawing measurable', () => {
+      const svg = new BlissSVGBuilder(`B291;ZSA:${manyNines},0`).svgCode;
+      expect(svg).not.toContain('Infinity');
+      expect(svg).not.toContain('NaN');
+    });
+
+    it('refuses a negative overflow the same way', () => {
+      const builder = new BlissSVGBuilder(`B291;ZSA:-${manyNines},0`);
+      expect(builder.toString()).toBe('B291;ZSA:,0');
+      expect(builder.svgCode).not.toContain('NaN');
     });
   });
 
