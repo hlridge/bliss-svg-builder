@@ -461,7 +461,7 @@ export const optionSpellingWatcher = (warn) => {
     written.set(storedKey, { key: writtenKey, value });
     if (displaced === undefined || displaced.key === writtenKey) return;
     // A bare key is stored as `true`, so name it the way it was written.
-    const source = displaced.value === true ? displaced.key : `${displaced.key}=${displaced.value}`;
+    const source = displaced.value === true ? displaced.key : `${displaced.key}=${textOfValue(displaced.value)}`;
     warn({
       code: WARNING_CODES.MULTIPLE_OPTION_SPELLINGS,
       message: `An option takes one value however it is spelled, so "${source}" is ignored. "${displaced.key}" and "${writtenKey}" are two spellings of one name, and the last value written wins.`,
@@ -509,7 +509,9 @@ export const INTERNAL_ONLY_SPELLINGS = new Map([
  * ONLY `\"`.
  */
 export const serializeOptionValue = (value) => {
-  const str = String(value);
+  // Guarded: a key the admission stage keeps whatever it holds (a switch, a key
+  // refused for its NAME) can hold a value `String()` throws on.
+  const str = textOfValue(value);
   return /[;\[\]|"']/.test(str) || /^\s|\s$/.test(str)
     ? `"${str.replace(/"/g, '\\"')}"`
     : str;
@@ -939,17 +941,52 @@ const describeRefusedValue = (rawValue) => {
   }
 };
 
+/**
+ * A value as the text a warning's `source` or a saved bracket writes, without
+ * throwing. `String()` is the conversion everywhere it succeeds, so nothing it
+ * can convert reads any differently.
+ *
+ * It fails on three plain literals, and that is why this exists: an object whose
+ * `toString` is not a function (`{ toString: 5 }`, which `JSON.parse` produces
+ * as readily as a hand-written literal), an object with no prototype, and a
+ * `toString` that throws. Each is exactly the kind of value the library refuses,
+ * so building the refusal must not be what fails: a throw here escapes the
+ * constructor and hands the caller no picture and no diagnosis instead of a
+ * report. On failure it falls back to the description a refusal message uses.
+ */
+export const textOfValue = (value) => {
+  try {
+    return String(value);
+  } catch {
+    return describeRefusedValue(value);
+  }
+};
+
+/**
+ * A written value read as a number, or NaN when it cannot be one, with the TYPE
+ * deciding first: only a number, a bigint, or text that is not blank, is read.
+ *
+ * The same rule `judgeNumericOptionValue` applies to the numeric options, and
+ * for the same reason. `Number()` reads `null`, `[]` and a blank string as 0 and
+ * `[5]` as 5, so trusting it alone invents a value nobody wrote, and for a
+ * position a 0 is not an absence: it moves the element to its own origin.
+ * Shared by the position and kerning readers so the two cannot drift.
+ */
+export const writtenNumber = (value) => (
+  typeof value === 'number' || typeof value === 'bigint'
+    || (typeof value === 'string' && value.trim() !== '')
+    ? Number(value)
+    : NaN
+);
+
 export const judgeNumericOptionValue = (key, rawValue) => {
   const policy = NUMERIC_OPTION_POLICY.get(key);
   if (!policy) return null;
   const tail = `so it was ignored: the ${policy.noun} keeps the value it would have had without it.`;
-  // `String(...)` rather than interpolation, for the same reason
-  // `describeRefusedValue` guards its own conversion: a symbol throws when a
-  // template literal coerces it, and that throw would escape the constructor
-  // and leave a caller with no picture and no diagnosis instead of a refusal.
-  // The conversion is explicit, so it yields 'Symbol(x)' instead. Every other
-  // value converts identically either way.
-  const source = rawValue === true ? key : `${key}=${String(rawValue)}`;
+  // Guarded rather than interpolated: this judge now sees the RAW value on every
+  // route, and a template literal throws on a symbol and on the three objects
+  // `textOfValue` names. Every value that converts reads exactly as before.
+  const source = rawValue === true ? key : `${key}=${textOfValue(rawValue)}`;
   // Blank rather than absent: a bare key arrives as `true`, an empty value as
   // '', a quoted blank as whitespace, and an omitted one as null or undefined.
   // Number() turns every one of them into 0, so each would otherwise set a
@@ -1097,7 +1134,7 @@ export const judgeTextOptionValue = (key, rawValue) => {
   return {
     code: WARNING_CODES.INVALID_OPTION_VALUE,
     message: `"${key}" needs a text value and ${shown} is not one, ${tail}`,
-    source: `${key}=${String(rawValue)}`,
+    source: `${key}=${textOfValue(rawValue)}`,
   };
 };
 
@@ -1157,7 +1194,36 @@ export const optionNameIsAlreadyRefused = (key) => {
 const admissionRefusal = (key, value) => {
   if (hasAuthoredTextForm(value)) return null;
   if (optionNameIsAlreadyRefused(key)) return null;
-  return judgeNumericOptionValue(key, value) ?? judgeTextOptionValue(key, value);
+  return judgeNumericOptionValue(key, value)
+    ?? judgeTextOptionValue(key, value)
+    ?? judgeGeometryOptionValue(key, value);
+};
+
+/**
+ * Position and kerning under the same rule, reported the way their own gates
+ * report, so a value refused here reads exactly like one refused further on.
+ *
+ * Their gates live downstream because a position and a kerning value are read
+ * as geometry, not written as text, and a text refusal would name the wrong
+ * thing. Leaving a value with no text form to those gates is what the JavaScript
+ * channels could not do: they converted to text first, so a `null` there was
+ * dropped in silence while the same `null` in a composition object was read as
+ * a written 0, and an `undefined` was saved as `[x=undefined]`.
+ */
+const judgeGeometryOptionValue = (key, value) => {
+  if (!INTERNAL_OPTIONS.has(key)) return null;
+  const source = `${key}=${textOfValue(value)}`;
+  return key === 'x' || key === 'y'
+    ? {
+        code: WARNING_CODES.MALFORMED_COORDINATES,
+        message: `Malformed position "${source}"; the option is ignored.`,
+        source,
+      }
+    : {
+        code: WARNING_CODES.MALFORMED_KERNING_VALUE,
+        message: `Malformed kerning value "${source}"; the option is ignored.`,
+        source,
+      };
 };
 
 /**

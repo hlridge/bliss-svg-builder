@@ -278,25 +278,26 @@ describe('BlissSVGBuilder text option values', () => {
     });
 
     it.each([
-      ['a list the position gate reads as a number', [5]],
+      ['a list holding a number', [5]],
       ['an absent coordinate, which is what {x: record.x} yields', undefined],
-      ['a null the position gate reads as zero', null],
-    ])('leaves a coordinate written as %s to the position gate', (_kind, value) => {
+      ['a null', null],
+    ])('refuses a coordinate written as %s under the position code, once', (_kind, value) => {
       // `x` and `y` are uncurated names whose values never become attribute
       // text: an emitter reads them as geometry, and MALFORMED_COORDINATES is
-      // their gate. Claiming them here refused a value the position gate had
-      // already read and honoured, so `{x: [5]}` positioned the character AND
-      // reported the option as dropped, and the ordinary `{x: record.x}` idiom
-      // raised one warning per axis per node.
+      // their code. The claim this row keeps is that a text refusal never lands
+      // on one: this gate once reported `{x: [5]}` as needing a text value while
+      // the position gate honoured it, so the character moved AND was reported
+      // as not moved. The value is now refused once, in the position's own
+      // words, and the character stays where an unwritten one would.
       const b = build(atCharacter({ x: value }));
-      expect(codes(b)).toEqual([]);
-      expect(b.svgCode).toBe(build(atCharacter({ x: value === undefined ? undefined : Number(value) })).svgCode);
+      expect(codes(b)).toEqual(['MALFORMED_COORDINATES']);
+      expect(b.svgCode).toBe(build(atCharacter({})).svgCode);
     });
 
     it.each([
       ['the spelling a bracket carries', 'relative-kerning'],
       ['the spelling JavaScript uses', 'absoluteKerning'],
-    ])('stays silent on %s at a scope where no kerning gate runs', (_spelling, key) => {
+    ])('refuses a value with no text form in %s, at a scope no kerning gate reads', (_spelling, key) => {
       // The row that can tell the exemption from its absence. At document scope
       // there is nothing for kerning to sit between, so the kerning gate never
       // runs and the key reaches the options pass carrying whatever was written.
@@ -308,14 +309,14 @@ describe('BlissSVGBuilder text option values', () => {
       // is also silent: whether an out-of-scope kerning option should be
       // reported at all is the kerning gate's question, not this gate's.
       //
-      // KNOWN GAP, pinned as CURRENT behaviour: the DSL DOES report here
-      // (`[relative-kerning=3]||B291` gives `MISPLACED_KERNING_OPTION`) and the
-      // object channel does not, which is filed in `backlog.md` beside the
-      // identically-shaped target-prefixed-key row. When that is fixed this row
-      // goes red and wants rewriting, not deleting: the claim it must keep is
-      // that whatever is reported here is NOT `INVALID_OPTION_VALUE`.
+      // A value with no text form is refused on the way in wherever it is
+      // written, so it is reported here too, in the kerning gate's own words.
+      // The claim this row must keep is that whatever is reported is NOT
+      // `INVALID_OPTION_VALUE`. (Whether an out-of-scope kerning option with a
+      // usable value should be reported is still the kerning gate's question,
+      // filed in `backlog.md` beside the target-prefixed-key row.)
       const b = build(atDocument({ [key]: { a: 1 } }));
-      expect(codes(b)).toEqual([]);
+      expect(codes(b)).toEqual(['MALFORMED_KERNING_VALUE']);
       expect(b.svgCode).toBe(unwritten());
     });
   });

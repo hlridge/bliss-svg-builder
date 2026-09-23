@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -970,12 +970,10 @@ class BlissSVGBuilder {
   //
   // The two drops below are what is left for this channel to decide, and both
   // are silent because the stage has already reported everything it refused.
-  // What reaches them is what the stage deliberately ADMITS and this channel
-  // still cannot carry: a position or kerning value (exempt from the value gate
-  // because it reaches an emitter as geometry, and dropped here because it must
-  // survive a `structuredClone` across a rebuild), a switch turned off by
-  // writing something that is not `true`, and a key whose NAME a later pass
-  // refuses.
+  // What reaches them is what the stage deliberately ADMITS whatever it holds:
+  // a switch, which is off for any value but `true`; the element key, which
+  // reaches neither the picture nor the saved text; and a key whose NAME a later
+  // pass refuses.
   static #toRaw(obj, warn) {
     const raw = {};
     for (const [key, value] of admitOptions(Object.entries(obj), warn)) {
@@ -1002,7 +1000,7 @@ class BlissSVGBuilder {
       if (typeof value === 'boolean') {
         raw[key] = value;
       } else {
-        raw[key] = String(value);
+        raw[key] = textOfValue(value);
       }
     }
     return raw;

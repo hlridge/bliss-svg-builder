@@ -23,6 +23,14 @@
  * - All five entry routes agreeing: bracket, composition object, the
  *   constructor's options argument, the mutation setters, a definition's
  *   `defaultOptions`.
+ * - A value whose conversion to text THROWS (a non-callable `toString`, no
+ *   prototype, a `toString` that throws) being refused rather than crashing
+ *   the builder, on every route, and a key the library keeps whatever it holds
+ *   still saving without a crash.
+ * - Position and kerning following the same rule under their own codes
+ *   (`MALFORMED_COORDINATES`, `MALFORMED_KERNING_VALUE`), on the options bag
+ *   and on the promoted position field.
+ * - The two deliberate exceptions, the switches and `key`, left alone.
  *
  * Does NOT cover:
  * - Which values each half of the gate refuses and the wording of each
@@ -33,8 +41,9 @@
  * - The coerced form a refusal publishes in `source`, which is its own open
  *   row (`backlog.md`, "a warning `source` publishes the coerced form the
  *   message deliberately avoids") and is deliberately not pinned here.
- * - Position and kerning, which are exempt from this gate and carry their own
- *   (`MALFORMED_COORDINATES`, `MALFORMED_KERNING_VALUE`).
+ * - The kerning gate beyond a value with no text form, see
+ *   `BlissParser.kerning.test.js`; the position gate beyond it, see
+ *   `BlissSVGBuilder.object-input-position-gate.test.js`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -215,6 +224,115 @@ describe('BlissSVGBuilder refused value retention', () => {
       });
       expect(result.warnings.map((w) => w.code)).toEqual(['INVALID_OPTION_VALUE']);
       expect(result.warnings[0].message).toContain('"REPORTEDDEFAULT"');
+    });
+  });
+
+  describe('when a value cannot be converted to text at all', () => {
+    // regression: refusing the RAW value meant building the refusal's `source`
+    // from it, and these three throw on conversion, so the constructor threw
+    // where the old channel had dropped them. All three are plain literals.
+    const unconvertible = [
+      ['a toString that is not a function', () => ({ toString: 5 })],
+      ['no prototype at all', () => Object.create(null)],
+      ['a toString that throws', () => ({ toString() { throw new Error('boom'); } })],
+    ];
+
+    it.each(unconvertible)('refuses %s on a text option rather than throwing', (_kind, make) => {
+      const b = new BlissSVGBuilder('B291', { color: make() });
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.toString()).toBe('B291');
+    });
+
+    it.each(unconvertible)('refuses %s on a numeric option rather than throwing', (_kind, make) => {
+      const b = new BlissSVGBuilder('B291/B291', { charSpace: make() });
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('refuses one through a mutation setter', () => {
+      const b = new BlissSVGBuilder('B291');
+      b.glyph(0).setOptions({ color: { toString: 5 } });
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+    });
+
+    it('refuses one parsed from JSON in a composition object', () => {
+      const b = new BlissSVGBuilder(compositionWith({ color: JSON.parse('{"toString":5}') }));
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(b.toString()).toBe('B291');
+    });
+
+    it('saves a key refused for its name without throwing', () => {
+      // A key whose NAME is refused keeps its value, so the name refusal can
+      // fire; the serializer then has to write that value down.
+      const b = new BlissSVGBuilder(compositionWith({ onclick: { toString: 5 } }));
+      expect(() => b.toString()).not.toThrow();
+    });
+  });
+
+  describe('when a position or kerning value has no text form', () => {
+    it.each([
+      ['a null', null],
+      ['undefined', undefined],
+      ['a list holding a number', [5]],
+    ])('refuses %s as a position through a composition object', (_kind, value) => {
+      const json = new BlissSVGBuilder('B291/B313').toJSON();
+      json.groups[0].glyphs[1].options = { x: value };
+      const b = new BlissSVGBuilder(json);
+      expect(codes(b)).toEqual(['MALFORMED_COORDINATES']);
+      expect(b.toString()).toBe('B291/B313');
+      expect(b.svgCode).toBe(new BlissSVGBuilder('B291/B313').svgCode);
+    });
+
+    it('refuses the same value through a mutation setter', () => {
+      const b = new BlissSVGBuilder('B291/B313');
+      b.glyph(1).setOptions({ x: null });
+      expect(codes(b)).toEqual(['MALFORMED_COORDINATES']);
+    });
+
+    it('refuses the same value written as the position field beside an element', () => {
+      const json = new BlissSVGBuilder('B291/B313').toJSON();
+      json.groups[0].glyphs[1].x = null;
+      const b = new BlissSVGBuilder(json);
+      expect(codes(b)).toEqual(['MALFORMED_COORDINATES']);
+      expect(b.svgCode).toBe(new BlissSVGBuilder('B291/B313').svgCode);
+    });
+
+    it('refuses a blank position rather than reading it as a written 0', () => {
+      // note: a written 0 is a position (it moves a character to its own
+      // origin), so reading blank text as 0 would invent ink nobody asked for.
+      const b = new BlissSVGBuilder('[x=" "]B291');
+      expect(codes(b)).toEqual(['MALFORMED_COORDINATES']);
+    });
+
+    it('refuses a kerning value with no text form', () => {
+      const b = new BlissSVGBuilder('B291/B313');
+      b.glyph(1).setOptions({ relativeKerning: null });
+      expect(codes(b)).toEqual(['MALFORMED_KERNING_VALUE']);
+      expect(b.toString()).toBe('B291/B313');
+    });
+  });
+
+  describe('when a switch or an element key holds a value with no text form', () => {
+    // The two deliberate exceptions. A switch is on only when it is exactly
+    // `true`, so any other value already means off and reporting one would
+    // scold an ordinary way of turning it off. A key names the element and
+    // reaches neither the picture nor the saved text.
+    it('leaves a switch off and says nothing', () => {
+      const b = new BlissSVGBuilder(compositionWith({ grid: null }));
+      expect(codes(b)).toEqual([]);
+      expect(reloaded(b).svgCode).toBe(b.svgCode);
+    });
+
+    it('saves a switch holding a value that cannot be converted without throwing', () => {
+      const b = new BlissSVGBuilder(compositionWith({ grid: { toString: 5 } }));
+      expect(() => b.toString()).not.toThrow();
+      expect(reloaded(b).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps an element key out of the saved text', () => {
+      const b = new BlissSVGBuilder('B291');
+      b.glyph(0).setOptions({ key: null });
+      expect(codes(b)).toEqual([]);
+      expect(b.toString()).toBe('B291');
     });
   });
 });

@@ -31,6 +31,12 @@
  * instead, because you can read it and correct it. It is reported, ignored when
  * drawing, saved with the composition, and reported again each time that
  * composition is loaded.
+ *
+ * Position and kerning follow the same rule under their own codes,
+ * `MALFORMED_COORDINATES` and `MALFORMED_KERNING_VALUE`. Two options are left
+ * alone whatever they hold: a switch (`grid`, `center`, `errorPlaceholder`) is
+ * on only when it is exactly `true`, so any other value already means off, and
+ * `key` names the element and reaches neither the picture nor the saved text.
  */
 export interface BlissOptions {
   // Stroke and spacing

@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isLayerAttributeKey, serializeOptionValue } from "./bliss-constants.js";
+import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isLayerAttributeKey, serializeOptionValue, textOfValue, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -252,7 +252,7 @@ export function kerningOptionEntries(options) {
       key: KERNING_OPTION_KEYS[key],
       writtenKey: key,
       value,
-      source: value === true ? key : `${key}=${value}`,
+      source: value === true ? key : `${key}=${textOfValue(value)}`,
     }));
 }
 
@@ -262,12 +262,9 @@ export function kerningOptionEntries(options) {
 const POSITION_SCOPE_NAMES = ['composition', 'word', 'character', 'part'];
 
 // One reading of "can this be a coordinate?", shared by the two channels a
-// position arrives on so that the two cannot drift. A boolean and an empty
-// string are refused whatever Number() makes of them; everything else is
-// whatever Number() makes of it.
-const coordinateNumber = (written) => (
-  typeof written === 'boolean' || written === '' ? NaN : Number(written)
-);
+// position arrives on so that the two cannot drift, and with the kerning reader
+// below. The type decides before Number() is asked: see writtenNumber.
+const coordinateNumber = writtenNumber;
 
 // Reads the promoted `x`/`y` FIELD. That field is the one route to a position
 // object input has and the DSL does not: a DSL coordinate is grammar-gated to
@@ -301,7 +298,7 @@ export function normalizePositionFields(obj, parseWarnings) {
     // A field always carries a written value, so it is always quoted as
     // `axis=value`. The options channel has a second spelling to account for (a
     // bare `[x]`, stored as `true`) and reports that one as the axis alone.
-    const source = `${axis}=${String(written)}`;
+    const source = `${axis}=${textOfValue(written)}`;
     // Not optional, unlike its neighbour: this runs from one call site, which
     // always has somewhere to report to. A guard here would be a branch no test
     // can reach.
@@ -334,7 +331,7 @@ export function extractPositionFromOptions(obj, parseWarnings, level = 3) {
     if (!Number.isFinite(value)) {
       delete obj.options[axis];
       // A bare key is stored as `true`, so name it the way it was written.
-      const source = written === true ? axis : `${axis}=${written}`;
+      const source = written === true ? axis : `${axis}=${textOfValue(written)}`;
       parseWarnings?.push({
         code: WARNING_CODES.MALFORMED_COORDINATES,
         message: `Malformed position "${source}"; the option is ignored.`,
@@ -390,9 +387,7 @@ export function resolveKerning(glyphObj, marker, bracketEntries, parseWarnings) 
   if (!options) return;
 
   const numeric = (entry) => {
-    const value = typeof entry.value === 'boolean' || entry.value === ''
-      ? NaN
-      : Number(entry.value);
+    const value = writtenNumber(entry.value);
     if (!Number.isFinite(value)) {
       parseWarnings.push({
         code: WARNING_CODES.MALFORMED_KERNING_VALUE,
