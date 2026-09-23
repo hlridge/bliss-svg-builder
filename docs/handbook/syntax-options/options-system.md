@@ -81,10 +81,12 @@ A value that *is* text but wrong for the option is kept instead, because you can
 const builder = new BlissSVGBuilder('B313', { color: null, crop: 'nope' });
 
 builder.warnings.length;   // 2, one for each
-builder.toString();        // '[crop=nope]||B313' — the null is gone, the typo is kept
+builder.toString();        // '[crop=nope]||B313': the null is gone, the typo is kept
 ```
 
 Both draw the same picture as `B313` on its own, and reloading that saved string reports the typo again.
+
+A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). Two options are left alone whatever they hold. A switch (`grid`, `center`, `errorPlaceholder`) is on only when it is exactly `true`, so any other value already means off. And `key`, which names an element, reaches neither the picture nor the saved text.
 
 ## Scope Levels
 

@@ -97,7 +97,10 @@ And it covers an `x`/`y` written beside an element in a composition object, whic
 { codeName: 'C8', x: '3' }     //  placed at 3, no warning
 { codeName: 'C8', x: 'abc' }   //  warns "x=abc", renders C8 unmoved
 { codeName: 'C8', x: true }    //  warns "x=true": a switch is not a position
+{ codeName: 'C8', x: null }    //  warns "x=null": nothing was written, not a 0
 ```
+
+Only a number or text that spells one is read as a coordinate, the same rule the numeric options follow. A `null`, a list such as `[5]`, or blank text is refused rather than read as the number JavaScript would make of it, because a position of 0 is not the same as no position: it places the element at its own origin.
 
 ### `MALFORMED_KERNING_VALUE`
 
@@ -106,6 +109,8 @@ An `RK:`/`AK:` kerning marker carrying a value the marker cannot read as a numbe
 ```
 B313/RK:x/B431         →  renders both characters, default spacing
 ```
+
+The same code covers a kerning option given something that is not a number, including a `null` or a list handed over from JavaScript.
 
 ## Values Out of Range
 
