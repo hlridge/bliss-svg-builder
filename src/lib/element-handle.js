@@ -140,6 +140,13 @@ export class ElementHandle {
     return this.#level;
   }
 
+  // This handle's level in the words an options report prints, the same words
+  // the parser uses for where a bracket was written. A part inside a part is
+  // still a part.
+  get #scopeLevel() {
+    return this.#level === 1 ? 'group' : this.#level === 2 ? 'character' : 'part';
+  }
+
   get isGroup() {
     return this.#level === 1;
   }
@@ -445,7 +452,9 @@ export class ElementHandle {
 
   // Apply defaults/overrides merge to a node's options.
   // Accepts { defaults, overrides } or flat options (treated as overrides).
-  #applyDefaultsOverrides(node, opts) {
+  // `level` is the node's, which is not always this handle's: a word handle's
+  // addGlyph writes a character's options.
+  #applyDefaultsOverrides(node, opts, level) {
     if (!opts) return;
     let defaults, overrides;
     if ('defaults' in opts || 'overrides' in opts) {
@@ -454,8 +463,9 @@ export class ElementHandle {
       overrides = opts;
     }
     if (!defaults && !overrides) return;
-    const rawDefaults = defaults ? this.#ctx.toRaw(defaults) : {};
-    const rawOverrides = overrides ? this.#ctx.toRaw(overrides) : {};
+    const scope = { level, notation: 'setter' };
+    const rawDefaults = defaults ? this.#ctx.toRaw(defaults, scope) : {};
+    const rawOverrides = overrides ? this.#ctx.toRaw(overrides, scope) : {};
     // A position or a kerning value set here REPLACES the one the element
     // carries, so the channels this call fills are cleared before the merge:
     // the leftovers are what an earlier call promoted, not a second value the
@@ -572,7 +582,7 @@ export class ElementHandle {
     assertOptsArg('insertGlyph', opts);
     if (!Number.isInteger(index)) return this;
     const newGlyph = this.#parseGlyphArg(code);
-    this.#applyDefaultsOverrides(newGlyph, opts);
+    this.#applyDefaultsOverrides(newGlyph, opts, 'character');
     if (!group.glyphs) group.glyphs = [];
     group.glyphs.splice(index, 0, newGlyph);
     this.#ctx.rebuild();
@@ -598,7 +608,7 @@ export class ElementHandle {
     assertCodeArg(method, code);
     assertOptsArg(method, opts);
     const newPart = this.#parsePartArg(code);
-    this.#applyDefaultsOverrides(newPart, opts);
+    this.#applyDefaultsOverrides(newPart, opts, 'part');
     group.glyphs = [{ parts: [newPart] }];
     this.#ctx.rebuild();
     this.#syncGeneration();
@@ -662,7 +672,7 @@ export class ElementHandle {
     assertOptsArg('insertPart', opts);
     if (!Number.isInteger(index)) return this;
     const newPart = this.#parsePartArg(code);
-    this.#applyDefaultsOverrides(newPart, opts);
+    this.#applyDefaultsOverrides(newPart, opts, 'part');
     if (!glyph.parts) glyph.parts = [];
     glyph.parts.splice(index, 0, newPart);
     this.#clearGlyphIdentity(glyph);
@@ -853,7 +863,7 @@ export class ElementHandle {
     if (index < 0) index = group.glyphs.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= group.glyphs.length) return this;
     const newGlyph = this.#parseGlyphArg(code);
-    this.#applyDefaultsOverrides(newGlyph, opts);
+    this.#applyDefaultsOverrides(newGlyph, opts, 'character');
     group.glyphs[index] = newGlyph;
     this.#ctx.rebuild();
     this.#syncGeneration();
@@ -873,7 +883,7 @@ export class ElementHandle {
     if (index < 0) index = glyph.parts.length + index;
     if (!Number.isInteger(index) || index < 0 || index >= glyph.parts.length) return this;
     const newPart = this.#parsePartArg(code);
-    this.#applyDefaultsOverrides(newPart, opts);
+    this.#applyDefaultsOverrides(newPart, opts, 'part');
     glyph.parts[index] = newPart;
     this.#clearGlyphIdentity(glyph);
     this.#ctx.rebuild();
@@ -896,7 +906,7 @@ export class ElementHandle {
       const glyphIndex = group.glyphs.indexOf(this.#nodeRef);
       if (glyphIndex < 0) return this;
       const newGlyph = this.#parseGlyphArg(code);
-      this.#applyDefaultsOverrides(newGlyph, opts);
+      this.#applyDefaultsOverrides(newGlyph, opts, 'character');
       group.glyphs[glyphIndex] = newGlyph;
       this.#nodeRef = newGlyph;
       this.#ctx.rebuild();
@@ -912,7 +922,7 @@ export class ElementHandle {
       const partIndex = glyph.parts.indexOf(this.#nodeRef);
       if (partIndex < 0) return this;
       const newPart = this.#parsePartArg(code);
-      this.#applyDefaultsOverrides(newPart, opts);
+      this.#applyDefaultsOverrides(newPart, opts, 'part');
       glyph.parts[partIndex] = newPart;
       this.#clearGlyphIdentity(glyph);
       this.#nodeRef = newPart;
@@ -1458,7 +1468,7 @@ export class ElementHandle {
     const node = this.#nodeRef;
     if (!node) return this;
     assertOptsArg('setOptions', opts);
-    this.#applyDefaultsOverrides(node, opts);
+    this.#applyDefaultsOverrides(node, opts, this.#scopeLevel);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
@@ -1527,7 +1537,7 @@ export class ElementHandle {
     const node = this.#nodeRef;
     if (!node) return this;
     assertOptsArg('setTransientOptions', opts);
-    const raw = this.#ctx.toRaw(opts ?? {});
+    const raw = this.#ctx.toRaw(opts ?? {}, { level: this.#scopeLevel, notation: 'setter', transient: true });
     node.transientOptions = { ...(node.transientOptions ?? {}), ...raw };
     this.#ctx.rebuild();
     this.#syncGeneration();

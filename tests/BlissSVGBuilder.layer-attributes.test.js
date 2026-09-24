@@ -154,13 +154,15 @@ describe('BlissSVGBuilder layer attributes', () => {
       expect(builder.toString()).toContain('fill=red');
     });
 
-    it('emits no attribute from object input either, which warns nothing', () => {
+    it('emits no attribute from object input either, and reports it there too', () => {
       const builder = new BlissSVGBuilder({
         groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }], options: { 'grid--opacity': 0.3 } }] }],
       });
 
       expect(builder.svgCode).not.toContain('grid--opacity');
-      expect(builder.warnings.some(w => w.code === 'MISPLACED_LAYER_OPTION')).toBe(false);
+      // regression: object input used to drop this key in silence while the
+      // same key in a bracket was reported
+      expect(builder.warnings.map(w => w.code)).toEqual(['MISPLACED_LAYER_OPTION']);
     });
 
     it('leaves element-scope pass-through untouched', () => {

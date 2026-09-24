@@ -6,8 +6,8 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries, KERNING_OPTION_KEYS } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
+import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -783,6 +783,7 @@ class BlissSVGBuilder {
     if (typeof input !== 'string') {
       BlissSVGBuilder.#admitAuthoredBags(
         blissObj,
+        'global',
         (warning) => (blissObj._parseWarnings ??= []).push(warning),
       );
     }
@@ -847,8 +848,9 @@ class BlissSVGBuilder {
       // its own: one option written once in `defaults` and once in `overrides`
       // is a layering, not a collision.
       const optionWarn = (warning) => (blissObj._parseWarnings ??= []).push(warning);
-      const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn) : {};
-      const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn) : {};
+      const scope = { level: 'global', notation: 'setter' };
+      const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn, scope) : {};
+      const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn, scope) : {};
       blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
     }
 
@@ -869,7 +871,7 @@ class BlissSVGBuilder {
         BlissSVGBuilder.#flagWordParts(parsed);
         return parsed;
       },
-      toRaw: (obj) => BlissSVGBuilder.#toRaw(obj, (warning) => this.#mutationWarnings.push(warning)),
+      toRaw: (obj, scope) => BlissSVGBuilder.#toRaw(obj, (warning) => this.#mutationWarnings.push(warning), scope),
       clearStalePositioning: (node, ...incoming) =>
         BlissSVGBuilder.#clearStalePositioning(node, ...incoming),
       isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
@@ -918,12 +920,18 @@ class BlissSVGBuilder {
   // its own bag, so a composition object is the only way an unadmitted key
   // reaches that channel, and it merges into the node's options before the
   // options pass runs.
-  static #admitAuthoredBags(node, warn) {
-    for (const bag of ['options', 'transientOptions']) {
-      if (node[bag]) node[bag] = BlissSVGBuilder.#admitAuthoredBag(node[bag], warn);
+  //
+  // The level each bag is judged at comes from the array its node was found
+  // in, the way a bracket's comes from where it was written. A part's own
+  // `parts` are parts too, at any depth.
+  static #admitAuthoredBags(node, level, warn) {
+    for (const [bag, transient] of [['options', false], ['transientOptions', true]]) {
+      if (node[bag]) {
+        node[bag] = BlissSVGBuilder.#admitAuthoredBag(node[bag], warn, { level, notation: 'object', transient });
+      }
     }
-    for (const level of ['groups', 'glyphs', 'parts']) {
-      for (const child of node[level] ?? []) BlissSVGBuilder.#admitAuthoredBags(child, warn);
+    for (const [children, childLevel] of [['groups', 'group'], ['glyphs', 'character'], ['parts', 'part']]) {
+      for (const child of node[children] ?? []) BlissSVGBuilder.#admitAuthoredBags(child, childLevel, warn);
     }
   }
 
@@ -949,9 +957,9 @@ class BlissSVGBuilder {
   // Measured, resolving it costs nothing, because the kerning resolver reads
   // either spelling and the name is promoted back on the way out, so a round
   // trip is byte-identical and `toJSON()` deep-equal either way.
-  static #admitAuthoredBag(bag, warn) {
+  static #admitAuthoredBag(bag, warn, scope) {
     const admitted = {};
-    for (const [key, value] of admitOptions(Object.entries(bag), warn)) admitted[key] = value;
+    for (const [key, value] of admitOptions(Object.entries(bag), warn, scope)) admitted[key] = value;
     return admitted;
   }
 
@@ -974,9 +982,13 @@ class BlissSVGBuilder {
   // a switch, which is off for any value but `true`; the element key, which
   // reaches neither the picture nor the saved text; and a key whose NAME a later
   // pass refuses.
-  static #toRaw(obj, warn) {
+  //
+  // `scope` is where the caller is writing, which only the caller knows: the
+  // document for the options argument, the new or the addressed element for
+  // the setters, and the transient channel for `setTransientOptions`.
+  static #toRaw(obj, warn, scope) {
     const raw = {};
-    for (const [key, value] of admitOptions(Object.entries(obj), warn)) {
+    for (const [key, value] of admitOptions(Object.entries(obj), warn, scope)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;
       // Two internal names have no kebab twin for isNamedOptionKey to find, so
@@ -989,11 +1001,18 @@ class BlissSVGBuilder {
       // The truthiness test is not decoration: both are boolean switches, so
       // translating unconditionally would turn `{ autoVertical: false }` INTO
       // the crop it asks not to have.
+      //
+      // The option a shorthand stands for goes through the stage in its own
+      // right, because the stage only saw the shorthand's name, which is bound
+      // to no scope. `crop` is: without this, `autoVertical` set on a character
+      // became a `crop` that was kept, saved, and reported only on reload.
       const internalOnly = INTERNAL_ONLY_SPELLINGS.get(key);
       if (internalOnly) {
         if (value) {
           const [optionKey, optionValue] = internalOnly.split('=');
-          raw[optionKey] = optionValue;
+          for (const [admittedKey, admittedValue] of admitOptions([[optionKey, optionValue]], warn, scope)) {
+            raw[admittedKey] = admittedValue;
+          }
         }
         continue;
       }
@@ -2498,8 +2517,9 @@ class BlissSVGBuilder {
       const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
       if (defaults || overrides) {
         const optionWarn = (warning) => this.#mutationWarnings.push(warning);
-        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn) : {};
-        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn) : {};
+        const scope = { level: 'group', notation: 'setter' };
+        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn, scope) : {};
+        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn, scope) : {};
         const merged = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
         // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
         // options:{} onto the group, which would be toJSON noise.
@@ -2614,7 +2634,11 @@ class BlissSVGBuilder {
     // #toRaw kebab-cases the keys and stringifies the values, matching how an
     // option written in a bracket arrives, and dropping object values that
     // structuredClone could not carry across a rebuild.
-    const raw = BlissSVGBuilder.#toRaw(opts ?? {}, (warning) => this.#mutationWarnings.push(warning));
+    const raw = BlissSVGBuilder.#toRaw(
+      opts ?? {},
+      (warning) => this.#mutationWarnings.push(warning),
+      { level: 'global', notation: 'setter', transient: true },
+    );
     this.#rawBlissObj.transientOptions = { ...(this.#rawBlissObj.transientOptions ?? {}), ...raw };
     this.#rebuild();
     return this;

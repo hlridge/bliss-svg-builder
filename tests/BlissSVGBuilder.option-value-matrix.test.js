@@ -62,13 +62,11 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
  *   because the options argument drops them before any gate exists while a
  *   composition object refuses them, and that split is pinned as deliberate in
  *   `BlissSVGBuilder.option-value-gate.test.js`.
- * - A global-only key written at element scope. A REFUSED value is reported
- *   there like anywhere else, which is why the rows below can be written at
- *   all; but a LEGAL one is silently kept and re-emitted on the mutation
- *   surfaces, where a bracket reports `MISPLACED_GLOBAL_OPTION`. That
- *   divergence belongs to the scope gate rather than to this one, and it is
- *   why the element-scope rows are scoped to the five keys every element
- *   surface accepts.
+ * - A global-only key written at element scope. Every surface refuses it for
+ *   its scope before its value is judged, see
+ *   `BlissSVGBuilder.option-scope-admission.test.js`, which is why the
+ *   element-scope rows are scoped to the five keys every element surface
+ *   accepts.
  */
 
 // A composition each key demonstrably acts on, plus whatever else has to be

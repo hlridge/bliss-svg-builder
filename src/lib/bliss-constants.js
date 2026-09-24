@@ -301,6 +301,18 @@ const kebabToCamel = (str) => str.replace(/-(.)/g, (_, letter) => letter.toUpper
 // a different reason: keeping them out of the emitted markup.)
 const KERNING_OPTION_SPELLINGS = new Set(['relative-kerning', 'absolute-kerning']);
 
+// The long-form option spellings of the two kerning markers, mapped to the one
+// numeric key the layout reads. Kebab is what a writer puts in a bracket, camel
+// is what the API and a definition's `defaultOptions` use; both mean the same
+// value, so both resolve here rather than at each consumer. Exported so no site
+// re-derives the set.
+export const KERNING_OPTION_KEYS = Object.freeze({
+  'relative-kerning': 'relativeKerning',
+  relativeKerning: 'relativeKerning',
+  'absolute-kerning': 'absoluteKerning',
+  absoluteKerning: 'absoluteKerning',
+});
+
 /**
  * True when a key belongs to the curated option vocabulary, in either spelling.
  *
@@ -1227,6 +1239,119 @@ const judgeGeometryOptionValue = (key, value) => {
 };
 
 /**
+ * Some option keys mean something at exactly ONE scope. Written anywhere else
+ * they are dropped with a warning rather than left in place, because an option
+ * the library does not recognize AT THAT SCOPE falls through to the SVG
+ * attribute pass-through (what `[data-*]` options are for), so a silent drop
+ * would make a real option and a pass-through attribute look identical in the
+ * source and behave differently with nothing said.
+ *
+ * One row per bound key set. A future key with a home scope of its own needs a
+ * row and a warning code, not new machinery. `text` has no row: it is an
+ * unimplemented stub at every level, so it is misplaced nowhere.
+ *
+ * Each report is two sentences. The first says what is wrong and is the same on
+ * every route. The second says where the key belongs, and it is written in the
+ * notation the author was using, since a bracket to paste is no help to someone
+ * writing a JavaScript object.
+ */
+const SCOPE_BOUND_OPTIONS = [
+  {
+    home: 'global',
+    has: (key) => GLOBAL_ONLY_OPTION_KEYS.has(key),
+    code: WARNING_CODES.MISPLACED_GLOBAL_OPTION,
+    diagnosis: (written, level) => `Global option (${written}) ignored at ${level} level: it configures the whole SVG.`,
+    fix: (written, scope) => `${documentHome(written, scope)} to apply it globally.`,
+  },
+  {
+    home: 'character',
+    has: (key) => Object.hasOwn(KERNING_OPTION_KEYS, key),
+    code: WARNING_CODES.MISPLACED_KERNING_OPTION,
+    diagnosis: (written, level) => `Kerning option (${written}) ignored at ${level} level: kerning is the gap before a character.`,
+    // The RK:/AK: markers are code-string syntax, so only a bracket is offered them.
+    fix: (_written, { notation }) => (notation === 'bracket'
+      ? 'Write it on the character, or use the RK:/AK: marker before it.'
+      : "Set it on the character's options."),
+  },
+  {
+    home: 'global',
+    has: (key) => isLayerAttributeKey(key),
+    code: WARNING_CODES.MISPLACED_LAYER_OPTION,
+    diagnosis: (written, level) => `Layer option (${written}) ignored at ${level} level: it names a layer of the whole SVG.`,
+    fix: (written, scope) =>
+      `${documentHome(written, scope)} to apply it, or write the attribute without a layer prefix to put it on this element.`,
+  },
+];
+
+// Where a key that acts on the whole SVG goes, in the author's own notation, as
+// the start of the sentence that sends it there. A transient key goes to the
+// transient channel's own top level, which is what keeps it transient.
+const documentHome = (written, { notation, transient = false }) => {
+  if (notation === 'bracket') return `Use [${written}]||`;
+  if (notation === 'object') return `Put it in the composition's top-level ${transient ? 'transientOptions' : 'options'}`;
+  return transient ? 'Pass it to builder.setTransientOptions()' : "Pass it in the builder's options";
+};
+
+/**
+ * The refusal for one key written at a scope it cannot act on, or null when the
+ * key is at home there or bound to no scope at all.
+ *
+ * The one judge of scope, whatever route the key arrived through, and asked only
+ * by `admitOptions`: a DSL bracket and a JavaScript bag both reach it inside the
+ * stage, in the same order against the same neighbours. One table read by one
+ * function in one place is what keeps a key misplaced in a bracket and the same
+ * key misplaced in an object from being reported differently, or one of them
+ * not at all.
+ *
+ * `level` is the parser's vocabulary (`'global'`, `'group'`, `'character'`,
+ * `'part'`) because the message prints it. `notation` is how the author wrote
+ * the bag: `'bracket'` for the DSL, `'object'` for a composition object, and
+ * `'setter'` for any options argument of a JavaScript call (the constructor's,
+ * the handle setters', and the `opts` of the adding and replacing methods).
+ * Only the second sentence of a report depends on it. `transient` marks a
+ * transient bag, where a key the transient channel refuses outright is left to
+ * that refusal: it refuses kerning at every level, so telling the author to
+ * move a transient kerning value onto a character would only send them to the
+ * second refusal.
+ *
+ * The report names the key as stored, and the value is written through
+ * `textOfValue`, so building a report cannot throw on a value with no text form.
+ *
+ * @param {string} key - the stored (canonical) option name
+ * @param {unknown} value - the value as written
+ * @param {OptionScope} scope
+ * @returns {{code: string, message: string, source: string} | null}
+ */
+const scopeRefusal = (key, value, scope) => {
+  if (scope.transient && TRANSIENT_REFUSED_OPTION_KEYS.has(key)) return null;
+  const rule = SCOPE_BOUND_OPTIONS.find((r) => r.home !== scope.level && r.has(key));
+  if (!rule) return null;
+  const written = value === true ? key : `${key}=${textOfValue(value)}`;
+  return {
+    code: rule.code,
+    message: `${rule.diagnosis(written, scope.level)} ${rule.fix(written, scope)}`,
+    source: written,
+  };
+};
+
+/**
+ * @typedef {object} OptionScope
+ * @property {'global' | 'group' | 'character' | 'part'} level - where the bag is being written
+ * @property {'bracket' | 'object' | 'setter'} notation - how the author wrote it
+ * @property {boolean} [transient] - a transient bag
+ */
+
+/**
+ * True when a report is one the scope judge wrote. For a caller that inspects a
+ * bracket rather than ingesting it, and has to know whether the stage dropped a
+ * key for its scope without re-deriving which keys are bound to one.
+ *
+ * @param {{code: string}} warning
+ * @returns {boolean}
+ */
+export const isScopeRefusal = (warning) => SCOPE_BOUND_OPTIONS.some((r) => r.code === warning.code);
+
+/**
  * The one stage an options bag passes through on its way INTO a composition:
  * the name is resolved, the value is judged, and what comes back is what the
  * composition will hold.
@@ -1256,16 +1381,28 @@ const judgeGeometryOptionValue = (key, value) => {
  * (`parsePartString`) reads a DSL bracket, where values are always text and
  * nothing is ever refused.
  *
+ * Given the `scope` the bag is being written at, the stage also refuses a key
+ * that cannot act there (`scopeRefusal`), and it asks that FIRST: where a key
+ * cannot act, fixing its value would achieve nothing, so `{marginTop: null}` on
+ * a character is reported once, as misplaced. A key refused for its scope is
+ * never noted as a spelling either, for the same reason a refused value is not.
+ * Without a scope nothing is judged for scope. That is the definition route: a
+ * definition's defaults have a stricter guard that refuses the same keys as an
+ * error, and expanding a definition's code string reads its brackets with no
+ * warnings channel to report to.
+ *
  * @param {Iterable<[string, unknown]>} writtenEntries - keys as written, with their values
  * @param {(warning: object) => void} [warn] - where to send a refusal
+ * @param {OptionScope} [scope] - where the bag is being written, and how
  * @returns {Array<[string, unknown]>} the admitted entries, keys resolved
  */
-export const admitOptions = (writtenEntries, warn) => {
+export const admitOptions = (writtenEntries, warn, scope) => {
   const admitted = [];
   const noteSpelling = warn ? optionSpellingWatcher(warn) : () => {};
   for (const [writtenKey, value] of writtenEntries) {
     const key = canonicalOptionKey(writtenKey);
-    const refusal = admissionRefusal(key, value);
+    const refusal = (scope ? scopeRefusal(key, value, scope) : null)
+      ?? admissionRefusal(key, value);
     if (refusal) {
       warn?.(refusal);
       continue;

@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { GLOBAL_ONLY_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isLayerAttributeKey, serializeOptionValue, textOfValue, writtenNumber } from "./bliss-constants.js";
+import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, serializeOptionValue, textOfValue, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -229,18 +229,6 @@ export function processXCodes(codeString) {
 
   return result.join('/');
 }
-
-// The long-form option spellings of the two kerning markers, mapped to the one
-// numeric key the layout reads. Kebab is what a writer puts in a bracket, camel
-// is what the API and a definition's `defaultOptions` use; both mean the same
-// value, so both resolve here rather than at each consumer. Exported so no site
-// re-derives the set (the same one-place rule the X-run grammar follows).
-export const KERNING_OPTION_KEYS = Object.freeze({
-  'relative-kerning': 'relativeKerning',
-  relativeKerning: 'relativeKerning',
-  'absolute-kerning': 'absoluteKerning',
-  absoluteKerning: 'absoluteKerning',
-});
 
 // The kerning values an options object carries, in the order they were written,
 // each tagged with the numeric key it resolves to and how to name it in a
@@ -484,8 +472,9 @@ export class BlissParser {
   // `warn` is optional because the entry points are not uniform: `parse` keeps
   // a warnings array, and `parsePartString` is a public static that returns a
   // part object and has no warnings route of its own. The silent default
-  // matches that entry point rather than hiding a hole.
-  static #parseOptions(optionsString, warn) {
+  // matches that entry point rather than hiding a hole. `scope` is the level
+  // the bracket was written at, given by every site that has one.
+  static #parseOptions(optionsString, warn, scope) {
     if (!optionsString) return;
 
     const bracketMatch = optionsString.match(BRACKET_EXTRACT_PATTERN);
@@ -523,13 +512,15 @@ export class BlissParser {
 
     // Admitted HERE, where a bracket first becomes an options bag, so every
     // gate, emitter and serializer downstream sees one spelling of a name the
-    // library or a standard owns and none of them learns a rule. The scope
-    // gates read the bag this builds, which is what satisfies "canonicalize
-    // before the gates" by construction rather than by ordering discipline;
-    // the part path reaches this method without passing any gate at all.
+    // library or a standard owns and none of them learns a rule. The stage
+    // resolves each name before it judges the key's scope, which is what
+    // satisfies "canonicalize before the gates" by construction rather than by
+    // ordering discipline.
     //
-    // The same stage every other entry point runs, though a bracket can only
-    // ever produce a string or the `true` of a bare key, so its value arm never
+    // The same stage every other entry point runs, scope included, so a key
+    // misplaced in a bracket is reported exactly as the same key misplaced in
+    // an object is, next to the same neighbours. A bracket can only ever
+    // produce a string or the `true` of a bare key, so the value arm never
     // refuses anything here. It runs anyway, because that is what makes the
     // routes unable to drift apart rather than merely agreeing today.
     //
@@ -537,15 +528,16 @@ export class BlissParser {
     // `__proto__`, and on a plain object that assignment would be swallowed
     // instead of stored.
     const parsedObject = Object.create(null);
-    for (const [key, value] of admitOptions(written, warn)) parsedObject[key] = value;
+    for (const [key, value] of admitOptions(written, warn, scope)) parsedObject[key] = value;
 
     return parsedObject;
   }
 
-  // `warn` is passed by the parse path, which has a warnings array, and omitted
-  // by a definition expansion, which has none. A part bracket reports its
-  // option spellings on the first route and stays silent on the second.
-  static parsePartString(str, restoreFunction = (s) => s, warn) {
+  // `warn` and `scope` are passed by the parse path, which has a warnings array
+  // and knows the bracket sits on a part, and omitted by a definition
+  // expansion, which has neither. A part bracket reports its option spellings
+  // and misplaced keys on the first route and stays silent on the second.
+  static parsePartString(str, restoreFunction = (s) => s, warn, scope) {
     const part = {};
 
     let optionsString, codeString;
@@ -553,7 +545,7 @@ export class BlissParser {
     if (match) {
       optionsString = match[1];
       codeString = match[2];
-      part.options = this.#parseOptions(restoreFunction(optionsString), warn);
+      part.options = this.#parseOptions(restoreFunction(optionsString), warn, scope);
     } else {
       codeString = str;
     }
@@ -657,61 +649,10 @@ export class BlissParser {
       });
     };
 
-    // Builder-canvas option keys configure the whole SVG, so they are valid
-    // only in the global [opts]|| bracket. At group/character/part level they
-    // are inert but used to serialize + round-trip silently (audit N-2): warn
-    // per key and drop it, keeping the bracket's other options. Returns the
-    // mutated object, or undefined when every key was dropped, so call sites
-    // store "no options" instead of an empty artifact. `text` is exempt via
-    // the curated set (an unimplemented stub at EVERY level, not misplaced).
-    // Some option keys mean something at exactly ONE scope. Written anywhere
-    // else they are dropped with a warning rather than left in place, because
-    // an option the library does not recognize AT THAT SCOPE falls through to
-    // the SVG attribute pass-through (what `[data-*]` options are for), so a
-    // silent drop would make a real option and a pass-through attribute look
-    // identical in the source and behave differently with nothing said.
-    //
-    // One row per bound key set. A future key with a home scope of its own
-    // needs a row and a warning code, not new machinery.
-    const SCOPE_BOUND_OPTIONS = [
-      {
-        home: 'global',
-        has: (key) => GLOBAL_ONLY_OPTION_KEYS.has(key),
-        code: WARNING_CODES.MISPLACED_GLOBAL_OPTION,
-        message: (written, levelName) =>
-          `Global option (${written}) ignored at ${levelName} level: it configures the whole SVG. Use [${written}]|| to apply it globally.`,
-      },
-      {
-        home: 'character',
-        has: (key) => Object.hasOwn(KERNING_OPTION_KEYS, key),
-        code: WARNING_CODES.MISPLACED_KERNING_OPTION,
-        message: (written, levelName) =>
-          `Kerning option (${written}) ignored at ${levelName} level: kerning is the gap before a character. Write it on the character, or use the RK:/AK: marker before it.`,
-      },
-      {
-        home: 'global',
-        has: (key) => isLayerAttributeKey(key),
-        code: WARNING_CODES.MISPLACED_LAYER_OPTION,
-        message: (written, levelName) =>
-          `Layer option (${written}) ignored at ${levelName} level: it names a layer of the whole SVG. Use [${written}]|| to apply it, or write the attribute without a layer prefix to put it on this element.`,
-      },
-    ];
-
-    const dropMisplacedGlobalKeys = (options, levelName) => {
-      if (!options) return options;
-      for (const key of Object.keys(options)) {
-        const rule = SCOPE_BOUND_OPTIONS.find(r => r.home !== levelName && r.has(key));
-        if (!rule) continue;
-        const written = options[key] === true ? key : `${key}=${options[key]}`;
-        parseWarnings.push({
-          code: rule.code,
-          message: rule.message(written, levelName),
-          source: written,
-        });
-        delete options[key];
-      }
-      return Object.keys(options).length > 0 ? options : undefined;
-    };
+    // An options bag with nothing left in it is stored as no options at all, so
+    // a bracket the stage emptied (every key misplaced at its scope) or one
+    // written empty leaves no `{}` artifact: its toJSON matches the bare form's.
+    const nonEmpty = (options) => (options && Object.keys(options).length > 0 ? options : undefined);
 
     // Extract global options
     let [_, globalOptionsString, globalCodeString] = inputString.match(/^\s*(?:([^|]*)\s*\|\|)?(.*)$/);
@@ -728,7 +669,7 @@ export class BlissParser {
       // Gated like every other scope: a global-only key is at HOME here, but a
       // key bound to a lower scope (kerning) is as misplaced here as a global
       // key is down there.
-      result.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredGlobal, warn), 'global') || {};
+      result.options = nonEmpty(this.#parseOptions(restoredGlobal, warn, { level: 'global', notation: 'bracket' })) || {};
     } else {
       if (globalOptionsString && globalOptionsString.length > 0) {
         const restored = restorePlaceholders(globalOptionsString);
@@ -802,7 +743,7 @@ export class BlissParser {
               source: restoredBeforePipe,
             });
           }
-          group.options = dropMisplacedGlobalKeys(this.#parseOptions(restoredBeforePipe, warn), 'group');
+          group.options = nonEmpty(this.#parseOptions(restoredBeforePipe, warn, { level: 'group', notation: 'bracket' }));
           groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
@@ -1129,18 +1070,17 @@ export class BlissParser {
             const optionPrefix = current.match(OVERLAY_PART_OPTION_PATTERN);
             if (!optionPrefix) return current;
             // This pass INSPECTS the bracket rather than ingesting it: when
-            // every key survives, the written text is returned untouched and
-            // parsed again for real downstream. So its option-spelling reports
-            // are buffered and released only on the branches that REWRITE the
-            // text, which are the last place the written spellings are visible.
-            // Passing them straight through would report a collapse twice.
-            const spellingReports = [];
-            const parsed = BlissParser.#parseOptions(optionPrefix[1], (w) => spellingReports.push(w)) ?? {};
-            const keyCount = Object.keys(parsed).length;
-            const kept = dropMisplacedGlobalKeys(parsed, 'part');
-            const keptEntries = kept ? Object.entries(kept) : [];
-            if (keptEntries.length === keyCount) return current;
-            parseWarnings.push(...spellingReports);
+            // no key is misplaced, the written text is returned untouched and
+            // parsed again for real downstream. So the stage's reports are
+            // buffered and released only when a key was dropped for its scope,
+            // which is the branch that REWRITES the text and so the last place
+            // the written spellings are visible. Passing them straight through
+            // would report a collapse twice.
+            const reports = [];
+            const kept = BlissParser.#parseOptions(optionPrefix[1], (w) => reports.push(w), { level: 'part', notation: 'bracket' }) ?? {};
+            if (!reports.some(isScopeRefusal)) return current;
+            parseWarnings.push(...reports);
+            const keptEntries = Object.entries(kept);
             if (keptEntries.length === 0) return optionPrefix[3];
             return `[${keptEntries.map(([k, v]) => v === true ? k : `${k}=${serializeOptionValue(v)}`).join(';')}]>${optionPrefix[3]}`;
           });
@@ -1858,8 +1798,8 @@ export class BlissParser {
         while ((charMatch = glyphCodeString.match(/^(\[[^\[\]]*\])(?!>)(.*)/)) !== null) {
           charBracketsSeen++;
           if (charBracketsSeen === 1) {
-            const parsedOptions = dropMisplacedGlobalKeys(
-              this.#parseOptions(restorePlaceholders(charMatch[1]), warn), 'character');
+            const parsedOptions = nonEmpty(
+              this.#parseOptions(restorePlaceholders(charMatch[1]), warn, { level: 'character', notation: 'bracket' }));
             bracketKerning = kerningOptionEntries(parsedOptions);
             // Merge only when something remains: a bracket fully emptied by the
             // gate (or written empty) must not leave an options: {} artifact on
@@ -1945,11 +1885,8 @@ export class BlissParser {
               twoPartPartString = partMatch[2];
             }
             twoPartPartString = head + twoPartPartString;
-            const part = this.parsePartString(twoPartPartString, restorePlaceholders, warn);
-            if (part.options) {
-              part.options = dropMisplacedGlobalKeys(part.options, 'part');
-              if (!part.options) delete part.options;
-            }
+            const part = this.parsePartString(twoPartPartString, restorePlaceholders, warn, { level: 'part', notation: 'bracket' });
+            if (part.options && !nonEmpty(part.options)) delete part.options;
 
             // A `;`-part slot sits inside a glyph, so the glyph-boundary
             // anchored expansion pass above never sees it: without this, a

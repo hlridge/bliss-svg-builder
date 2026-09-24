@@ -208,9 +208,11 @@ describe('BlissSVGBuilder object-input options', () => {
     });
 
     it('reports once per bag that holds both spellings', () => {
+      // The inner pair is one a character can hold. It used to be `marginTop`,
+      // which is refused at character scope before any spelling is noted.
       const b = build({
         options: { strokeWidth: 1, 'stroke-width': 2 },
-        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }], options: { marginTop: 1, 'margin-top': 2 } }] }],
+        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }], options: { strokeWidth: 1, 'stroke-width': 2 } }] }],
       });
       expect(codes(b)).toEqual(['MULTIPLE_OPTION_SPELLINGS', 'MULTIPLE_OPTION_SPELLINGS']);
     });

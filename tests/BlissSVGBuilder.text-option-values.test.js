@@ -298,26 +298,33 @@ describe('BlissSVGBuilder text option values', () => {
       ['the spelling a bracket carries', 'relative-kerning'],
       ['the spelling JavaScript uses', 'absoluteKerning'],
     ])('refuses a value with no text form in %s, at a scope no kerning gate reads', (_spelling, key) => {
-      // The row that can tell the exemption from its absence. At document scope
-      // there is nothing for kerning to sit between, so the kerning gate never
-      // runs and the key reaches the options pass carrying whatever was written.
-      // Both spellings, because ingest resolves the camel one to the kebab one
-      // and an exemption written in terms of the promoted spelling alone misses
-      // every key that arrived through a composition object.
+      // At document scope there is nothing for kerning to sit between, so the
+      // key is refused for its scope before its value is judged at all, as any
+      // kerning option there is, whatever it holds. The claim this row must
+      // keep is that whatever is reported is NOT `INVALID_OPTION_VALUE`. Both
+      // spellings, because ingest resolves the camel one to the kebab one.
       //
-      // Silence here matches what a VALID value does at the same scope, which
-      // is also silent: whether an out-of-scope kerning option should be
-      // reported at all is the kerning gate's question, not this gate's.
-      //
-      // A value with no text form is refused on the way in wherever it is
-      // written, so it is reported here too, in the kerning gate's own words.
-      // The claim this row must keep is that whatever is reported is NOT
-      // `INVALID_OPTION_VALUE`. (Whether an out-of-scope kerning option with a
-      // usable value should be reported is still the kerning gate's question,
-      // filed in `backlog.md` beside the target-prefixed-key row.)
+      // It used to be the row that told the exemption from its absence. The
+      // scope refusal now answers first here, so that job moved to the
+      // character-scope row below, where the key is at home and its value is
+      // the thing judged.
       const b = build(atDocument({ [key]: { a: 1 } }));
-      expect(codes(b)).toEqual(['MALFORMED_KERNING_VALUE']);
+      expect(codes(b)).toEqual(['MISPLACED_KERNING_OPTION']);
       expect(b.svgCode).toBe(unwritten());
+    });
+
+    it.each([
+      ['the spelling a bracket carries', 'relative-kerning'],
+      ['the spelling JavaScript uses', 'absoluteKerning'],
+    ])('refuses a value with no text form in %s, in the kerning gate\'s own words, where kerning is at home', (_spelling, key) => {
+      // The row that can tell the exemption from its absence: without it this
+      // gate would claim the key and report `INVALID_OPTION_VALUE`. Both
+      // spellings, because an exemption written in terms of the promoted
+      // spelling alone misses every key that arrived through a composition
+      // object.
+      const b = build(atCharacter({ [key]: { a: 1 } }));
+      expect(codes(b)).toEqual(['MALFORMED_KERNING_VALUE']);
+      expect(b.svgCode).toBe(build(atCharacter({})).svgCode);
     });
   });
 

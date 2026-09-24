@@ -204,11 +204,11 @@ describe('BlissSVGBuilder option spelling', () => {
       ['when the gate keeps every key', 'B291;;[strokeWidth=1;stroke-width=2]>B81',
         ['MULTIPLE_OPTION_SPELLINGS'], 'strokeWidth=1'],
       // Here the gate rewrites the bracket, so this is the last place the
-      // written spellings exist and the report has to come from the gate.
+      // written spellings exist and the report has to come from the gate. The
+      // reports come in the order the keys were written, as they do for the
+      // same bracket on a plain part.
       ['when the gate drops one key', 'B291;;[strokeWidth=1;stroke-width=2;margin=1]>B81',
-        ['MISPLACED_GLOBAL_OPTION', 'MULTIPLE_OPTION_SPELLINGS'], 'strokeWidth=1'],
-      ['when the gate empties the bracket', 'B291;;[marginTop=1;margin-top=2]>B81',
-        ['MISPLACED_GLOBAL_OPTION', 'MULTIPLE_OPTION_SPELLINGS'], 'marginTop=1'],
+        ['MULTIPLE_OPTION_SPELLINGS', 'MISPLACED_GLOBAL_OPTION'], 'strokeWidth=1'],
       // Counting the report is not enough, and a mutation pass proved it: with
       // only a length check, corrupting the released warning's `source`, its
       // `message`, or the scope this gate judges keys at all pass the whole
@@ -221,6 +221,27 @@ describe('BlissSVGBuilder option spelling', () => {
       expect(spellings[0].source).toBe(displaced);
       expect(spellings[0].message).toContain(`"${displaced}"`);
       expect(codes(b)).toEqual(expectedCodes);
+    });
+
+    it('stores a word-indicator bracket verbatim when its keys only collide', () => {
+      // pins the gate's rewrite condition: only a key dropped for its scope
+      // rewrites the stored text; hand-applied mutants that rewrote on any
+      // report, or on any but a scope report, passed the suite without this.
+      const b = render('B291;;[strokeWidth=1;stroke-width=2]>B81');
+      expect(b.toString()).toBe('B291;;[strokeWidth=1;stroke-width=2]>B81');
+    });
+
+    it('reports each misplaced spelling and no collision, when the gate empties the bracket', () => {
+      // Scope is judged before the spelling is noted, so a key that cannot act
+      // here is never named as displacing another: both spellings are reported
+      // as misplaced, in the words the same bracket gets on a plain part.
+      const b = render('B291;;[marginTop=1;margin-top=2]>B81');
+      expect(b.warnings.map((w) => [w.code, w.source])).toEqual([
+        ['MISPLACED_GLOBAL_OPTION', 'margin-top=1'],
+        ['MISPLACED_GLOBAL_OPTION', 'margin-top=2'],
+      ]);
+      expect(b.warnings).toEqual(render('B291;[marginTop=1;margin-top=2]>B81').warnings);
+      expect(b.toString()).toBe('B291;;B81');
     });
 
     it('judges the overlay bracket at PART scope, not the scope above it', () => {
@@ -296,16 +317,18 @@ describe('BlissSVGBuilder option spelling', () => {
     // watcher and a sink dropped from one of them reads as covered. The three
     // sinks are the handle route (`mutationCtx.toRaw`, shared by every handle
     // opts method), the builder's transient channel, and the group builder.
+    // Each pair is one its scope can hold: a canvas key below the document is
+    // refused for its scope before any spelling is noted.
     it.each([
-      ['a handle setter', (b) => b.glyph(0).setOptions({ marginTop: 3, 'margin-top': 4 })],
-      ['the transient channel', (b) => b.setTransientOptions({ marginTop: 3, 'margin-top': 4 })],
-      ['a new group', (b) => b.addGroup('B4', { marginTop: 3, 'margin-top': 4 })],
-      ['a new character', (b) => b.addGlyph('B4', { marginTop: 3, 'margin-top': 4 })],
-    ])('reports the displaced spelling from %s', (_where, mutate) => {
+      ['a handle setter', (b) => b.glyph(0).setOptions({ strokeWidth: 0.3, 'stroke-width': 0.4 }), 'strokeWidth=0.3'],
+      ['the transient channel', (b) => b.setTransientOptions({ marginTop: 3, 'margin-top': 4 }), 'marginTop=3'],
+      ['a new group', (b) => b.addGroup('B4', { strokeWidth: 0.3, 'stroke-width': 0.4 }), 'strokeWidth=0.3'],
+      ['a new character', (b) => b.addGlyph('B4', { strokeWidth: 0.3, 'stroke-width': 0.4 }), 'strokeWidth=0.3'],
+    ])('reports the displaced spelling from %s', (_where, mutate, displaced) => {
       const b = render('B291');
       mutate(b);
       expect(codes(b)).toEqual(['MULTIPLE_OPTION_SPELLINGS']);
-      expect(b.warnings[0].source).toBe('marginTop=3');
+      expect(b.warnings[0].source).toBe(displaced);
     });
 
     it('records one report per call rather than one per builder', () => {

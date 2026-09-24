@@ -231,16 +231,19 @@ describe('the attribute naming contract', () => {
     });
   });
 
-  describe('kerning, the name whose storage differs by scope', () => {
-    it('publishes the same spelling from both scopes', () => {
-      // A bracket at character scope is promoted onto the glyph under the
-      // camelCase spelling; the options argument stores the kebab one at
-      // document scope. They are one curated name, so they publish alike.
-      const character = render('[relative-kerning=3]B291');
-      const document = render('B291/B291', { relativeKerning: 3 });
+  describe('kerning, the name whose storage differs by route', () => {
+    it('publishes the same spelling from both routes', () => {
+      // A bracket is promoted onto the glyph under the camelCase spelling; the
+      // handle setter stores the kebab one it resolved on the way in. They are
+      // one curated name, so they publish alike. (The kebab carrier used to be
+      // the options argument at document scope, which kerning is now refused
+      // at, see `BlissSVGBuilder.option-scope-admission.test.js`.)
+      const bracket = render('[relative-kerning=3]B291');
+      const setter = render('B291');
+      setter.glyph(0).setOptions({ relativeKerning: 3 });
 
-      expect(Object.keys(character.toJSON().groups[0].glyphs[0].options)).toEqual(['relativeKerning']);
-      expect(optionKeys(document.toJSON())).toEqual(['relativeKerning']);
+      expect(Object.keys(bracket.toJSON().groups[0].glyphs[0].options)).toEqual(['relativeKerning']);
+      expect(Object.keys(setter.toJSON().groups[0].glyphs[0].options)).toEqual(['relativeKerning']);
     });
   });
 });

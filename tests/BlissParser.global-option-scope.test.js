@@ -12,7 +12,8 @@ import { GLOBAL_ONLY_OPTION_KEYS } from '../src/lib/bliss-constants.js';
  * - The curated key set as an exact-set pin against GLOBAL_ONLY_OPTION_KEYS.
  * - Every curated key at group `[k]|`, character `[k]`, and part `[k]>` level:
  *   warn + drop + byte-identical render + the key never re-serializes.
- * - Mixed brackets drop only the global-only key(s), one warning per key.
+ * - Mixed brackets drop only the global-only key(s), one warning per written
+ *   occurrence, a repeated key included.
  * - `;;`-overlay codes (`B303;;[k]>B81`): the key is stripped from the STORED
  *   overlay string (SIB-2 stores codes verbatim, parsed only at render-merge),
  *   clean overlay codes stay verbatim.
@@ -22,14 +23,13 @@ import { GLOBAL_ONLY_OPTION_KEYS } from '../src/lib/bliss-constants.js';
  * - toJSON object rebuilds do not resurrect a dropped key (5a review F1 class).
  * - Exclusions stay untouched: `text` (silent no-op stub at EVERY level incl.
  *   global), the dot-sizing family, per-element keys, x/y positioning.
- * - The setOptions scope boundary: an API-stored key serializes and surfaces
- *   the warning at the NEXT parse of the serialized form.
+ * - The setOptions boundary: a key set through the API is reported when it is
+ *   set, so its saved form carries nothing for the next parse to report.
  *
  * Does NOT cover:
- * - Gating of structured API input itself (setOptions objects, hand-authored
- *   toJSON input): the trusted structured surface is deliberately ungated;
- *   only its serialized form warns on reparse (boundary pinned here and in
- *   `ElementHandle.mutation-parse-warnings.test.js`).
+ * - The same gate on every other route (composition objects, the options
+ *   argument, the handle setters and the transient channel) and the wording
+ *   each gets, see `BlissSVGBuilder.option-scope-admission.test.js`.
  * - What each key DOES at the global level (grid rendering in
  *   `BlissSVGBuilder.grid.test.js`, margins/crop in the options suites).
  * - The group-option bracket-placement arm, see
@@ -157,6 +157,14 @@ describe('BlissParser global option scope', () => {
         .toEqual(['MISPLACED_GLOBAL_OPTION', 'MISPLACED_GLOBAL_OPTION']);
       expect(gated.warnings.map((w) => w.source)).toEqual(['margin=2', 'crop-top=1']);
       expect(gated.toString()).toBe('B291');
+    });
+
+    it('warns once per written occurrence when one key is repeated', () => {
+      // The scope is judged as each key is read, before a repeat collapses
+      // into the last value, so an earlier occurrence is not dropped unsaid.
+      const gated = build('[margin=1;color=red;margin=2]|B291');
+      expect(gated.warnings.map((w) => w.source)).toEqual(['margin=1', 'margin=2']);
+      expect(gated.toString()).toBe('[color=red]|B291');
     });
   });
 
@@ -545,18 +553,16 @@ describe('BlissParser global option scope', () => {
     });
   });
 
-  describe('when the API stores a global-only key without a parse boundary', () => {
-    it('surfaces the warning at the next parse of the serialized form', () => {
-      // pins the scope boundary: structured input is trusted as written; the
-      // gate lives in the parser, so the key warns when its serialized form
-      // crosses the next parse.
+  describe('when the API sets a global-only key below global scope', () => {
+    it('reports it when it is set, so the saved form reloads with nothing to report', () => {
+      // regression: the gate used to live in the parser alone, so this key was
+      // kept, saved as `[margin=2]B291`, and first reported by the next parse
       const stored = build('B291');
       stored.glyph(0).setOptions({ margin: 2 });
-      expect(stored.warnings).toEqual([]);
-      expect(stored.toString()).toBe('[margin=2]B291');
+      expect(stored.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(stored.toString()).toBe('B291');
       const reparsed = build(stored.toString());
-      expect(reparsed.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
-      expect(reparsed.toString()).toBe('B291');
+      expect(reparsed.warnings).toEqual([]);
     });
   });
 });
