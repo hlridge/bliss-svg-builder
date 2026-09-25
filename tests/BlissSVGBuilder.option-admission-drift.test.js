@@ -18,8 +18,8 @@
  * back out by `toString()`. The table and its judge now sit beside the stage,
  * which judges scope only when a call says where its bag is written, so a call
  * that does not say is that defect again. The calls that carry a bag toward the
- * stage are read hop by hop, and the two that pass no scope are named with
- * their reasons.
+ * stage are read hop by hop, and the one that passes no scope is named with its
+ * reason.
  *
  * Behavioural rows cannot state this. They can only show that the routes agree
  * TODAY, one input at a time; this states that they cannot disagree, including
@@ -35,8 +35,8 @@
  * - The scope table defined once, beside the stage, its codes written nowhere
  *   else, and its judge private to the stage.
  * - Every call carrying a bag toward the stage naming its scope, hop by hop, on
- *   the DSL, composition-object, setter and handle routes; the two calls that
- *   pass none, each named with its reason.
+ *   the DSL, definition-expansion, composition-object, setter and handle
+ *   routes; the one call that passes none, named with its reason.
  * - That both scans can fail: a route with a resolution added back, a stage
  *   that stopped resolving, a call past the end of the function being read, a
  *   call with no scope, a scope code written outside the table, and a call
@@ -177,6 +177,9 @@ describe('BlissSVGBuilder option admission drift', () => {
     it.each([
       ['admitOptions', 'bliss-parser.js'],
       ['.#parseOptions', 'bliss-parser.js'],
+      // both part reads: the DSL's part site, and a definition's code string
+      // expanded for a composition object
+      ['.parsePartString', 'bliss-parser.js'],
       ['.#admitAuthoredBag', 'bliss-svg-builder.js'],
       ['.#toRaw', 'bliss-svg-builder.js'],
       ['.toRaw', 'element-handle.js'],
@@ -199,18 +202,6 @@ describe('BlissSVGBuilder option admission drift', () => {
       const builder = libSource('bliss-svg-builder.js');
       expect(callArguments(builder, 'admitOptions')).toHaveLength(callCount(builder, 'admitOptions'));
       expect(unscopedCalls(builder, 'admitOptions')).toEqual(['Object.entries(defaultOptions), warn']);
-    });
-
-    it("leaves one parser part read unscoped, the one expanding a definition's code string", () => {
-      // Reached only through `expandParts`, for a composition object that names
-      // a definition; a DSL string expands one through its own part site, which
-      // passes a scope. So a key misplaced inside a definition's code string is
-      // reported when a string names the definition and kept in silence when an
-      // object does: an open gap, tracked in the backlog. This row fails when
-      // that gap closes, and is rewritten with it.
-      const parser = libSource('bliss-parser.js');
-      expect(callArguments(parser, '.parsePartString')).toHaveLength(callCount(parser, '.parsePartString'));
-      expect(unscopedCalls(parser, '.parsePartString')).toEqual(['segment']);
     });
   });
 

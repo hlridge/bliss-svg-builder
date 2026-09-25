@@ -1377,20 +1377,21 @@ export const isScopeRefusal = (warning) => SCOPE_BOUND_OPTIONS.some((r) => r.cod
  * 'stroke-width': null}` is why: the null is dropped and the 5 survives, so a
  * collision report would say the 5 was ignored when it is the value in force.
  *
- * The drop does not depend on there being anywhere to report it. Every route
- * with a warnings channel passes one; the one entry point without a channel
- * (`parsePartString`) reads a DSL bracket, where values are always text and
- * nothing is ever refused.
+ * The drop does not depend on there being anywhere to report it: every route
+ * passes a warnings channel, and a caller that passes none still has the
+ * refusal applied, with nobody told.
  *
  * Given the `scope` the bag is being written at, the stage also refuses a key
  * that cannot act there (`scopeRefusal`), and it asks that FIRST: where a key
  * cannot act, fixing its value would achieve nothing, so `{marginTop: null}` on
  * a character is reported once, as misplaced. A key refused for its scope is
  * never noted as a spelling either, for the same reason a refused value is not.
- * Without a scope nothing is judged for scope. That is the definition route: a
- * definition's defaults have a stricter guard that refuses the same keys as an
- * error, and expanding a definition's code string reads its brackets with no
- * warnings channel to report to.
+ * Without a scope nothing is judged for scope. That is a definition's
+ * `defaultOptions`, and only those: `define()` refuses a canvas-wide or
+ * target-prefixed key there as a definition error, and the defaults attach
+ * wherever the definition is used, which the stage cannot know when they are
+ * declared. A definition's code string is DSL text, so its brackets are judged
+ * at part scope wherever it is expanded.
  *
  * @param {Iterable<[string, unknown]>} writtenEntries - keys as written, with their values
  * @param {(warning: object) => void} [warn] - where to send a refusal

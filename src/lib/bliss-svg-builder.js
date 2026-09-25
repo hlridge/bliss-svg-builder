@@ -675,17 +675,6 @@ class BlissSVGBuilder {
         obj.key = obj.options.key;
         delete obj.options.key;
       }
-      if (!isTopLevel) {
-        // A `<layer>--<attribute>` key names a layer of the whole SVG, so below
-        // global scope there is nothing for it to target. The parser drops it
-        // with a warning for DSL input; object input never passes that gate and
-        // would otherwise reach the markup as a `<g layer--attr="...">` nothing
-        // can use. Done on the render clone, so the authoring tree still
-        // round-trips the key the caller wrote.
-        for (const key of Object.keys(obj.options)) {
-          if (isLayerAttributeKey(key)) delete obj.options[key];
-        }
-      }
       // Two guards judge a NAME, and an emitter that honours either one simply
       // never writes the attribute. Reporting them HERE is what makes that
       // visible: this pass runs once per rebuild and reaches every scope,
@@ -790,9 +779,12 @@ class BlissSVGBuilder {
       );
     }
 
-    // For object input (from toJSON), re-expand any parts that were stripped
+    // For object input (from toJSON), re-expand any parts that were stripped.
+    // A definition's code string is read as the DSL reads it, so a key misplaced
+    // in one of its brackets is reported down the same channel, for the same
+    // reason: it is dropped, and the rebuilt tree keeps no trace of it.
     if (typeof input !== 'string') {
-      BlissParser.expandParts(blissObj);
+      BlissParser.expandParts(blissObj, (warning) => (blissObj._parseWarnings ??= []).push(warning));
     }
 
     // Reverse toJSON() normalization: codeName → internal field names
@@ -2361,8 +2353,18 @@ class BlissSVGBuilder {
     );
     if (!hasContent) return this;
 
-    // Re-ingest toJSON output into internal format (same order as constructor)
-    BlissParser.expandParts({ groups: otherGroups });
+    // Re-ingest toJSON output into internal format (same order as constructor).
+    // What arrives is saved composition data, so it meets the admission stage
+    // as a composition object does. `other` is whatever answers toJSON(), a
+    // builder from another copy of the library included, and a key such a
+    // builder kept would otherwise be merged in unjudged and saved.
+    const warn = (warning) => this.#mutationWarnings.push(warning);
+    for (const group of otherGroups) BlissSVGBuilder.#admitAuthoredBags(group, 'group', warn);
+    // A deep toJSON arrives expanded, so what is left to expand here is a part
+    // whose code was unknown when `other` was built and has been defined
+    // since. A key misplaced in that definition's code string is reported like
+    // any other this merge causes.
+    BlissParser.expandParts({ groups: otherGroups }, warn);
     BlissSVGBuilder.#normalizeGlyphCodes(otherGroups);
     // Parity with the constructor's object-ingest: a partless glyph node
     // normalizes to the first-class empty glyph. A no-op today (a builder's

@@ -16,6 +16,9 @@
  *   character and a part, and the `opts` argument of `addGlyph`, `addPart`,
  *   `replace` and the builder's `addGroup`. Each reports once and leaves the
  *   key out of `toString()` and `toJSON()`.
+ * - `merge()` handed saved data holding such a key, as a builder from another
+ *   copy of the library can: reported as a composition object reports it, and
+ *   neither saved nor drawn.
  * - The transient channel at element scope, for the two families it can carry.
  * - The report outliving a later mutation, on both warning channels.
  * - A saved string that reloads clean and draws the same picture.
@@ -73,6 +76,10 @@ const afterMutating = (codeString, mutate) => {
 const codes = (builder) => builder.warnings.map((w) => w.code);
 const bothSaves = (builder) => `${builder.toString()} ${JSON.stringify(builder.toJSON())}`;
 
+// merge() takes whatever answers toJSON(). A builder from another copy of the
+// library answers with whatever that copy kept.
+const savedBy = (json) => ({ toJSON: () => structuredClone(json) });
+
 const KERNING = ['MISPLACED_KERNING_OPTION', /relative-?kerning/i];
 const CANVAS = ['MISPLACED_GLOBAL_OPTION', /margin-?top/i];
 const LAYER = ['MISPLACED_LAYER_OPTION', /content--fill/];
@@ -105,6 +112,20 @@ describe('BlissSVGBuilder option scope admission', () => {
 
     it.each(SAVED_ROUTES)('leaves it out of both saves, through %s', (_route, build, [, spelled]) => {
       expect(bothSaves(build())).not.toMatch(spelled);
+    });
+  });
+
+  describe('when merge() is handed saved data holding the key', () => {
+    it.each([
+      ['a target-prefixed key on a character', () => bagAt('character', { 'content--fill': 'red' }), LAYER],
+      ['a kerning key on a word', () => bagAt('word', { 'relative-kerning': 3 }), KERNING],
+    ])('reports %s as a composition object does, and neither saves nor draws it', (_what, saved, [code, spelled]) => {
+      const target = new BlissSVGBuilder('B313');
+      target.merge(savedBy(saved()));
+
+      expect(codes(target)).toEqual([code]);
+      expect(target.warnings).toEqual(new BlissSVGBuilder(saved()).warnings);
+      expect(`${bothSaves(target)} ${target.svgCode}`).not.toMatch(spelled);
     });
   });
 

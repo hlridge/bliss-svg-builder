@@ -533,10 +533,11 @@ export class BlissParser {
     return parsedObject;
   }
 
-  // `warn` and `scope` are passed by the parse path, which has a warnings array
-  // and knows the bracket sits on a part, and omitted by a definition
-  // expansion, which has neither. A part bracket reports its option spellings
-  // and misplaced keys on the first route and stays silent on the second.
+  // Both callers read a bracket that sits on a part, and both pass that scope
+  // and the channel a refused key is reported to: the DSL's part site, and the
+  // expansion of a definition's code string for a composition object. So a key
+  // misplaced inside a definition is reported the same way whichever of the two
+  // named the definition.
   static parsePartString(str, restoreFunction = (s) => s, warn, scope) {
     const part = {};
 
@@ -2019,17 +2020,23 @@ export class BlissParser {
    * but no sub-parts. This supports toJSON round-trips where nested
    * parts were stripped.
    *
+   * A definition's code string is DSL text, so its brackets are read here as
+   * the DSL reads them when a string names the definition: at part scope, with
+   * a key that cannot act there reported to `warn` and dropped. A saved
+   * composition then reports what the string it was saved from reported.
+   *
    * @param {Object} blissObj - Raw parsed structure with groups/glyphs/parts
+   * @param {(warning: object) => void} [warn] - where a misplaced key is reported
    * @returns {Object} The same object, mutated with expanded parts
    */
-  static expandParts(blissObj) {
+  static expandParts(blissObj, warn) {
     if (!blissObj?.groups) return blissObj;
     for (const group of blissObj.groups) {
       if (!group.glyphs) continue;
       for (const glyph of group.glyphs) {
         if (!glyph.parts) continue;
         for (const [partIndex, part] of glyph.parts.entries()) {
-          BlissParser.#expandPartRecursive(part);
+          BlissParser.#expandPartRecursive(part, warn);
           BlissParser.#flagCompositePart(part, partIndex);
         }
       }
@@ -2137,7 +2144,7 @@ export class BlissParser {
    * Only expands if the part has a codeName, a matching definition with
    * codeString, and no existing sub-parts.
    */
-  static #expandPartRecursive(part) {
+  static #expandPartRecursive(part, warn) {
     if (!part.codeName || part.parts?.length > 0) return;
 
     const definition = blissElementDefinitions[part.codeName];
@@ -2151,7 +2158,7 @@ export class BlissParser {
     if (codeString.includes(';') || codeString.includes(':')
         || PART_OPTION_CODESTRING.test(codeString)
         || blissElementDefinitions[codeString]?.codeString) {
-      part.parts = BlissParser.#parseCodeStringToParts(codeString);
+      part.parts = BlissParser.#parseCodeStringToParts(codeString, warn);
     } else {
       // Same single-code rename recording as parseParts (Phase 2.3b).
       part._aliasCodeName = part.codeName;
@@ -2166,7 +2173,7 @@ export class BlissParser {
    * Parse a codeString like "HL8;HL8:0,8;VL8;VL8:8,0" into an array
    * of part objects, recursively expanding nested definitions.
    */
-  static #parseCodeStringToParts(codeString, depth = 0) {
+  static #parseCodeStringToParts(codeString, warn, depth = 0) {
     if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
     // Drop empty segments, mirroring parseParts: a definition codeString with a
     // leading ';' (an empty base) must expand to an indicator-only glyph here too,
@@ -2176,7 +2183,10 @@ export class BlissParser {
     const parts = [];
 
     for (const segment of segments) {
-      const part = BlissParser.parsePartString(segment);
+      // Every bracket here sits on a part, at any depth, as in parseParts.
+      const part = BlissParser.parsePartString(segment, undefined, warn, { level: 'part', notation: 'bracket' });
+      // A bracket the stage emptied stores no `{}`, as in parseParts.
+      if (part.options && Object.keys(part.options).length === 0) delete part.options;
 
       const definition = blissElementDefinitions[part.codeName] || {};
       const innerCodeString = definition.codeString;
@@ -2187,7 +2197,7 @@ export class BlissParser {
         } else if (innerCodeString.includes(';') || innerCodeString.includes(':')
             || PART_OPTION_CODESTRING.test(innerCodeString)
             || blissElementDefinitions[innerCodeString]?.codeString) {
-          part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, depth + 1);
+          part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, warn, depth + 1);
         } else {
           // Same single-code rename recording as parseParts (Phase 2.3b).
           part._aliasCodeName = part.codeName;
