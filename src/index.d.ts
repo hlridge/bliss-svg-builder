@@ -1187,7 +1187,9 @@ export declare class BlissSVGBuilder {
    * codes by default. `{ preserve: true }` keeps a custom name that stands
    * for a single glyph, indicator, or shape: every `type`d definition
    * (whatever its anatomy) and every bare alias renaming one existing code;
-   * multi-code shorthand always serializes expanded.
+   * multi-code shorthand always serializes expanded. A name is kept only while
+   * the glyph still has the parts it names: after one of them is removed,
+   * moved or recoloured, the glyph is written out in full.
    *
    * The output uses the compact shorthand wherever it means the same thing: a
    * space that matches the default for its position is written as a bare

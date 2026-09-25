@@ -88,6 +88,8 @@ new BlissSVGBuilder('B2661').toString({ preserve: true });
 // 'B1103;B81' (multi-code shorthand always expands)
 ```
 
+A name is kept only while it still describes what you have. Remove, move or recolour one of a custom character's own parts and `preserve` writes the character out in full instead, because reading the name back would bring the old parts with it.
+
 As a rule of thumb: the default is for output that leaves your app, `preserve` is for output that stays where your definitions live. Custom indicators and shapes have a few extra wrinkles worth knowing; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes) below.
 
 ## Characters (Glyphs)
