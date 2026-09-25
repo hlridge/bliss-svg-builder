@@ -12,9 +12,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   must decompose its parts, not emit the bare built-in (the `if(!code)`
  *   fallback in `serializeGlyph`). [external Review #5, F-INFO-2]
  * - Preserve mode: the base-only `name;codes` delta in `serializeCustomGlyphDelta`
- *   maps `p.codeName` only and re-references the base at 0,0, so a baked base
- *   offset / indicator coord / part-option is dropped; it must fall back to
- *   decomposition when any part carries one. [external Review #5, F-D / F-A / F-B]
+ *   writes each APPENDED part as its bare code, so an appended indicator coord
+ *   or part-option would be dropped; it must fall back to decomposition when an
+ *   appended part carries one. A baked base offset is the definition's own and
+ *   rides the name, which reloads it. [external Review #5, F-D / F-A / F-B]
  *
  * Covers:
  * - Default `toString()` of a built-in-identity custom glyph + applied indicator
@@ -99,12 +100,15 @@ describe('BlissSVGBuilder serializer fidelity', () => {
   });
 
   describe('when a modified base-only custom glyph carries coordinates or options', () => {
-    it('re-emits a baked base offset under preserve rather than re-referencing the base at 0,0', () => {
-      // regression: external Review #5 F-D - `_FID_OFFSET;B81` lost the 2,3 base
-      // offset (the name re-references its base opaquely at 0,0).
+    it('keeps the name over a baked base offset under preserve, and the reload keeps the offset', () => {
+      // regression: external Review #5 F-D - `_FID_OFFSET;B81` once reloaded
+      // with the 2,3 base offset lost, so the glyph was spelled out. The parser
+      // now nests a typed base with its offset intact (already so at v1.0.0),
+      // and the offset is the definition's own, so the name carries it: chunk
+      // C18 keeps the name, and the reload assertion is what guards F-D.
       const b = applied('_FID_OFFSET', 'B81');
       const str = b.toString({ preserve: true });
-      expect(str).toContain(':2,3');
+      expect(str).toBe('_FID_OFFSET;B81');
       expect(new BlissSVGBuilder(str).svgCode).toBe(b.svgCode);
     });
 

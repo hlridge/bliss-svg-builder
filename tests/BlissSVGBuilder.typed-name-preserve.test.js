@@ -18,20 +18,16 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   target's delta) instead of keeping a stale written name.
  * - Glyph-level toJSON restore, public no-leak in both modes, re-ingest
  *   round-trips, object-input parity, mutation and merge survival.
- * - Anatomy spelled with a zero or half coordinate: the consult's token has to
- *   match the way toString spells a position, or a clean instance reads as a
- *   diverged one and loses its name.
+ * - Anatomy spelled any way the save does not reproduce (a zero or half
+ *   coordinate, a trailing comma, a position written as an option, an option
+ *   under its kebab name): the consult compares the glyph's parts with the
+ *   parts the name parses to, never with the definition's text, so every
+ *   spelling keeps the name on both surfaces.
  * - Built-in, letter-alias, and multi-code-shorthand guardrails.
- * - One GATED DEFERRAL, asserting the wrong answer on purpose: an anatomy that
- *   spells its position as an OPTION (`[x=2]>S8`) loses the alias name that the
- *   same anatomy spelled as a coordinate (`S8:2`) keeps. Both rows sit together
- *   so the asymmetry is visible; see the comment on them before touching either.
  *
  * Does NOT cover:
- * - Anatomy written in a spelling toString normalizes away (`C8:3,` becomes
- *   `C8:3`, `C8:,` becomes `C8`): the consult compares against the codeString
- *   as written, so such a definition never matches and keeps decomposing.
- *   Pre-existing, and narrower now than before the axis-presence change.
+ * - A typed glyph's OWN name after one of its parts changed, see
+ *   `BlissSVGBuilder.preserve-divergence.test.js`.
  * - Bare aliases to BUILT-IN targets at character level (the part-level
  *   side channel), see `BlissSVGBuilder.char-alias-preserve.test.js`.
  * - `type: 'glyph'` identity and indicator-delta mechanics, see
@@ -103,6 +99,17 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       expect(new BlissSVGBuilder(emitted).svgCode).toBe(b.svgCode);
     });
 
+    it.each([
+      ['C8:3,'],
+      ['[stroke-width=0.5]>C8;C2'],
+    ])('keeps the name of a shape whose definition spells %s, on both surfaces', (codeString) => {
+      defineAndTrack({ SHSPELT: { type: 'shape', codeString } });
+      const b = new BlissSVGBuilder('SHSPELT');
+      expect(b.toString({ preserve: true })).toBe('SHSPELT');
+      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('SHSPELT');
+      expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
+    });
+
     it('keeps default emission decomposed and byte-stable', () => {
       defineTypedFixtures();
       // pins default byte-identity: the recording is preserve-only
@@ -161,47 +168,47 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       expect(new BlissSVGBuilder(emitted).svgCode).toBe(b.svgCode);
     });
 
-    // GATED DEFERRAL. This row asserts the CURRENT, WRONG answer, so the gap
-    // cannot be believed fixed while it is still live: when this row goes red,
-    // the fix has landed, and the move is to invert it and close the backlog
-    // row it guards ("Two emitters disagree about a part's position spelling").
-    //
-    // Acceptance criterion: a bare alias onto a glyph defined `[x=2]>S8` keeps
-    // its written name through BOTH preserve surfaces.
-    //
-    // Mechanism: the written-name consult compares the glyph's serialized parts
-    // against the definition's codeString as a raw string, so a definition
-    // matches only when the serializer writes it back the way it was spelled.
-    // Every other option does, which is what the `[color=red]>C8` row above
-    // shows. A position is the exception, and it is the only one: an option is
-    // one of its two spellings and the serializer always emits the other, so
-    // `[x=2]>S8` is compared against `S8:2`, and a clean instance reads as a
-    // diverged one. Closing it means canonicalizing BOTH sides through one
-    // emitter rather than comparing text, which is a design call, and it belongs
-    // with the other preserve-path position work rather than here.
-    it('loses the written name over a position-option anatomy, the deferred gap', () => {
+    it('keeps the written name over a position-option anatomy', () => {
+      // regression: the consult compared the glyph against the definition's
+      // TEXT, and the save spells a part position as a coordinate, so `[x=2]>S8`
+      // was compared against `S8:2` and a clean instance read as a changed one.
+      // Was a gated deferral until the comparison moved onto parsed parts.
       defineAndTrack({ GLX: { type: 'glyph', codeString: '[x=2]>S8' } });
       defineAndTrack({ ALX: { codeString: 'GLX' } });
       const b = new BlissSVGBuilder('ALX');
       expect(b.toString()).toBe('S8:2');
-      expect(b.toString({ preserve: true })).toBe('GLX'); // wanted: 'ALX'
-      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('GLX'); // wanted: 'ALX'
-      // The render survives either way, which is why this is a name loss rather
-      // than a broken composition, and why it is deferrable at all.
+      expect(b.toString({ preserve: true })).toBe('ALX');
+      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('ALX');
       expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
     });
 
     it('keeps that same anatomy name when the definition spells the position as a coordinate', () => {
-      // The positive control for the row above: one composition, one render,
-      // two answers to "does my name survive", decided by nothing but how the
-      // DEFINITION spelled its position. Without this row the gap reads as a
-      // limit on decorated anatomy instead of the spelling asymmetry it is.
+      // One composition, one render: the row above and this one must give the
+      // same answer, since the only difference is how the DEFINITION spelled
+      // its position.
       defineAndTrack({ GLC: { type: 'glyph', codeString: 'S8:2' } });
       defineAndTrack({ ALC: { codeString: 'GLC' } });
       const b = new BlissSVGBuilder('ALC');
       expect(b.toString()).toBe('S8:2');
       expect(b.toString({ preserve: true })).toBe('ALC');
       expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('ALC');
+    });
+
+    it.each([
+      ['[x=0]>S8'],
+      ['[y=3]>S8'],
+      ['S8:3,'],
+      ['[stroke-width=0.5]>S8'],
+    ])('keeps the written name over a glyph whose definition spells its part %s', (codeString) => {
+      // regression: `[x=0]>S8` kept the name in 1.0.0 and lost it during 1.1.0
+      // development; `[stroke-width=0.5]>S8` lost it on the toJSON surface only,
+      // once toJSON started publishing the option as `strokeWidth`
+      defineAndTrack({ GLSPELT: { type: 'glyph', codeString } });
+      defineAndTrack({ ALSPELT: { codeString: 'GLSPELT' } });
+      const b = new BlissSVGBuilder('ALSPELT');
+      expect(b.toString({ preserve: true })).toBe('ALSPELT');
+      expect(b.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('ALSPELT');
+      expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
     });
 
     it('keeps the outermost written name through an alias chain', () => {
@@ -236,6 +243,16 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       const b = new BlissSVGBuilder('MYSH2');
       b.glyph(0).addPart('B81');
       expect(b.toString({ preserve: true })).toBe('C8;C2:3,3;B81');
+    });
+
+    it('saves a saved object that names a shape but carries no parts, on both surfaces, without throwing', () => {
+      // pins the consult's parts guard: a glyph authored with a name and no
+      // parts has nothing to compare, and must not crash either save (what it
+      // saves as is backlog row "A glyph authored with only codeName")
+      defineTypedFixtures();
+      const b = new BlissSVGBuilder({ groups: [{ glyphs: [{ codeName: 'MYSH2' }] }] });
+      expect(() => b.toString({ preserve: true })).not.toThrow();
+      expect(() => b.toJSON({ preserve: true })).not.toThrow();
     });
 
     it('ignores a hand-authored stale glyph recording', () => {
@@ -286,21 +303,20 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       const shape = new BlissSVGBuilder('MYSH2').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(shape.codeName).toBe('MYSH2');
       expect(shape.parts.map(p => p.codeName)).toEqual(['C8', 'C2']);
-      // pins the shared options canonicalizer: the toJSON consult must
-      // canonicalize part options the same way toString does, or the two
-      // preserve surfaces diverge (preserve-completeness review, 2026-07-23)
+      // pins one consult for both surfaces: toJSON must judge a decorated part
+      // the way toString does, or the two preserve surfaces diverge
+      // (preserve-completeness review, 2026-07-23)
       defineAndTrack({ MYSHOP: { type: 'shape', codeString: '[color=red]>C8' } });
       const decorated = new BlissSVGBuilder('MYSHOP').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(decorated.codeName).toBe('MYSHOP');
     });
 
     it('restores the name over an anatomy written with a zero or half coordinate', () => {
-      // the coordinate sibling of the options canonicalizer above: the consult
-      // compares a token per part against the definition's written codeString,
-      // so it must spell a coordinate exactly as toString does. Asking whether
-      // an axis is non-zero loses a definition written `:0,0`, and always
-      // spelling the pair form loses one written `:3`; either mismatch reads
-      // as "not a clean instance" and silently drops the author's name
+      // the coordinate sibling of the row above: a written zero is a position
+      // (`:0,0` pins a part where no coordinate would let it be placed), and one
+      // axis is not two, so judging an axis by its value, or reading `:3` as
+      // `:3,0`, would read a clean instance as a changed one and silently drop
+      // the author's name
       defineAndTrack({
         PPZERO: { type: 'glyph', codeString: 'B291;C8:0,0' },
         PPHALF: { type: 'glyph', codeString: 'B291;C8:3' },
