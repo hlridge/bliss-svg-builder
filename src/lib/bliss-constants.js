@@ -484,10 +484,11 @@ export const optionSpellingWatcher = (warn) => {
 
 /**
  * The two internal option names with no curated kebab spelling of their own, and
- * the whole option that reaches the same behaviour. Both worked as bracket
- * options until the options bags were separated, by the same accident as every
- * other internal name: the key fell through into the bag under exactly the name
- * the consumer reads.
+ * the whole option that reaches the same behaviour. Both worked as input on
+ * every route until the options bags were separated, by the same accident as
+ * every other internal name: the key fell through into the bag under exactly
+ * the name the consumer reads. Nothing documented them, and no route reads them
+ * as input now; the table exists so the report can name the option that works.
  *
  * `camelToKebab` gives `auto-vertical` and `crop-compact`, neither of which is
  * an option, so `canonicalOptionKey` cannot see these two and any rule derived

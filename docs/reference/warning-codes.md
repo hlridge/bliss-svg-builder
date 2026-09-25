@@ -571,17 +571,15 @@ A transient option written on a space is a different case and reports `MISPLACED
 
 ### `MISPLACED_OPTION_SPELLING`
 
-One of two internal names written where an option goes: `autoVertical`, which means `crop=auto-vertical`, and `cropCompact`, which means `crop=compact`. Neither is a *spelling* of an option name, so there is nothing to resolve either one to. Written as an option the key lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), is emitted exactly as typed and sets nothing, and the warning names the option that works.
+One of two internal names written where an option goes: `autoVertical`, the library's own name for `crop=auto-vertical`, and `cropCompact`, its name for `crop=compact`. Neither is a *spelling* of an option name, so there is nothing to resolve either one to. Written as an option, in a bracket or in JavaScript alike, the key lands among your own [pass-through attributes](/handbook/syntax-options/svg-pass-through), is emitted exactly as typed and sets nothing, and the warning names the option that works.
 
 ```
 [autoVertical]||B291    →  warns; write [crop=auto-vertical]
 [cropCompact]||B291     →  warns; write [crop=compact]
 ```
 
-Both keep working in the JavaScript entry points, where camelCase is the expected spelling:
-
 ```js
-new BlissSVGBuilder('B291', { autoVertical: true });   // silent; crops
+new BlissSVGBuilder('B291', { autoVertical: true });   // warns; write { crop: 'auto-vertical' }
 ```
 
 A curated option written in its camelCase spelling is **not** this warning. Every input resolves the name, so `[marginTop=3]`, `new BlissSVGBuilder('B291', { marginTop: 3 })` and `new BlissSVGBuilder({ options: { marginTop: 3 }, groups: [/* … */] })` all set the margin and say nothing. Writing the same name twice under two spellings is [`MULTIPLE_OPTION_SPELLINGS`](#multiple-option-spellings).

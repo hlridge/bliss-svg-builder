@@ -69,14 +69,8 @@ export interface BlissOptions {
   relativeKerning?: number;
   absoluteKerning?: number;
 
-  // Cropping (builder-level). `autoVertical` and `cropCompact` are JavaScript
-  // shorthands for a whole option rather than spellings of a name, so they work
-  // here and on the other JavaScript entry points and are reported with
-  // `MISPLACED_OPTION_SPELLING` in a DSL bracket or a composition object, where
-  // `crop=auto-vertical` and `crop=compact` are what to write.
+  // Cropping (builder-level)
   crop?: number | 'auto' | 'auto-vertical' | 'compact';
-  autoVertical?: boolean;
-  cropCompact?: boolean;
   cropTop?: number | 'auto';
   cropBottom?: number | 'auto';
   cropLeft?: number | 'auto';
@@ -662,8 +656,8 @@ export interface GlyphDefinition {
    * target-prefixed key such as `content--fill` or `grid-line--sky--stroke` —
    * those configure the whole SVG or name a part of it, and would be inert on a
    * definition; `define()` reports a violation in its `errors` result,
-   * `patchDefinition()` throws. `autoVertical` and `cropCompact` are refused on
-   * the same ground, being the programmatic spellings of `crop`.
+   * `patchDefinition()` throws. `autoVertical` and `cropCompact`, the library's
+   * internal names for two `crop` values, are refused on the same ground.
    *
    * This is a programmatic surface, so a curated option may be written in
    * camelCase (`{ strokeWidth: 2 }`) and is stored under its `stroke-width`

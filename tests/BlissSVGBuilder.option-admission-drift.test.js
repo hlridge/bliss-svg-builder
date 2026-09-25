@@ -83,13 +83,10 @@ describe('BlissSVGBuilder option admission drift', () => {
       expect(stageCalls(libSource('bliss-parser.js'))).toBe(1);
     });
 
-    it('finds all three of the builder routes running it, and no fourth', () => {
+    it('finds all three of the builder routes running it', () => {
       // A composition object's bags, the JavaScript channels (the options
       // argument and every mutation setter), and a definition's defaultOptions.
-      // The JavaScript channel calls it twice: once for the bag, and once for
-      // the option a shorthand stands for (`autoVertical` means a `crop`),
-      // which is bound to a scope where the shorthand's own name is not.
-      expect(stageCalls(libSource('bliss-svg-builder.js'))).toBe(4);
+      expect(stageCalls(libSource('bliss-svg-builder.js'))).toBe(3);
     });
   });
 

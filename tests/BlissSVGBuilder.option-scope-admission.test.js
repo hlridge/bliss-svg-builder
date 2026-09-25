@@ -17,8 +17,6 @@
  *   `replace` and the builder's `addGroup`. Each reports once and leaves the
  *   key out of `toString()` and `toJSON()`.
  * - The transient channel at element scope, for the two families it can carry.
- * - A shorthand that stands for a canvas-wide option (`autoVertical`) set below
- *   global scope, which is judged as the option it stands for.
  * - The report outliving a later mutation, on both warning channels.
  * - A saved string that reloads clean and draws the same picture.
  * - A key that is wrong twice over (misplaced, and a value with no text form)
@@ -107,20 +105,6 @@ describe('BlissSVGBuilder option scope admission', () => {
 
     it.each(SAVED_ROUTES)('leaves it out of both saves, through %s', (_route, build, [, spelled]) => {
       expect(bothSaves(build())).not.toMatch(spelled);
-    });
-  });
-
-  describe('when a shorthand for a canvas-wide option is set below global scope', () => {
-    it.each([
-      ['autoVertical', 'crop=auto-vertical'],
-      ['cropCompact', 'crop=compact'],
-    ])('reports %s once as the %s it stands for, and saves neither', (shorthand, option) => {
-      const builder = afterMutating('B291', (b) => b.group(0).glyph(0).setOptions({ [shorthand]: true }));
-
-      // regression: the shorthand was translated after the stage had judged
-      // its name, so the crop it became was kept and reported only on reload
-      expect(builder.warnings.map((w) => [w.code, w.source])).toEqual([['MISPLACED_GLOBAL_OPTION', option]]);
-      expect(builder.toString()).toBe('B291');
     });
   });
 

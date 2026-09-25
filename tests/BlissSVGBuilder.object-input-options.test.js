@@ -130,10 +130,9 @@ describe('BlissSVGBuilder object-input options', () => {
     });
 
     it('still reports a spelling that names a whole option rather than a name', () => {
-      // `autoVertical` is a JavaScript shorthand for `crop=auto-vertical`, not a
+      // `autoVertical` is an internal name for `crop=auto-vertical`, not a
       // spelling of a name, so ingest has nothing to resolve and the report
-      // keeps its job. Expanding it here instead would read `crop` at a scope
-      // where `crop` is inert, turning a report into silence.
+      // keeps its job, as it does on every route.
       const b = build(atDocument({ autoVertical: true }));
       expect(codes(b)).toEqual(['MISPLACED_OPTION_SPELLING']);
       expect(viewBox(b)).toBe(viewBox(build(atDocument({}))));

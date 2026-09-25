@@ -49,9 +49,10 @@ import { PUBLICATION_MAP } from '../src/lib/bliss-constants.js';
  * - The serializers, which snapshot the authoring tree before the options pass
  *   runs and must therefore never see the second bag.
  * - The two internal names with no curated twin (`autoVertical`, `cropCompact`),
- *   which the generic rule cannot see and a two-entry lookup handles instead.
- *   These are the only spellings anything still reports, because they name a
- *   whole option rather than a name, so there is nothing for ingest to resolve.
+ *   which the generic rule cannot see and a two-entry lookup names the working
+ *   option for. These are the only spellings anything still reports, because
+ *   they name a whole option rather than a name, so there is nothing for ingest
+ *   to resolve. Every route reports them alike and none of them crops.
  *
  * Does NOT cover:
  * - What a curated option's camelCase spelling now does on a composition
@@ -421,42 +422,40 @@ describe('BlissSVGBuilder option namespace split', () => {
     });
 
     it.each([
-      ['autoVertical', 'crop', 'auto-vertical'],
-      ['cropCompact', 'crop', 'compact'],
-    ])('keeps %s working in the constructor, by lookup rather than by rule', (camel, key, value) => {
-      // camelCase is the constructor's documented spelling, so these two keep
-      // working there. Compared against the option they mean, byte for byte,
-      // which is the assertion that fails if the lookup translates to the wrong
-      // one; the third row is what fails if it translates unconditionally.
-      const b = render('B291', { [camel]: true });
-      expect(b.svgCode).toBe(render('B291', { [key]: value }).svgCode);
-      expect(b.warnings).toEqual([]);
-      // and it really did crop, so the row cannot pass on two plain pictures.
-      expect(viewBox(b)).not.toBe(viewBox(render('B291')));
+      ['autoVertical', 'the constructor', (camel) => render('B291', { [camel]: true }), '[autoVertical]||B291'],
+      ['cropCompact', 'the constructor', (camel) => render('B291', { [camel]: true }), '[cropCompact]||B291'],
+      ['autoVertical', 'setOptions on a character', (camel) => {
+        const b = render('B291');
+        b.glyph(0).setOptions({ [camel]: true });
+        return b;
+      }, '[autoVertical]B291'],
+    ])('reports %s through %s exactly as a bracket does, and crops nothing', (camel, _route, build, bracket) => {
+      // regression: the JavaScript entry points used to translate these two
+      // internal names into the crop they stand for, the one place a whole
+      // option could be written as a single word. Every route now reads them
+      // as the bracket does.
+      const b = build(camel);
+      expect(b.warnings).toEqual(render(bracket).warnings);
+      expect(b.svgCode).toBe(render(bracket).svgCode);
+      expect(b.toString()).toBe(bracket);
+      expect(viewBox(b)).toBe(viewBox(render('B291')));
+    });
+
+    it('reports it through the transient channel too, which never saves it', () => {
+      const b = render('B291');
+      b.setTransientOptions({ autoVertical: true });
+      expect(spellingReports(b).map((w) => w.source)).toEqual(['autoVertical']);
+      expect(viewBox(b)).toBe(viewBox(render('B291')));
+      expect(b.toString()).toBe('B291');
     });
 
     it.each([
-      ['the internal name written second', { crop: 'compact', autoVertical: true }, 'crop=auto-vertical'],
-      ['the bulk option written second', { autoVertical: true, crop: 'compact' }, 'crop=compact'],
-    ])('lets the later of two crops win, %s', (_order, options, equivalent) => {
-      // Recording, not endorsing. Both keys resolve to `crop`, so one silently
-      // clobbers the other and which one depends on the order the object lists
-      // them in. That is pre-existing for every bulk-and-specific pair on this
-      // channel and is not this task's to change; the row exists so a later
-      // reader meets it as a known outcome rather than reading it as intended.
-      // It is NOT the two-spellings collapse: these are two different option
-      // names that happen to mean the same thing, not one name written twice.
-      const [key, value] = equivalent.split('=');
-      expect(viewBox(render('B291', options))).toBe(viewBox(render('B291', { [key]: value })));
-    });
-
-    it('leaves an explicit false off rather than turning it into the crop it refuses', () => {
-      // Both are boolean switches, so translating unconditionally would turn
-      // `{ autoVertical: false }` INTO the crop it asks not to have.
-      const b = render('B291', { autoVertical: false });
-      expect(viewBox(b)).toBe(viewBox(render('B291')));
-      expect(b.svgCode).not.toContain('autoVertical');
-      expect(b.warnings).toEqual([]);
+      ['the internal name written second', { crop: 'compact', autoVertical: true }],
+      ['the real option written second', { autoVertical: true, crop: 'compact' }],
+    ])('keeps the real crop whatever order the internal name sits in, %s', (_order, options) => {
+      // The internal name sets nothing, so it cannot clobber the crop that was
+      // really written, in either order.
+      expect(viewBox(render('B291', options))).toBe(viewBox(render('B291', { crop: 'compact' })));
     });
   });
 

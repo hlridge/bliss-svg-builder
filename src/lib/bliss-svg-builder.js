@@ -618,12 +618,14 @@ class BlissSVGBuilder {
     // Numeric values pass through as-is — they're used for calculations, not SVG markup.
     //
     // ONE kind of key reaches here meaning a curated option and not setting one:
-    // a whole option written as a single JavaScript word (`autoVertical` for
-    // `crop=auto-vertical`). It is not a spelling of a NAME, so ingest has
-    // nothing to resolve and only the surfaces that document the shorthand read
-    // it. Reported HERE rather than at an emitter: this pass runs once per
-    // rebuild and reaches every scope, where the emitters run per render and are
-    // spread across two files. The key is left in the bag, so it still
+    // a name the computed bag uses for a crop value (`autoVertical` for
+    // `crop=auto-vertical`), written as an option. It is not a spelling of a
+    // NAME, so ingest has nothing to resolve, and no route reads it as the crop:
+    // it reached the renderer only while the author's options and the computed
+    // ones shared a bag, which was an accident rather than a design. Reported
+    // HERE rather than at an emitter: this pass runs once per rebuild and
+    // reaches every scope, where the emitters run per render and are spread
+    // across two files. The key is left in the bag, so it still
     // round-trips, re-warns on reparse and is emitted as written; a usable
     // attribute name reaches the markup as typed, which is the pass-through rule
     // and not an exception to it.
@@ -639,7 +641,7 @@ class BlissSVGBuilder {
       if (internalOnly) {
         this.#warnings.push({
           code: WARNING_CODES.MISPLACED_OPTION_SPELLING,
-          message: `"${key}" is the programmatic spelling of the "${internalOnly}" option, which the JavaScript entry points read. Written as an option it is not curated, so it was emitted as written and sets nothing. Write "${internalOnly}" instead.`,
+          message: `"${key}" is the library's internal name for "${internalOnly}", not an option, so it was emitted as written and sets nothing. Write "${internalOnly}" instead.`,
           source: key,
         });
       }
@@ -944,13 +946,6 @@ class BlissSVGBuilder {
   // deep-equal. What the two channels no longer differ on is which values get
   // in at all; that moved into the shared stage.
   //
-  // It does not expand the two internal-only shorthands. `autoVertical` means
-  // `crop=auto-vertical`, a whole option rather than a name, and `crop` is
-  // global-only, so expanding it in a bag below the document would replace a
-  // report with a key that is silently inert. The surfaces that document the
-  // shorthand read it; a stored composition is not one of them, since nothing
-  // the library serializes ever contains one.
-  //
   // The two kerning names are resolved here like any other curated option, even
   // though this is the one channel where such a key may be the PARSER's rather
   // than the author's: `toJSON()` stores a kerned character as `relativeKerning`.
@@ -991,31 +986,6 @@ class BlissSVGBuilder {
     for (const [key, value] of admitOptions(Object.entries(obj), warn, scope)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;
-      // Two internal names have no kebab twin for isNamedOptionKey to find, so
-      // they are translated by name to the option they mean. Same job
-      // `admitOptions` does for the rest of the curated vocabulary, done by
-      // lookup because there is no rule to derive it from. The lookup still
-      // finds them after that stage has run, for the same reason they need it:
-      // neither has a curated kebab spelling to be resolved to.
-      //
-      // The truthiness test is not decoration: both are boolean switches, so
-      // translating unconditionally would turn `{ autoVertical: false }` INTO
-      // the crop it asks not to have.
-      //
-      // The option a shorthand stands for goes through the stage in its own
-      // right, because the stage only saw the shorthand's name, which is bound
-      // to no scope. `crop` is: without this, `autoVertical` set on a character
-      // became a `crop` that was kept, saved, and reported only on reload.
-      const internalOnly = INTERNAL_ONLY_SPELLINGS.get(key);
-      if (internalOnly) {
-        if (value) {
-          const [optionKey, optionValue] = internalOnly.split('=');
-          for (const [admittedKey, admittedValue] of admitOptions([[optionKey, optionValue]], warn, scope)) {
-            raw[admittedKey] = admittedValue;
-          }
-        }
-        continue;
-      }
       if (typeof value === 'boolean') {
         raw[key] = value;
       } else {
@@ -4135,7 +4105,7 @@ class BlissSVGBuilder {
       const meant = internalOnly ? internalOnly.split('=')[0] : normalized;
       if (GLOBAL_ONLY_OPTION_KEYS.has(meant) || GLOBAL_ONLY_OPTION_KEYS.has(camelToKebab(meant))) {
         const named = internalOnly
-          ? `"${key}", the programmatic spelling of the global-only option "${internalOnly}"`
+          ? `"${key}", the library's internal name for the global-only option "${internalOnly}"`
           : `the global-only option "${key}"`;
         throw new Error(`${callName}("${code}"): defaultOptions cannot include ${named}; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }

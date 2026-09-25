@@ -90,7 +90,7 @@ const declaredStringLiterals = () =>
   );
 
 // The literals `crop` must declare, derived rather than restated. The two
-// internal-only shorthands each name one (`autoVertical` means
+// internal names each point at one (`autoVertical` is reported as
 // `crop=auto-vertical`), and `'auto'` is the value its four sides take, so the
 // bulk option accepts everything a side does.
 const requiredCropLiterals = () => [
@@ -111,7 +111,7 @@ const expectedOptionTypes = () => {
   // to judge. It still takes a string, and the typed surface has to say so.
   const families = [
     [[...NUMERIC_OPTION_POLICY.keys(), ...INTERNAL_OPTIONS], 'number'],
-    [[...BOOLEAN_OPTION_KEYS, ...INTERNAL_ONLY_SPELLINGS.keys()], 'boolean'],
+    [[...BOOLEAN_OPTION_KEYS], 'boolean'],
     [[...TEXT_OPTION_KEYS, 'key'], 'string'],
   ];
   // `INTERNAL_OPTIONS` holds both spellings of each kerning name, which resolve
@@ -126,16 +126,15 @@ const expectedOptionTypes = () => {
 };
 
 // Every option name a JavaScript caller can write, under the spelling the
-// contract gives JavaScript. THREE registries, not two: the curated vocabulary,
-// the internal positions and kerning markers, and the two shorthands that stand
-// for a whole option rather than for a name. The third is the one a first pass
-// misses, and missing it is not neutral here, because the row set is asserted as
-// an EXACT set: leaving it out does not merely fail to require those rows, it
-// forbids them.
+// contract gives JavaScript: the curated vocabulary and the internal positions
+// and kerning markers. The row set is asserted as an EXACT set, so a name
+// missing from either registry is forbidden as a row, not merely unrequired.
+// The two internal names for a crop value (`autoVertical`, `cropCompact`) are
+// not among them: every route reports them and neither sets anything.
 const expectedOptionRows = () =>
   [
     ...new Set(
-      [...KNOWN_OPTION_KEYS, ...INTERNAL_OPTIONS, ...INTERNAL_ONLY_SPELLINGS.keys()].map(
+      [...KNOWN_OPTION_KEYS, ...INTERNAL_OPTIONS].map(
         programmaticOptionKey,
       ),
     ),
@@ -196,18 +195,12 @@ describe('BlissSVGBuilder typed option surface', () => {
       expect(declaredOptionRows().filter((row) => row.includes('-'))).toEqual([]);
     });
 
-    it.each([...INTERNAL_ONLY_SPELLINGS])('declares %s, which really does mean %s', (shorthand, expansion) => {
-      // the shipped `warning-codes.md` teaches `{ autoVertical: true }` as the
-      // JavaScript form, so the type has to carry it; a DSL bracket reports
-      // MISPLACED_OPTION_SPELLING for the same name, which is the documented
-      // split rather than an inconsistency
-      expect(declaredOptionRows()).toContain(shorthand);
-
-      const [option, value] = expansion.split('=');
-      const viaShorthand = new BlissSVGBuilder('B291', { [shorthand]: true });
-      expect(viaShorthand.svgCode).toBe(new BlissSVGBuilder('B291', { [option]: value }).svgCode);
-      expect(viaShorthand.svgCode).not.toBe(new BlissSVGBuilder('B291').svgCode);
-      expect(viaShorthand.warnings).toEqual([]);
+    it.each([...INTERNAL_ONLY_SPELLINGS])('does not declare %s, an internal name for %s that every route reports', (internal) => {
+      // A declared row would promise the name works, and it does not on any
+      // route: it is reported with MISPLACED_OPTION_SPELLING and sets nothing.
+      expect(declaredOptionRows()).not.toContain(internal);
+      expect(new BlissSVGBuilder('B291', { [internal]: true }).warnings.map((w) => w.code))
+        .toEqual(['MISPLACED_OPTION_SPELLING']);
     });
 
     it('declares `key`, which a handle honours as element identity', () => {
