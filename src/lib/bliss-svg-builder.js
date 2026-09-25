@@ -4033,7 +4033,7 @@ class BlissSVGBuilder {
       // (round-4 review F1).
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
-        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
         entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
@@ -4048,7 +4048,7 @@ class BlissSVGBuilder {
   // are touched, because hyphenating an arbitrary name is a guess that would
   // destroy `preserveAspectRatio` and every camelCase data attribute.
   //
-  // Runs AFTER the global-only guard, on the object that guard judged, for two
+  // Runs AFTER the defaultOptions guard, on the object that guard judged, for two
   // reasons. The guard's error must name the spelling the caller typed, or it
   // tells them to fix a key they never wrote; and translating first could not
   // smuggle anything past it anyway, since it already tests both spellings.
@@ -4074,14 +4074,23 @@ class BlissSVGBuilder {
     return translated;
   }
 
-  // A definition's defaultOptions attach at glyph/part level, where a
-  // builder-canvas (global-only) option key is inert at EVERY use form — and a
-  // ;; overlay stores the definition NAME, so such a key would never reach a
-  // parse boundary that could warn (silent forever; review-fix round 2, F1).
-  // A definition must be clean: reject at the source, like the codeString
-  // guards. Both spellings are checked (defaultOptions are stored verbatim,
-  // so a camelCase key is just as inert).
-  static #assertNoGlobalOnlyDefaultOptions(callName, code, defaultOptions) {
+  // A definition says what a character IS, and its defaultOptions attach to
+  // every use of it, at character or part level depending on how the use is
+  // written. So a key can be a default only if it means the same thing at every
+  // use, and five kinds cannot:
+  // - A builder-canvas (global-only) key and a layer key act on the whole SVG,
+  //   so they are inert at every use, and a ;; overlay stores the definition
+  //   NAME, so no parse boundary would ever report them.
+  // - A position or kerning key says where ONE use sits: in its parent, or
+  //   after its neighbour. As a default neither had one meaning. Kerning
+  //   applied where the definition stood as a character and was saved as a
+  //   misplaced bracket where it stood as a part, and a position beat the
+  //   coordinate the author wrote at the use site.
+  // - `key` identifies one element, so as a default every use claims the same.
+  // Refused at the source, like the codeString guards, in the spelling the
+  // caller typed. Both spellings are checked, because the translation to the
+  // stored spelling runs after this guard.
+  static #assertDefaultOptionsDescribeTheCharacter(callName, code, defaultOptions) {
     for (const key of Object.keys(defaultOptions)) {
       // Trim before matching: the serializer emits a padded key as
       // '[ margin=2]' and #parseOptions reads that as plain 'margin', so a
@@ -4115,6 +4124,15 @@ class BlissSVGBuilder {
       // SVG, so it is inert wherever a definition's defaults attach.
       if (isLayerAttributeKey(normalized)) {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include the layer option "${key}"; it targets a layer of the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
+      }
+      if (normalized === 'x' || normalized === 'y') {
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include the position option "${key}"; a position says where one use of a character sits, not what the character is. Set it where the code is used instead, as a coordinate (${code}:x,y) or the ${normalized} option on that element.`);
+      }
+      if (Object.hasOwn(KERNING_OPTION_KEYS, normalized)) {
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include the kerning option "${key}"; kerning is the gap before one use of a character, not part of what the character is. Set it where the code is used instead, with an RK:/AK: marker before it or in that character's options, or in the kerningRules of the character before it when the gap depends on the pair.`);
+      }
+      if (normalized === 'key') {
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include "${key}"; a key identifies one element, so every use of the definition would share it. Set it on the element where the code is used instead.`);
       }
     }
   }
@@ -4191,7 +4209,7 @@ class BlissSVGBuilder {
       // (round-4 review F1).
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
-        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
         entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
@@ -4236,7 +4254,7 @@ class BlissSVGBuilder {
       // (round-4 review F1).
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
-        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
         entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
@@ -4365,7 +4383,7 @@ class BlissSVGBuilder {
       // (round-4 review F1).
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
-        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('define', code, defaultOptionsSnapshot);
+        BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
         entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
@@ -4685,7 +4703,7 @@ class BlissSVGBuilder {
     if (changes.defaultOptions && typeof changes.defaultOptions === 'object') {
       const defaultOptionsSnapshot = { ...changes.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
-        BlissSVGBuilder.#assertNoGlobalOnlyDefaultOptions('patchDefinition', code, defaultOptionsSnapshot);
+        BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('patchDefinition', code, defaultOptionsSnapshot);
       }
       changes = { ...changes, defaultOptions: BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings) };
     }

@@ -27,7 +27,9 @@
  * - A misplaced key in a bag or bracket the caller wrote, on each route, see
  *   `BlissSVGBuilder.option-scope-admission.test.js`.
  * - A definition's `defaultOptions`, which refuse a canvas or layer key as a
- *   definition error, see `BlissParser.global-option-scope.test.js`.
+ *   definition error, see `BlissParser.global-option-scope.test.js`, and a
+ *   position, kerning or `key` too, see
+ *   `BlissSVGBuilder.definition-use-site-options.test.js`.
  * - The other ways the two readers of a code string differ (a bare `>` or a
  *   second bracket in a slot), tracked in the backlog.
  * - That no route skips the scope, see

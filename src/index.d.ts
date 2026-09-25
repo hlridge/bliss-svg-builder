@@ -651,13 +651,19 @@ export interface GlyphDefinition {
   /**
    * Default options merged into each use of the definition. Keys must be
    * well-formed option names (letters, digits, hyphens; names beginning with
-   * `on` are rejected, as for any attribute) and may not include a global-only
-   * (builder-canvas) option key such as `margin` or `grid`, nor a
-   * target-prefixed key such as `content--fill` or `grid-line--sky--stroke` —
-   * those configure the whole SVG or name a part of it, and would be inert on a
-   * definition; `define()` reports a violation in its `errors` result,
-   * `patchDefinition()` throws. `autoVertical` and `cropCompact`, the library's
-   * internal names for two `crop` values, are refused on the same ground.
+   * `on` are rejected, as for any attribute), and two kinds of key are refused:
+   * - One that acts on the whole SVG: a global-only (builder-canvas) key such
+   *   as `margin` or `grid`, or a target-prefixed key such as `content--fill`
+   *   or `grid-line--sky--stroke`. It would be inert on a definition.
+   *   `autoVertical` and `cropCompact`, the library's internal names for two
+   *   `crop` values, are refused on the same ground.
+   * - One that belongs to a single use of the character: a position (`x`,
+   *   `y`), kerning (`relativeKerning`, `absoluteKerning`, in either spelling)
+   *   or `key`. A definition says what a character is, so write these where
+   *   the code is used.
+   *
+   * `define()` reports a violation in its `errors` result, and
+   * `patchDefinition()` throws.
    *
    * This is a programmatic surface, so a curated option may be written in
    * camelCase (`{ strokeWidth: 2 }`) and is stored under its `stroke-width`
@@ -683,7 +689,7 @@ export interface ShapeDefinition {
   x?: number;
   y?: number;
   extraPathOptions?: Record<string, any>;
-  /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
+  /** Default options merged into each use; the keys a glyph definition refuses are refused here too (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
@@ -699,7 +705,7 @@ export interface ExternalGlyphDefinition {
   y?: number;
   height?: number;
   kerningRules?: Record<string, any>;
-  /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
+  /** Default options merged into each use; the keys a glyph definition refuses are refused here too (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
@@ -708,7 +714,7 @@ export interface BareDefinition {
   codeString: string;
   /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
   isIndicator?: never;
-  /** Default options merged into each use; global-only option keys are rejected (see {@link GlyphDefinition.defaultOptions}). */
+  /** Default options merged into each use; the keys a glyph definition refuses are refused here too (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
@@ -1282,7 +1288,7 @@ export declare class BlissSVGBuilder {
    *   bakes an indicator (or an `isIndicator` change that leaves one baked); internal
    *   coordinates in a multi-character bare `codeString` (kerning markers allowed);
    *   a patch that would turn an already-referenced code into an indicator; or a
-   *   global-only `defaultOptions` key.
+   *   `defaultOptions` key a definition cannot hold (see {@link GlyphDefinition.defaultOptions}).
    */
   static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true; warnings: Warning[] };
 }

@@ -409,7 +409,7 @@ B99/RK:3/AK:4/B291                    →  kerns by AK:4; "RK:3" is ignored
 B99/RK:3/[absolute-kerning=4]B291     →  kerns by the option; "RK:3" is ignored
 ```
 
-A definition's `defaultOptions` is a default, so a value written on the character overrides it silently. That is what a default is for.
+A definition cannot supply a kerning value of its own: `define()` refuses one in `defaultOptions`, since the gap before a character belongs to one use of it. So every value this names was written on the character.
 
 ### `MULTIPLE_GEOMETRY_VALUES`
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
@@ -11,10 +11,12 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  *   - an OPTION beats a MARKER, because options override the DSL shorthand;
  *   - among equals, the one written LATER wins;
- *   - a definition's `defaultOptions` is a default, so it loses to both;
- *   - every value a writer supplied and the winner displaced is reported with
- *     `MULTIPLE_KERNING_VALUES`. Nothing throws, and a displaced DEFAULT says
- *     nothing, since being overridden is what a default is for.
+ *   - every value the winner displaced is reported with
+ *     `MULTIPLE_KERNING_VALUES`, and nothing throws.
+ *
+ * A definition cannot bring a kerning value of its own: `define()` refuses one
+ * in `defaultOptions`, since the gap before a character belongs to one use of
+ * it (see `BlissSVGBuilder.definition-use-site-options.test.js`).
  *
  * Before this, `RK:` always beat `AK:` whatever the order, the loser vanished
  * in silence, and both long-form options were accepted, serialized, and inert.
@@ -228,56 +230,13 @@ describe('BlissSVGBuilder kerning options', () => {
     });
   });
 
-  describe('when a definition carries kerning in its defaultOptions', () => {
-    const KDEF = 'C5_KERN_DEFAULT';
-
-    beforeEach(() => {
-      BlissSVGBuilder.define({ [KDEF]: { type: 'glyph', codeString: 'B291', defaultOptions: { relativeKerning: 3 } } });
-    });
-
-    afterEach(() => {
-      BlissSVGBuilder.removeDefinition(KDEF);
-    });
-
-    it('applies the default when the writer says nothing', () => {
-      expect(glyphXs(`B99/${KDEF}`)[1]).toBe(7);
-    });
-
-    it('lets a written marker override it silently', () => {
-      // Overriding a default is what a default is for, so this is not a
-      // conflict between two written values and says nothing.
-      expect(glyphXs(`B99/AK:4/${KDEF}`)[1]).toBe(6);
-      expect(codes(`B99/AK:4/${KDEF}`)).toEqual([]);
-    });
-
-    it('lets a written option override it silently', () => {
-      expect(glyphXs(`B99/[absolute-kerning=4]${KDEF}`)[1]).toBe(6);
-      expect(codes(`B99/[absolute-kerning=4]${KDEF}`)).toEqual([]);
-    });
-
-    it('lets an API-set value override it as silently as the DSL does', () => {
-      // Once the default is normalized onto the character it looks like any
-      // other kerning value, so setting the other kind through the API must
-      // replace it rather than be read as a second authored value. The two
-      // surfaces hold the same state, so they must report the same thing.
-      const built = new BlissSVGBuilder(`B99/${KDEF}`);
-      built.glyph(1).setOptions({ absoluteKerning: 4 });
-      const dsl = new BlissSVGBuilder(`B99/AK:4/${KDEF}`);
-      expect(built.groups[0].children[1].x).toBe(6);
-      expect(built.warnings).toEqual(dsl.warnings);
-      expect(built.svgCode).toBe(dsl.svgCode);
-    });
-
-    it('takes the last of two defaults, silently, since neither was written here', () => {
-      BlissSVGBuilder.define({
-        [`${KDEF}2`]: { type: 'glyph', codeString: 'B291', defaultOptions: { relativeKerning: 3, absoluteKerning: 4 } },
+  describe('when a definition tries to carry kerning in its defaultOptions', () => {
+    it('refuses the definition, so every kerning value a character holds was written on it', () => {
+      const result = BlissSVGBuilder.define({
+        C5_KERN_DEFAULT: { type: 'glyph', codeString: 'B291', defaultOptions: { relativeKerning: 3 } },
       });
-      try {
-        expect(glyphXs(`B99/${KDEF}2`)[1]).toBe(6);
-        expect(codes(`B99/${KDEF}2`)).toEqual([]);
-      } finally {
-        BlissSVGBuilder.removeDefinition(`${KDEF}2`);
-      }
+      expect(result.errors).toHaveLength(1);
+      expect(BlissSVGBuilder.isDefined('C5_KERN_DEFAULT')).toBe(false);
     });
   });
 });

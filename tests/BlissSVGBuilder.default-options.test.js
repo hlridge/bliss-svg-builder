@@ -43,6 +43,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - The full `BlissSVGBuilder.define` API beyond the defaultOptions
  *   field, see `tests/BlissSVGBuilder.define.test.js` and
  *   `tests/BlissSVGBuilder.definition-maintenance.test.js`.
+ * - The keys defaultOptions cannot hold at all: canvas-wide and layer keys, see
+ *   `BlissParser.global-option-scope.test.js`; position, kerning and `key`, see
+ *   `BlissSVGBuilder.definition-use-site-options.test.js`.
  * - Visual regression of the rendered defaultOptions output, see
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
  *
@@ -116,25 +119,19 @@ describe('BlissSVGBuilder defaultOptions', () => {
       expect(svg).not.toContain('strokeDasharray');
     });
 
-    it('translates a kerning name, which the report side deliberately does not judge', () => {
-      // The translation gate is `isNamedOptionKey`, which answers for the two
-      // kerning spellings as well as the curated vocabulary; the REPORT asks
-      // `KNOWN_OPTION_KEYS`, which does not. The two halves disagree on purpose:
-      // the parser writes `relativeKerning` into an options bag itself, so a
-      // report there cannot tell a promoted key from a written one, while a
-      // definition's defaults are a programmatic surface where camelCase is the
-      // documented spelling of everything else.
-      //
-      // Asserted on what the registry STORES. `kerningOptionEntries` reads all
-      // four spellings, so no rendered picture can see which one was stored, and
-      // a mutant that stores the camel key survives the whole suite otherwise.
-      defineTracked({
+    it('refuses a kerning name in either spelling rather than translating it', () => {
+      // A definition cannot hold kerning at all: the gap before a character
+      // belongs to one use of it (see
+      // `BlissSVGBuilder.definition-use-site-options.test.js`). The guard runs
+      // before the translation, so each refusal names the spelling typed.
+      const result = defineTracked({
         DOPTKERNA: { type: 'glyph', codeString: 'B291', defaultOptions: { relativeKerning: 3 } },
         DOPTKERNB: { type: 'glyph', codeString: 'B291', defaultOptions: { 'relative-kerning': 3 } },
       });
-      expect(BlissSVGBuilder.getDefinition('DOPTKERNA').defaultOptions).toEqual({ 'relative-kerning': 3 });
-      expect(new BlissSVGBuilder('B99/DOPTKERNA').svgCode.replace(/DOPTKERNA/g, 'X'))
-        .toBe(new BlissSVGBuilder('B99/DOPTKERNB').svgCode.replace(/DOPTKERNB/g, 'X'));
+      expect(result.defined).toEqual([]);
+      expect(result.errors).toHaveLength(2);
+      expect(result.errors[0]).toContain('"relativeKerning"');
+      expect(result.errors[1]).toContain('"relative-kerning"');
     });
 
     it('names the written spelling when the guard refuses the key', () => {

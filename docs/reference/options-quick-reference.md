@@ -50,7 +50,7 @@ Precedence within a dot type: **absolute wins over relative**. These options cas
 
 ## Positioning
 
-These four are the exception to the scope note above: they are not canvas-wide, they position one element, and what they mean depends on which scope you write them at. They work identically in the DSL and through an options object (`{ x: 5 }`, `{ relativeKerning: -1 }`), including the opts argument of `addGlyph`, `insertPart`, `replaceGlyph` and the rest of that family.
+These four are the exception to the scope note above: they are not canvas-wide, they position one element, and what they mean depends on which scope you write them at. They work identically in the DSL and through an options object (`{ x: 5 }`, `{ relativeKerning: -1 }`), including the opts argument of `addGlyph`, `insertPart`, `replaceGlyph` and the rest of that family. A definition's `defaultOptions` cannot hold them, since they place one use of a character rather than describe the character.
 
 | Option | Scope | Description |
 |--------|-------|-------------|

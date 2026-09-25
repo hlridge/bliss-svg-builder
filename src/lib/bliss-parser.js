@@ -364,12 +364,14 @@ export function extractPositionFromOptions(obj, parseWarnings, level = 3) {
 
 // Kerning is ONE value per character, however it is written: the `RK:`/`AK:`
 // markers and the long-form options are four spellings of the same thing. An
-// OPTION beats a MARKER (options override the DSL shorthand), a written value
-// beats a definition default, and among equals the one written LATER wins.
-// Every value a WRITER supplied and the winner displaced is reported; a
-// displaced default is not, since being overridden is what a default is for.
+// OPTION beats a MARKER (options override the DSL shorthand), and among equals
+// the one written LATER wins. Every value the winner displaced is reported.
 // Resolving here leaves the layout one numeric key to read and the serializer
 // one spelling to emit.
+//
+// Every value here was written on this character. A definition cannot bring
+// one: `define()` refuses kerning in `defaultOptions`, because the gap before a
+// character belongs to one use of it, not to what it is.
 export function resolveKerning(glyphObj, marker, bracketEntries, parseWarnings) {
   const options = glyphObj.options;
   if (!options) return;
@@ -391,37 +393,21 @@ export function resolveKerning(glyphObj, marker, bracketEntries, parseWarnings) 
   // fall out as "everything before the winner".
   const written = [...(marker ? [marker] : []), ...bracketEntries.map(numeric).filter(Boolean)];
 
-  // Clear what this character wrote, in the exact spelling it wrote it, so
-  // whatever is left on the options came from a definition default.
+  // Clear what this character wrote, in the exact spelling it wrote it, so the
+  // winner is the only kerning its options keep.
   for (const entry of bracketEntries) delete options[entry.writtenKey];
   if (marker) delete options[marker.key];
+  if (written.length === 0) return;
 
-  if (written.length > 0) {
-    // A written value beats a definition default, including a default of the
-    // other kind, which would otherwise linger and win the layout's own
-    // relative-before-absolute tie-break.
-    for (const key of Object.keys(KERNING_OPTION_KEYS)) delete options[key];
-    for (const displaced of written.slice(0, -1)) {
-      parseWarnings.push({
-        code: WARNING_CODES.MULTIPLE_KERNING_VALUES,
-        message: `A character takes one kerning value, so "${displaced.source}" is ignored. An option beats an RK:/AK: marker, and the last value written wins.`,
-        source: displaced.source,
-      });
-    }
-    const winner = written[written.length - 1];
-    options[winner.key] = winner.value;
-    return;
+  for (const displaced of written.slice(0, -1)) {
+    parseWarnings.push({
+      code: WARNING_CODES.MULTIPLE_KERNING_VALUES,
+      message: `A character takes one kerning value, so "${displaced.source}" is ignored. An option beats an RK:/AK: marker, and the last value written wins.`,
+      source: displaced.source,
+    });
   }
-
-  // Nothing usable was written on this character, so a definition default is
-  // all there is. Normalize it to the numeric key whatever spelling it used.
-  // (A malformed written value has already been reported and ignored, which
-  // leaves the default standing, exactly as a malformed marker does.)
-  const defaults = kerningOptionEntries(options);
-  if (defaults.length === 0) return;
-  for (const key of Object.keys(KERNING_OPTION_KEYS)) delete options[key];
-  const winner = numeric(defaults[defaults.length - 1]);
-  if (winner) options[winner.key] = winner.value;
+  const winner = written[written.length - 1];
+  options[winner.key] = winner.value;
 }
 
 // What a bare X code denotes, for the sites that meet one already stripped of
@@ -1761,10 +1747,8 @@ export class BlissParser {
           continue;
         }
 
-        // Applied before the defaultOptions merge below, so a written marker
-        // beats a definition default. A bracket option on this character can
-        // still displace it; resolveKerning settles that once the bracket is
-        // parsed.
+        // A bracket option on this character can still displace it;
+        // resolveKerning settles that once the bracket is parsed.
         const markerKerning = pendingKerning;
         if (markerKerning) {
           (glyphObj.options ??= {})[markerKerning.key] = markerKerning.value;
@@ -1792,9 +1776,8 @@ export class BlissParser {
         let charBracketsSeen = 0;
         let charMatch;
         // Kerning written in the character bracket, captured here rather than
-        // read back off the merged options: only what the bracket itself
-        // carries outranks a marker, while the same key arriving from a
-        // definition's defaultOptions is a default and loses to one.
+        // read back off the merged options, which hold the marker's value too:
+        // only what the bracket itself carries outranks a marker.
         let bracketKerning = [];
         while ((charMatch = glyphCodeString.match(/^(\[[^\[\]]*\])(?!>)(.*)/)) !== null) {
           charBracketsSeen++;

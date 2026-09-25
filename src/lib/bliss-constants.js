@@ -794,8 +794,7 @@ export const WARNING_CODES = Object.freeze({
   // one character kerned twice: the `RK:`/`AK:` markers and the long-form
   // `[relative-kerning=N]` / `[absolute-kerning=N]` options are spellings of
   // one value, so an option beats a marker, the last one written wins, and
-  // every displaced value is named. A definition default that a written value
-  // overrides is not a conflict and stays silent.
+  // every displaced value is named.
   MULTIPLE_KERNING_VALUES: 'MULTIPLE_KERNING_VALUES',
   // one viewBox written two ways: a global `viewBox` attribute states the value
   // that margin/crop/min-width/center exist to compute, so the written value
@@ -1387,11 +1386,11 @@ export const isScopeRefusal = (warning) => SCOPE_BOUND_OPTIONS.some((r) => r.cod
  * a character is reported once, as misplaced. A key refused for its scope is
  * never noted as a spelling either, for the same reason a refused value is not.
  * Without a scope nothing is judged for scope. That is a definition's
- * `defaultOptions`, and only those: `define()` refuses a canvas-wide or
- * target-prefixed key there as a definition error, and the defaults attach
- * wherever the definition is used, which the stage cannot know when they are
- * declared. A definition's code string is DSL text, so its brackets are judged
- * at part scope wherever it is expanded.
+ * `defaultOptions`, and only those: the defaults attach wherever the definition
+ * is used, which the stage cannot know when they are declared, and no key bound
+ * to a scope can be among them, since `define()` refuses every one (canvas-wide,
+ * target-prefixed, kerning) as a definition error. A definition's code string
+ * is DSL text, so its brackets are judged at part scope wherever it is expanded.
  *
  * @param {Iterable<[string, unknown]>} writtenEntries - keys as written, with their values
  * @param {(warning: object) => void} [warn] - where to send a refusal

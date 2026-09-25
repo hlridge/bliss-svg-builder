@@ -196,9 +196,10 @@ describe('BlissSVGBuilder option admission drift', () => {
     });
 
     it("leaves one builder stage call unscoped, the one reading a definition's defaults", () => {
-      // `define()` refuses a canvas or layer key in `defaultOptions` as an error
-      // before this call runs, and a kerning default has no scope yet: it lands
-      // wherever the definition is used, which this call cannot know.
+      // The defaults land wherever the definition is used, which this call
+      // cannot know, and there is nothing for a scope to judge: `define()`
+      // refuses every key bound to one (canvas-wide, target-prefixed, kerning)
+      // in `defaultOptions` as an error before this call runs.
       const builder = libSource('bliss-svg-builder.js');
       expect(callArguments(builder, 'admitOptions')).toHaveLength(callCount(builder, 'admitOptions'));
       expect(unscopedCalls(builder, 'admitOptions')).toEqual(['Object.entries(defaultOptions), warn']);
