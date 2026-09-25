@@ -242,6 +242,19 @@ A canvas-wide option key placed at word, character, or part scope. These keys co
 
 The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background`/`background-*`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
 
+The report is the same however the key reaches that scope: a bracket, a bracket inside a custom code's `codeString`, a composition object, `setOptions()` or the options of an adding or replacing method, and `setTransientOptions()`. Only the last sentence of the message changes, to say where the key goes in the notation you were using:
+
+```js
+const builder = new BlissSVGBuilder('B313');
+builder.glyph(0).setOptions({ marginTop: 3 });
+// MISPLACED_GLOBAL_OPTION, source 'margin-top=3':
+// "Global option (margin-top=3) ignored at character level: it configures
+//  the whole SVG. Pass it in the builder's options to apply it globally."
+builder.toString();  // 'B313'
+```
+
+The next two codes, `MISPLACED_KERNING_OPTION` and `MISPLACED_LAYER_OPTION`, follow the same rule.
+
 ### `MISPLACED_KERNING_OPTION`
 
 The mirror image of the one above: a kerning option (`relative-kerning`, `absolute-kerning`, in either the kebab or camel spelling) written at part, word, or global scope. Kerning is the gap **before a character**, so those scopes have nothing for it to do; the key is dropped and the content renders unchanged.
@@ -254,11 +267,13 @@ B99/[relative-kerning=3]B291 →  valid: character scope is where kerning lives
 
 Any other option in the same bracket is kept, so `[relative-kerning=3;color=red]>B291` still renders the part in red.
 
+The builder's own options argument is global scope, so kerning handed to it is reported too: `new BlissSVGBuilder('B291', { relativeKerning: 3 })` warns and does not kern. Set it on the character instead, with `builder.glyph(0).setOptions({ relativeKerning: 3 })`. The one route with its own answer is `setTransientOptions()`, which cannot carry kerning at any scope and reports [`MISPLACED_TRANSIENT_OPTION`](#misplaced-transient-option) instead.
+
 Dropping it is what keeps it out of the drawing. An option key the library does not recognize at a given scope is passed through to the SVG as an attribute (that is what `[data-*]` options are for), so leaving a misplaced kerning option in place would put `relative-kerning="3"` into the output, where it means nothing to any renderer. An unrecognized key still passes through, warning-free, exactly as before.
 
 ### `MISPLACED_LAYER_OPTION`
 
-A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope **in a bracket**. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged. The same key reaching the same scope through object input or `setTransientOptions` is dropped too, but in silence: nothing is emitted and no warning is raised. This code's name is older than the vocabulary: what it calls a layer is what the handbook calls a [target](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture), and they are the same thing.
+A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--stroke`, anything with a `--` in its key) written at part, word, or character scope. The parts it can name belong to the document as a whole, so below global scope there is nothing for the key to reach; it is dropped and the content renders unchanged. This code's name is older than the vocabulary: what it calls a layer is what the handbook calls a [target](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture), and they are the same thing.
 
 ```
 [grid--opacity=0.3]|B291   →  renders B291, the prefixed key dropped

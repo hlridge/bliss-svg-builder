@@ -124,8 +124,7 @@ export interface BlissOptions {
   // prefix and the key splits at the LAST `--`
   // (`'grid-line--sky--stroke-dasharray': 2`). At element scope the key lands on
   // that element's own <g>; a target prefix has nothing to name there, so it is
-  // dropped, reported with `MISPLACED_LAYER_OPTION` when it was written in a DSL
-  // bracket and dropped in silence on the object-input and transient surfaces.
+  // dropped and reported with `MISPLACED_LAYER_OPTION`, however it was written.
   // Includes `boolean` so the boolean options (`grid`, `center`,
   // `errorPlaceholder`) conform to the index signature; without it `tsc` rejects
   // this interface. It is also what keeps the kebab spelling of a curated option
@@ -561,6 +560,12 @@ export declare class ElementHandle {
   /**
    * Sets or merges options on this element. Accepts flat options (treated as
    * overrides) or { defaults, overrides }.
+   *
+   * A key that cannot act at this element's level is dropped with the warning
+   * the same key gets in a bracket there: a canvas-wide option such as `margin`
+   * (`MISPLACED_GLOBAL_OPTION`), kerning anywhere but a character
+   * (`MISPLACED_KERNING_OPTION`), a target-prefixed key such as `grid--opacity`
+   * (`MISPLACED_LAYER_OPTION`). It is not stored, so it is never saved.
    * @throws {TypeError} If `opts` is provided and is not an object.
    */
   setOptions(opts: BlissOptions | OptionLayers): this;
@@ -595,7 +600,10 @@ export declare class ElementHandle {
    * drawing it (`x`, `y`, either kerning option in either spelling, and `key`)
    * are refused with a `MISPLACED_TRANSIENT_OPTION` warning, and an unusable
    * attribute name with `UNSAFE_ATTRIBUTE_NAME`. A space carries no decoration
-   * in this channel either, matching `MISPLACED_SPACE_DECORATION`.
+   * in this channel either, matching `MISPLACED_SPACE_DECORATION`. A key that
+   * cannot act at this element's level is refused as `setOptions` refuses it:
+   * `minWidth` on a character reports `MISPLACED_GLOBAL_OPTION`, since it sizes
+   * the whole SVG and belongs on the builder's own `setTransientOptions`.
    *
    * @throws {TypeError} If `opts` is provided and is not an object.
    */

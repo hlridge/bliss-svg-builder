@@ -1046,6 +1046,8 @@ builder.glyph(0).setOptions({
 
 A non-object `opts` throws a `TypeError`; an empty `{}` is a no-op (see [error handling](#error-handling)).
 
+A key that cannot act at the element's level is dropped with the warning the same key gets in a bracket there, and is not saved: a canvas-wide option such as `margin` ([`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option)), kerning anywhere but a character ([`MISPLACED_KERNING_OPTION`](/reference/warning-codes#misplaced-kerning-option)), or a key naming a part of the picture such as `grid--opacity` ([`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option)). The same holds for the options of the adding and replacing methods.
+
 #### `.removeOptions(...keys)`
 
 Removes specific option keys:
@@ -1092,7 +1094,7 @@ Transient options exist only in code, by design. The DSL string *is* the seriali
 
 Some option keys are read while the composition is being built rather than while it is drawn, so a transient spelling could never reach the picture. Rather than accept one and quietly do nothing, they are dropped with a `MISPLACED_TRANSIENT_OPTION` warning: `x`, `y`, `relativeKerning` and `absoluteKerning` (in either spelling), and `key`. Set those with `setOptions` instead.
 
-An attribute name that can never be emitted — an `on*` event handler, or a name outside letters, digits and dashes — is dropped with `UNSAFE_ATTRIBUTE_NAME`. A space carries no decoration in this channel either, matching how a normal option on a space already behaves (`MISPLACED_SPACE_DECORATION`).
+An attribute name that can never be emitted (an `on*` event handler, or a name outside letters, digits and dashes) is dropped with `UNSAFE_ATTRIBUTE_NAME`. A space carries no decoration in this channel either, matching how a normal option on a space already behaves (`MISPLACED_SPACE_DECORATION`). A key that cannot act at the element's level is refused as [`setOptions`](#setoptions-opts) refuses it: `minWidth` on a character reports `MISPLACED_GLOBAL_OPTION`, since it sizes the whole SVG and belongs on the builder's own `setTransientOptions`.
 
 #### They do not survive a JSON round trip
 
