@@ -37,6 +37,9 @@
  * - Every call carrying a bag toward the stage naming its scope, hop by hop, on
  *   the DSL, definition-expansion, composition-object, setter and handle
  *   routes; the one call that passes none, named with its reason.
+ * - That reason checked for every option the library names and every layer
+ *   target: a key a bracket refuses below global scope is one `define()`
+ *   refuses as a default, so a scope row added without the guard fails here.
  * - That both scans can fail: a route with a resolution added back, a stage
  *   that stopped resolving, a call past the end of the function being read, a
  *   call with no scope, a scope code written outside the table, and a call
@@ -62,6 +65,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as constantsModule from '../src/lib/bliss-constants.js';
+import { BlissSVGBuilder } from '../src/index.js';
 
 const libSource = (file) => readFileSync(resolve(import.meta.dirname, '..', 'src', 'lib', file), 'utf8');
 
@@ -110,6 +114,27 @@ const namesWhereItWrites = (args) =>
   /(?:\bscope|\blevel|#scopeLevel|\{[^{}]*\bnotation:[^{}]*\}|'(?:global|group|character|part)')\s*,?\s*$/.test(args);
 
 const unscopedCalls = (text, callee) => callArguments(text, callee).filter((args) => !namesWhereItWrites(args));
+
+const camelCase = (key) => key.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+
+// Every option the library names, in both spellings, and a key for every layer
+// target: where a key bound to a scope would come from, now or later.
+const OPTION_VOCABULARY = [...new Set([
+  ...constantsModule.KNOWN_OPTION_KEYS,
+  ...[...constantsModule.KNOWN_OPTION_KEYS].map(camelCase),
+  ...Object.keys(constantsModule.KERNING_OPTION_KEYS),
+  ...[...constantsModule.LAYER_TARGETS].map((target) => `${target}--opacity`),
+])];
+
+// True when a bracket at word, character or part scope drops the key for where
+// it was written. Asked of the report, so a scope row with a code of its own
+// counts too.
+const refusedBelowGlobal = (key) => ['|B291', 'B291', '>B291'].some((site) =>
+  new BlissSVGBuilder(`[${key}=1]${site}`).warnings.some(constantsModule.isScopeRefusal));
+
+const refusedAsDefault = (key, code) => BlissSVGBuilder.define({
+  [code]: { type: 'glyph', codeString: 'B291', defaultOptions: { [key]: '1' } },
+}).errors.length > 0;
 
 describe('BlissSVGBuilder option admission drift', () => {
   describe('when counting the places an option name is resolved', () => {
@@ -203,6 +228,15 @@ describe('BlissSVGBuilder option admission drift', () => {
       const builder = libSource('bliss-svg-builder.js');
       expect(callArguments(builder, 'admitOptions')).toHaveLength(callCount(builder, 'admitOptions'));
       expect(unscopedCalls(builder, 'admitOptions')).toEqual(['Object.entries(defaultOptions), warn']);
+    });
+
+    it('finds that reason true for every option: define() refuses as a default each key a bracket below global scope refuses', () => {
+      const bound = OPTION_VOCABULARY.filter(refusedBelowGlobal);
+      expect(bound).toEqual(expect.arrayContaining(['margin', 'marginTop', 'relative-kerning', 'relativeKerning', 'background--opacity']));
+      // pins the reason the unscoped call above gives; a stage judging that call
+      // at part scope instead survived the 2026-09-25 close-gate mutants as
+      // equivalent, because of this
+      expect(bound.filter((key, index) => !refusedAsDefault(key, `DRIFTDEFAULT${index}`))).toEqual([]);
     });
   });
 
