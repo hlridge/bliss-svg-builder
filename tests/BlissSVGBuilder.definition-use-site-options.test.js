@@ -15,7 +15,8 @@
  *
  * Covers:
  * - Each of the seven spellings on each define path (glyph, shape, external
- *   glyph, bare alias) and through `patchDefinition()`, named as typed.
+ *   glyph, bare alias) and through `patchDefinition()`, named as typed, and
+ *   `X` / `Y`, which the name resolution stores as `x` / `y`.
  * - A whitespace-padded spelling, which is the same key at the next boundary.
  * - What each refusal says, word for word, and that the canvas and layer
  *   refusals of the same guard still say what they said.
@@ -42,7 +43,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
-const USE_SITE_KEYS = ['x', 'y', 'relativeKerning', 'relative-kerning', 'absoluteKerning', 'absolute-kerning', 'key'];
+// `X` and `Y` are here because the option name resolution stores them as `x`
+// and `y`: they are those keys in all but spelling.
+const USE_SITE_KEYS = ['x', 'y', 'X', 'Y', 'relativeKerning', 'relative-kerning', 'absoluteKerning', 'absolute-kerning', 'key'];
 
 const DEFINE_PATHS = [
   ['glyph', { type: 'glyph', codeString: 'B291' }],
@@ -106,6 +109,18 @@ describe('BlissSVGBuilder definition use-site options', () => {
       // advised "the  x option" and survived without this
       expect(result.errors[0]).toContain(advice);
       expect(BlissSVGBuilder.isDefined(code)).toBe(false);
+    });
+
+    it.each([
+      ['X', 'the x option on that element', 'USOCASE0'],
+      ['Y', 'the y option on that element', 'USOCASE1'],
+    ])('refuses %j as the axis it is stored as, and advises that axis', (key, advice, code) => {
+      // regression: the guard read the key as typed and let X through, stored as
+      // x, so a position default beat the coordinate written at the use site again
+      const result = BlissSVGBuilder.define({ [code]: { codeString: 'B291', defaultOptions: { [key]: 3 } } });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(`the position option "${key}"`);
+      expect(result.errors[0]).toContain(advice);
     });
   });
 

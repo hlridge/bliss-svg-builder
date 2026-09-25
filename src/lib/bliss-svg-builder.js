@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -4088,8 +4088,9 @@ class BlissSVGBuilder {
   //   coordinate the author wrote at the use site.
   // - `key` identifies one element, so as a default every use claims the same.
   // Refused at the source, like the codeString guards, in the spelling the
-  // caller typed. Both spellings are checked, because the translation to the
-  // stored spelling runs after this guard.
+  // caller typed. The translation to the stored spelling runs after this guard,
+  // so a canvas key is checked in both spellings and a use-site key by the name
+  // it will be stored under.
   static #assertDefaultOptionsDescribeTheCharacter(callName, code, defaultOptions) {
     for (const key of Object.keys(defaultOptions)) {
       // Trim before matching: the serializer emits a padded key as
@@ -4125,13 +4126,16 @@ class BlissSVGBuilder {
       if (isLayerAttributeKey(normalized)) {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include the layer option "${key}"; it targets a layer of the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
-      if (normalized === 'x' || normalized === 'y') {
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include the position option "${key}"; a position says where one use of a character sits, not what the character is. Set it where the code is used instead, as a coordinate (${code}:x,y) or the ${normalized} option on that element.`);
+      // The stored name is the one that acts where the definition is used, and
+      // it is not always the typed one: `X` is stored as `x`.
+      const stored = canonicalOptionKey(normalized);
+      if (stored === 'x' || stored === 'y') {
+        throw new Error(`${callName}("${code}"): defaultOptions cannot include the position option "${key}"; a position says where one use of a character sits, not what the character is. Set it where the code is used instead, as a coordinate (${code}:x,y) or the ${stored} option on that element.`);
       }
-      if (Object.hasOwn(KERNING_OPTION_KEYS, normalized)) {
+      if (Object.hasOwn(KERNING_OPTION_KEYS, stored)) {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include the kerning option "${key}"; kerning is the gap before one use of a character, not part of what the character is. Set it where the code is used instead, with an RK:/AK: marker before it or in that character's options, or in the kerningRules of the character before it when the gap depends on the pair.`);
       }
-      if (normalized === 'key') {
+      if (stored === 'key') {
         throw new Error(`${callName}("${code}"): defaultOptions cannot include "${key}"; a key identifies one element, so every use of the definition would share it. Set it on the element where the code is used instead.`);
       }
     }

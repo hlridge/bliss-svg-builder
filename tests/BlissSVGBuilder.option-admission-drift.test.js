@@ -28,8 +28,9 @@
  * Covers:
  * - No ingest route resolving an option name for itself.
  * - The one ingest resolution sitting inside the admission stage.
- * - The two resolutions that are not ingest at all, each named: removing an
- *   option by name, and clearing a coordinate the same call removes.
+ * - The three resolutions that are not ingest at all, each named: removing an
+ *   option by name, clearing a coordinate the same call removes, and refusing a
+ *   definition default by the name it would be stored under.
  * - Every ingest route running the stage: the DSL bracket, a composition
  *   object's bags, the JavaScript channels, a definition's `defaultOptions`.
  * - The scope table defined once, beside the stage, its codes written nowhere
@@ -93,6 +94,14 @@ const bodyOf = (text, fn) => {
 
 const nameResolutionsIn = (text, fn) => nameResolutions(bodyOf(text, fn));
 
+// One static method's body, ending at the first line that closes a block at
+// the method's own indent. Throws when the name is gone, as `bodyOf` does.
+const methodBodyOf = (text, method) => {
+  const body = text.split(`static ${method}(`)[1];
+  if (body === undefined) throw new Error(`${method} not found in the source being scanned`);
+  return body.split('\n  }')[0];
+};
+
 // A callee as a pattern: the `.` of a member call is literal. The `.` is what
 // tells a call (`X.#toRaw(`) from its definition (`static #toRaw(`).
 const asPattern = (callee) => callee.replaceAll('.', '\\.');
@@ -138,9 +147,17 @@ const refusedAsDefault = (key, code) => BlissSVGBuilder.define({
 
 describe('BlissSVGBuilder option admission drift', () => {
   describe('when counting the places an option name is resolved', () => {
-    it('finds none in the parser or the builder, which run the stage instead', () => {
+    it('finds none in the parser, which runs the stage instead', () => {
       expect(nameResolutions(libSource('bliss-parser.js'))).toBe(0);
-      expect(nameResolutions(libSource('bliss-svg-builder.js'))).toBe(0);
+    });
+
+    it("finds one in the builder, the definition guard's, which refuses a default by the name it is stored under", () => {
+      // Not ingest: the guard stores nothing and judges no value, it refuses the
+      // definition. It needs the stored name because the typed one can differ:
+      // `X` is stored as `x`.
+      const builder = libSource('bliss-svg-builder.js');
+      expect(nameResolutions(builder)).toBe(1);
+      expect(nameResolutions(methodBodyOf(builder, '#assertDefaultOptionsDescribeTheCharacter'))).toBe(1);
     });
 
     it('finds the one ingest resolution inside the admission stage', () => {
@@ -254,6 +271,12 @@ describe('BlissSVGBuilder option admission drift', () => {
       const past = 'const admitOptions = (entries) => {\n  return canonicalOptionKey(entries);\n};\n'
         + 'const elsewhere = (key) => canonicalOptionKey(key);\n';
       expect(nameResolutionsIn(past, 'admitOptions')).toBe(1);
+    });
+
+    it('stops at the end of the method it was asked about', () => {
+      const past = '  static #guard(key) {\n    if (key) {\n      return canonicalOptionKey(key);\n    }\n  }\n'
+        + '  static #other(key) {\n    return canonicalOptionKey(key);\n  }\n';
+      expect(nameResolutions(methodBodyOf(past, '#guard'))).toBe(1);
     });
   });
 
