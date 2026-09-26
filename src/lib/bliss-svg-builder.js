@@ -2981,6 +2981,8 @@ class BlissSVGBuilder {
     const obj = this.toJSON({ preserve: options.preserve, deep: true, flattenIndicators: options.flattenIndicators });
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
+    // A custom name reads the same way throughout one save, so it is parsed once.
+    const namedParts = new Map();
 
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
@@ -3100,19 +3102,24 @@ class BlissSVGBuilder {
     // delta writes a bare code and nothing else, so an appended part with an
     // axis written (a zero included: an indicator at `0,0` is pinned where one
     // with no position is placed) or an option spells the glyph out instead.
+    // An option INSIDE an appended part counts too: a custom glyph appended
+    // whole carries its anatomy's options, and on reload they make the renderer
+    // merge the named glyph's own parts into one path where the builder drew
+    // them apart, so the SVG differs although the ink does not.
     // So does any append to a definition that bakes indicators: only a compound
     // indicator does (D-S1a), and the API reorders or strips its baked parts,
     // which no `;` delta against the name can say.
     function serializeCustomGlyphDelta(glyph) {
       const def = blissElementDefinitions[glyph.codeName];
       if (!def?.codeString || !glyph.parts) return glyph.codeName;
-      const named = BlissSVGBuilder.#partsNamedBy(glyph.codeName);
+      const named = BlissSVGBuilder.#partsNamedBy(glyph.codeName, namedParts);
       if (!named || !BlissSVGBuilder.#startsWithParts(glyph.parts, named)) {
         return serializeParts(glyph.parts);
       }
       const appended = glyph.parts.slice(named.length);
       if (appended.length === 0) return glyph.codeName;
-      const bare = (p) => p.x === undefined && p.y === undefined && serializeOptions(p.options) === '';
+      const decorated = (p) => serializeOptions(p.options) !== '' || (p.parts ?? []).some(decorated);
+      const bare = (p) => p.x === undefined && p.y === undefined && !decorated(p);
       if (named.some(p => p.isIndicator === true) || !appended.every(bare)) {
         return serializeParts(glyph.parts);
       }
@@ -3185,7 +3192,7 @@ class BlissSVGBuilder {
           ?? (!glyph.isBlissGlyph && glyph.codeName && !builtInCodes.has(glyph.codeName)
               ? glyph.codeName : null);
         const written = name
-          ? BlissSVGBuilder.#preservedWrittenName(name, glyph.parts)
+          ? BlissSVGBuilder.#preservedWrittenName(name, glyph.parts, namedParts)
           : null;
         if (written) code = written;
       }
@@ -3308,6 +3315,8 @@ class BlissSVGBuilder {
    */
   toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
+    // A custom name reads the same way throughout one save, so it is parsed once.
+    const namedParts = new Map();
 
     // Internal parse-warning record: consumed by #rebuild to repopulate
     // `warnings`, never part of the public composition data (absent from the
@@ -3484,7 +3493,7 @@ class BlissSVGBuilder {
               const name = glyph._aliasCodeName
                 ?? (glyph.codeName && !builtInCodes.has(glyph.codeName) ? glyph.codeName : null);
               if (name) {
-                const written = BlissSVGBuilder.#preservedWrittenName(name, glyph.parts);
+                const written = BlissSVGBuilder.#preservedWrittenName(name, glyph.parts, namedParts);
                 if (written) glyph.codeName = written;
               }
             }
@@ -3768,7 +3777,7 @@ class BlissSVGBuilder {
   // only when the chain passes a CUSTOM definition with identity (typed
   // shape/glyph/indicator; bare shorthand never qualifies) AND the glyph has
   // exactly the parts the name reloads to, i.e. it is a clean instance.
-  static #preservedWrittenName(name, parts) {
+  static #preservedWrittenName(name, parts, namedParts) {
     let code = name;
     let identityDef = null;
     const seen = new Set();
@@ -3787,18 +3796,24 @@ class BlissSVGBuilder {
       code = def.codeString;
     }
     if (!identityDef || !Array.isArray(parts)) return null;
-    const named = BlissSVGBuilder.#partsNamedBy(name);
+    const named = BlissSVGBuilder.#partsNamedBy(name, namedParts);
     return named && parts.length === named.length
       && BlissSVGBuilder.#startsWithParts(parts, named) ? name : null;
   }
 
   // The parts a custom name reloads to: the parser's own reading of it, so
   // the definition's spelling cannot matter (`[x=2]>S8`, `S8:2` and `S8:2,`
-  // are one part). Null when the name does not read as a single character.
-  static #partsNamedBy(name) {
+  // are one part). Null when the name does not read as a single character,
+  // which a name holding a separator can do: define() accepts one, and the
+  // parser splits on the separator before it looks the name up. `namedParts`
+  // memoizes the reading for one save, during which no definition can change.
+  static #partsNamedBy(name, namedParts) {
+    if (namedParts.has(name)) return namedParts.get(name);
     const { groups } = BlissParser.parse(name);
     const glyphs = groups?.length === 1 ? groups[0].glyphs : undefined;
-    return glyphs?.length === 1 && Array.isArray(glyphs[0].parts) ? glyphs[0].parts : null;
+    const parts = glyphs?.length === 1 && Array.isArray(glyphs[0].parts) ? glyphs[0].parts : null;
+    namedParts.set(name, parts);
+    return parts;
   }
 
   // Whether `parts` begins with `named`, part for part, judged on the written

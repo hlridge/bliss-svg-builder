@@ -38,8 +38,13 @@ const FIXTURES = {
   PDOWNSPOS: { type: 'glyph', codeString: 'B291;C8:3,4' },
   PDCOLOURED: { type: 'glyph', codeString: 'B291;[color=blue]>C8' },
   PDCOMPOUND: { type: 'glyph', isIndicator: true, codeString: 'B86;B97' },
+  PDDECIND: { type: 'glyph', isIndicator: true, codeString: 'B86;[color=red]>B97' },
   PDSHAPE: { type: 'shape', codeString: 'C8', defaultOptions: { color: 'blue', 'stroke-width': 0.5 } },
   PDINNER: { type: 'glyph', codeString: 'C8' },
+  // note: define() accepts a name no DSL string can reach (the parser splits on
+  // the separator before it looks the name up), so only a saved object uses these
+  'B291/C8': { type: 'glyph', codeString: 'B291;C8' },
+  'B291//C8': { type: 'glyph', codeString: 'B291;C8' },
 };
 const DEPENDENT_FIXTURES = {
   PDTWOOPT: { type: 'glyph', codeString: 'B291;PDSHAPE' },
@@ -181,6 +186,37 @@ describe('BlissSVGBuilder preserve divergence', () => {
       expect(reloaded).toBe(builder.svgCode);
     });
 
+    it('spells the glyph out when a saved object appends a custom glyph whose own anatomy is decorated', () => {
+      // regression (C18 review F1): the appended part is bare at its own level,
+      // but `NAME;PDCOLOURED` reloads with the base's paths merged into one
+      // where the builder drew them apart, so the SVG differed from what it saved
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: 'PDBASE', parts: [{ codeName: 'B291' }, { codeName: 'C8' }, { codeName: 'PDCOLOURED' }] }] }],
+      });
+      const { saved, reloaded } = preserveSave(builder);
+      expect(saved).toBe('B291;C8;PDCOLOURED');
+      expect(reloaded).toBe(builder.svgCode);
+    });
+
+    it('keeps the name when a saved object appends a custom glyph whose anatomy only positions its parts', () => {
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: 'PDBASE', parts: [{ codeName: 'B291' }, { codeName: 'C8' }, { codeName: 'PDOWNSPOS' }] }] }],
+      });
+      const { saved, reloaded } = preserveSave(builder);
+      expect(saved).toBe('PDBASE;PDOWNSPOS');
+      expect(reloaded).toBe(builder.svgCode);
+    });
+
+    it('spells the glyph out when a flattened word-level indicator is decorated inside its own definition', () => {
+      // regression (C18 review F1, reachable from the DSL alone): flattening
+      // `;;PDDECIND` appends the indicator whole, and its definition colours one
+      // of its parts
+      const builder = new BlissSVGBuilder('PDBASE;;PDDECIND');
+      const saved = builder.toString({ preserve: true, flattenIndicators: true });
+      expect(saved).toBe('B291;C8;PDDECIND');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
+    });
+
     it('spells a compound indicator out when an indicator is applied to it', () => {
       const builder = changed('PDCOMPOUND', (g) => g.applyIndicators('B81'));
       const { saved, reloaded } = preserveSave(builder);
@@ -196,6 +232,22 @@ describe('BlissSVGBuilder preserve divergence', () => {
       });
       const { saved, reloaded } = preserveSave(builder);
       expect(saved).toBe('B86;B97;B81');
+      expect(reloaded).toBe(builder.svgCode);
+    });
+  });
+
+  describe('when the name cannot be read back as one character', () => {
+    it.each([
+      ['a character separator', 'B291/C8'],
+      ['a word separator', 'B291//C8'],
+    ])('spells the glyph out when its name holds %s', (_label, name) => {
+      // pins the single-character guard on the name's reading: taking the first
+      // character of `B291/C8` would save `B291/C8;C8`, which reloads as two
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: name, parts: [{ codeName: 'B291' }, { codeName: 'C8' }] }] }],
+      });
+      const { saved, reloaded } = preserveSave(builder);
+      expect(saved).toBe('B291;C8');
       expect(reloaded).toBe(builder.svgCode);
     });
   });
