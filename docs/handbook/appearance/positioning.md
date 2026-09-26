@@ -182,9 +182,9 @@ Removal reaches only the element you call it on, so clearing a character's `x` l
 | `[x=+5]B291` | `[x=5]B291` |
 | `[x=.5]B291` | `[x=0.5]B291` |
 | `[color=red;x=5]B291` | `[x=5;color=red]B291` |
-| `[AK:5;x=3]B291` | `[5;x=3;AK]B291` |
+| `[absolute-kerning=5;x=3]B291` | `AK:5/[x=3]B291` |
 
-The picture is the same in every case. If you compare stored text against fresh output, expect these differences. The last row is the one exception to "the position leads": a [kerning](/handbook/writing/spacing#kerning) value is a marker rather than an option, so it keeps its own place in front.
+The picture is the same in every case. If you compare stored text against fresh output, expect these differences. The last row is the one exception to "the position leads": a [kerning](/handbook/writing/spacing#kerning) value is written as its marker rather than as an option, so it comes back in front of the bracket.
 
 **In a saved composition the position sits beside the element, not in its options:**
 

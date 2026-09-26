@@ -1199,7 +1199,8 @@ export declare class BlissSVGBuilder {
    * either way. A position is likewise written one way whichever spelling
    * authored it: the number is normalized (`[x=5.0]` and `[x=+5]` come back as
    * `[x=5]`) and it leads the option keys in its bracket. A kerning value is not
-   * an option key and still precedes it (`[AK:5;x=3]` → `[5;x=3;AK]`). Output is
+   * an option key: it is written as its marker in front of the bracket
+   * (`[absolute-kerning=5;x=3]B291` → `AK:5/[x=3]B291`). Output is
    * therefore not a byte-copy of the input; compare a round trip against
    * `toString()` output, not against stored text.
    *
