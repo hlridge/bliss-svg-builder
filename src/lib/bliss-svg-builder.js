@@ -2930,20 +2930,6 @@ class BlissSVGBuilder {
     return '';
   }
 
-  /**
-   * The number in one coordinate slot, or undefined when the slot was empty.
-   *
-   * The reading half of #positionSuffix, for the one caller that parses a
-   * position back out of text. An unusable slot reads as unwritten rather than
-   * as NaN, because a NaN would be added to an offset and emitted as a
-   * coordinate, putting `:NaN` into a saved composition.
-   */
-  static #coordinateSlot(text) {
-    if (text === undefined) return undefined;
-    const value = parseFloat(text);
-    return Number.isFinite(value) ? value : undefined;
-  }
-
   /** Creates a default space group for insertion between words */
   static #makeSpaceGroup() {
     return { glyphs: [{ parts: [{ codeName: 'TSP' }] }] };
@@ -2993,8 +2979,8 @@ class BlissSVGBuilder {
     });
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
-    // A custom name reads the same way throughout one save, so it is parsed once.
-    const namedParts = new Map();
+    // A code reads the same way throughout one save, so it is parsed once.
+    const readings = new Map();
 
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
@@ -3041,7 +3027,12 @@ class BlissSVGBuilder {
         // failure becomes a different valid character). preserve already keeps
         // the name; this makes default agree. (Row 80.) WORD_AS_PART has no
         // `.parts`, so it already round-tripped; the guard just unifies them.
-        if ((!options.preserve || isBareAliasBase)
+        // Under preserve a custom name is also spelled out when it no longer
+        // carries what it supplies. A name the save restored was judged where
+        // it was restored, against the reading its spelling reloads as.
+        const restored = part._aliasCodeName === part.codeName;
+        if ((!options.preserve || isBareAliasBase
+            || (!restored && !BlissSVGBuilder.#keepsNamedOptions(part, part.codeName, 'part', readings)))
             && !builtInCodes.has(part.codeName) && !part.errorCode) {
           // Custom code with nested parts (e.g., positioned custom glyph)
           if (part.parts) {
@@ -3069,10 +3060,24 @@ class BlissSVGBuilder {
               : part.parts;
             return serializeParts(innerParts, x, y);
           }
-          // Custom composite shape (has codeString, no getPath)
+          // A custom shape part with no parts of its own: its definition arrived
+          // after the composition was built, so the tree still holds the bare
+          // name. Write what the parser reads the name as in this slot, with
+          // this part's own position and options over it. That is the node the
+          // composition would hold had the definition existed at parse time, so
+          // the late save writes what the early one does, and no definition
+          // text is copied that a save without options would have to strip.
           const def = blissElementDefinitions[part.codeName];
-          if (def?.isShape && def.codeString && !def.getPath) {
-            return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y, hasX, hasY);
+          const reading = def?.isShape && def.codeString && !def.getPath
+            ? BlissSVGBuilder.#readingOf(part.codeName, 'part', readings)
+            : null;
+          if (reading) {
+            const node = structuredClone(reading);
+            if (part.x !== undefined) node.x = part.x;
+            if (part.y !== undefined) node.y = part.y;
+            if (part.options) node.options = { ...node.options, ...part.options };
+            if (options.omitOptions) BlissSVGBuilder.#clearOptionsFrom(node, 3);
+            return serializeParts([node], offsetX, offsetY);
           }
         }
         // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
@@ -3089,8 +3094,10 @@ class BlissSVGBuilder {
         // and the composition have no coordinate spelling of their own, so a
         // position at those levels stays a bracket.)
         str += BlissSVGBuilder.#positionSuffix(hasX ? x : undefined, hasY ? y : undefined);
-        // Prefix part-level options with [opts]> syntax
-        const optPrefix = serializeOptions(part.options);
+        // Prefix part-level options with [opts]> syntax, less the look a code
+        // the string can only name draws with by its own name
+        const optPrefix = serializeOptions(
+          BlissSVGBuilder.#withoutOwnLook(part.options, part.codeName, 'part', readings));
         if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
       })
@@ -3117,14 +3124,17 @@ class BlissSVGBuilder {
     // An option INSIDE an appended part counts too: a custom glyph appended
     // whole carries its anatomy's options, and on reload they make the renderer
     // merge the named glyph's own parts into one path where the builder drew
-    // them apart, so the SVG differs although the ink does not.
+    // them apart, so the SVG differs although the ink does not. For the same
+    // reason a built-in's own look counts although the string never writes it
+    // (`ANCHORRING`'s dotted line): the renderer reads the options, not the
+    // string.
     // So does any append to a definition that bakes indicators: only a compound
     // indicator does (D-S1a), and the API reorders or strips its baked parts,
     // which no `;` delta against the name can say.
     function serializeCustomGlyphDelta(glyph) {
       const def = blissElementDefinitions[glyph.codeName];
       if (!def?.codeString || !glyph.parts) return glyph.codeName;
-      const named = BlissSVGBuilder.#partsNamedBy(glyph.codeName, namedParts);
+      const named = BlissSVGBuilder.#partsNamedBy(glyph.codeName, readings);
       if (!named || !BlissSVGBuilder.#startsWithParts(glyph.parts, named)) {
         return serializeParts(glyph.parts);
       }
@@ -3155,18 +3165,13 @@ class BlissSVGBuilder {
       // Build the glyph code string
       let code;
       if (glyph.isBlissGlyph && glyph.codeName) {
-        // Decompose custom glyphs (non-built-in) to portable output
-        // Use the glyph's parts (which have correct positions) rather than
-        // re-decomposing from the definition (which would lose position offsets)
+        // Decompose custom glyphs (non-built-in) to portable output, from the
+        // glyph's parts, which have the correct positions. A partless one has
+        // nothing to decompose: toJSON names a custom glyph whose definition
+        // has a code string by the built-in that code string resolves to, or
+        // leaves it unnamed, so no definition text is ever copied from here.
         if (!options.preserve && !builtInCodes.has(glyph.codeName)) {
-          if (glyph.parts) {
-            code = serializeParts(glyph.parts);
-          } else {
-            const def = blissElementDefinitions[glyph.codeName];
-            if (def?.codeString) {
-              code = BlissSVGBuilder.#decomposeCodeString(def.codeString, 0, 0);
-            }
-          }
+          if (glyph.parts) code = serializeParts(glyph.parts);
         } else if (options.preserve && !builtInCodes.has(glyph.codeName)) {
           code = serializeCustomGlyphDelta(glyph);
         }
@@ -3204,13 +3209,18 @@ class BlissSVGBuilder {
           ?? (!glyph.isBlissGlyph && glyph.codeName && !builtInCodes.has(glyph.codeName)
               ? glyph.codeName : null);
         const written = name
-          ? BlissSVGBuilder.#preservedWrittenName(name, glyph.parts, namedParts)
+          ? BlissSVGBuilder.#preservedWrittenName(name, glyph, readings)
           : null;
         if (written) code = written;
       }
 
-      // Prefix glyph-level options (skip internal kerning keys)
-      const optPrefix = serializeOptionsWithPosition(glyph, GLYPH_INTERNAL_KEYS);
+      // Prefix glyph-level options (skip internal kerning keys), less the look
+      // a code the string can only name supplies to the character written as
+      // `code`, which reading it back supplies again.
+      const optPrefix = serializeOptionsWithPosition(
+        { ...glyph, options: BlissSVGBuilder.#withoutOwnLook(glyph.options, code, 'glyph', readings) },
+        GLYPH_INTERNAL_KEYS,
+      );
       result.push(optPrefix + code);
       return result;
     }
@@ -3329,7 +3339,11 @@ class BlissSVGBuilder {
   toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
     // A custom name reads the same way throughout one save, so it is parsed once.
-    const namedParts = new Map();
+    const readings = new Map();
+    // How far down a character's name is read back. Deep output feeds the
+    // string, which writes the name alone; the public JSON writes the parts
+    // out beside it, so there the name restores the character's own options.
+    const nameLevels = options.deep ? Infinity : 0;
 
     // The view without options is the in-place clear run on this working copy,
     // then the one rebuild rule that reads options: a head designation on a
@@ -3378,8 +3392,9 @@ class BlissSVGBuilder {
     if (obj.groups) {
       // Strip keys from parts. Unless deep: true, also strip nested sub-parts
       // (internal expansion detail). The constructor re-expands from codeName
-      // via BlissParser.expandParts().
-      const stripParts = (parts) => {
+      // via BlissParser.expandParts(). `glyph` is the character holding `parts`
+      // when they are its own, and absent for a part's inner parts.
+      const stripParts = (parts, glyph) => {
         for (const [partIndex, part] of parts.entries()) {
           delete part.key;
           delete part.transientOptions;
@@ -3403,9 +3418,23 @@ class BlissSVGBuilder {
             // instance decoration (preserve-completeness chunk; the glyph-
             // level consult keeps such a name at the clean-glyph level).
             const decorated = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0 || part.options;
+            // The name also has to leave nothing to bring back. A sole part
+            // carrying the character's own recording, with no options of its
+            // own to write, is written as the whole character, where the name
+            // puts its defaults on the character, so the character is what the
+            // name is judged against. Anywhere else the name is written in a
+            // part slot (`[opts]>NAME` included) and puts them on the part.
+            const writesOwnOptions = Object.entries(part.options ?? {})
+              .some(([key, value]) => key !== 'key' && value !== false);
+            const writtenAsCharacter = parts.length === 1 && !writesOwnOptions
+              && glyph?._aliasCodeName === part._aliasCodeName;
+            const keepsOptions = writtenAsCharacter
+              ? BlissSVGBuilder.#keepsNamedOptions(glyph, part._aliasCodeName, 'glyph', readings)
+              : BlissSVGBuilder.#keepsNamedOptions(part, part._aliasCodeName, 'part', readings);
             if ((partIndex > 0 || parts.length === 1
                 || (namedDef && !BlissSVGBuilder.#isBareAliasDefinition(namedDef)))
-                && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))) {
+                && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))
+                && keepsOptions) {
               part.codeName = part._aliasCodeName;
             }
           }
@@ -3454,10 +3483,12 @@ class BlissSVGBuilder {
           // so clear its single-code identity to force part-based serialization
           // (`B291;B81`); otherwise serializeGlyph emits the bare codeName and
           // drops the baked parts. The one exception is a custom glyph under
-          // `preserve`: it keeps its name and re-emits the overlay as a delta
-          // (`_LOVE;B81`), so leave its identity intact.
+          // `preserve` that still carries what its name supplies: it keeps its
+          // name and re-emits the overlay as a delta (`_LOVE;B81`), so leave
+          // its identity intact.
           if (head.glyphCode && head.parts.some(p => p.isIndicator)
-              && !(options.preserve && !builtInCodes.has(head.glyphCode))) {
+              && !(options.preserve && !builtInCodes.has(head.glyphCode)
+                && BlissSVGBuilder.#keepsNamedOptions(head, head.glyphCode, 'glyph', readings, nameLevels))) {
             delete head.glyphCode;
             delete head.isBlissGlyph;
           }
@@ -3470,7 +3501,7 @@ class BlissSVGBuilder {
             delete glyph.transientOptions;
             if (glyph.options) delete glyph.options.key;
             publishOptionSpellings(glyph);
-            if (glyph.parts) stripParts(glyph.parts);
+            if (glyph.parts) stripParts(glyph.parts, glyph);
 
             // Did this glyph ever have an identity code? Read it BEFORE the
             // rename below, which drops the code for a custom glyph decomposed
@@ -3485,8 +3516,11 @@ class BlissSVGBuilder {
               const publicCode = glyph.glyphCode.startsWith('XTXT_')
                 ? 'X' + glyph.glyphCode.slice(5)
                 : glyph.glyphCode;
-              // Decompose custom glyphs to portable codes by default
-              if (!options.preserve && !builtInCodes.has(glyph.glyphCode)) {
+              // Decompose custom glyphs to portable codes by default, and under
+              // `preserve` a custom glyph that no longer carries what its name
+              // supplies, which reading the name back would restore.
+              if (!builtInCodes.has(glyph.glyphCode) && (!options.preserve
+                  || !BlissSVGBuilder.#keepsNamedOptions(glyph, glyph.glyphCode, 'glyph', readings, nameLevels))) {
                 const def = blissElementDefinitions[glyph.glyphCode];
                 if (def?.codeString) {
                   // Resolve to the underlying built-in code (null for complex compositions)
@@ -3521,7 +3555,7 @@ class BlissSVGBuilder {
               const name = glyph._aliasCodeName
                 ?? (glyph.codeName && !builtInCodes.has(glyph.codeName) ? glyph.codeName : null);
               if (name) {
-                const written = BlissSVGBuilder.#preservedWrittenName(name, glyph.parts, namedParts);
+                const written = BlissSVGBuilder.#preservedWrittenName(name, glyph, readings);
                 if (written) glyph.codeName = written;
               }
             }
@@ -3697,75 +3731,6 @@ class BlissSVGBuilder {
       .filter(code => code.length > 0);
   }
 
-  // Recursively decompose a codeString to built-in codes, adjusting coordinates.
-  // Used by toString() for portable output of custom shapes and glyphs.
-  //
-  // This reads a position the way the part emitter writes one: per axis, and by
-  // whether the axis was written rather than by whether it happens to be zero.
-  //
-  // The reader must accept every spelling the DSL accepts (`:x,y`, `:x`, `:,y`,
-  // `:x,`, `:,`), because a definition's codeString is text a human wrote. A
-  // pair-only reader treats a half coordinate as unparseable and returns the
-  // part unchanged, which silently discards the parent offset belonging to it
-  // and moves the part on reload.
-  //
-  // forceX/forceY carry whether the CALLER's own position wrote that axis, and
-  // they exist because an offset is a number and therefore cannot say it.
-  // Whether they apply turns on what the codeString is:
-  //
-  //   one part  -> an ALIAS HOP. When the definition exists at parse time the
-  //                parser merges it away, so the use-site position becomes that
-  //                part's own written position and a written `0` must survive.
-  //                Honour the caller.
-  //   many parts -> a real COMPOSITE. Its own token does not survive
-  //                decomposition, so its position reaches the parts only as a
-  //                fold, and a zero fold moves nothing and leaves no trace.
-  //                Ignore the caller, which is what the merged path also does.
-  //
-  // Getting this split wrong is observable: the two paths then answer
-  // differently for the same input depending only on WHEN define() ran.
-  static #decomposeCodeString(codeString, offsetX, offsetY, forceX = false, forceY = false) {
-    const parts = codeString.split(';');
-    const isAliasHop = parts.length === 1;
-    return parts.map(part => {
-      const posMatch = part.match(/^([^:]+)(?::(-?[\d.]+)?(?:,(-?[\d.]+)?)?)?$/);
-      if (!posMatch) return part;
-
-      const [, code, xStr, yStr] = posMatch;
-      const writtenX = BlissSVGBuilder.#coordinateSlot(xStr);
-      const writtenY = BlissSVGBuilder.#coordinateSlot(yStr);
-      // An axis is emitted when the definition wrote it, OR when a non-zero
-      // offset moves it: that offset has to land somewhere, and this function
-      // cannot know the layout default it would otherwise be added to. The same
-      // approximation, applied per axis, that the part emitter makes.
-      // A PURE RENAME is the only shape the parser merges away, and merging is
-      // what makes the use-site position the part's own rather than a fold. One
-      // part, no position of its own, no options: `{codeString:'C8'}` merges to
-      // a bare `C8` node carrying the use-site position, while `'C8:2'` keeps a
-      // node of its own and takes that position as a fold.
-      const isPureRename = isAliasHop
-        && writtenX === undefined && writtenY === undefined
-        && !code.includes('>') && !code.includes('[');
-      const hasX = writtenX !== undefined || offsetX !== 0 || (isPureRename && forceX);
-      const hasY = writtenY !== undefined || offsetY !== 0 || (isPureRename && forceY);
-      const x = (writtenX ?? 0) + offsetX;
-      const y = (writtenY ?? 0) + offsetY;
-
-      // Recursively decompose custom composite shapes
-      if (!builtInCodes.has(code)) {
-        const def = blissElementDefinitions[code];
-        if (def?.isShape && def.codeString && !def.getPath) {
-          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y, hasX, hasY);
-        }
-        if (def?.isBlissGlyph && def.codeString) {
-          return BlissSVGBuilder.#decomposeCodeString(def.codeString, x, y, hasX, hasY);
-        }
-      }
-
-      return `${code}${BlissSVGBuilder.#positionSuffix(hasX ? x : undefined, hasY ? y : undefined)}`;
-    }).join(';');
-  }
-
   // Resolve a custom glyph code to its underlying built-in code (for toJSON).
   // Follows the chain until a built-in code is found.
   static #resolveToBuiltInCode(code, visited = new Set()) {
@@ -3794,6 +3759,21 @@ class BlissSVGBuilder {
     const def = blissElementDefinitions[code];
     if (!def.defaultOptions) return undefined;
     return builtInCodes.has(code) || typeof def.getPath === 'function' ? def.defaultOptions : undefined;
+  }
+
+  // `bag` without the values a code the string can only name supplies by its
+  // own name at this level, wherever the element holds the same value: that
+  // look is part of the character, so the canonical string does not repeat it
+  // (`REFSQUARE`, not `[stroke-dasharray=0 0.999]...REFSQUARE`). A different
+  // value is an override and is written. `code` is what the string writes for
+  // the element, read at `level` the way the reload reads it. Both bags hold
+  // the stored spelling of every key, so the keys compare as they stand.
+  static #withoutOwnLook(bag, code, level, readings) {
+    if (!bag || !BlissSVGBuilder.#ownLookOf(getBareCode(code ?? ''))) return bag;
+    const own = BlissSVGBuilder.#readingOf(code, level, readings)?.options;
+    if (!own) return bag;
+    return Object.fromEntries(Object.entries(bag).filter(([key, value]) =>
+      !Object.hasOwn(own, key) || serializeOptionValue(own[key]) !== serializeOptionValue(value)));
   }
 
   // One element's options emptied of everything the canonical string writes in
@@ -3916,9 +3896,13 @@ class BlissSVGBuilder {
   // Preserve-completeness chunk: written-name consult for the glyph-level
   // recording. Walks single-code links from `name`; the name is emittable
   // only when the chain passes a CUSTOM definition with identity (typed
-  // shape/glyph/indicator; bare shorthand never qualifies) AND the glyph has
-  // exactly the parts the name reloads to, i.e. it is a clean instance.
-  static #preservedWrittenName(name, parts, namedParts) {
+  // shape/glyph/indicator; bare shorthand never qualifies) AND the glyph is a
+  // clean instance: it has exactly the parts the name reloads to, and still
+  // carries every option key the name supplies. The part match already asks
+  // more of the parts than the key check does, so reading every level costs
+  // the public JSON nothing it keeps, where the parts below them are gone.
+  static #preservedWrittenName(name, glyph, readings) {
+    const { parts } = glyph;
     let code = name;
     let identityDef = null;
     const seen = new Set();
@@ -3937,24 +3921,78 @@ class BlissSVGBuilder {
       code = def.codeString;
     }
     if (!identityDef || !Array.isArray(parts)) return null;
-    const named = BlissSVGBuilder.#partsNamedBy(name, namedParts);
+    const named = BlissSVGBuilder.#partsNamedBy(name, readings);
     return named && parts.length === named.length
-      && BlissSVGBuilder.#startsWithParts(parts, named) ? name : null;
+      && BlissSVGBuilder.#startsWithParts(parts, named)
+      && BlissSVGBuilder.#keepsNamedOptions(glyph, name, 'glyph', readings) ? name : null;
   }
 
-  // The parts a custom name reloads to: the parser's own reading of it, so
-  // the definition's spelling cannot matter (`[x=2]>S8`, `S8:2` and `S8:2,`
-  // are one part). Null when the name does not read as a single character,
-  // which a name holding a separator can do: define() accepts one, and the
-  // parser splits on the separator before it looks the name up. `namedParts`
-  // memoizes the reading for one save, during which no definition can change.
-  static #partsNamedBy(name, namedParts) {
-    if (namedParts.has(name)) return namedParts.get(name);
-    const { groups } = BlissParser.parse(name);
+  // The parser's own reading of `code` alone, so the definition's spelling
+  // cannot matter (`[x=2]>S8`, `S8:2` and `S8:2,` are one part). At 'glyph'
+  // level it is the one character the code reads as; at 'part' level the part
+  // it reads as in a `;` slot, through the scaffold the part methods parse a
+  // new part with. The two differ: a shape's own defaults land on the
+  // character when it is written alone and on the part when it sits in a slot.
+  // Null when the code does not read as one character or one part, which a
+  // name holding a separator can do: define() accepts one, and the parser
+  // splits on the separator before it looks the name up. `readings` memoizes
+  // it for one save, during which no definition can change.
+  static #readingOf(code, level, readings) {
+    const memoKey = `${level}:${code}`;
+    if (readings.has(memoKey)) return readings.get(memoKey);
+    const { groups } = BlissParser.parse(level === 'part' ? `H;${code}` : code);
     const glyphs = groups?.length === 1 ? groups[0].glyphs : undefined;
-    const parts = glyphs?.length === 1 && Array.isArray(glyphs[0].parts) ? glyphs[0].parts : null;
-    namedParts.set(name, parts);
-    return parts;
+    const glyph = glyphs?.length === 1 ? glyphs[0] : undefined;
+    let reading = null;
+    if (level === 'glyph') {
+      if (Array.isArray(glyph?.parts)) reading = glyph;
+    } else if (glyph?.parts?.length === 2) {
+      reading = glyph.parts[1];
+    }
+    readings.set(memoKey, reading);
+    return reading;
+  }
+
+  // The parts a custom name reloads to as a character, or null.
+  static #partsNamedBy(name, readings) {
+    return BlissSVGBuilder.#readingOf(name, 'glyph', readings)?.parts ?? null;
+  }
+
+  // Whether an element written by its custom name still carries every option
+  // key that reading the name back supplies, each level against the same
+  // level of the element: a key the name puts on a part is not carried by the
+  // character holding it. A name that fails would bring the key back on
+  // reload, so the element is spelled out instead. Presence, not value: an
+  // override keeps the name, and the name reloads the override. A name that
+  // does not read as one element cannot vouch for anything, so it fails.
+  //
+  // `levels` is how far down the save's route reads the name back. The string
+  // writes the name alone, so reading it back restores every level it reaches
+  // (Infinity). The public JSON writes a character's parts out beside its
+  // name, so the name restores only the character's own options there (0),
+  // and each part is judged by its own name.
+  //
+  // Only custom names are asked about. A built-in is never spelled out, and a
+  // shape drawn by its own function has nothing to spell out into.
+  static #keepsNamedOptions(node, name, level, readings, levels = Infinity) {
+    const reading = BlissSVGBuilder.#readingOf(name, level, readings);
+    return !!reading && BlissSVGBuilder.#carriesKeysOf(node, reading, levels);
+  }
+
+  // Whether `node` holds a value the string writes (so not `false`) for every
+  // key `reading` holds, at its own level and then, `levels` deep, part by
+  // part below it. A part the element no longer has carries nothing. A part
+  // with no parts array is written by its name, which brings its inner parts
+  // back whatever this answers.
+  static #carriesKeysOf(node, reading, levels) {
+    const writtenKeys = (bag) => Object.entries(bag ?? {})
+      .filter(([, value]) => value !== false)
+      .map(([key]) => programmaticOptionKey(key));
+    const held = new Set(writtenKeys(node?.options));
+    if (!writtenKeys(reading.options).every((key) => held.has(key))) return false;
+    const parts = node ? node.parts : [];
+    if (levels === 0 || !Array.isArray(parts)) return true;
+    return (reading.parts ?? []).every((part, i) => BlissSVGBuilder.#carriesKeysOf(parts[i], part, levels - 1));
   }
 
   // Whether `parts` begins with `named`, part for part, judged on the written

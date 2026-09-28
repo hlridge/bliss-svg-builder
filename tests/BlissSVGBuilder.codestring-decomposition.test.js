@@ -10,7 +10,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * at parse time is resolved then and serializes through the part emitter, which
  * never reaches here. This path is reached when the definition arrived AFTER the
  * composition was built, so the tree still holds the bare code and serialization
- * has to expand the codeString itself.
+ * has to expand the codeString itself. It does so by reading the name the way
+ * the parser reads it in that slot, never by reading the definition's text a
+ * second way.
  *
  * The two paths must produce the same string, and the shape of the definition
  * decides what that string is:
@@ -27,7 +29,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - The fold arithmetic, per axis: a definition's own coordinate is added to,
  *   not replaced by, the use-site position, including negative offsets and when
  *   either side writes only one axis.
- * - A coordinate slot that cannot be read, which must not reach the output.
+ * - A coordinate slot that cannot be read: the parser fails that part, so it is
+ *   left out, and no unreadable value reaches the output.
+ * - Option text on either side: the part's own options, a bracket in the
+ *   codeString, a colon inside an option value, and a trailing `;`.
  *
  * Does NOT cover:
  * - The rule itself and its ten forms at the part emitter, see
@@ -37,8 +42,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   code. That is a definition-binding question, not a serialization one, and it
  *   has its own backlog row. These tests therefore pin the emitted STRING and
  *   what that string means when reloaded, never the source composition's ink.
- * - `define()` accepting a malformed coordinate at all (`'C8:1.2.3'` reads as
- *   `1.2`), which is its own backlog row; these rows pin today's behaviour.
+ * - `define()` accepting a malformed coordinate at all (`'C8:.'`, `'C8:1.2.3'`)
+ *   without reporting it, which is its own backlog row; these rows pin today's
+ *   behaviour.
+ * - A save leaving out every option, on this path too, see
+ *   `BlissSVGBuilder.omit-options-edges.test.js`.
  */
 
 const customCodes = [];
@@ -143,21 +151,39 @@ describe('BlissSVGBuilder codeString decomposition', () => {
 
   describe('when the definition writes a coordinate that cannot be read', () => {
     // `define()` accepts these, so they are reachable rather than hypothetical.
-    // pins the coordinate-slot guard: without it the slot parses to NaN, the
-    // offset is added to it, and `:NaN` is written into a saved composition,
-    // which no reload can read back as a position
-    it('treats an unreadable slot as unset instead of writing NaN', () => {
-      expect(serializeAfterLateDefine('B291;DEF:3', 'C8:.')).toBe('B291;C8:3');
+    // regression: this path read the definition's text a second way, and wrote
+    // a `C8` the parser fails and neither side of define() draws (`B291;C8:3`);
+    // before that, the unreadable slot parsed to NaN and `:NaN` was saved
+    it.each([
+      ['B291;DEF:3', 'C8:.'],
+      ['B291;DEF', 'C8:.'],
+      ['B291;DEF', 'C8:.,2'],
+    ])('leaves %s over %s out, as the composition built after define() does', (input, codeString) => {
+      expect(serializeAfterLateDefine(input, codeString)).toBe('B291');
+      expect(serializeAfterEarlyDefine(input, codeString)).toBe('B291');
+    });
+  });
+
+  describe('when options are written on either side', () => {
+    // regression: reading the definition's text dropped the part's own options
+    // and the use-site offset beside a colon in an option value, and kept a
+    // trailing `;`, each where the composition built after define() did not
+    it.each([
+      ['B291;[color=blue]>DEF', 'C8;HL2', 'B291;[color=blue]>C8;[color=blue]>HL2'],
+      ['B291;[color=blue]>DEF:3', 'C8', 'B291;[color=blue]>C8:3'],
+      ['B291;DEF:3', '[title=a:b]>C8', 'B291;[title=a:b]>C8:3'],
+      ['B291;DEF', 'C8;', 'B291;C8'],
+    ])('spells %s over %s as the composition built after define() does', (input, codeString, expected) => {
+      expect(serializeAfterLateDefine(input, codeString)).toBe(expected);
+      expect(serializeAfterEarlyDefine(input, codeString)).toBe(expected);
     });
 
-    it('leaves the axis unset when no offset forces it either', () => {
-      // the row above cannot see a slot that defaults to 0 instead of unset,
-      // because the offset forces the axis anyway and hides the difference
-      expect(serializeAfterLateDefine('B291;DEF', 'C8:.')).toBe('B291;C8');
-    });
-
-    it('keeps the readable axis when only one slot is unreadable', () => {
-      expect(serializeAfterLateDefine('B291;DEF', 'C8:.,2')).toBe('B291;C8:,2');
+    it('reads each use of one name on its own, at its own position', () => {
+      // pins that the save reads a name once and copies the reading for every
+      // use, so one use's position cannot leak into the next
+      const builder = new BlissSVGBuilder('B291;LATEDEF:3/B291;LATEDEF');
+      defineOrThrow('LATEDEF', 'C8');
+      expect(builder.toString()).toBe('B291;C8:3/B291;C8');
     });
   });
 

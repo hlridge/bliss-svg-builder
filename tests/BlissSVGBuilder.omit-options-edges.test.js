@@ -15,8 +15,9 @@
  *   marker goes with them, so a word-level indicator lands on the head that is
  *   left, flattened or not.
  * - A definition whose code string styles its parts: a styled glyph and a
- *   multi-part shape in the DSL, a styled shape as an object part, and a glyph
- *   object with no parts, which draws nothing and now saves as nothing.
+ *   multi-part shape in the DSL, a styled shape as an object part, a styled
+ *   shape defined after the composition was built, and a glyph object with no
+ *   parts, which draws nothing and now saves as nothing.
  * - No `[` in any output of this file.
  *
  * Does NOT cover:
@@ -50,7 +51,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  for (const code of Object.keys(FIXTURES)) BlissSVGBuilder.removeDefinition(code);
+  for (const code of [...Object.keys(FIXTURES), 'OE_LATESH']) BlissSVGBuilder.removeDefinition(code);
 });
 
 // What the flag writes for `input`, with any other serializer options.
@@ -149,6 +150,15 @@ describe('BlissSVGBuilder omit options edges', () => {
 
     it('drops the options a styled shape brings as an object part', () => {
       expect(styledShapePart().toString({ omitOptions: true })).toBe('B291;C8');
+    });
+
+    it('drops the options of a styled shape defined after the composition was built', () => {
+      // regression: the save copied the definition's text, bracket included
+      // (`B291;[color=red]>C8:3`)
+      const builder = new BlissSVGBuilder('B291;OE_LATESH:3');
+      BlissSVGBuilder.define({ OE_LATESH: { type: 'shape', codeString: '[color=red]>C8' } });
+      expect(builder.toString({ omitOptions: true })).toBe('B291;C8:3');
+      expect(builder.toString({ omitOptions: true, preserve: true })).not.toContain('[');
     });
 
     it('saves a glyph object with no parts as nothing, which is what it draws', () => {

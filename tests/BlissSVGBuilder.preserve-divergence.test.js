@@ -25,10 +25,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   from how it is saved, see `BlissSVGBuilder.typed-name-preserve.test.js`.
  * - `toJSON({ preserve: true })`, which saves the parts beside the name and
  *   rebuilds from the parts, see `BlissSVGBuilder.custom-glyphs.test.js`.
- * - A change made inside a part that is saved by its own name (`part(0).part(0)`,
- *   or a default option of a part's definition removed): the part's name brings
- *   it back on every save, see backlog row "A part saved by its name forgets a
- *   change made inside it".
+ * - A change made inside a part that is saved by its own name (`part(0).part(0)`
+ *   recoloured or moved): the part's name brings it back on every save, see
+ *   backlog row "A part saved by its name forgets a change made inside it".
+ * - A default option the name supplies, removed at any level, see
+ *   `BlissSVGBuilder.preserve-removed-default.test.js`.
  * - A glyph authored as object input with a name and no parts, see backlog row
  *   "A glyph authored with only `codeName`".
  */
@@ -146,6 +147,16 @@ describe('BlissSVGBuilder preserve divergence', () => {
       expect(reloaded).toBe(builder.svgCode);
     });
 
+    it('spells the glyph out when the appended indicator draws with a look of its own', () => {
+      // note: the string does not write ANCHORRING's dotted line, but the
+      // renderer draws a character holding a styled part part by part, so
+      // `PDBASE;ANCHORRING` would reload with the base's paths merged into one
+      const builder = changed('PDBASE', (g) => g.applyIndicators('ANCHORRING'));
+      const { saved, reloaded } = preserveSave(builder);
+      expect(saved).toBe('B291;C8;ANCHORRING');
+      expect(reloaded).toBe(builder.svgCode);
+    });
+
     it('keeps the name when the definition positions its own part', () => {
       // regression: the position check read every part, so a definition owning
       // `C8:3,4` lost its name for a position the name already carries
@@ -187,7 +198,7 @@ describe('BlissSVGBuilder preserve divergence', () => {
     });
 
     it('spells the glyph out when a saved object appends a custom glyph whose own anatomy is decorated', () => {
-      // regression (C18 review F1): the appended part is bare at its own level,
+      // regression: the appended part is bare at its own level,
       // but `NAME;PDCOLOURED` reloads with the base's paths merged into one
       // where the builder drew them apart, so the SVG differed from what it saved
       const builder = new BlissSVGBuilder({
@@ -208,7 +219,7 @@ describe('BlissSVGBuilder preserve divergence', () => {
     });
 
     it('spells the glyph out when a flattened word-level indicator is decorated inside its own definition', () => {
-      // regression (C18 review F1, reachable from the DSL alone): flattening
+      // regression, reachable from the DSL alone: flattening
       // `;;PDDECIND` appends the indicator whole, and its definition colours one
       // of its parts
       const builder = new BlissSVGBuilder('PDBASE;;PDDECIND');
