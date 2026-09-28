@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
-import { mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
+import { getBareCode, mergeWordIndicatorsOntoHead, partitionWordIndicators, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -32,6 +32,15 @@ const GLYPH_OPTION_KEYS_WITHOUT_TOKEN = new Set(['key', 'relativeKerning', 'abso
 const glyphEmitsOptionsToken = (glyph) =>
   Object.entries(glyph.options ?? {}).some(([k, v]) =>
     v !== false && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
+
+// A head designation on a glyph the serializer omits has no written form: no
+// parts, no code, and no option that re-emits it as an options-only token. The
+// rebuild drops such a designation, and so does the view without options,
+// which empties glyphs on its own working copy and has to lose exactly what
+// the rebuild of a builder cleared in place loses.
+const designationIsUnwritten = (glyph) =>
+  glyph.isHeadGlyph === true && !glyph.parts?.length
+    && !glyph.glyphCode && !glyph.codeName && !glyphEmitsOptionsToken(glyph);
 
 // The written `Xword` shorthand expands to one glyph per letter at parse time
 // (`Xab` -> `Xa/Xb`), so serializing each glyph faithfully spells a word out
@@ -1049,10 +1058,7 @@ class BlissSVGBuilder {
         if (glyph.isHeadGlyph === true && BlissSVGBuilder.#isNonHeadMarkerNode(glyph)) {
           delete glyph.isHeadGlyph;
         }
-        if (glyph.isHeadGlyph === true && !glyph.parts?.length
-            && !glyph.glyphCode && !glyph.codeName && !glyphEmitsOptionsToken(glyph)) {
-          delete glyph.isHeadGlyph;
-        }
+        if (designationIsUnwritten(glyph)) delete glyph.isHeadGlyph;
       }
       if (group.wordIndicators && !group.errorCode && BlissSVGBuilder.#isNonHeadMarkerGroup(group)) {
         const { codes = [], stripSemantic } = group.wordIndicators;
@@ -2973,12 +2979,18 @@ class BlissSVGBuilder {
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
    * @param {boolean} [options.flattenIndicators=false] - Collapse word-level (`;;`) indicators onto the head as character-level `;`
+   * @param {boolean} [options.omitOptions=false] - Leave out every option bracket, at every scope; part coordinates and kerning stay
    * @returns {string}
    */
   toString(options = {}) {
     // toString always needs nested parts so serializeParts can decompose
     // custom codes. The string output itself stays flat (;-delimited).
-    const obj = this.toJSON({ preserve: options.preserve, deep: true, flattenIndicators: options.flattenIndicators });
+    const obj = this.toJSON({
+      preserve: options.preserve,
+      deep: true,
+      flattenIndicators: options.flattenIndicators,
+      omitOptions: options.omitOptions,
+    });
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
     // A custom name reads the same way throughout one save, so it is parsed once.
@@ -3311,12 +3323,28 @@ class BlissSVGBuilder {
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names
    * @param {boolean} [options.flattenIndicators=false] - Bake word-level (`;;`) indicators onto the head and omit the wordIndicators field
+   * @param {boolean} [options.omitOptions=false] - Leave out every option the string form writes in brackets; part coordinates and kerning stay
    * @returns {Object} Plain object with groups/glyphs/options structure
    */
   toJSON(options = {}) {
     const obj = structuredClone(this.#rawBlissObj);
     // A custom name reads the same way throughout one save, so it is parsed once.
     const namedParts = new Map();
+
+    // The view without options is the in-place clear run on this working copy,
+    // then the one rebuild rule that reads options: a head designation on a
+    // glyph the clear left with nothing to write goes with it. Both run before
+    // the flatten and before any `preserve` decision reads the tree. A flatten
+    // ahead of them bakes the overlay onto a glyph the clear then empties, and
+    // a name judged ahead of them is judged on options that are about to go.
+    if (options.omitOptions) {
+      BlissSVGBuilder.#clearOptionsFrom(obj, 0);
+      for (const group of obj.groups ?? []) {
+        for (const glyph of group.glyphs ?? []) {
+          if (designationIsUnwritten(glyph)) delete glyph.isHeadGlyph;
+        }
+      }
+    }
 
     // Internal parse-warning record: consumed by #rebuild to repopulate
     // `warnings`, never part of the public composition data (absent from the
@@ -3745,12 +3773,125 @@ class BlissSVGBuilder {
     visited.add(code);
     const def = blissElementDefinitions[code];
     if (!def?.codeString) return code;
-    // If codeString is a single code reference (no ; or / or :), resolve further
-    if (!def.codeString.includes(';') && !def.codeString.includes('/') && !def.codeString.includes(':')) {
+    // Only a code string that is one code reference resolves further. A
+    // separator, a coordinate, an option bracket or its part-scope marker
+    // makes it a composition no single code draws, and its text would
+    // otherwise be published as a code name (`[color=red]>B291`).
+    if (!/[;/:[>]/.test(def.codeString)) {
       if (builtInCodes.has(def.codeString)) return def.codeString;
       return BlissSVGBuilder.#resolveToBuiltInCode(def.codeString, visited);
     }
     return null; // Complex codeString — parts already expanded, no single code
+  }
+
+  // What a code the canonical string can only name draws with by its own
+  // definition, or undefined. That is every built-in, and a custom shape drawn
+  // by its own function: neither is ever spelled out, so its own look is part
+  // of the character rather than an option on top of it, and clearing an
+  // element named by one returns it to that look instead of stripping it.
+  static #ownLookOf(code) {
+    if (!code || !Object.hasOwn(blissElementDefinitions, code)) return undefined;
+    const def = blissElementDefinitions[code];
+    if (!def.defaultOptions) return undefined;
+    return builtInCodes.has(code) || typeof def.getPath === 'function' ? def.defaultOptions : undefined;
+  }
+
+  // One element's options emptied of everything the canonical string writes in
+  // brackets, in place. `level` is 0 for the composition, 1 a word, 2 a
+  // character and 3 a part. Shared by the view without options, which runs it
+  // on toJSON's working copy, and by the in-place clears, so the two cannot
+  // disagree about what an option is.
+  //
+  // What stays is what the string writes outside a bracket, or never writes:
+  // a part's coordinates, a character's kerning (the JSON keeps it in the bag,
+  // the string writes it as an `RK:`/`AK:` marker), the runtime `key`, and what
+  // a code the string can only name draws with by its own definition. A
+  // character, word or composition position has no spelling outside a bracket,
+  // so it goes with the rest. Transient options sit in a bag of their own and
+  // are never touched.
+  //
+  // A bag with nothing to take off is left exactly as it was, so a composition
+  // with no options saves the same with the view as without it.
+  static #clearOwnOptions(node, level) {
+    const bag = node.options ?? {};
+    const kept = {};
+    for (const [key, value] of Object.entries(bag)) {
+      if (key === 'key' || (level === 2 && Object.hasOwn(KERNING_OPTION_KEYS, key))) kept[key] = value;
+    }
+    Object.assign(kept, BlissSVGBuilder.#ownLookOf(level === 2 ? node.glyphCode : level === 3 ? node.codeName : undefined));
+    const keptKeys = Object.keys(kept);
+    const changed = keptKeys.length !== Object.keys(bag).length || keptKeys.some((key) => bag[key] !== kept[key]);
+    if (changed) {
+      // The composition keeps an empty bag, the shape its JSON always has.
+      if (keptKeys.length > 0 || level === 0) node.options = kept;
+      else delete node.options;
+    }
+    if (level < 3) {
+      delete node.x;
+      delete node.y;
+    }
+    const overlay = level === 1 ? node.wordIndicators : undefined;
+    if (overlay?.codes?.length) {
+      const codes = overlay.codes.map((code) => BlissSVGBuilder.#wordIndicatorCodeWithoutOptions(code));
+      if (codes.some((code, i) => code !== overlay.codes[i])) node.wordIndicators = { ...overlay, codes };
+    }
+  }
+
+  // The same clear on `node` and on everything below it: a composition's words,
+  // a word's characters, and the parts of a character or a part at any depth.
+  static #clearOptionsFrom(node, level) {
+    BlissSVGBuilder.#clearOwnOptions(node, level);
+    const children = level === 0 ? node.groups : level === 1 ? node.glyphs : node.parts;
+    for (const child of children ?? []) BlissSVGBuilder.#clearOptionsFrom(child, Math.min(level + 1, 3));
+  }
+
+  // One word-level (`;;`) code without its options: the code and its position
+  // stay, the position in the `:x,y` spelling. The overlay stores each code as
+  // the text it was written as, brackets included, so its options live in the
+  // text rather than in a bag.
+  //
+  // A code that names a definition bringing options of its own is written as
+  // the code it draws, when that is a code a `;;` list accepts. A name with no
+  // such spelling (an indicator drawn from a shape that is not one) stays, and
+  // brings its definition's values back with it, as any code the string can
+  // only name does.
+  static #wordIndicatorCodeWithoutOptions(code) {
+    const node = wordIndicatorNode(code, blissElementDefinitions, (text) => BlissParser.parse(text));
+    if (!node) return code;
+    const spelled = BlissSVGBuilder.#optionFreeIndicatorSpelling(node);
+    if (spelled) return spelled;
+    if (!code.startsWith('[')) return code;
+    return getBareCode(code) + BlissSVGBuilder.#positionSuffix(node.x, node.y);
+  }
+
+  // The single code a word-level indicator node draws, written with its
+  // position and no option; null when the node carries no option, or when
+  // what it draws has no spelling a `;;` list accepts. A custom name that
+  // brings options of its own is followed down to the one code it stands for,
+  // adding up the positions on the way, which is where the render places it.
+  static #optionFreeIndicatorSpelling(node) {
+    if (!BlissSVGBuilder.#carriesOptions(node)) return null;
+    const standsWithoutOptions = (code) => builtInCodes.has(code)
+      || typeof blissElementDefinitions[code]?.getPath === 'function'
+      || !BlissSVGBuilder.#carriesOptions(wordIndicatorNode(code, blissElementDefinitions, (text) => BlissParser.parse(text)));
+    const addAxis = (a, b) => (a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0));
+    let current = node;
+    let { x, y } = node;
+    while (current.codeName && !standsWithoutOptions(current.codeName)) {
+      if (current.parts?.length !== 1) return null;
+      current = current.parts[0];
+      x = addAxis(x, current.x);
+      y = addAxis(y, current.y);
+    }
+    if (!current.codeName) return null;
+    const spelled = current.codeName + BlissSVGBuilder.#positionSuffix(x, y);
+    return partitionWordIndicators([spelled], blissElementDefinitions).valid.length === 1 ? spelled : null;
+  }
+
+  // Whether a part node or anything inside it holds an option.
+  static #carriesOptions(node) {
+    return !!node && (Object.keys(node.options ?? {}).length > 0
+      || (node.parts ?? []).some((part) => BlissSVGBuilder.#carriesOptions(part)));
   }
 
   // Determine the type of a definition entry.

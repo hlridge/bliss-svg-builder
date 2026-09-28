@@ -414,61 +414,76 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
       indicatorParts.push({ ...reusable.splice(reuseIndex, 1)[0] });
       continue;
     }
-    const parsedParts = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts;
-    // A custom flagged compound indicator (e.g. define COMBI = 'B97;B99:3,0')
-    // parses at GLYPH level into multiple decomposed parts, unlike a built-in
-    // compound (B98) which the parser keeps as one nested part. Taking parts[0]
-    // dropped the rest of the anatomy from render AND flatten (`;;COMBI` rendered
-    // only B97; backlog: custom compound `;;` anatomy truncation). Wrap the whole
-    // anatomy back into one atomic part, mirroring the `;`-slot form (`B291;COMBI`);
-    // the shared indicator-metadata stamp below then flags it, so `;` and `;;`
-    // agree for the same definition.
-    let node = parsedParts?.length > 1
-      ? { codeName: getBareCode(code), parts: parsedParts }
-      : parsedParts?.[0];
-    if (node) {
-      const bare = getBareCode(code);
-      const immediate = Object.prototype.hasOwnProperty.call(definitions, bare)
-        ? definitions[bare]
-        : undefined;
-      // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81) loses
-      // the written code at parse; record it so preserve-mode serialization
-      // restores it (Phase 2.3b). This stamp is load-bearing for the `;;`
-      // surface: the standalone parse resolves the alias at glyph level, so the
-      // parser's own single-ref rename recording never fires for this node
-      // (unlike an object-input part, where it does). A multi-part wrap keeps its
-      // own code (its codeName is already `bare`): stamping the alias on just the
-      // first part would mislabel it.
-      if (parsedParts.length === 1 && node.codeName !== bare) {
-        node._aliasCodeName = bare;
-      }
-      // The `;;` overlay parses its code standalone, which (unlike the `;`-slot's
-      // #applyDefinitionMetadata) does not carry a single-code alias's own
-      // indicator metadata onto the node when the alias target is not itself an
-      // indicator (MYIND -> C2, isIndicator on the definition); the compound wrap
-      // above also starts bare. Apply it here from the effective definition so
-      // `;` and `;;` place the indicator identically and the flatten+preserve
-      // round-trip is svg-stable (external review MAJOR-1). Built-in indicators
-      // already carry the flag, so the guard makes this a no-op for them.
-      if (node.isIndicator !== true) {
-        const effective = resolveEffectiveDefinition(immediate, definitions);
-        if (effective?.isIndicator) {
-          node.isIndicator = true;
-          node.width = effective.width ?? 2;
-          if (effective.anchorOffsetX !== undefined) node.anchorOffsetX = effective.anchorOffsetX;
-        }
-      }
-      // A standalone parse of an alias code lands the alias definition's
-      // defaultOptions at GLYPH level, so the extracted part node would
-      // silently lose them (`;;` diverging from the `;`-part slot). Merge them
-      // here with the same precedence as #applyDefinitionMetadata: explicit
-      // options on the code win.
-      if (immediate?.defaultOptions) {
-        node.options = { ...immediate.defaultOptions, ...(node.options || {}) };
-      }
-      indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
-    }
+    const node = wordIndicatorNode(code, definitions, parse);
+    if (node) indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
   }
 
   return [...baseParts, ...indicatorParts];
+}
+
+/**
+ * The part node one word-level (`;;`) code stands for: the reading the render
+ * merges onto the head, flatten writes out, and the view without options
+ * rewrites. One reading for all three, so what the view takes off is exactly
+ * what the overlay draws with.
+ *
+ * @param {string} code - a stored `;;` code (may carry an option bracket and coordinates)
+ * @param {Object} definitions
+ * @param {(code: string) => Object} parse - parser used to build the node
+ * @returns {Object|undefined} a fresh part node, or undefined when the code reads as nothing
+ */
+export function wordIndicatorNode(code, definitions, parse) {
+  const parsedParts = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts;
+  const bare = getBareCode(code);
+  // A custom flagged compound indicator (e.g. define COMBI = 'B97;B99:3,0')
+  // parses at GLYPH level into multiple decomposed parts, unlike a built-in
+  // compound (B98) which the parser keeps as one nested part. Taking parts[0]
+  // dropped the rest of the anatomy from render AND flatten (`;;COMBI` rendered
+  // only B97; backlog: custom compound `;;` anatomy truncation). Wrap the whole
+  // anatomy back into one atomic part, mirroring the `;`-slot form (`B291;COMBI`);
+  // the shared indicator-metadata stamp below then flags it, so `;` and `;;`
+  // agree for the same definition.
+  const node = parsedParts?.length > 1
+    ? { codeName: bare, parts: parsedParts }
+    : parsedParts?.[0];
+  if (!node) return undefined;
+  const immediate = Object.prototype.hasOwnProperty.call(definitions, bare)
+    ? definitions[bare]
+    : undefined;
+  // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81) loses
+  // the written code at parse; record it so preserve-mode serialization
+  // restores it (Phase 2.3b). This stamp is load-bearing for the `;;`
+  // surface: the standalone parse resolves the alias at glyph level, so the
+  // parser's own single-ref rename recording never fires for this node
+  // (unlike an object-input part, where it does). A multi-part wrap keeps its
+  // own code (its codeName is already `bare`): stamping the alias on just the
+  // first part would mislabel it.
+  if (parsedParts.length === 1 && node.codeName !== bare) {
+    node._aliasCodeName = bare;
+  }
+  // The `;;` overlay parses its code standalone, which (unlike the `;`-slot's
+  // #applyDefinitionMetadata) does not carry a single-code alias's own
+  // indicator metadata onto the node when the alias target is not itself an
+  // indicator (MYIND -> C2, isIndicator on the definition); the compound wrap
+  // above also starts bare. Apply it here from the effective definition so
+  // `;` and `;;` place the indicator identically and the flatten+preserve
+  // round-trip is svg-stable (external review MAJOR-1). Built-in indicators
+  // already carry the flag, so the guard makes this a no-op for them.
+  if (node.isIndicator !== true) {
+    const effective = resolveEffectiveDefinition(immediate, definitions);
+    if (effective?.isIndicator) {
+      node.isIndicator = true;
+      node.width = effective.width ?? 2;
+      if (effective.anchorOffsetX !== undefined) node.anchorOffsetX = effective.anchorOffsetX;
+    }
+  }
+  // A standalone parse of an alias code lands the alias definition's
+  // defaultOptions at GLYPH level, so the extracted part node would
+  // silently lose them (`;;` diverging from the `;`-part slot). Merge them
+  // here with the same precedence as #applyDefinitionMetadata: explicit
+  // options on the code win.
+  if (immediate?.defaultOptions) {
+    node.options = { ...immediate.defaultOptions, ...(node.options || {}) };
+  }
+  return node;
 }
