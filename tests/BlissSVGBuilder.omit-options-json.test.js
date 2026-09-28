@@ -100,7 +100,7 @@ describe('BlissSVGBuilder omit options JSON', () => {
 
   describe('when a definition\'s code string carries a bracket', () => {
     it('publishes no codeName for the glyph, since no single code draws it', () => {
-      // regression (C20 F4): the resolver stopped at `;`, `/` and `:` but not
+      // regression: the resolver stopped at `;`, `/` and `:` but not
       // at `[` or `>`, so the definition's own text became the codeName
       const builder = new BlissSVGBuilder('OJ_STYGL');
       expect(builder.toJSON().groups[0].glyphs[0]).toEqual({ parts: [{ codeName: 'B291', options: { color: 'red' } }] });
