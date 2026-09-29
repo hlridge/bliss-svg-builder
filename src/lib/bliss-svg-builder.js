@@ -882,6 +882,8 @@ class BlissSVGBuilder {
       getGeneration: () => this.#generation,
       getDefinitions: () => blissElementDefinitions,
       addMutationWarning: (warning) => this.#mutationWarnings.push(warning),
+      clearOwnOptions: (node, level) => BlissSVGBuilder.#clearOwnOptions(node, level),
+      ownLookAt: (node, level) => BlissSVGBuilder.#ownLookAt(node, level),
     };
   }
 
@@ -2598,9 +2600,10 @@ class BlissSVGBuilder {
    * that describes this view rather than the composition — a display width, a
    * highlight, an annotation the app re-applies on each render.
    *
-   * There is no builder-level `setOptions` counterpart: global options belong
-   * to the composition and arrive with it. This channel is the transient one,
-   * so changing it after construction is exactly what it is for.
+   * There is no builder-level `setOptions` counterpart: global options arrive
+   * with the composition, and `clearAllOptions()` is the one call that takes
+   * them away again. This channel is the transient one, so changing it after
+   * construction is exactly what it is for.
    *
    * @param {Object} opts - Option keys and values
    * @returns {this}
@@ -2641,6 +2644,28 @@ class BlissSVGBuilder {
     // twin records: an empty transient bag is indistinguishable from an absent
     // one on every public surface, because transient options never serialize.
     if (Object.keys(bag).length === 0) delete this.#rawBlissObj.transientOptions;
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Removes every option at every scope, the global bracket included: exactly
+   * what `toString()` writes inside `[...]` brackets, so the builder afterwards
+   * saves what `toString({ omitOptions: true })` saved before. A character,
+   * word or composition position goes with the rest; a part's coordinates and
+   * a character's kerning stay, since the string writes those outside a
+   * bracket. `key`s and transient options are untouched, and a code the string
+   * can only name (a built-in, or a shape drawn by its own function) keeps the
+   * look its definition gives it.
+   *
+   * @returns {this}
+   */
+  clearAllOptions() {
+    // The function the flagged view runs on its working copy, run here on the
+    // authoring structure, so the two cannot disagree about what an option is.
+    // The rebuild then applies the rule the view applies after it: a head
+    // designation on a character left with nothing to write goes with it.
+    BlissSVGBuilder.#clearOptionsFrom(this.#rawBlissObj, 0);
     this.#rebuild();
     return this;
   }
@@ -3081,21 +3106,13 @@ class BlissSVGBuilder {
           }
           // A custom shape part with no parts of its own: its definition arrived
           // after the composition was built, so the tree still holds the bare
-          // name. Write what the parser reads the name as in this slot, with
-          // this part's own position and options over it. That is the node the
-          // composition would hold had the definition existed at parse time, so
-          // the late save writes what the early one does, and no definition
-          // text is copied that a save without options would have to strip.
-          const def = blissElementDefinitions[part.codeName];
-          const reading = def?.isShape && def.codeString && !def.getPath
-            ? BlissSVGBuilder.#readingOf(part.codeName, 'part', readings)
-            : null;
-          if (reading) {
-            const node = structuredClone(reading);
-            if (part.x !== undefined) node.x = part.x;
-            if (part.y !== undefined) node.y = part.y;
-            if (part.options) node.options = { ...node.options, ...part.options };
-            if (options.omitOptions) BlissSVGBuilder.#clearOptionsFrom(node, 3);
+          // name. It is written as the node it would hold had the definition
+          // existed at parse time, so the late save writes what the early one
+          // does, and no definition text is copied that a save without options
+          // would have to strip. (That save never gets here: its clear already
+          // made the same expansion on its working copy.)
+          const node = structuredClone(part);
+          if (BlissSVGBuilder.#expandLateShape(node, readings)) {
             return serializeParts([node], offsetX, offsetY);
           }
         }
@@ -3780,6 +3797,14 @@ class BlissSVGBuilder {
     return builtInCodes.has(code) || typeof def.getPath === 'function' ? def.defaultOptions : undefined;
   }
 
+  // The own look of the element `node` at `level` (2 a character, 3 a part),
+  // read from the code that names it there; undefined for a word or the
+  // composition, which no code names. Shared by the clear and by the removal
+  // of a named option, so both return an element to the same look.
+  static #ownLookAt(node, level) {
+    return BlissSVGBuilder.#ownLookOf(level === 2 ? node.glyphCode : level === 3 ? node.codeName : undefined);
+  }
+
   // `bag` without the values a code the string can only name supplies by its
   // own name at this level, wherever the element holds the same value: that
   // look is part of the character, so the canonical string does not repeat it
@@ -3812,12 +3837,13 @@ class BlissSVGBuilder {
   // A bag with nothing to take off is left exactly as it was, so a composition
   // with no options saves the same with the view as without it.
   static #clearOwnOptions(node, level) {
+    if (level === 3) BlissSVGBuilder.#expandLateShape(node);
     const bag = node.options ?? {};
     const kept = {};
     for (const [key, value] of Object.entries(bag)) {
       if (key === 'key' || (level === 2 && Object.hasOwn(KERNING_OPTION_KEYS, key))) kept[key] = value;
     }
-    Object.assign(kept, BlissSVGBuilder.#ownLookOf(level === 2 ? node.glyphCode : level === 3 ? node.codeName : undefined));
+    Object.assign(kept, BlissSVGBuilder.#ownLookAt(node, level));
     const keptKeys = Object.keys(kept);
     const changed = keptKeys.length !== Object.keys(bag).length || keptKeys.some((key) => bag[key] !== kept[key]);
     if (changed) {
@@ -3834,6 +3860,27 @@ class BlissSVGBuilder {
       const codes = overlay.codes.map((code) => BlissSVGBuilder.#wordIndicatorCodeWithoutOptions(code));
       if (codes.some((code, i) => code !== overlay.codes[i])) node.wordIndicators = { ...overlay, codes };
     }
+  }
+
+  // A part named by a shape defined after the composition was built still holds
+  // the bare name, so the options that definition brings sit in no bag: only in
+  // what the parser reads the name as in a part's slot. This puts that reading
+  // in place of the bare name, with the part's own options over it: the node
+  // the part would hold had the definition existed when it was built. The slot
+  // is read with no coordinate written, so the reading has no position of its
+  // own and the part keeps the one it has. Every save writes the part that way,
+  // and a clear makes the same expansion first, since it can take off only what
+  // is in the tree. Returns whether the node was expanded.
+  static #expandLateShape(node, readings = new Map()) {
+    if (node.parts || node.errorCode || builtInCodes.has(node.codeName)) return false;
+    const def = blissElementDefinitions[node.codeName];
+    if (!def?.isShape || !def.codeString || def.getPath) return false;
+    const reading = BlissSVGBuilder.#readingOf(node.codeName, 'part', readings);
+    if (!reading) return false;
+    const { options } = node;
+    Object.assign(node, structuredClone(reading));
+    if (options) node.options = { ...node.options, ...options };
+    return true;
   }
 
   // The same clear on `node` and on everything below it: a composition's words,

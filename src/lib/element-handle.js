@@ -1508,10 +1508,44 @@ export class ElementHandle {
       if (resolved === 'x' || resolved === 'y') delete node[resolved];
       if (node.options) deleteOptionByName(node.options, key);
     }
+    // What a code the string can only name draws with by its own definition
+    // (a built-in's dotted line, a `getPath` shape's defaults) is part of the
+    // character, so removing one of its keys returns it to the definition's
+    // value instead of taking it off. Clearing does the same, so the two agree,
+    // and no look is made that no save could write back. The names are matched
+    // the way the deletion above matched them, on a copy of the look.
+    const ownLook = this.#ctx.ownLookAt(node, this.#level);
+    if (ownLook) {
+      const unnamed = { ...ownLook };
+      for (const key of keys) deleteOptionByName(unnamed, key);
+      for (const [key, value] of Object.entries(ownLook)) {
+        if (!Object.hasOwn(unnamed, key)) (node.options ??= {})[key] = value;
+      }
+    }
     // Clean up empty options object
     if (node.options && Object.keys(node.options).length === 0) {
       delete node.options;
     }
+    this.#ctx.rebuild();
+    this.#syncGeneration();
+    return this;
+  }
+
+  // Everything the canonical string writes in brackets for this element and no
+  // more: its options, a word's or a character's position, and the options
+  // inside a word's `;;` codes. A part keeps its coordinates and a character its
+  // kerning (both written outside a bracket), which is where this differs from
+  // removing `x` by name. `key`, transient options and what the element's code
+  // draws with by its own definition stay; what sits below it is its own
+  // element's to clear. The same function saves a composition without options,
+  // so what that save leaves out and what this takes away are one set.
+  clearOptions() {
+    this.#assertReachable();
+    // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
+    if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
+    const node = this.#nodeRef;
+    if (!node) return this;
+    this.#ctx.clearOwnOptions(node, this.#level);
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
