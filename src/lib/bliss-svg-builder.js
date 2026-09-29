@@ -3874,7 +3874,7 @@ class BlissSVGBuilder {
   static #expandLateShape(node, readings = new Map()) {
     if (node.parts || node.errorCode || builtInCodes.has(node.codeName)) return false;
     const def = blissElementDefinitions[node.codeName];
-    if (!def?.isShape || !def.codeString || def.getPath) return false;
+    if (!def?.isShape || !def.codeString) return false;
     const reading = BlissSVGBuilder.#readingOf(node.codeName, 'part', readings);
     if (!reading) return false;
     const { options } = node;
@@ -4310,6 +4310,8 @@ class BlissSVGBuilder {
       }
     }
 
+    if (!hasGetPath) BlissSVGBuilder.#assertCodeStringReadable('define', code, 'shape', entry);
+
     blissElementDefinitions[code] = entry;
   }
 
@@ -4494,6 +4496,8 @@ class BlissSVGBuilder {
       BlissSVGBuilder.#assertNoIndicatorBakeDependents('define', code, entry);
     }
 
+    BlissSVGBuilder.#assertCodeStringReadable('define', code, 'glyph', entry);
+
     blissElementDefinitions[code] = entry;
   }
 
@@ -4599,6 +4603,78 @@ class BlissSVGBuilder {
     return false;
   }
 
+  // The name a definition is read under while it is judged. Not the
+  // definition's own name: define() accepts names the DSL cannot spell
+  // (`C8:.`, `A/B`), and reading one of those would judge the name instead of
+  // the code string.
+  static #READING_STAND_IN = '_definition-being-read_';
+
+  // Refuses a code string that no use of the definition could read, judged by
+  // the one reader every use runs: the entry about to be stored is read the way
+  // written input reads a code, at every depth its references reach. Refused
+  // are a format error the reader reports (MALFORMED_COORDINATES,
+  // MALFORMED_KERNING_VALUE: the MALFORMED_ family is the registry's format
+  // errors), a kerning marker read as a part (RK and AK are syntax no
+  // definition may take, so such a part can never draw), and a glyph or shape
+  // that reads as no character at all. A bare alias may read as a lone marker:
+  // between characters it spaces them like the marker it names.
+  //
+  // What the reader reads and reports as misplaced is left to the use site,
+  // which is where a code string's option keys are judged, and an unknown code
+  // is a forward reference, which define() allows by design.
+  static #assertCodeStringReadable(callName, code, kind, entry) {
+    const reading = BlissSVGBuilder.#readAsUsed(entry);
+    if (!reading) return;
+    const written = `${callName}("${code}"): the codeString "${entry.codeString}"`;
+    const whereUsed = `where "${code}" is used instead, e.g. RK:2/${code}.`;
+    const formatError = reading._parseWarnings?.find((warning) => warning.code.startsWith('MALFORMED_'))?.code
+      ?? BlissSVGBuilder.#findInReading(reading, (node) => node.errorCode?.startsWith('MALFORMED_'))?.errorCode;
+    if (formatError) {
+      const remedy = formatError === WARNING_CODES.MALFORMED_COORDINATES
+        ? ' Write a position as :x,y with plain numbers, e.g. C8:1,2.'
+        : formatError === WARNING_CODES.MALFORMED_KERNING_VALUE
+          ? ` A kerning marker is RK:n or AK:n with a plain number, written before the character it spaces, e.g. RK:2/${code}.`
+          : '';
+      throw new Error(`${written} cannot be read (${formatError}), so every use of "${code}" would warn and drop it.${remedy}`);
+    }
+    const marker = BlissSVGBuilder.#findInReading(reading, (node) => node.codeName === 'RK' || node.codeName === 'AK')?.codeName;
+    if (marker) {
+      throw new Error(`${written} uses a kerning marker (${marker}) as a part, which can never be drawn: a kerning marker sets the gap before a character. Write it ${whereUsed}`);
+    }
+    if ((kind === 'glyph' || kind === 'shape') && !reading.groups?.some((group) => group.glyphs?.length > 0)) {
+      throw new Error(`${written} reads as no character, so every use of "${code}" would draw nothing. A ${kind} must draw one character; a kerning marker alone is only a gap, so write it ${whereUsed}`);
+    }
+  }
+
+  // The parser's reading of `entry` as written input names a code, with the
+  // entry in the registry under the stand-in for exactly as long as the read
+  // takes. Null when the read throws, which only a runaway reference chain can
+  // make it do, and that is not what #assertCodeStringReadable judges.
+  static #readAsUsed(entry) {
+    const standIn = BlissSVGBuilder.#READING_STAND_IN;
+    const hadStandIn = Object.hasOwn(blissElementDefinitions, standIn);
+    const displaced = blissElementDefinitions[standIn];
+    blissElementDefinitions[standIn] = entry;
+    try {
+      return BlissParser.parse(standIn);
+    } catch {
+      return null;
+    } finally {
+      if (hadStandIn) blissElementDefinitions[standIn] = displaced;
+      else delete blissElementDefinitions[standIn];
+    }
+  }
+
+  // The first node of a parsed reading, at any depth, that `matches`.
+  static #findInReading(node, matches) {
+    if (matches(node)) return node;
+    for (const child of [...(node.groups ?? []), ...(node.glyphs ?? []), ...(node.parts ?? [])]) {
+      const found = BlissSVGBuilder.#findInReading(child, matches);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
   static #defineBare(code, definition, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
@@ -4667,6 +4743,8 @@ class BlissSVGBuilder {
     if (resolveEffectiveDefinition(entry, blissElementDefinitions)?.isIndicator === true) {
       BlissSVGBuilder.#assertNoIndicatorBakeDependents('define', code, entry);
     }
+
+    BlissSVGBuilder.#assertCodeStringReadable('define', code, 'bare', entry);
 
     blissElementDefinitions[code] = entry;
   }
@@ -4929,6 +5007,16 @@ class BlissSVGBuilder {
       }
     }
 
+    // A shape is drawn by its getPath function or by its codeString, never by
+    // both: define() keeps one, and a shape holding both drew one while every
+    // save wrote the other. A patch that names either one means it, so the
+    // patch is refused rather than trimmed.
+    if (type === 'shape'
+        && ('getPath' in changes || typeof def.getPath === 'function')
+        && ('codeString' in changes || typeof def.codeString === 'string')) {
+      throw new Error(`patchDefinition("${code}"): a shape is drawn either by its getPath function or by its codeString, and this patch would leave it with both. To change how "${code}" is drawn, remove it and define it again.`);
+    }
+
     // D-S1a on the patch surface: a glyph (not flagged isIndicator) cannot
     // bake an indicator, whichever property the patch changes — a codeString
     // gaining indicator anatomy, or an isIndicator un-flag on a compound
@@ -4982,6 +5070,10 @@ class BlissSVGBuilder {
         BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('patchDefinition', code, defaultOptionsSnapshot);
       }
       changes = { ...changes, defaultOptions: BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings) };
+    }
+
+    if ('codeString' in changes) {
+      BlissSVGBuilder.#assertCodeStringReadable('patchDefinition', code, type, { ...def, ...changes });
     }
 
     // Apply changes

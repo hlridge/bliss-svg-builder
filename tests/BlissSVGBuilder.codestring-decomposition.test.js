@@ -29,8 +29,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - The fold arithmetic, per axis: a definition's own coordinate is added to,
  *   not replaced by, the use-site position, including negative offsets and when
  *   either side writes only one axis.
- * - A coordinate slot that cannot be read: the parser fails that part, so it is
- *   left out, and no unreadable value reaches the output.
+ * - A coordinate that cannot be read never reaches this path: `define()`
+ *   refuses the definition, so a composition built first keeps its unknown name.
  * - Option text on either side: the part's own options, a bracket in the
  *   codeString, a colon inside an option value, and a trailing `;`.
  *
@@ -42,9 +42,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   code. That is a definition-binding question, not a serialization one, and it
  *   has its own backlog row. These tests therefore pin the emitted STRING and
  *   what that string means when reloaded, never the source composition's ink.
- * - `define()` accepting a malformed coordinate at all (`'C8:.'`, `'C8:1.2.3'`)
- *   without reporting it, which is its own backlog row; these rows pin today's
- *   behaviour.
+ * - Every code string `define()` refuses as unreadable, and the wording, see
+ *   `BlissSVGBuilder.define-readable-code-string.test.js`.
  * - A save leaving out every option, on this path too, see
  *   `BlissSVGBuilder.omit-options-edges.test.js`.
  */
@@ -150,17 +149,21 @@ describe('BlissSVGBuilder codeString decomposition', () => {
   });
 
   describe('when the definition writes a coordinate that cannot be read', () => {
-    // `define()` accepts these, so they are reachable rather than hypothetical.
-    // regression: this path read the definition's text a second way, and wrote
-    // a `C8` the parser fails and neither side of define() draws (`B291;C8:3`);
-    // before that, the unreadable slot parsed to NaN and `:NaN` was saved
+    // define() refuses these, so this path can no longer meet one: the
+    // composition built first keeps the unknown name it was written with.
+    // regression: while define() accepted them, this path saved `B291` for a
+    // character that drew nothing; before that it wrote a `C8` the parser fails
+    // (`B291;C8:3`), and before that the unreadable slot was saved as `:NaN`
     it.each([
-      ['B291;DEF:3', 'C8:.'],
-      ['B291;DEF', 'C8:.'],
-      ['B291;DEF', 'C8:.,2'],
-    ])('leaves %s over %s out, as the composition built after define() does', (input, codeString) => {
-      expect(serializeAfterLateDefine(input, codeString)).toBe('B291');
-      expect(serializeAfterEarlyDefine(input, codeString)).toBe('B291');
+      ['B291;LATEDEF:3', 'C8:.'],
+      ['B291;LATEDEF', 'C8:.'],
+      ['B291;LATEDEF', 'C8:.,2'],
+    ])('keeps %s as written, since define() refuses %s', (input, codeString) => {
+      const builder = new BlissSVGBuilder(input);
+      customCodes.push('LATEDEF');
+      const result = BlissSVGBuilder.define({ LATEDEF: { type: 'shape', codeString } });
+      expect(result.errors).toHaveLength(1);
+      expect(builder.toString()).toBe(input);
     });
   });
 
