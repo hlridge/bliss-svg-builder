@@ -197,10 +197,22 @@ describe('BlissSVGBuilder define readable code string', () => {
       expect(result.errors[0]).toMatch(/^"REFUSED": /);
     });
 
-    it('leaves the registry exactly as it was', () => {
-      const before = BlissSVGBuilder.listDefinitions();
+    it('leaves no definition behind but the ones it registers', () => {
+      // pins that judging a definition leaves nothing in the registry; the
+      // cleanup removes every tracked code, so any other custom code is a leak
       defineTracked('REFUSED', { type: 'glyph', codeString: 'C8;RK:3' });
-      expect(BlissSVGBuilder.listDefinitions()).toEqual(before);
+      defineTracked('ACCEPTED', { type: 'glyph', codeString: 'B291' });
+      const custom = BlissSVGBuilder.listDefinitions()
+        .filter((code) => !BlissSVGBuilder.getDefinition(code).isBuiltIn);
+      expect(custom).toEqual(['ACCEPTED']);
+    });
+
+    it('keeps a definition that happens to share the name the check reads under', () => {
+      // pins the restore of a displaced entry: `_definition-being-read_` is the
+      // stand-in name the check puts the judged entry under while it reads it
+      defineTracked('_definition-being-read_', { type: 'shape', codeString: 'C8:1,2' });
+      defineTracked('JUDGED', { type: 'glyph', codeString: 'C8;RK:3' });
+      expect(BlissSVGBuilder.getDefinition('_definition-being-read_').codeString).toBe('C8:1,2');
     });
 
     it('keeps the existing definition when overwrite is asked for', () => {
