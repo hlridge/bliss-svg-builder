@@ -4609,44 +4609,36 @@ class BlissSVGBuilder {
   // the code string.
   static #READING_STAND_IN = '_definition-being-read_';
 
-  // Refuses a code string that no use of the definition could read, judged by
-  // the one reader every use runs: the entry about to be stored is read the way
-  // written input reads a code, at every depth its references reach. What is
-  // judged is the DSL's own syntax, and three things fail it:
-  // - a coordinate or kerning marker the reader cannot read: a code whose
-  //   `:x,y` suffix fails (MALFORMED_COORDINATES, which fails the part), or an
-  //   RK:/AK: marker whose value fails (MALFORMED_KERNING_VALUE);
+  // Refuses a code string whose content no use of the definition could draw,
+  // judged by the one reader every use runs: the entry about to be stored is
+  // read the way written input reads a code, at every depth its references
+  // reach. Content is what fails:
+  // - a code whose `:x,y` suffix the reader cannot read (MALFORMED_COORDINATES),
+  //   which fails its whole character at every use;
   // - a kerning marker read as a part: RK and AK are syntax no definition may
-  //   take, so such a part can never draw;
-  // - a glyph or shape that reads as no character at all. A bare alias may read
+  //   take, so such a part can never draw, and it fails its character too;
+  // - a glyph or shape that reads as no character at all, a lone marker or one
+  //   whose unreadable value swallows the rest included. A bare alias may read
   //   as a lone marker: between characters it spaces them like the marker it
   //   names.
   //
-  // Option keys and values inside a bracket are left to the use site, which
-  // judges them for every route alike: it reports a misplaced key or a value it
-  // cannot read (`[x=.]`), ignores it and still draws. An unknown code is a
-  // forward reference, which define() allows by design. A part the reader
-  // cannot take for a code at all (`B291;!`) is left to the use site too, which
-  // reports it as UNKNOWN_CODE: some of those fail only because a definition is
-  // read without the spaces and quoted brackets top-level input allows, and
-  // those want reading, not refusing.
+  // Decoration is left to the use site, which reports it, drops it and still
+  // draws: a bracket's keys and values (`[margin=2]`, `[x=.]`) and a marker's
+  // value (`B291/RK:x/B313` draws both characters at the default gap). An
+  // unknown code is a forward reference, which define() allows by design. A part
+  // the reader cannot take for a code at all (`B291;!`) is left to the use site
+  // too, which reports it as UNKNOWN_CODE: some of those fail only because a
+  // definition is read without the spaces and quoted brackets top-level input
+  // allows, and those want reading, not refusing.
   static #assertCodeStringReadable(callName, code, kind, entry) {
     const reading = BlissSVGBuilder.#readAsUsed(entry);
     if (!reading) return;
     const written = `${callName}("${code}"): the codeString "${entry.codeString}"`;
     const whereUsed = `where "${code}" is used instead, e.g. RK:2/${code}.`;
-    // The same test the reader applies before it reports a marker it cannot
-    // read; a bracket's kerning value is reported under the same code.
-    const unreadableMarker = reading._parseWarnings?.find((warning) =>
-      warning.code === WARNING_CODES.MALFORMED_KERNING_VALUE && /^(?:RK|AK):/.test(warning.source));
     const unreadablePart = BlissSVGBuilder.#findInReading(reading, (node) =>
       node.errorCode === WARNING_CODES.MALFORMED_COORDINATES);
-    const formatError = unreadableMarker?.code ?? unreadablePart?.errorCode;
-    if (formatError) {
-      const remedy = formatError === WARNING_CODES.MALFORMED_KERNING_VALUE
-        ? `A kerning marker is RK:n or AK:n with a plain number, written before the character it spaces, e.g. RK:2/${code}.`
-        : 'Write a position as :x,y with plain numbers, e.g. C8:1,2.';
-      throw new Error(`${written} cannot be read (${formatError}), so every use of "${code}" would warn and drop it. ${remedy}`);
+    if (unreadablePart) {
+      throw new Error(`${written} cannot be read (${WARNING_CODES.MALFORMED_COORDINATES}), so every use of "${code}" would warn and drop it. Write a position as :x,y with plain numbers, e.g. C8:1,2.`);
     }
     const marker = BlissSVGBuilder.#findInReading(reading, (node) => node.codeName === 'RK' || node.codeName === 'AK')?.codeName;
     if (marker) {

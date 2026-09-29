@@ -7,19 +7,19 @@ import { BlissSVGBuilder } from '../src/index.js';
  * that `patchDefinition()` refuses to give a shape two ways of being drawn.
  *
  * Covers:
- * - A coordinate the DSL cannot read (MALFORMED_COORDINATES) and a kerning
- *   value it cannot read (MALFORMED_KERNING_VALUE), on every code-string type,
- *   at any depth the reader reaches (a character bracket included).
+ * - A coordinate the DSL cannot read (MALFORMED_COORDINATES), which fails its
+ *   character at every use, on every code-string type, at any depth the reader
+ *   reaches (a character bracket included).
  * - A kerning marker standing where a part must be (`C8;RK:3`), which the
  *   reader takes for a part named RK that no definition may ever supply.
  * - A glyph or shape that reads as no character at all (a lone marker, a
- *   lone `;`), while a bare alias of a lone marker stays a working named
- *   marker.
+ *   lone `;`, a marker whose unreadable value swallows the rest), while a bare
+ *   alias of a lone marker stays a working named marker.
  * - What stays accepted: readable coordinates, an unknown code (a forward
- *   reference), a misplaced option or an option value the use site cannot read
- *   (both reported where the code is used, which still draws), indicator,
- *   head-marker and multi-word anatomy, and a name the DSL cannot spell, since
- *   the check reads through a stand-in.
+ *   reference), decoration the use site reports and drops while still drawing
+ *   (a misplaced option, a bracket value or a marker value it cannot read),
+ *   indicator, head-marker and multi-word anatomy, and a name the DSL cannot
+ *   spell, since the check reads through a stand-in.
  * - The registry after a refusal, the other definitions in the same call, an
  *   existing name, and the exact wording of each refusal.
  * - patchDefinition(): the same refusals, the definition left unchanged, and a
@@ -33,9 +33,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.codestring-decomposition.test.js`.
  * - A character bracket in a code string carrying a position, kerning or
  *   `key` to every use: readable, so not refused here; an open backlog row.
- * - A part the reader cannot take for a code at all (`B291;!`, a stray space):
- *   accepted and reported as UNKNOWN_CODE where the code is used; an open
- *   backlog row.
+ * - A part the reader cannot take for a code at all (`B291;!`, a stray space),
+ *   or one a `;` slot cannot hold (`B291;Xabc`): accepted and reported where
+ *   the code is used; an open backlog row, whose tripwire the letter-run row is.
  * - `define()` given both getPath and a codeString keeping only the function:
  *   unchanged, see `BlissSVGBuilder.define-hardening.test.js`.
  */
@@ -87,26 +87,6 @@ describe('BlissSVGBuilder define readable code string', () => {
     });
   });
 
-  describe('when a code string holds a kerning value the DSL cannot read', () => {
-    it.each([
-      ['shape', 'RK:x'],
-      ['glyph', 'RK:3;C8'],
-      ['bare', 'B291/RK:x/B313'],
-    ])('refuses a %s whose codeString is %s', (type, codeString) => {
-      const result = defineTracked('UNREADABLE', definitionOf(type, codeString));
-      expect(result.defined).toEqual([]);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]).toContain('(MALFORMED_KERNING_VALUE)');
-    });
-
-    it('says how to write a kerning marker', () => {
-      const result = defineTracked('UNREADABLE', { codeString: 'B291/RK:x/B313' });
-      expect(result.errors).toEqual([
-        '"UNREADABLE": define("UNREADABLE"): the codeString "B291/RK:x/B313" cannot be read (MALFORMED_KERNING_VALUE), so every use of "UNREADABLE" would warn and drop it. A kerning marker is RK:n or AK:n with a plain number, written before the character it spaces, e.g. RK:2/UNREADABLE.',
-      ]);
-    });
-  });
-
   describe('when a kerning marker stands where a part must be', () => {
     it.each([
       ['glyph', 'C8;RK:3', 'RK'],
@@ -135,6 +115,10 @@ describe('BlissSVGBuilder define readable code string', () => {
       ['glyph', 'RK:3'],
       ['glyph', 'RK'],
       ['glyph', ';'],
+      // note: a marker whose value cannot be read swallows the rest of the
+      // character (MALFORMED_KERNING_VALUE at every use), leaving nothing
+      ['glyph', 'RK:3;C8'],
+      ['shape', 'RK:x'],
     ])('refuses a %s whose codeString is %s', (type, codeString) => {
       const result = defineTracked('NOTHING', definitionOf(type, codeString));
       expect(result.defined).toEqual([]);
@@ -195,25 +179,36 @@ describe('BlissSVGBuilder define readable code string', () => {
     });
   });
 
-  describe('when a bracket holds a value the use site reports', () => {
-    // note: option keys and values in a code string are judged where the code
-    // is used, which warns, ignores the value and still draws the character
+  describe('when the code string holds decoration the use site reports', () => {
+    // note: a bracket's keys and values and a marker's value are decoration,
+    // judged where the code is used, which warns, drops it and still draws
     it.each([
       ['glyph', '[x=.]>B291', 'MALFORMED_COORDINATES'],
       ['glyph', '[x=abc]B291', 'MALFORMED_COORDINATES'],
       ['shape', '[y=1.2.3]>C8', 'MALFORMED_COORDINATES'],
       ['glyph', '[relative-kerning=abc]B291', 'MALFORMED_KERNING_VALUE'],
-      // pins that only a marker's own value counts: this bracket value merely
-      // contains `RK:` (killed the unanchored-marker mutant, 2026-09-29 hand run)
       ['glyph', '[relative-kerning=RK:3]B291', 'MALFORMED_KERNING_VALUE'],
-      // pins that a readable marker another value displaces is not refused
-      // (killed the any-warning-quoting-a-marker mutant, 2026-09-29 hand run)
       ['bare', 'B291/RK:3/[relative-kerning=1]B313', 'MULTIPLE_KERNING_VALUES'],
+      ['bare', 'B291/RK:x/B313', 'MALFORMED_KERNING_VALUE'],
+      ['bare', 'RK:.5.5/B291', 'MALFORMED_KERNING_VALUE'],
     ])('defines a %s whose codeString is %s, and a use warns %s and draws', (type, codeString, code) => {
       expect(defineTracked('VALUED', definitionOf(type, codeString)).defined).toEqual(['VALUED']);
-      const use = new BlissSVGBuilder(type === 'shape' ? 'VALUED' : 'B313/VALUED');
+      const use = new BlissSVGBuilder('VALUED');
       expect(use.warnings.map((warning) => warning.code)).toContain(code);
       expect(use.svgCode).toContain('<path');
+    });
+  });
+
+  describe('when a part fails for a reason only the use site reports', () => {
+    // note: `Xabc` reads as a code, a three-letter word, which a `;` slot
+    // cannot hold; the use site reports WORD_AS_PART. Only an unreadable
+    // coordinate is refused as a failed part here; this class is an open
+    // backlog row, and this row is its tripwire
+    it('defines a glyph holding a letter run as a part', () => {
+      expect(defineTracked('WORDPART', { type: 'glyph', codeString: 'B291;Xabc' }).defined)
+        .toEqual(['WORDPART']);
+      expect(new BlissSVGBuilder('WORDPART').warnings.map((warning) => warning.code))
+        .toContain('WORD_AS_PART');
     });
   });
 
@@ -277,7 +272,7 @@ describe('BlissSVGBuilder define readable code string', () => {
   describe('when patchDefinition changes a code string', () => {
     it.each([
       ['shape', 'C8', 'C8:.', '(MALFORMED_COORDINATES)'],
-      ['glyph', 'B291', 'RK:3;B291', '(MALFORMED_KERNING_VALUE)'],
+      ['glyph', 'B291', 'RK:3;B291', 'reads as no character'],
       ['glyph', 'B291', 'B291;RK:3', 'uses a kerning marker (RK) as a part'],
       ['shape', 'C8', 'AK:0', 'reads as no character'],
       ['bare', 'B291', 'B291;C8:1.2.3', '(MALFORMED_COORDINATES)'],
