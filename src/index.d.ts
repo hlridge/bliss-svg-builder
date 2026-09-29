@@ -707,7 +707,7 @@ export interface GlyphDefinition {
   defaultOptions?: BlissOptions;
 }
 
-/** Definition for a custom shape (rendered via getPath or codeString). */
+/** Definition for a custom shape, drawn by `getPath` or by `codeString`, not both (`define()` keeps `getPath`; `patchDefinition()` refuses a patch leaving both). */
 export interface ShapeDefinition {
   type?: 'shape';
   /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
@@ -1313,9 +1313,11 @@ export declare class BlissSVGBuilder {
    * Does NOT throw: each entry is validated independently, and any rejection is reported
    * in `result.errors` (other entries in the same call still register). Always inspect
    * the returned `{ defined, skipped, errors }`. Rejected entries include names with
-   * invisible characters, the reserved names (`X` + letters, `RK`, `AK`, `SP`), and
+   * invisible characters, the reserved names (`X` + letters, `RK`, `AK`, `SP`),
    * a define that would make an existing glyph definition bake an indicator (deferred
-   * validation of a forward reference).
+   * validation of a forward reference), and a `codeString` holding content no use
+   * could draw: a coordinate the DSL cannot read (`C8:.`), a kerning marker used as
+   * a part (`C8;RK:3`), or a glyph or shape with no character in it (`RK:3`).
    */
   static define(
     definitions: Record<string, CodeDefinition>,
@@ -1351,6 +1353,8 @@ export declare class BlissSVGBuilder {
    *   reference; a `;`-part that is itself a composition; a glyph `codeString` that
    *   bakes an indicator (or an `isIndicator` change that leaves one baked); internal
    *   coordinates in a multi-character bare `codeString` (kerning markers allowed);
+   *   a `codeString` holding content no use could draw (see {@link BlissSVGBuilder.define});
+   *   a patch that would leave a shape with both `getPath` and `codeString`;
    *   a patch that would turn an already-referenced code into an indicator; or a
    *   `defaultOptions` key a definition cannot hold (see {@link GlyphDefinition.defaultOptions}).
    */

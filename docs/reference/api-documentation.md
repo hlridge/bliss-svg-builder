@@ -1282,6 +1282,8 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
 | `defaultOptions` | `object` | no | Default options, overridable per-element |
 
+Give a shape `getPath` or `codeString`, not both: `define()` keeps the function, and `patchDefinition()` refuses a patch that would leave a shape with both.
+
 **type: 'externalGlyph': external font character:** <Badge type="warning" text="Experimental" />
 
 For adding characters from external font systems. Requires providing your own SVG path data.
@@ -1309,6 +1311,7 @@ For adding characters from external font systems. Requires providing your own SV
 - **A glyph cannot bake in an indicator.** Define a base+indicator combination as a bare code, attach the indicator at the use site (`BASE;B81`), or flag a compound indicator glyph with `isIndicator: true`. This holds in every definition order: a later `define()` or patch that would turn an already-referenced code into an indicator is rejected as well, with an error naming the affected definition.
 - **`isIndicator` is valid only on a `type: 'glyph'` definition.** The flag marks a glyph as a compound indicator; on a bare alias, shape, or external glyph it is rejected (and `patchDefinition()` rejects it as an invalid property for those types). Indicator-ness still rides through an unflagged bare alias whose target is itself an indicator (`{ codeString: 'B81' }`).
 - **Word codeStrings carry no internal coordinates.** In a multi-character `codeString` (containing `/`), a position suffix like `B516:2,0` is rejected; apply coordinates at the usage site (`WORD:2,0`). Kerning markers (`RK:-2`, `AK:1`) are spacing, not coordinates, and are allowed. A single-character `codeString` keeps its coordinate freedom.
+- **A `codeString` must hold content a use can draw.** Each definition is read the way a use of it would be, and refused when that reading finds a coordinate the DSL cannot read (`C8:.`, `C8:1.2.3`; the error names `MALFORMED_COORDINATES`, the warning every use would give), a kerning marker standing as a part (`C8;RK:3`), or, for a glyph or shape, no character at all (`RK:3` alone). Every use of such a definition drew nothing for it. What a use warns about and drops while still drawing is left to the use site: an option key or value in a bracket (`[x=.]>B291`) and a kerning marker's value (`B291/RK:x/B313`). A bare code may be a lone marker: `{ codeString: 'RK:3' }` spaces two characters exactly like `RK:3`. A code not defined yet is not refused, since definitions can be registered in any order.
 - **Spaces spell out as `//` or explicit space codes.** The shorthand `SP` has meaning only in top-level input (punctuation context resolves it), so an `SP` segment in a stored codeString is normalized to `//` at registration.
 - **`defaultOptions` keys must be valid option names**, and cannot include the canvas-wide global-only options (`margin`, `grid`, `svg-title`, …) or a key that names a part of the picture (`grid--opacity`): those act on the whole SVG and would be inert on a definition. Set them in the global bracket (`[opts]||`) or the builder options instead.
 - **`defaultOptions` cannot hold what belongs to one use of the character**: a position (`x`, `y`), kerning (`relativeKerning`, `absoluteKerning`, in either spelling) or `key`. A definition says what a character is, so these are written where the code is used: `MYCHAR:2,0` or `[x=2]MYCHAR`, `B313/RK:1/MYCHAR`, `[key=subject]MYCHAR`. A gap that depends on which character comes next belongs in `kerningRules` on the definition of the first.
@@ -1361,9 +1364,9 @@ x.char;             // 'a'
 x.isExternalGlyph;  // true
 ```
 
-These describe the current behavior. `define()` validates references and
-rejects cycles, but does not validate option *values* or coordinate ranges —
-do not rely on the definition API for that.
+These describe the current behavior. `define()` validates references, rejects
+cycles and refuses content no use could draw, but does not validate option
+*values* or coordinate ranges: do not rely on the definition API for that.
 
 ### Options
 
@@ -1438,7 +1441,7 @@ Allowed properties by type:
 
 Patching `defaultOptions` replaces the entire sub-object (not a deep merge). Patching `codeString` validates references and checks for circular dependencies.
 
-**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; a glyph `codeString` that bakes an indicator (or an `isIndicator` change that leaves one baked); internal coordinates in a multi-character bare `codeString` (kerning markers stay allowed); a patch that would turn an already-referenced code into an indicator; or a `defaultOptions` key a definition cannot hold (see [Definition validation](#definition-validation)). A rejected patch leaves the definition untouched (validation runs before any change is applied).
+**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; a glyph `codeString` that bakes an indicator (or an `isIndicator` change that leaves one baked); internal coordinates in a multi-character bare `codeString` (kerning markers stay allowed); a `codeString` holding content no use could draw (see [Definition validation](#definition-validation)); a patch that would leave a shape with both `getPath` and `codeString`; a patch that would turn an already-referenced code into an indicator; or a `defaultOptions` key a definition cannot hold (see [Definition validation](#definition-validation)). A rejected patch leaves the definition untouched (validation runs before any change is applied).
 
 ### `listDefinitions(filter?)`
 
