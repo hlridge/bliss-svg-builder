@@ -19,6 +19,8 @@
  *   written as the whole character.
  * - The JSON, which writes a character's parts out beside its name, keeping
  *   the name when only a part lost a default.
+ * - A name the DSL cannot read (`define()` accepts one holding a separator,
+ *   which only a composition object can name), spelled out in the JSON.
  * - Under `omitOptions`, every name whose definition carries options spelled
  *   out (glyph defaults, part defaults, a code string's brackets, a styled
  *   nested shape, a flattened head), a built-in keeping its code, and no reload
@@ -50,6 +52,7 @@ const FIXTURES = {
   PR_NESTED: { type: 'shape', codeString: 'C8', defaultOptions: { color: 'red' } },
   PR_RING: { codeString: 'C2', defaultOptions: { color: 'red' } },
   PR_DOPT: { codeString: 'B431', defaultOptions: { color: 'red' } },
+  'PR_SEP/X': { type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } },
 };
 const DEPENDENT_FIXTURES = {
   PR_MULTI: { type: 'shape', codeString: 'PR_NESTED;HL8:0,8' },
@@ -168,6 +171,16 @@ describe('BlissSVGBuilder preserve removed default', () => {
       const builder = changed('PR_TWO', (g) => g.part(1).removeOptions('color'));
       const json = builder.toJSON({ preserve: true });
       expect(json.groups[0].glyphs[0].codeName).toBe('PR_TWO');
+      expect(new BlissSVGBuilder(json).svgCode).toBe(builder.svgCode);
+    });
+  });
+
+  describe('when the DSL cannot read the name', () => {
+    it('spells the character out in the JSON, whose reload draws the same', () => {
+      // pins a name that does not read as one character vouching for nothing
+      const builder = new BlissSVGBuilder({ groups: [{ glyphs: [{ codeName: 'PR_SEP/X', parts: [{ codeName: 'B291' }] }] }] });
+      const json = builder.toJSON({ preserve: true });
+      expect(json.groups[0].glyphs[0].codeName).toBe('B291');
       expect(new BlissSVGBuilder(json).svgCode).toBe(builder.svgCode);
     });
   });

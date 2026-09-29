@@ -2123,29 +2123,32 @@ export class BlissParser {
   }
 
   /**
-   * Recursively expand a single part from its definition's codeString.
-   * Only expands if the part has a codeName, a matching definition with
-   * codeString, and no existing sub-parts.
+   * Recursively expand a single part from its definition's codeString, and
+   * give it the definition's metadata as parseParts does. Only runs if the
+   * part has a codeName, a matching definition, and no existing sub-parts. A
+   * definition drawn by its own function (`getPath`) has no codeString to
+   * expand, but its defaults still land on the part, where the DSL puts them.
    */
   static #expandPartRecursive(part, warn) {
     if (!part.codeName || part.parts?.length > 0) return;
 
     const definition = blissElementDefinitions[part.codeName];
-    if (!definition?.codeString) return;
+    if (!definition) return;
 
     const codeString = definition.codeString;
+    if (codeString) {
+      // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
+      if (codeString.includes('/')) return;
 
-    // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
-    if (codeString.includes('/')) return;
-
-    if (codeString.includes(';') || codeString.includes(':')
-        || PART_OPTION_CODESTRING.test(codeString)
-        || blissElementDefinitions[codeString]?.codeString) {
-      part.parts = BlissParser.#parseCodeStringToParts(codeString, warn);
-    } else {
-      // Same single-code rename recording as parseParts (Phase 2.3b).
-      part._aliasCodeName = part.codeName;
-      part.codeName = codeString;
+      if (codeString.includes(';') || codeString.includes(':')
+          || PART_OPTION_CODESTRING.test(codeString)
+          || blissElementDefinitions[codeString]?.codeString) {
+        part.parts = BlissParser.#parseCodeStringToParts(codeString, warn);
+      } else {
+        // Same single-code rename recording as parseParts (Phase 2.3b).
+        part._aliasCodeName = part.codeName;
+        part.codeName = codeString;
+      }
     }
 
     BlissParser.#applyDefinitionMetadata(part, definition);

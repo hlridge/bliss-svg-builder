@@ -2692,6 +2692,8 @@ class BlissSVGBuilder {
    * @param {Object[]} groups - Array of raw group objects
    */
   static #normalizeGlyphCodes(groups) {
+    // A name reads the same way throughout one ingest, so it is parsed once.
+    const readings = new Map();
     for (const group of groups) {
       if (!group.glyphs) continue;
       for (const glyph of group.glyphs) {
@@ -2704,9 +2706,26 @@ class BlissSVGBuilder {
         // directly and they round-trip external-glyph navigation/spacing, so
         // restore them from the resolved code the same way the parser does.
         BlissSVGBuilder.#reapplyGlyphMetadata(glyph);
+        BlissSVGBuilder.#applyNamedOptions(glyph, readings);
         if (glyph.parts) BlissSVGBuilder.#normalizePartCodes(glyph.parts);
       }
     }
+  }
+
+  // A character named by a definition gets the options the name puts on a
+  // character where the DSL reads it alone (the definition's defaultOptions,
+  // or those of the definition it renames), under the ones the object writes,
+  // which win. It is the reading a `preserve` save judges a kept name by, so a
+  // save keeps a name only while its reload would bring back nothing the
+  // element lacks. Only a defined name is read: a code the registry does not
+  // hold is not a name, and reading it as DSL would turn a codeName holding
+  // bracket text into options. Object ingest only; a rebuild re-applying the
+  // defaults would bring back what an edit removed.
+  static #applyNamedOptions(glyph, readings) {
+    const code = glyph.glyphCode;
+    if (!code || !Object.hasOwn(blissElementDefinitions, code)) return;
+    const supplied = BlissSVGBuilder.#readingOf(code, 'glyph', readings)?.options;
+    if (supplied) glyph.options = { ...supplied, ...glyph.options };
   }
 
   static #normalizePartCodes(parts) {
