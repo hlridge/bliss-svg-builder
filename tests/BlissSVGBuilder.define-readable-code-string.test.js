@@ -16,8 +16,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   lone `;`), while a bare alias of a lone marker stays a working named
  *   marker.
  * - What stays accepted: readable coordinates, an unknown code (a forward
- *   reference), a misplaced option (reported where the code is used), and a
- *   name the DSL cannot spell, since the check reads through a stand-in.
+ *   reference), a misplaced option or an option value the use site cannot read
+ *   (both reported where the code is used, which still draws), indicator,
+ *   head-marker and multi-word anatomy, and a name the DSL cannot spell, since
+ *   the check reads through a stand-in.
  * - The registry after a refusal, the other definitions in the same call, an
  *   existing name, and the exact wording of each refusal.
  * - patchDefinition(): the same refusals, the definition left unchanged, and a
@@ -31,6 +33,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.codestring-decomposition.test.js`.
  * - A character bracket in a code string carrying a position, kerning or
  *   `key` to every use: readable, so not refused here; an open backlog row.
+ * - A part the reader cannot take for a code at all (`B291;!`, a stray space):
+ *   accepted and reported as UNKNOWN_CODE where the code is used; an open
+ *   backlog row.
  * - `define()` given both getPath and a codeString keeping only the function:
  *   unchanged, see `BlissSVGBuilder.define-hardening.test.js`.
  */
@@ -144,6 +149,13 @@ describe('BlissSVGBuilder define readable code string', () => {
       ]);
     });
 
+    it('speaks of a marker only when the code string holds one', () => {
+      const result = defineTracked('NOTHING', { type: 'glyph', codeString: ';' });
+      expect(result.errors).toEqual([
+        '"NOTHING": define("NOTHING"): the codeString ";" reads as no character, so every use of "NOTHING" would draw nothing. A glyph must draw one character.',
+      ]);
+    });
+
     it('keeps a bare alias of a lone marker, which spaces characters like the marker', () => {
       expect(defineTracked('NAMEDGAP', { codeString: 'RK:3' }).defined).toEqual(['NAMEDGAP']);
       expect(new BlissSVGBuilder('B291/NAMEDGAP/B313').svgCode)
@@ -169,6 +181,39 @@ describe('BlissSVGBuilder define readable code string', () => {
       const result = defineTracked('READABLE', definitionOf(type, codeString));
       expect(result.errors).toEqual([]);
       expect(result.defined).toEqual(['READABLE']);
+    });
+
+    it.each([
+      ['a compound indicator', { type: 'glyph', codeString: 'B81;B86', isIndicator: true }],
+      ['a baseless indicator glyph', { type: 'glyph', codeString: ';B81', isIndicator: true }],
+      ['a glyph with a head marker', { type: 'glyph', codeString: 'B291^' }],
+      ['a word with a head marker', { codeString: 'B291/B313^' }],
+      ['a multi-word code', { codeString: 'B291//B313' }],
+      ['a word spelling its space as SP', { codeString: 'B291/SP/B313' }],
+    ])('defines %s', (label, definition) => {
+      expect(defineTracked('READABLE', definition)).toMatchObject({ defined: ['READABLE'], errors: [] });
+    });
+  });
+
+  describe('when a bracket holds a value the use site reports', () => {
+    // note: option keys and values in a code string are judged where the code
+    // is used, which warns, ignores the value and still draws the character
+    it.each([
+      ['glyph', '[x=.]>B291', 'MALFORMED_COORDINATES'],
+      ['glyph', '[x=abc]B291', 'MALFORMED_COORDINATES'],
+      ['shape', '[y=1.2.3]>C8', 'MALFORMED_COORDINATES'],
+      ['glyph', '[relative-kerning=abc]B291', 'MALFORMED_KERNING_VALUE'],
+      // pins that only a marker's own value counts: this bracket value merely
+      // contains `RK:` (killed the unanchored-marker mutant, 2026-09-29 hand run)
+      ['glyph', '[relative-kerning=RK:3]B291', 'MALFORMED_KERNING_VALUE'],
+      // pins that a readable marker another value displaces is not refused
+      // (killed the any-warning-quoting-a-marker mutant, 2026-09-29 hand run)
+      ['bare', 'B291/RK:3/[relative-kerning=1]B313', 'MULTIPLE_KERNING_VALUES'],
+    ])('defines a %s whose codeString is %s, and a use warns %s and draws', (type, codeString, code) => {
+      expect(defineTracked('VALUED', definitionOf(type, codeString)).defined).toEqual(['VALUED']);
+      const use = new BlissSVGBuilder(type === 'shape' ? 'VALUED' : 'B313/VALUED');
+      expect(use.warnings.map((warning) => warning.code)).toContain(code);
+      expect(use.svgCode).toContain('<path');
     });
   });
 
