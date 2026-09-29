@@ -171,6 +171,14 @@ describe('BlissSVGBuilder clear options', () => {
       expect(builder.toString()).toBe('B291');
     });
 
+    it('keeps a part\'s transient options', () => {
+      const builder = new BlissSVGBuilder('B291;[color=red]>C8');
+      builder.glyph(0).part(1).setTransientOptions({ color: 'blue' });
+      builder.glyph(0).part(1).clearOptions();
+      expect(builder.svgCode).toContain('stroke="blue"');
+      expect(builder.toString()).toBe('B291;C8');
+    });
+
     it('returns the same handle, which keeps working', () => {
       const builder = new BlissSVGBuilder('[color=red]B291');
       const handle = builder.glyph(0);

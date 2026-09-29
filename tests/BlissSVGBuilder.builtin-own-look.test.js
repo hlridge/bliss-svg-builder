@@ -119,6 +119,13 @@ describe('BlissSVGBuilder built-in own look', () => {
       expect(inkOf(new BlissSVGBuilder('REFSQUARE').svgCode)).toBe(inkOf(builder.svgCode));
     });
 
+    it('returns a REFSQUARE drawn solid to its own look after clearing the part', () => {
+      const builder = changed('[stroke-dasharray=none]>REFSQUARE', (b) => b.glyph(0).part(0).clearOptions());
+      expect(dashesOf(builder.svgCode)).not.toContain('stroke-dasharray="none"');
+      expect(dashesOf(builder.svgCode)).toContain('stroke-dasharray="0 0.999"');
+      expect(builder.toString()).toBe('REFSQUARE');
+    });
+
     it('keeps the dotted line of ANCHORRING when it is removed from the part', () => {
       const builder = changed('B291;ANCHORRING', (b) => b.glyph(0).part(1).removeOptions('stroke-dasharray'));
       expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;ANCHORRING').svgCode);
