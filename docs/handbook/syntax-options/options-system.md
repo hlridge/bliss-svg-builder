@@ -86,7 +86,13 @@ builder.toString();        // '[crop=nope]||B313': the null is gone, the typo is
 
 Both draw the same picture as `B313` on its own, and reloading that saved string reports the typo again.
 
-A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). Two options are left alone whatever they hold. A switch (`grid`, `center`, `errorPlaceholder`) is on only when it is exactly `true`, so any other value already means off. And `key`, which names an element, reaches neither the picture nor the saved text.
+A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). Two kinds of key are left alone whatever they hold. A switch (`grid`, `center`, `errorPlaceholder`) is on only when it is exactly `true`, so any other value already means off. And `key`, which names an element rather than describing it, reaches neither the picture nor the saved text.
+
+## What Counts as an Option
+
+An option is anything `toString()` writes inside a `[...]` bracket, at any scope. That is what a save [without options](/reference/api-documentation#saving-without-options) leaves out, and what [`clearOptions()`](/handbook/syntax-options/programmatic-mutation#clearing-options) takes off an element.
+
+A part's position and a character's kerning can be written as options (`[x=3]>C8`, `[relative-kerning=2]B313`), but they are saved in their own spelling outside the bracket (`C8:3`, `RK:2/B313`), so they belong to the content and stay. A character's, a word's or the composition's position has no other spelling (`[x=2]B313`), so it is an option like any other. A `key` and a [transient option](/reference/api-documentation#transient-options) are never saved at all, so neither counts as one here.
 
 ## Scope Levels
 

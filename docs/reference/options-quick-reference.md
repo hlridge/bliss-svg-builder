@@ -6,6 +6,8 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 
 **Spelling:** every option on this page works in either casing, so `[margin-top=3]` and `[marginTop=3]` are one option, as are `{ marginTop: 3 }` and `{ 'margin-top': 3 }`. The names below are the spelling a string gives back, except where a shorthand exists: a part's `x` and `y` come back as the `CODE:x,y` suffix, and the two kerning options come back as `RK:` and `AK:`. `toJSON()` gives back the camelCase name in every case. For attributes you pass through rather than options the library names, see [which name is emitted](/handbook/syntax-options/svg-pass-through#which-name-is-emitted).
 
+**What counts as an option:** anything `toString()` writes inside a `[...]` bracket, at any scope. A save [without options](/reference/api-documentation#saving-without-options) and `clearOptions()` remove exactly that, so a part's `x` and `y` and the two kerning options, which come back outside the bracket, stay (see [Positioning](#positioning)).
+
 **Scope:** the [Rendering](#rendering) and [Dots](#dots) options (plus [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through)) cascade at every scope: global `[opts]||`, word `[opts]|`, character `[opts]`, part `[opts]>`. Everything else on this page is canvas-wide and takes effect only at global scope; written at any other scope, in a bracket or from JavaScript, the key is dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning.
 
 **Where a pass-through attribute lands:** at global scope it goes on the root `<svg>`, so it applies to the whole picture. Prefix it to target one part of the output instead: every class the library writes is a target, spelled without the `bliss-` prefix, and the attribute follows the last `--`, so `root--`, `background--`, `background-zone--top--`, `grid--`, `grid-line--sky--` and `content--` are all keys you can write. At any other scope the attribute goes on the `<g>` wrapping that element, and a prefixed key there is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning, however it was written. Two names are refused behind a prefix: `xmlns`, which would move the subtree out of SVG, and the link attributes, which need an `<a>` element. See [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through).
@@ -51,6 +53,8 @@ Precedence within a dot type: **absolute wins over relative**. These options cas
 ## Positioning
 
 These four are the exception to the scope note above: they are not canvas-wide, they position one element, and what they mean depends on which scope you write them at. They work identically in the DSL and through an options object (`{ x: 5 }`, `{ relativeKerning: -1 }`), including the opts argument of `addGlyph`, `insertPart`, `replaceGlyph` and the rest of that family. A definition's `defaultOptions` cannot hold them, since they place one use of a character rather than describe the character.
+
+A part's `x` and `y` and the two kerning options are options only as you enter them: they are saved outside the bracket, as `CODE:x,y` and `RK:`/`AK:`, so a save [without options](/reference/api-documentation#saving-without-options) and `clearOptions()` keep them. `x` and `y` at every other scope are saved in the bracket and go with the other options.
 
 | Option | Scope | Description |
 |--------|-------|-------------|

@@ -578,6 +578,14 @@ export declare class ElementHandle {
    * Naming `x` or `y` removes the position, whichever spelling wrote it: a
    * part's `CODE:x,y` coordinate and an `[x=N]` option are two spellings of one
    * value. Only this element's own position, never one on an element below it.
+   * `clearOptions()` differs here: it leaves a part's coordinates, and a
+   * character's kerning, in place.
+   *
+   * A built-in's own look is not removed: the dotted line `REFSQUARE` and
+   * `ANCHORRING` draw with by definition, and likewise the `defaultOptions` of
+   * a shape drawn by its own `getPath` function. Naming one of those keys
+   * returns it to the definition's value. To change it, override it instead:
+   * `[stroke-dasharray=none]>REFSQUARE` draws the square solid.
    *
    * Naming no key at all asks for nothing and is not an error. Every key is
    * read before any is removed, so a call that throws has changed nothing.
@@ -585,6 +593,21 @@ export declare class ElementHandle {
    * @throws {TypeError} If any key is not a string.
    */
   removeOptions(...keys: string[]): this;
+
+  /**
+   * Removes this element's options: what `toString()` writes for it inside a
+   * `[...]` bracket. A word or a character loses its position with them, and a
+   * word also loses the options inside its word-level (`;;`) indicators. A part
+   * keeps its coordinates and a character its kerning, since the string writes
+   * those outside a bracket (`C8:3,4`, `RK:2`), unlike `removeOptions('x')`,
+   * which removes a part's coordinate too.
+   *
+   * What sits inside the element keeps its own options, so a character's parts
+   * stay styled. `key` and transient options are untouched, and so is a
+   * built-in's own look (see `removeOptions`). Clearing an element that has no
+   * options is not an error.
+   */
+  clearOptions(): this;
 
   /**
    * Sets transient options on this element: values that reach the rendered SVG
@@ -1180,6 +1203,17 @@ export declare class BlissSVGBuilder {
   /** Removes all content from the builder. */
   clear(): this;
 
+  /**
+   * Removes every option at every scope, the global bracket included: what
+   * `toString()` writes inside `[...]` brackets. Afterwards the builder saves
+   * what `toString({ omitOptions: true })` saved before, with either
+   * serializer. The positions of characters, words and the whole composition
+   * go with the rest; a part's coordinates and a character's kerning stay.
+   * `key`s and transient options are untouched, and so is a built-in's own look
+   * (the dotted line of `REFSQUARE`).
+   */
+  clearAllOptions(): this;
+
   // --- Serialization ---
 
   /**
@@ -1188,8 +1222,10 @@ export declare class BlissSVGBuilder {
    * for a single glyph, indicator, or shape: every `type`d definition
    * (whatever its anatomy) and every bare alias renaming one existing code;
    * multi-code shorthand always serializes expanded. A name is kept only while
-   * the glyph still has the parts it names: after one of them is removed,
-   * moved or recoloured, the glyph is written out in full.
+   * the glyph still has the parts it names and every option key the name
+   * brings (a different value counts, a removed one does not): after a part is
+   * removed, moved or recoloured, or a default option removed, the glyph is
+   * written out in full.
    *
    * The output uses the compact shorthand wherever it means the same thing: a
    * space that matches the default for its position is written as a bare
@@ -1200,17 +1236,27 @@ export declare class BlissSVGBuilder {
    * authored it: the number is normalized (`[x=5.0]` and `[x=+5]` come back as
    * `[x=5]`) and it leads the option keys in its bracket. A kerning value is not
    * an option key: it is written as its marker in front of the bracket
-   * (`[absolute-kerning=5;x=3]B291` → `AK:5/[x=3]B291`). Output is
-   * therefore not a byte-copy of the input; compare a round trip against
-   * `toString()` output, not against stored text.
+   * (`[absolute-kerning=5;x=3]B291` → `AK:5/[x=3]B291`). A built-in's own
+   * look is part of the code and is not written as options (`REFSQUARE` comes
+   * back as `REFSQUARE`, dotted line and all). Output is therefore not a
+   * byte-copy of the input; compare a round trip against `toString()` output,
+   * not against stored text.
    *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the
    * same concept as `applyIndicators(code, { flatten })`; the name is qualified
    * here only because `toString`/`toJSON` lack the "indicator" context the
    * method name provides.
+   *
+   * `omitOptions` saves the composition without its options, at every scope:
+   * colours and other styling, canvas settings such as margins and spacing,
+   * pass-through attributes, and the position of a character, a word or the
+   * whole composition. A part's coordinates and a character's kerning stay,
+   * since they are written outside a bracket (`[x=1]>C8` comes back as `C8:1`),
+   * and a character that held nothing but options goes with them, a head
+   * marker on it included. `clearAllOptions()` makes the same change in place.
    */
-  toString(options?: { preserve?: boolean; flattenIndicators?: boolean }): string;
+  toString(options?: { preserve?: boolean; flattenIndicators?: boolean; omitOptions?: boolean }): string;
 
   /**
    * Returns a normalized parsed structure (plain object). Custom codes are
@@ -1225,16 +1271,23 @@ export declare class BlissSVGBuilder {
    * re-derived from the code on reconstruction) and is the authoring shape
    * described by {@link BlissJSON}, whose option keys use each name's owner
    * spelling.
+   *
+   * `omitOptions` leaves out the options `toString` leaves out: no options bag
+   * keeps one, and characters, words and the composition lose their `x`/`y`,
+   * while a part keeps its own. Two things stay: a character's kerning, which
+   * saved JSON always keeps in its options bag, and a built-in's own look (the
+   * dotted line of `REFSQUARE`).
    */
-  toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean }): BlissJSON;
+  toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean; omitOptions?: boolean }): BlissJSON;
 
   /**
    * Sets transient options on the whole SVG: values that reach the rendered
    * output and never reach `toString()` or `toJSON()`. Repeated calls merge.
    *
-   * There is no builder-level `setOptions` counterpart, because global options
-   * belong to the composition and arrive with it; this channel is the transient
-   * one, so changing it after construction is what it is for.
+   * There is no builder-level `setOptions` counterpart: global options arrive
+   * with the composition, and `clearAllOptions()` is the one call that takes
+   * them away again. This channel is the transient one, so changing it after
+   * construction is what it is for.
    *
    * @throws {TypeError} If `opts` is provided and is not an object.
    */

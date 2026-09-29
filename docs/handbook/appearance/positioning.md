@@ -162,7 +162,7 @@ This is also what tells `[x=N]` apart from [kerning](/handbook/writing/spacing#k
 
 A position is one value, and which spelling wrote it does not show anywhere you can read it, change it or save it.
 
-**Clearing it takes the axis name, whichever spelling wrote it:**
+**Removing it takes the axis name, whichever spelling wrote it:**
 
 ```js
 const builder = new BlissSVGBuilder('C8:0,8;DOT:2');
@@ -172,7 +172,9 @@ builder.toString();   // 'C8:0,8;DOT'
 // the same call on 'C8:0,8;[x=2]>DOT' gives the same answer
 ```
 
-Removal reaches only the element you call it on, so clearing a character's `x` leaves a coordinate on a part inside that character standing.
+Removal reaches only the element you call it on, so removing a character's `x` leaves a coordinate on a part inside that character standing.
+
+`clearOptions()` is different on purpose. It takes off what a save writes inside a bracket, so it leaves a part's position standing, whichever spelling wrote it, while a character's or a word's `[x=N]` goes with its other options. See [Clearing Options](/handbook/syntax-options/programmatic-mutation#clearing-options).
 
 **On the way out the position is written in one form.** The number is normalized, and the position leads the options in its bracket whatever order you typed them in:
 

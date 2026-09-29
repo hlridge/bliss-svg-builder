@@ -56,8 +56,8 @@ const INSTANCE_METHODS = [
   'traverse', 'query', 'getElementByKey', 'group', 'element', 'glyph', 'part',
   'snapshot', 'addGroup', 'addGlyph', 'addPart', 'insertGroup', 'removeGroup',
   'replaceGroup', 'merge', 'splitAt', 'addElement', 'insertElement',
-  'removeElement', 'replaceElement', 'clear', 'toString', 'toJSON',
-  'setTransientOptions', 'removeTransientOptions',
+  'removeElement', 'replaceElement', 'clear', 'clearAllOptions', 'toString',
+  'toJSON', 'setTransientOptions', 'removeTransientOptions',
 ];
 
 const INSTANCE_GETTERS = [
@@ -70,7 +70,7 @@ const HANDLE_METHODS = [
   'insertPart', 'remove', 'detach', 'replace', 'removeGlyph', 'replaceGlyph',
   'removePart', 'replacePart', 'applyIndicators', 'clearIndicators',
   'splitAt', 'mergeWithNext',
-  'setOptions', 'removeOptions',
+  'setOptions', 'removeOptions', 'clearOptions',
   'setTransientOptions', 'removeTransientOptions',
 ];
 

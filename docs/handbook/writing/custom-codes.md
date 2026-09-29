@@ -88,7 +88,7 @@ new BlissSVGBuilder('B2661').toString({ preserve: true });
 // 'B1103;B81' (multi-code shorthand always expands)
 ```
 
-A name is kept only while it still describes what you have. Remove, move or recolour one of a custom character's own parts and `preserve` writes the character out in full instead, because reading the name back would bring the old parts with it.
+A name is kept only while it still describes what you have. Remove, move or recolour one of a custom character's own parts and `preserve` writes the character out in full instead, because reading the name back would bring the old parts with it. The same goes for an option the name brings through its definition's `defaultOptions`: remove it and the character is written out in full, since the name would bring it back. Set a different value instead and the name stays, with your value written beside it.
 
 As a rule of thumb: the default is for output that leaves your app, `preserve` is for output that stays where your definitions live. Custom indicators and shapes have a few extra wrinkles worth knowing; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes) below.
 
@@ -264,7 +264,7 @@ What travels through the default **string** output (`toString()`):
 |---|---|
 | The ink (the `codeString` composition) | Yes, decomposed to built-in codes |
 | Baked and use-site coordinates | Yes, as explicit `:x,y` suffixes |
-| `defaultOptions` | Yes, materialized as explicit options (`[color=red]>C2`) |
+| `defaultOptions` | Yes, materialized as explicit options (`[color=red]>C2`). A `getPath` primitive's are its own look, like a built-in's, and stay with its name |
 | `isIndicator` and `width` | No. The receiver sees plain parts |
 | `getPath` geometry (primitives) | No. A primitive keeps its bare name and needs its definition to render |
 

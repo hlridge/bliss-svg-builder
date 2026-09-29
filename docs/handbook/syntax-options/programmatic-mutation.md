@@ -198,7 +198,7 @@ Replacing with an empty code is destructive on purpose: `replaceGroup(0, '')` an
 
 Parts are the one level with no empty state: a part is a reference to a shape, not a container that can stand empty. `addPart('')` throws, and the error points you to `addGlyph('')` when you want to reserve an empty slot.
 
-One thing to know when serializing: `toJSON()` keeps every empty slot, but a bare empty group or glyph has no DSL token, so it does not survive a `toString()` round-trip. An options-carrying empty does: an empty group serializes as `[color=red]|`, an empty glyph as `[color=red]`. Prefer `toJSON()` for saving documents that use empty slots.
+One thing to know when serializing: `toJSON()` keeps every empty slot, but a bare empty group or glyph has no DSL token, so it does not survive a `toString()` round-trip. An options-carrying empty does: an empty group serializes as `[color=red]|`, an empty glyph as `[color=red]` (unless you save [without options](/reference/api-documentation#saving-without-options)). Prefer `toJSON()` for saving documents that use empty slots.
 
 ## Modifying Content
 
@@ -236,6 +236,26 @@ builder.glyph(0).removeOptions('color');
 Either spelling removes a name the library or a standard owns, whichever way it was set, so `removeOptions('strokeWidth')` clears a `stroke-width` and `removeOptions('stroke-dasharray')` clears a `strokeDasharray`. A name of your own has no second spelling to resolve to, so remove it under the name you set it with. Its two spellings are two attributes, and removing one leaves the other: after `setOptions({ dataBlissId: 7, 'data-bliss-id': 8 })` both are live, and `removeOptions('dataBlissId')` clears only the one it names.
 
 Naming `x` or `y` removes a position, and a position has a second spelling that is not an option at all: a part's `CODE:x,y` coordinate. Both are cleared, since they are [one value](/handbook/appearance/positioning#one-value-two-spellings).
+
+A built-in's own look stays: `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and removing `stroke-dasharray` returns it to that line. Override it instead to change it (`[stroke-dasharray=none]>REFSQUARE` draws the square solid).
+
+### Clearing Options
+
+`clearOptions()` removes all of an element's options at once, and `clearAllOptions()` does it for the whole composition, global options included:
+
+```js
+const builder = new BlissSVGBuilder('[color=red]||[stroke-width=0.8]|B291;[x=3;color=blue]>C8');
+
+builder.glyph(0).part(1).clearOptions();
+builder.toString(); // '[color=red]||[stroke-width=0.8]|B291;C8:3'
+
+builder.clearAllOptions();
+builder.toString(); // 'B291;C8:3'
+```
+
+An option here is anything `toString()` writes inside a bracket. The part keeps its coordinate, because the string writes that outside one (`C8:3`), and a character keeps its kerning the same way. Removing by name is different there: `removeOptions('x')` on that part would take the coordinate, and `removeOptions('relativeKerning')` takes a character's kerning. A character's or a word's own position is written in a bracket (`[x=2]B291`), so clearing takes it with the other options.
+
+Clearing an element leaves what sits inside it alone, so a character's parts keep their own options, while a word's clear also reaches the options inside its word-level (`;;`) indicators. Neither call touches `key`s, transient options or a built-in's own look. After `clearAllOptions()` the builder saves exactly what `toString({ omitOptions: true })` saved before: see [Saving without options](/reference/api-documentation#saving-without-options).
 
 ### Transient Options
 

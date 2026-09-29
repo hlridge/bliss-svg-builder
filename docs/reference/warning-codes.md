@@ -322,6 +322,7 @@ A coordinate (`:x,y`) or a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`
 
 ```
 QSP:1,2                →  renders a plain quarter-space, coordinate dropped
+[x=1]>QSP              →  the same: a part's position is its coordinate, however it is written
 [color=red]|TSP        →  renders a plain space, option dropped
 ```
 

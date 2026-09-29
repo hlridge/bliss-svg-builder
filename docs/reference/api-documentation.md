@@ -42,7 +42,7 @@ Options use camelCase keys and native JS types, and the hyphenated spelling a DS
 
 ### Round-trip from toJSON()
 
-The constructor also accepts the plain object returned by `toJSON()`, recreating an identical builder:
+The constructor also accepts the plain object returned by `toJSON()`, recreating an identical builder (from one saved with `{ omitOptions: true }`, the same builder [without its options](#saving-without-options)):
 
 ```js
 const original = new BlissSVGBuilder('B313/B1103//B431');
@@ -167,6 +167,9 @@ flat.groups[0].wordIndicators;                            // undefined
 flat.groups[0].glyphs[0].parts.map(p => p.codeName);      // ['B313', 'B81']
 ```
 
+Options behavior:
+- Pass `{ omitOptions: true }` to save the composition [without its options](#saving-without-options), the same ones `toString()` leaves out: no options bag keeps one, and characters, words and the composition lose their `x` and `y`, while a part keeps its own. Two things stay: a character's kerning, which saved JSON always keeps in its options bag, and a built-in's own look (the dotted line of `REFSQUARE`).
+
 ### Indicators in the tree
 
 Character-level indicators (`;`) appear as parts within their parent glyph, marked with `isIndicator: true`. A word-level indicator (`;;`) is stored on its group as a `wordIndicators` overlay and resolved onto the head glyph only at render time, so by default the parts tree shows the base glyphs unchanged and the overlay lives in the group's `wordIndicators` field. Flatten it onto the head with `{ flattenIndicators: true }` if you need the indicator as an actual part.
@@ -183,11 +186,13 @@ builder.toString();
 // 'B313/B1103//B431;B81'
 ```
 
-Serialized spacing always matches rendered spacing: adjacent space groups serialize as one coalesced run, and every space in that run is written on its own. A space that matches its position's default is a bare separator, so a run of N default spaces emits N+1 slashes; a space that differs (like `QSP` between words, where the default is `TSP`) keeps its name while the spaces around it stay compact. `H/TSP/QSP/TSP/H` therefore comes back as `H//QSP//H`. [Empty slots](#empty-slots-are-deliberate) contribute nothing. A bare empty group or glyph has no DSL token of its own, so it is omitted from the string (an options-carrying empty does have one: `[color=red]|` for a group, `[color=red]` for a glyph); use `toJSON()` when empty slots must survive a round-trip.
+Serialized spacing always matches rendered spacing: adjacent space groups serialize as one coalesced run, and every space in that run is written on its own. A space that matches its position's default is a bare separator, so a run of N default spaces emits N+1 slashes; a space that differs (like `QSP` between words, where the default is `TSP`) keeps its name while the spaces around it stay compact. `H/TSP/QSP/TSP/H` therefore comes back as `H//QSP//H`. [Empty slots](#empty-slots-are-deliberate) contribute nothing. A bare empty group or glyph has no DSL token of its own, so it is omitted from the string (an options-carrying empty does have one: `[color=red]|` for a group, `[color=red]` for a glyph, unless the options are [left out](#saving-without-options)); use `toJSON()` when empty slots must survive a round-trip.
 
 A word written with the `X` shorthand comes back in that shorthand. `Xhello` parses into one glyph per letter and serializes as `Xhello`, not as `Xh/Xe/Xl/Xl/Xo`. A letter that carries something of its own (an option, a coordinate, a head marker) is written out on its own, because the compact form has nowhere to put it, but the letters beside it still join up: `Xa/[color=red]>Xb` stays as written, while `Xa^/Xb/Xc` comes back as `Xa^/Xbc`. Both spellings render the same image and parse back to the same composition; the compact one is just the one you would have typed.
 
-Custom code behavior: custom names are decomposed to built-in codes by default. `{ preserve: true }` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`. A name is kept only while the glyph still has the parts it names: after you remove, move or recolour one of them, the glyph is written out in full, so the string reloads to what you see.
+A built-in's own look is part of the code, so it is not written out as options. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and `REFSQUARE` comes back as `REFSQUARE`, dotted line and all. A look you set yourself is written as usual (`[stroke-dasharray=4 4]>REFSQUARE`); to draw the square solid, write `[stroke-dasharray=none]>REFSQUARE`.
+
+Custom code behavior: custom names are decomposed to built-in codes by default. `{ preserve: true }` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`. A name is kept only while the glyph still has the parts it names: after you remove, move or recolour one of them, the glyph is written out in full, so the string reloads to what you see. The same holds for an option the name brings with it (its definition's `defaultOptions`): remove one and the glyph is written out in full, while a different value keeps the name, since the value is written beside it.
 
 ```js
 BlissSVGBuilder.define({
@@ -225,14 +230,37 @@ builder.toString({ flattenIndicators: true });
 // 'B313;B81/B1103' — indicator baked onto the head glyph
 ```
 
-Both forms render an identical image; passing either back into the constructor reproduces the same result. `flattenIndicators` governs word *structure* (`;;`) and `preserve` governs local *names* (aliases / custom glyphs); they are independent and compose:
+Both forms render an identical image; passing either back into the constructor reproduces the same result. `flattenIndicators` governs word *structure* (`;;`) and `preserve` governs local *names* (aliases / custom glyphs); they are independent and compose (see [Combining the serializer options](#combining-the-serializer-options)).
 
-| `preserve` | `flattenIndicators` | local names | `;;` |
+### Saving without options
+
+An option is anything `toString()` writes inside a `[...]` bracket, at any scope. Pass `{ omitOptions: true }` to leave the options out and keep the content: every code, part and separator, word-level indicators, the head marker, a part's coordinates and kerning.
+
+```js
+const builder = new BlissSVGBuilder('[color=red;grid]||[stroke-width=0.8;x=2]|B291;[color=green]>C8:3,4/RK:2/[x=2]B313');
+builder.toString({ omitOptions: true });
+// 'B291;C8:3,4/RK:2/B313'
+```
+
+That hands back what was written without the styling somebody added, so your app can apply its own, or gives you the string without its global options.
+
+A part's position or a kerning value entered as an option keeps its own spelling, which sits outside a bracket: `[x=1]>C8` comes back as `C8:1`, and `B291/[relative-kerning=2]B313` as `B291/RK:2/B313`. The position of a character, a word or the whole composition has no spelling outside a bracket, so it goes, and ink that an option placed or spaced moves: `[char-space=4]||B291/B291` comes back as `B291/B291`, with the two characters closer together. Options written inside a word-level indicator go too (`B291;;[x=2;color=red]>B81` comes back as `B291;;B81:2`), and a character that holds nothing but options goes with them, a head marker on it included: `[color=red]^/B291;;B81` comes back as `B291;;B81`, so the indicator moves to `B291`.
+
+A built-in's own look is not an option, so `REFSQUARE` keeps its dotted line.
+
+With `preserve`, a custom name is kept only while the element still has every option the name brings, so a name whose definition brings options is written out: a character defined as `{ type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } }` comes back as `B291`.
+
+To take the options off the builder itself, call [`clearAllOptions()`](#clearalloptions): afterwards it saves what `toString({ omitOptions: true })` saved before. [`clearOptions()`](#clearoptions) takes them off one element. [`toJSON()`](#tojson-options) takes the same flag.
+
+### Combining the serializer options
+
+`preserve`, `flattenIndicators` and `omitOptions` are independent and combine freely, on `toString()` and `toJSON()` alike:
+
+| Option | Governs | Off *(default)* | On |
 |---|---|---|---|
-| off *(default)* | off *(default)* | decomposed | kept |
-| off | on | decomposed | flattened to `;` |
-| on | off | kept | kept |
-| on | on | kept | flattened to `;` |
+| `preserve` | custom names | decomposed to built-in codes | kept |
+| `flattenIndicators` | word-level `;;` indicators | kept | collapsed onto the head glyph as `;` |
+| `omitOptions` | options | written | left out |
 
 ### Head Marker Resolution
 
@@ -253,7 +281,7 @@ new BlissSVGBuilder('B486/B208').toString();
 // 'B486/B208'
 ```
 
-A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `MISPLACED_HEAD_MARKER` warning and never reappears on export.
+A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `MISPLACED_HEAD_MARKER` warning and never reappears on export. Saving [without options](#saving-without-options) drops one too: a head marker on a character that holds nothing but options goes with that character.
 
 Use for: serializing back to DSL format, portable exchange, logging.
 
@@ -545,6 +573,18 @@ Removes all content:
 builder.clear();
 builder.toJSON().groups; // []
 ```
+
+### `clearAllOptions()`
+
+Removes every option at every scope, the global bracket included, and keeps the content:
+
+```js
+const builder = new BlissSVGBuilder('[color=red;x=5]||B291/[stroke-width=0.8]B313');
+builder.clearAllOptions();
+builder.toString(); // 'B291/B313'
+```
+
+It removes exactly what [`omitOptions`](#saving-without-options) leaves out of a save, so afterwards the builder saves what `toString({ omitOptions: true })` saved before, with either serializer. The position of a character, a word or the whole composition goes with the other options; a part's coordinates and a character's kerning stay. It is also the one way to remove the global options, or the composition's own position, from a builder that already exists. `key`s and transient options are left alone, and so is a built-in's own look. For one element, use [`clearOptions()`](#clearoptions).
 
 ### Raw Element Methods
 
@@ -1058,6 +1098,22 @@ builder.glyph(0).removeOptions('color', 'strokeWidth');
 
 A key that is not a string throws a `TypeError`. Every key is read before any is removed, so a call that throws has changed nothing; naming no key at all asks for nothing and is not an error. The same holds for `removeTransientOptions`.
 
+Naming `x` or `y` removes the element's position, including a part's `CODE:x,y` coordinate, since that is the same value written another way.
+
+A built-in's own look is not removed. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and a shape you define with its own `getPath` function draws with its `defaultOptions` the same way; naming one of those keys returns it to the definition's value. To change the look, override it: `[stroke-dasharray=none]>REFSQUARE` draws the square solid.
+
+#### `.clearOptions()`
+
+Removes all of the element's options, meaning everything `toString()` writes for it inside a bracket:
+
+```js
+const builder = new BlissSVGBuilder('[color=red;x=2]|B291/[color=blue]B313;;[color=green]>B81');
+builder.group(0).clearOptions();
+builder.toString(); // 'B291/[color=blue]B313;;B81'
+```
+
+A word loses its options, its position and the options inside its word-level indicators; a character its options and position; a part its options. What sits inside the element keeps its own, which is why `B313` above stays blue. A part keeps its coordinates and a character its kerning, since the string writes those outside a bracket: on `B291;[x=3;color=red]>C8`, clearing the part gives `B291;C8:3`, while `removeOptions('x')` on it would remove the coordinate. `key` and transient options are left alone, and so is a built-in's own look. Clearing an element that has no options is not an error. To clear the whole composition, global options included, use [`clearAllOptions()`](#clearalloptions).
+
 ### Transient Options
 
 Transient options reach the rendered SVG and never reach `toString()` or `toJSON()`. Use them for anything that describes the current view rather than the composition: hit-test annotations an editor stamps onto each part, a selection highlight, or a display width that must not end up in the string a user saves or shares.
@@ -1549,7 +1605,7 @@ An omitted, empty, or whitespace-only `code` is not an error at group and glyph 
 - Empty slots render nothing, add no width, stay visible to navigation (`.groups`, `group(i)`, `stats.groupCount`), and round-trip through `toJSON()`. Fill them later: `group(i).addGlyph('B313')` fills an empty group, adding a part to an empty group wraps the part in a new character, and adding a part to an empty glyph fills that glyph.
 - Parts are the exception: a part is a reference to a shape, not a container, so an empty part cannot exist. `addPart('')` throws, and the message points to `addGlyph('')` for reserving an empty slot.
 
-One serialization asymmetry to know about: `toJSON()` always keeps empty slots, but a bare empty group or glyph has no DSL token, so it survives `toJSON()` round-trips and not `toString()` round-trips. An options-carrying empty serializes and round-trips on both surfaces: `[color=red]|` for an empty group, `[color=red]` for an empty glyph. Either way, serialized spacing matches rendered spacing.
+One serialization asymmetry to know about: `toJSON()` always keeps empty slots, but a bare empty group or glyph has no DSL token, so it survives `toJSON()` round-trips and not `toString()` round-trips. An options-carrying empty serializes and round-trips on both surfaces: `[color=red]|` for an empty group, `[color=red]` for an empty glyph (saved [without options](#saving-without-options), it is a bare empty again). Either way, serialized spacing matches rendered spacing.
 
 ### What does NOT throw: `define()` and content errors
 
