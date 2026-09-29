@@ -9,7 +9,7 @@
  *   output included, and every such save reloading what the builder draws.
  * - An override of the look written and kept, `none` drawing a solid line.
  * - `removeOptions`, `clearOptions()` and `clearAllOptions()` returning the look
- *   to the definition's instead of stripping it.
+ *   to the definition's instead of stripping it, a look two parts down included.
  * - The flag writing the bare code, its JSON keeping the look in the bags.
  * - A shape drawn by its own function (`getPath`) with `defaultOptions`, which
  *   the string can only name, behaving the same way, its own value typed out
@@ -29,6 +29,8 @@ const FIXTURES = {
   BL_PRIM: { type: 'shape', getPath: () => 'M0,0h4', width: 4, height: 0, defaultOptions: { color: 'red' } },
   BL_WIDEPRIM: { type: 'shape', getPath: () => 'M0,0h4', width: 4, height: 0, defaultOptions: { 'stroke-width': 0.5 } },
   BL_REDB: { type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } },
+  BL_BOXG: { type: 'glyph', codeString: 'REFSQUARE;C8' },
+  BL_PRIMSH: { type: 'shape', codeString: 'BL_PRIM;C8' },
 };
 
 beforeAll(() => {
@@ -129,6 +131,17 @@ describe('BlissSVGBuilder built-in own look', () => {
     it('keeps the dotted line of ANCHORRING when it is removed from the part', () => {
       const builder = changed('B291;ANCHORRING', (b) => b.glyph(0).part(1).removeOptions('stroke-dasharray'));
       expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;ANCHORRING').svgCode);
+    });
+
+    it.each([
+      ['REFSQUARE inside a custom glyph used as a part', '[color=blue]|B291;BL_BOXG', 'B291;BL_BOXG', 'stroke-dasharray="0 0.999"'],
+      ['a shape drawn by its own function inside a custom shape', '[color=blue]|B291;BL_PRIMSH', 'B291;BL_PRIMSH', 'stroke="red"'],
+    ])('keeps the look of %s when everything is cleared', (_label, input, bare, look) => {
+      // pins the clear reading every depth below a part as a part, so an element
+      // two parts down that such a code names keeps the look its definition gives it
+      const builder = changed(input, (b) => b.clearAllOptions());
+      expect(builder.svgCode).toContain(look);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder(bare).svgCode);
     });
   });
 

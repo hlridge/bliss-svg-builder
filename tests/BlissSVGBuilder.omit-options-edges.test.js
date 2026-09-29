@@ -71,6 +71,10 @@ const styledShapePart = () =>
 const OVERLAY_ROWS = [
   ['a colour', 'B291;;[color=red]>B81', 'B291;;B81'],
   ['a position beside a colour', 'B291;;[x=2;color=red]>B81', 'B291;;B81:2'],
+  // pins the position kept when the bracket holds nothing else, a path of its
+  // own: dropping the suffix there went unnoticed until these two rows
+  ['a bracket holding only a position', 'B291;;[x=2]>B81', 'B291;;B81:2'],
+  ['a bracket holding only a vertical position', 'B291;;[y=1]>B81', 'B291;;B81:,1'],
   ['one code of two, after the semantic strip', 'B291;;!B86;[color=red]>B81', 'B291;;!B86;B81'],
 ];
 
