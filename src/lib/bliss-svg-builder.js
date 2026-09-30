@@ -3028,7 +3028,7 @@ class BlissSVGBuilder {
 
     // Serialize a part with ; delimiter and :x,y positions.
     // Recursively decomposes custom shapes and glyphs unless preserve is set.
-    function serializeParts(parts, offsetX = 0, offsetY = 0) {
+    function serializeParts(parts, offsetX = 0, offsetY = 0, writtenX = false, writtenY = false) {
       return parts.map((part, partIndex) => {
         // An invalid part (no codeName, e.g. the `!B81` in `B291;[x=2]>!B81`)
         // must not let a coordinate suffix or `[opts]>` prefix decorate it into
@@ -3047,14 +3047,23 @@ class BlissSVGBuilder {
         // default. Approximated as 0, which is exact for every ordinary part
         // and off by the anchor placement for an indicator.
         //
+        // An axis written on the composite, a zero included, is written on
+        // each ordinary part it spells out into. Such a part sits at the
+        // composite's origin unless it wrote its own place, so the written
+        // axis says exactly where it is, and the part stays a position the
+        // leading-indicator rule reads: dropping the zero made the reload
+        // drop an indicator the builder had kept. An indicator's place is the
+        // indicator layout's, so under a zero offset it is left to the reload.
+        //
         // The addition below is arithmetic only because the positioning
         // invariant guarantees it: an axis on the authoring structure is a
         // finite number or absent, whichever channel wrote it. Without that
         // guarantee `+` concatenates, and a string `'3'` under a zero offset
         // becomes `30`. Any new route that writes an axis belongs behind
         // normalizePositionFields, not behind a second coercion here.
-        const hasX = part.x !== undefined || offsetX !== 0;
-        const hasY = part.y !== undefined || offsetY !== 0;
+        const takesWrittenAxis = part.isIndicator !== true;
+        const hasX = part.x !== undefined || offsetX !== 0 || (writtenX && takesWrittenAxis);
+        const hasY = part.y !== undefined || offsetY !== 0 || (writtenY && takesWrittenAxis);
         const x = (part.x ?? 0) + offsetX;
         const y = (part.y ?? 0) + offsetY;
         // Under preserve a BASE-slot custom name with `;`-siblings still
@@ -3102,7 +3111,7 @@ class BlissSVGBuilder {
                   return { ...p, options: { ...Object.fromEntries(outer), ...p.options } };
                 })
               : part.parts;
-            return serializeParts(innerParts, x, y);
+            return serializeParts(innerParts, x, y, hasX, hasY);
           }
           // A custom shape part with no parts of its own: its definition arrived
           // after the composition was built, so the tree still holds the bare
@@ -3113,7 +3122,7 @@ class BlissSVGBuilder {
           // made the same expansion on its working copy.)
           const node = structuredClone(part);
           if (BlissSVGBuilder.#expandLateShape(node, readings)) {
-            return serializeParts([node], offsetX, offsetY);
+            return serializeParts([node], offsetX, offsetY, writtenX, writtenY);
           }
         }
         // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.

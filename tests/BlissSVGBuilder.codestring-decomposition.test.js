@@ -20,8 +20,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - a PLAIN RENAME (`'C8'`) is merged away by the parser, so the use-site
  *   position becomes the part's own written position and a written `0` survives;
  * - anything else (`'C8:2'`, `'C8;HL2'`) keeps a node of its own, so the
- *   use-site position reaches the parts only as a FOLD, and a zero fold moves
- *   nothing and leaves no trace.
+ *   use-site position reaches the parts only as a FOLD. A zero fold moves
+ *   nothing, but it is still a position the author wrote, so it is written on
+ *   each ordinary part the node spells out into.
  *
  * Covers:
  * - Both of those, and the cross-path parity that decides between them, swept
@@ -117,8 +118,8 @@ describe('BlissSVGBuilder codeString decomposition', () => {
 
   describe('when the definition carries a position of its own', () => {
     // NOT a rename, so the parser keeps a node for it and the use-site position
-    // reaches the part as a FOLD. A fold of zero moves nothing and leaves no
-    // trace, which is why `:0,0` comes back bare here and keeps both axes above
+    // reaches the part as a FOLD. A fold of zero moves nothing, yet the axis was
+    // written, so it comes back written here as it does above
     it('adds the use-site offset to a coordinate written as a pair', () => {
       // distinct values per axis on both sides, so a mutant that crosses the
       // axes or subtracts instead of adding cannot produce this string
@@ -143,8 +144,10 @@ describe('BlissSVGBuilder codeString decomposition', () => {
       expect(serializeAfterLateDefine('B291;DEF:3', 'C8:0,0')).toBe('B291;C8:3,0');
     });
 
-    it('contributes nothing when the use site folds a zero', () => {
-      expect(serializeAfterLateDefine('B291;DEF:0,0', 'C8:2')).toBe('B291;C8:2');
+    it('adds nothing to the value when the use site folds a zero, and keeps the axis it wrote', () => {
+      // regression: a zero fold used to leave `y` unwritten, dropping a position
+      // the author wrote, which the leading-indicator rule reads
+      expect(serializeAfterLateDefine('B291;DEF:0,0', 'C8:2')).toBe('B291;C8:2,0');
     });
   });
 
@@ -199,8 +202,10 @@ describe('BlissSVGBuilder codeString decomposition', () => {
       expect(serializeAfterLateDefine('B291;DEF', 'C8;HL2')).toBe('B291;C8;HL2');
     });
 
-    it('drops a zero fold, because the composite token does not survive', () => {
-      expect(serializeAfterLateDefine('B291;DEF:0,0', 'C8;HL2')).toBe('B291;C8;HL2');
+    it('writes a zero fold on every ordinary part, as it writes any other position', () => {
+      // regression: the zero used to be dropped because the composite token
+      // does not survive, which lost a position the author wrote
+      expect(serializeAfterLateDefine('B291;DEF:0,0', 'C8;HL2')).toBe('B291;C8:0,0;HL2:0,0');
     });
 
     // a composite is the ONLY place these can be pinned. On a plain rename the
@@ -227,6 +232,17 @@ describe('BlissSVGBuilder codeString decomposition', () => {
       const late = POSITIONS.map(p => `${p || '(none)'} => ${serializeAfterLateDefine(`B291;DEF${p}`, codeString)}`);
       const early = POSITIONS.map(p => `${p || '(none)'} => ${serializeAfterEarlyDefine(`B291;DEF${p}`, codeString)}`);
       expect(late).toEqual(early);
+    });
+
+    it('passes a zero written on an enclosing composite to a shape defined late inside it', () => {
+      // the enclosing composite is spelled out with its zero on each ordinary
+      // part, and the part it holds by a name defined only afterwards is one
+      customCodes.push('OUTERZ', 'LATEIN');
+      BlissSVGBuilder.define({ OUTERZ: { type: 'shape', codeString: 'LATEIN;C8' } });
+      const builtFirst = new BlissSVGBuilder('B291;OUTERZ:0,0');
+      BlissSVGBuilder.define({ LATEIN: { type: 'shape', codeString: 'HL2;VL2' } });
+      expect(builtFirst.toString()).toBe('B291;HL2:0,0;VL2:0,0;C8:0,0');
+      expect(new BlissSVGBuilder('B291;OUTERZ:0,0').toString()).toBe(builtFirst.toString());
     });
   });
 });

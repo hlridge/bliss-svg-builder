@@ -27,7 +27,12 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - The parent-offset approximation when a nested composite decomposes: an
  *   unset axis under a non-zero offset is emitted as a value, because the
  *   serializer cannot compute the layout default it would have to add the
- *   offset to. Applied per axis, so a zero offset leaves its axis unwritten.
+ *   offset to. Applied per axis. An axis written on the composite, a zero
+ *   included, is written on every ordinary part it spells out into; an
+ *   indicator part under a zero offset stays unwritten.
+ * - An indicator before a custom character written at the origin: the
+ *   character is spelled out with the position on its parts, so the reload
+ *   keeps the indicator as the builder did.
  *
  * Does NOT cover:
  * - The preserve path's own copies of the presence test, see
@@ -186,12 +191,77 @@ describe('BlissSVGBuilder part position presence', () => {
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
-    it.each(['B291;OFFSH', 'B291;OFFSH:0,0', 'B291;OFFSH:0'])(
-      'leaves an unwritten axis unwritten when its offset is zero, in %s', (dsl) => {
-        defineNestedShape();
-        const b = new BlissSVGBuilder(dsl);
-        expect(b.toString()).toBe('B291;C8;C2:3');
-        expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
-      });
+    it('leaves an unwritten axis unwritten when the composite writes no position', () => {
+      defineNestedShape();
+      const b = new BlissSVGBuilder('B291;OFFSH');
+      expect(b.toString()).toBe('B291;C8;C2:3');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    // regression: a zero offset used to leave the axis unwritten, so the save
+    // dropped a position the author wrote, which the leading-indicator rule
+    // reads (see the describe below)
+    it.each([
+      ['B291;OFFSH:0,0', 'B291;C8:0,0;C2:3,0'],
+      ['B291;OFFSH:0',   'B291;C8:0;C2:3'],
+      ['B291;OFFSH:,0',  'B291;C8:,0;C2:3,0'],
+    ])('writes a zero offset on every ordinary part it spells out, in %s', (dsl, expected) => {
+      defineNestedShape();
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe(expected);
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('leaves the indicators of a spelled-out alias unwritten at a zero offset', () => {
+      // their places come from the indicator layout, so a zero written on each
+      // would pin both at the origin; left unwritten, the reload lays them out
+      // as the builder did
+      customCodes.push('TWOIND');
+      BlissSVGBuilder.define({ TWOIND: { codeString: 'B81;B86' } });
+      const b = new BlissSVGBuilder('TWOIND:0,0');
+      expect(b.toString()).toBe('B81;B86');
+      expect(new BlissSVGBuilder('B81;B86').svgCode).toBe(b.svgCode);
+    });
+  });
+
+  describe('when an indicator precedes a custom character written at the origin', () => {
+    // A written `:0` is a position, so the character does not convict the
+    // indicator before it. The save spells the character out, and the zero has
+    // to reach its parts, or the reload finds unpositioned content after the
+    // indicator and drops it.
+    const customCodes = [];
+    afterEach(() => {
+      for (const code of customCodes) {
+        try { BlissSVGBuilder.removeDefinition(code); } catch {}
+      }
+      customCodes.length = 0;
+    });
+
+    const defineTwoPartGlyph = () => {
+      customCodes.push('FZTWO');
+      BlissSVGBuilder.define({ FZTWO: { type: 'glyph', codeString: '[color=red]>B291;[color=blue]>C8' } });
+    };
+
+    it.each([
+      ['ANCHORRING;FZTWO:0',   'ANCHORRING;[color=red]>B291:0;[color=blue]>C8:0'],
+      ['ANCHORRING;FZTWO:0,0', 'ANCHORRING;[color=red]>B291:0,0;[color=blue]>C8:0,0'],
+      ['ANCHORRING;FZTWO:,0',  'ANCHORRING;[color=red]>B291:,0;[color=blue]>C8:,0'],
+      ['B81;FZTWO:0',          'B81;[color=red]>B291:0;[color=blue]>C8:0'],
+    ])('keeps the indicator in %s through a save, writing %s', (dsl, expected) => {
+      defineTwoPartGlyph();
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.warnings).toEqual([]);
+      expect(b.toString()).toBe(expected);
+      const reloaded = new BlissSVGBuilder(expected);
+      expect(reloaded.warnings).toEqual([]);
+      expect(reloaded.svgCode).toBe(b.svgCode);
+    });
+
+    it('still drops the indicator before a custom character with no position', () => {
+      defineTwoPartGlyph();
+      const b = new BlissSVGBuilder('ANCHORRING;FZTWO');
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_INDICATOR_PART']);
+      expect(b.toString()).toBe('[color=red]>B291;[color=blue]>C8');
+    });
   });
 });
