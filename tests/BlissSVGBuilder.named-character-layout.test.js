@@ -97,6 +97,7 @@ describe('BlissSVGBuilder named character layout', () => {
       customCodes.push(...Object.keys(NAMES));
       expect(BlissSVGBuilder.define(NAMES).defined).toHaveLength(3);
       const builder = new BlissSVGBuilder(input);
+      expect(secondWordX('B291//B291')).toBe(16);
       expect(secondWordX(input)).toBe(12);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
