@@ -427,6 +427,20 @@ export function classifyXCode(code) {
   return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
 
+// The definition a character's layout data is read from: its base code's,
+// followed through a pure rename, or for a code without an outline the
+// text-fallback glyph it draws as. Layout data is what places a character
+// among its neighbours: the
+// external-letter spacing, the letter it is (which pair kerning reads), its
+// kerning table, and whether it pulls in the word space before it. A
+// coordinate, a `;` part or an option bracket does not make a character a
+// different one, so it keeps all four; only a code of its own is lost.
+function layoutDefinitionOf(code, definitions) {
+  if (code.startsWith('XTXT_')) return createTextFallbackGlyph(code.slice(5));
+  const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
+  return definition ? resolveEffectiveDefinition(definition, definitions) : undefined;
+}
+
 export class BlissParser {
   static parse(codeStr, options) {
       const result = this.fromString(codeStr);
@@ -1246,25 +1260,23 @@ export class BlissParser {
                 str = `${optionBracket}>${gateBaseRaw}`;
               }
             }
-            const codeForKerning = partContent.split(':')[0];
-            // A text-fallback code is never in the registry (XTXT_ keys are
-            // deliberately unregistered), so a registry lookup alone lifted
-            // nothing for one and the glyph was spaced as a Bliss character:
-            // `[color=red]>Xhαllo` sat 1.2 units from its neighbour where the
-            // bare `Xhαllo` sits 0.8. Derive it the same way the other two
-            // XTXT_ resolution sites do.
-            const definition = codeForKerning.startsWith('XTXT_')
-              ? createTextFallbackGlyph(codeForKerning.slice(5))
-              : (definitions[codeForKerning] || {});
+            // The code behind the bracket is read as the gate above reads it,
+            // without its `;` parts or coordinate: `[color=red]>Xa;B86` is the
+            // letter a. Reading everything up to the first `:` left the parts
+            // attached, so the lookup named nothing and the letter was spaced
+            // as a Bliss character. A text-fallback code is never in the
+            // registry, and is derived the way the other XTXT_ sites derive it.
+            const definition = layoutDefinitionOf(gateBase, definitions) ?? {};
             // The identity code stays on the PART here: `[opts]>` binds the
             // option to a part, so the glyph is an anonymous wrapper around a
-            // named part. Only the glyph-classification metadata is lifted, so
-            // layout (external-glyph spacing, kerning) matches the bare
-            // spelling. See the toJSON metadata gate in bliss-svg-builder.js,
-            // which must keep that metadata for a glyph with no code of its own.
+            // named part. Only the layout data is lifted, so the glyph spaces,
+            // kerns and pulls in the word space before it as the bare spelling
+            // does. See the toJSON metadata gate in bliss-svg-builder.js, which
+            // must keep that data for a glyph with no code of its own.
             return [{
               part: str,
               _scanCode: partContent.split(';')[0].split(':')[0],
+              ...(definition.shrinksPrecedingWordSpace === true && { shrinksPrecedingWordSpace: true }),
               ...(definition.isExternalGlyph && { isExternalGlyph: definition.isExternalGlyph }),
               ...(definition.char && { char: definition.char }),
               ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
@@ -1561,14 +1573,24 @@ export class BlissParser {
             return expandedParts;
           }
 
-          // Base case - create object with properties from definition
+          // Base case - create object with properties from definition. A
+          // character written with a coordinate or `;` parts (`Xa:1`, `Xa;B86`)
+          // names no definition as written, so its layout data is read from
+          // its base code. Without it a letter was spaced as a Bliss
+          // character, a digit lost its kerning and a punctuation mark stopped
+          // pulling in the word space, while the builder keeps all three when
+          // it gives a character a part or a position, and every save writes
+          // this form. Its identity stays with the bare code.
+          const layout = Object.hasOwn(definitions, codeForLookup)
+            ? definition
+            : (layoutDefinitionOf(potentialBaseCode, definitions) ?? definition);
           const isIndicator = definition.isIndicator;
-          const isExternalGlyph = definition.isExternalGlyph;
-          const kerningRules = definition.kerningRules;
-          const char = definition.char;
+          const isExternalGlyph = layout.isExternalGlyph;
+          const kerningRules = layout.kerningRules;
+          const char = layout.char;
           const glyphCode = definition.glyphCode;
           const isBlissGlyph = definition.isBlissGlyph;
-          const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
+          const shrinksPrecedingWordSpace = layout.shrinksPrecedingWordSpace;
           // Strict Indicator Separation: `;` dumb-appends, so `str` is kept
           // verbatim (a trailing `;` is normalized away; an invalid appended
           // part such as `!B81` falls through to UNKNOWN_CODE in parseParts).
