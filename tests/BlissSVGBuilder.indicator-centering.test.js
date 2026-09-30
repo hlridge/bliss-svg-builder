@@ -20,6 +20,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Multi-part (re-origined) composite head: centering over the displaced
  *   ink span (the common baked min rides the composite since XC-2).
  * - Non-displaced head: centering unchanged.
+ * - A built-in drawn from letters (B118, B972): the indicator centres over all
+ *   three letters, and the `;;` overlay draws the same.
  *
  * Does NOT cover:
  * - Canvas width/advance truthfulness of displaced composites (the moved-min
@@ -181,6 +183,25 @@ describe('BlissSVGBuilder indicator centering', () => {
       expect(plain.svgCode).toContain('<g stroke="red"><path d="M3,6l1,-2M4,4l1,2"/></g>');
       const reparsed = new BlissSVGBuilder(plain.toString());
       expect(reparsed.svgCode).toBe(plain.svgCode);
+    });
+  });
+
+  describe('when the base is a built-in drawn from letters', () => {
+    // B118 and B972 (the Latin alphabet, lowercase and uppercase) are three
+    // outlined letters placed side by side as the parts of one character
+    const centres = (input) => {
+      const parts = new BlissSVGBuilder(input).groups[0].children[0].children;
+      const base = parts.filter((p) => !p.isIndicator);
+      const [indicator] = parts.filter((p) => p.isIndicator);
+      const left = Math.min(...base.map((p) => p.x));
+      const right = Math.max(...base.map((p) => p.x + p.width));
+      return { base: (left + right) / 2, indicator: indicator.x + indicator.width / 2 };
+    };
+
+    it.each(['B118', 'B972'])('centres an indicator over all three letters of %s', (code) => {
+      const { base, indicator } = centres(`${code};B86`);
+      expect(indicator).toBeCloseTo(base, 3);
+      expect(new BlissSVGBuilder(`${code};;B86`).svgCode).toBe(new BlissSVGBuilder(`${code};B86`).svgCode);
     });
   });
 });

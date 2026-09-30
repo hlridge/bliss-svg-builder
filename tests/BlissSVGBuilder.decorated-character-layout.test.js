@@ -12,7 +12,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Each decoration on a letter, a digit and a punctuation mark lays out like
  *   the bare code, measured as the gap its layout decides.
  * - A Bliss character with no layout data of its own, and a letter beside a
- *   Bliss character, keep the ordinary character space.
+ *   Bliss character, keep the ordinary character space, and so does a
+ *   built-in drawn from letters (B118, B972), bare or decorated.
  * - A decorated character still has no code of its own; it reports the letter
  *   it is made from.
  * - Every save of such a character reloads to the same drawing: a flattened
@@ -112,6 +113,15 @@ describe('BlissSVGBuilder decorated character layout', () => {
 
     it('keeps the ordinary character space between a decorated letter and a Bliss character', () => {
       expect(gapAfterFirst('Xa;B86/B291')).toBeCloseTo(2, 6);
+    });
+
+    it.each([
+      ['B118/Xd'], ['B118;B86/Xd'], ['B118:1/Xd'], ['Xd/B118;B86'], ['B972;B86/XD'],
+    ])('keeps the Bliss character space of a built-in drawn from letters in %s', (input) => {
+      // B118 and B972 are Bliss characters (the Latin alphabet) whose code
+      // strings start with a letter; decorated, they stay what they are bare,
+      // not the letter they start with
+      expect(gapAfterFirst(input)).toBe(2);
     });
   });
 
