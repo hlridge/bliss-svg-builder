@@ -16,7 +16,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   code string of a decorated typed glyph.
  * - A kerning table the definition sets winning over the digit it is made of.
  * - A name whose code string a decorated use cannot read lending the failed
- *   character nothing, so its save still reloads the same drawing.
+ *   character nothing, so its save still reloads the same drawing, and a
+ *   tripwire on that failure, which a later parser fix has to carry into the
+ *   layout lookup.
  * - The JSON of a typed glyph spelled out to anonymous parts: its layout data
  *   written out, its identity not, and nothing added for a Bliss character.
  *
@@ -129,6 +131,18 @@ describe('BlissSVGBuilder named character layout', () => {
       const builder = new BlissSVGBuilder('[color=blue]>CHARBRACKETDIGIT/B10');
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
+
+    it.each(['CHARBRACKETDIGIT:1/B10', 'CHARBRACKETDIGIT;B86/B10', '[color=blue]>CHARBRACKETDIGIT/B10'])(
+      'still fails the name in %s where it stands decorated', (input) => {
+        // tripwire: a shipped parser limit (backlog, "Definition-reference
+        // hygiene nits", niche 2). When a decorated use learns to read a
+        // character bracket in a code string, the layout lookup has to read it
+        // too (firstBaseCode strips part brackets only), or the newly working
+        // use draws without the name's spacing
+        customCodes.push('CHARBRACKETDIGIT');
+        expect(BlissSVGBuilder.define({ CHARBRACKETDIGIT: { type: 'glyph', codeString: '[color=red]B9' } }).defined).toEqual(['CHARBRACKETDIGIT']);
+        expect(new BlissSVGBuilder(input).warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
+      });
   });
 
   describe('when a typed glyph spelled out to anonymous parts is saved as JSON', () => {
