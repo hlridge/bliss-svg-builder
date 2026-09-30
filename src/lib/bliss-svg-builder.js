@@ -3550,9 +3550,10 @@ class BlissSVGBuilder {
 
             // Did this glyph ever have an identity code? Read it BEFORE the
             // rename below, which drops the code for a custom glyph decomposed
-            // to portable parts. That glyph is anonymous on purpose and its
-            // parts still re-derive its metadata; a glyph that never had a code
-            // has nothing to re-derive from. See the metadata gate further down.
+            // to portable parts. That glyph is anonymous on purpose, so its
+            // identity goes; its layout data stays unless a published code
+            // brings it back. A glyph that never had a code has nothing to
+            // re-derive anything from. See the metadata gate further down.
             const hadIdentityCode = !!glyph.glyphCode;
 
             // Normalize glyphCode → codeName for public API
@@ -3619,13 +3620,21 @@ class BlissSVGBuilder {
             // external, so every following glyph shifted by 1.2 units -- the
             // difference between external-glyph-space and char-space (GH #38).
             // Keep the metadata exactly where nothing can re-derive it.
+            //
+            // A custom glyph spelled out to anonymous parts is the third: a
+            // rebuild re-derives layout data from a glyph's code alone, never
+            // from its parts, so a typed glyph drawn from a decorated digit
+            // (`B9:1`) or punctuation mark keeps its kerning or word space
+            // only if its layout data is written out. Its identity is not.
             if (!options.deep && hadIdentityCode) {
-              delete glyph.char;
               delete glyph.isBlissGlyph;
-              delete glyph.isExternalGlyph;
-              delete glyph.kerningRules;
-              delete glyph.shrinksPrecedingWordSpace;
               delete glyph.isIndicator;
+              if (glyph.codeName !== undefined) {
+                delete glyph.char;
+                delete glyph.isExternalGlyph;
+                delete glyph.kerningRules;
+                delete glyph.shrinksPrecedingWordSpace;
+              }
             }
           }
         }

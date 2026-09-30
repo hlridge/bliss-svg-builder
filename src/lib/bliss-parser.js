@@ -45,6 +45,9 @@ const PART_SLOT_CHAR_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACK
 // quoted `]` truncates at one layer even when the other accepts it.
 const BRACKET_TOKEN_PATTERN = new RegExp(String.raw`\{(.*)\}|\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`, 'g');
 const BRACKET_EXTRACT_PATTERN = new RegExp(String.raw`\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`);
+// One leading option bracket, character or part scope, on a definition's code
+// string (raw text, so quotes are read by the same grammar).
+const LEADING_BRACKET_PATTERN = new RegExp(String.raw`^\[` + OPTION_BRACKET_CONTENT + String.raw`\]>?`);
 // The overlay prefix matchers run on RESTORED strings (the `;;` store keeps
 // codes verbatim), so they need the same quote-aware grammar; group 2 is the
 // grammar's internal atom, group 3 the remainder after the bracket.
@@ -427,18 +430,42 @@ export function classifyXCode(code) {
   return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
 
-// The definition a character's layout data is read from: its base code's,
-// followed through a pure rename, or for a code without an outline the
-// text-fallback glyph it draws as. Layout data is what places a character
-// among its neighbours: the
-// external-letter spacing, the letter it is (which pair kerning reads), its
-// kerning table, and whether it pulls in the word space before it. A
-// coordinate, a `;` part or an option bracket does not make a character a
-// different one, so it keeps all four; only a code of its own is lost.
-function layoutDefinitionOf(code, definitions) {
+// The code the first character of a code string is made from: without its
+// option brackets, before any `;` part, and without its coordinate.
+function firstBaseCode(codeString) {
+  let rest = codeString;
+  let bracket;
+  while ((bracket = rest.match(LEADING_BRACKET_PATTERN)) !== null) rest = rest.slice(bracket[0].length);
+  const [first] = rest.split(';');
+  const coordinate = first.match(COORD_SUFFIX_PATTERN);
+  return coordinate && coordinate.index > 0 ? first.slice(0, coordinate.index) : first;
+}
+
+// The layout data a code draws with, as its bare spelling gets it. Layout data
+// is what places a character among its neighbours: the external-letter
+// spacing, the letter it is (which pair kerning reads), its kerning table, and
+// whether it pulls in the word space before it. A coordinate, a `;` part or an
+// option bracket does not make a character a different one, so it keeps all
+// four; only a code of its own is lost. A built-in carries its own; a code
+// without an outline draws as its text-fallback glyph; a defined name that
+// stands for one character takes what it does not set itself from the
+// character its code string is made of, as its expansion does.
+function layoutDefinitionOf(code, definitions, depth = 0) {
   if (code.startsWith('XTXT_')) return createTextFallbackGlyph(code.slice(5));
   const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
-  return definition ? resolveEffectiveDefinition(definition, definitions) : undefined;
+  if (typeof definition?.codeString !== 'string' || builtInCodes.has(code) || depth >= MAX_RECURSION_DEPTH) {
+    return definition;
+  }
+  const madeOf = processXCodes(definition.codeString);
+  if (madeOf.includes('/')) return definition;
+  const inner = layoutDefinitionOf(firstBaseCode(madeOf), definitions, depth + 1);
+  if (!inner) return definition;
+  return {
+    isExternalGlyph: definition.isExternalGlyph ?? inner.isExternalGlyph,
+    char: definition.char ?? inner.char,
+    kerningRules: definition.kerningRules ?? inner.kerningRules,
+    shrinksPrecedingWordSpace: definition.shrinksPrecedingWordSpace ?? inner.shrinksPrecedingWordSpace,
+  };
 }
 
 export class BlissParser {
@@ -1456,7 +1483,11 @@ export class BlissParser {
                 const isExternalGlyph = expandedSubPart.isExternalGlyph;
                 const kerningRules = definition.kerningRules ?? expandedSubPart.kerningRules;
                 const char = expandedSubPart.char;
-                const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace;
+                // A name of a punctuation mark is that mark, so it pulls in
+                // the word space before it as the mark does, unless the
+                // definition says otherwise; its save writes the mark itself.
+                const shrinksPrecedingWordSpace = definition.shrinksPrecedingWordSpace
+                  ?? expandedSubPart.shrinksPrecedingWordSpace;
                 // For multi-glyph words, each part keeps its own glyphCode.
                 // For single-character composites: outer definition's glyphCode wins
                 // (preserves custom glyph identity, e.g., LOVE wrapping B431).
