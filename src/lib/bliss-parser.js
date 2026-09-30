@@ -45,9 +45,9 @@ const PART_SLOT_CHAR_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACK
 // quoted `]` truncates at one layer even when the other accepts it.
 const BRACKET_TOKEN_PATTERN = new RegExp(String.raw`\{(.*)\}|\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`, 'g');
 const BRACKET_EXTRACT_PATTERN = new RegExp(String.raw`\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`);
-// One leading option bracket, character or part scope, on a definition's code
-// string (raw text, so quotes are read by the same grammar).
-const LEADING_BRACKET_PATTERN = new RegExp(String.raw`^\[` + OPTION_BRACKET_CONTENT + String.raw`\]>?`);
+// One leading part-scope option bracket on a definition's code string (raw
+// text, so quotes are read by the same grammar).
+const LEADING_PART_BRACKET_PATTERN = new RegExp(String.raw`^\[` + OPTION_BRACKET_CONTENT + String.raw`\]>`);
 // The overlay prefix matchers run on RESTORED strings (the `;;` store keeps
 // codes verbatim), so they need the same quote-aware grammar; group 2 is the
 // grammar's internal atom, group 3 the remainder after the bracket.
@@ -430,12 +430,13 @@ export function classifyXCode(code) {
   return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
 
-// The code the first character of a code string is made from: without its
-// option brackets, before any `;` part, and without its coordinate.
+// The code the first character of a code string is made from, read as a part
+// slot reads it: without its part brackets, before any `;` part, and without
+// its coordinate.
 function firstBaseCode(codeString) {
   let rest = codeString;
   let bracket;
-  while ((bracket = rest.match(LEADING_BRACKET_PATTERN)) !== null) rest = rest.slice(bracket[0].length);
+  while ((bracket = rest.match(LEADING_PART_BRACKET_PATTERN)) !== null) rest = rest.slice(bracket[0].length);
   const [first] = rest.split(';');
   const coordinate = first.match(COORD_SUFFIX_PATTERN);
   return coordinate && coordinate.index > 0 ? first.slice(0, coordinate.index) : first;
@@ -449,16 +450,17 @@ function firstBaseCode(codeString) {
 // four; only a code of its own is lost. A built-in carries its own; a code
 // without an outline draws as its text-fallback glyph; a defined name that
 // stands for one character takes what it does not set itself from the
-// character its code string is made of, as its expansion does.
+// character its code string is made of, as its expansion does. Only as far as
+// a decorated use can read the name: a code string it fails on (a character
+// bracket, a letter without an outline) lends that failed character nothing.
 function layoutDefinitionOf(code, definitions, depth = 0) {
   if (code.startsWith('XTXT_')) return createTextFallbackGlyph(code.slice(5));
   const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
   if (typeof definition?.codeString !== 'string' || builtInCodes.has(code) || depth >= MAX_RECURSION_DEPTH) {
     return definition;
   }
-  const madeOf = processXCodes(definition.codeString);
-  if (madeOf.includes('/')) return definition;
-  const inner = layoutDefinitionOf(firstBaseCode(madeOf), definitions, depth + 1);
+  if (definition.codeString.includes('/')) return definition;
+  const inner = layoutDefinitionOf(firstBaseCode(definition.codeString), definitions, depth + 1);
   if (!inner) return definition;
   return {
     isExternalGlyph: definition.isExternalGlyph ?? inner.isExternalGlyph,

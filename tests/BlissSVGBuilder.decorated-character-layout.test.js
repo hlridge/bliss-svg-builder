@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
@@ -10,11 +10,7 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  * Covers:
  * - Each decoration on a letter, a digit and a punctuation mark lays out like
- *   the bare code, measured as the gap its layout decides, and so does a
- *   letter named through a bare alias, and a digit or punctuation mark named
- *   by a typed glyph or a bare alias, bare or decorated.
- * - The JSON of a typed glyph spelled out to anonymous parts carries the
- *   layout data a rebuild cannot re-derive, and not its identity.
+ *   the bare code, measured as the gap its layout decides.
  * - A Bliss character with no layout data of its own, and a letter beside a
  *   Bliss character, keep the ordinary character space.
  * - A decorated character still has no code of its own; it reports the letter
@@ -25,6 +21,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   and a part position set through `setOptions`.
  *
  * Does NOT cover:
+ * - A character named by a definition, bare or decorated, and the JSON of a
+ *   typed glyph spelled out to anonymous parts, see
+ *   `BlissSVGBuilder.named-character-layout.test.js`.
  * - A flattened word-level indicator on a DIGIT head, which still loses the
  *   kerning: digit kerning reads the next character's own code, which a
  *   character with a `;` part does not have (backlog, triage).
@@ -79,102 +78,6 @@ describe('BlissSVGBuilder decorated character layout', () => {
 
     it('reports a letter without an outline as that one letter', () => {
       expect(new BlissSVGBuilder('Xλ;B86').glyph(0).char).toBe('λ');
-    });
-  });
-
-  describe('when a letter is named through a bare alias and decorated', () => {
-    const customCodes = [];
-    afterEach(() => {
-      for (const code of customCodes) {
-        try { BlissSVGBuilder.removeDefinition(code); } catch { /* not defined */ }
-      }
-      customCodes.length = 0;
-    });
-
-    it.each([
-      ['a coordinate', 'LETTERA:1/Xb'],
-      ['a part bracket', '[color=red]>LETTERA/Xb'],
-    ])('reads the letter the alias names with %s (%s)', (_label, input) => {
-      customCodes.push('LETTERA');
-      expect(BlissSVGBuilder.define({ LETTERA: { codeString: 'Xa' } }).defined).toEqual(['LETTERA']);
-      expect(gapAfterFirst('LETTERA/Xb')).toBeCloseTo(gapAfterFirst('Xa/Xb'), 6);
-      expect(gapAfterFirst(input)).toBeCloseTo(gapAfterFirst('Xa/Xb'), 6);
-    });
-  });
-
-  describe('when a digit or punctuation mark is named by a definition', () => {
-    // regression: a typed glyph naming a digit or a punctuation mark read no
-    // layout data once decorated, while its save spells out the digit or mark
-    // itself, which does; and a name of a punctuation mark never pulled in the
-    // word space before it, bare or decorated
-    const customCodes = [];
-    afterEach(() => {
-      for (const code of customCodes) {
-        try { BlissSVGBuilder.removeDefinition(code); } catch { /* not defined */ }
-      }
-      customCodes.length = 0;
-    });
-
-    const NAMES = {
-      NAMEDDIGIT: { type: 'glyph', codeString: 'B9' },
-      NAMEDPERIOD: { type: 'glyph', codeString: 'B4' },
-      PERIODALIAS: { codeString: 'B4' },
-    };
-
-    it.each([
-      ['a coordinate', 'NAMEDDIGIT:1/B10'],
-      ['a `;` part', 'NAMEDDIGIT;B86/B10'],
-      ['a part bracket', '[color=red]>NAMEDDIGIT/B10'],
-    ])('keeps the digit kerning of a typed glyph naming a digit with %s (%s), and its save reloads the same drawing', (_label, input) => {
-      customCodes.push(...Object.keys(NAMES));
-      expect(BlissSVGBuilder.define(NAMES).defined).toHaveLength(3);
-      const builder = new BlissSVGBuilder(input);
-      expect(gapAfterFirst(input)).toBe(1);
-      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
-    });
-
-    it.each([
-      ['a typed glyph', 'B291//NAMEDPERIOD'],
-      ['a typed glyph with a coordinate', 'B291//NAMEDPERIOD:1'],
-      ['a typed glyph with a `;` part', 'B291//NAMEDPERIOD;B86'],
-      ['a typed glyph behind a part bracket', 'B291//[color=red]>NAMEDPERIOD'],
-      ['a bare alias', 'B291//PERIODALIAS'],
-      ['a bare alias at the origin', 'B291//PERIODALIAS:0'],
-    ])('pulls in the word space before a punctuation mark named by %s (%s), and its save reloads the same drawing', (_label, input) => {
-      customCodes.push(...Object.keys(NAMES));
-      expect(BlissSVGBuilder.define(NAMES).defined).toHaveLength(3);
-      const builder = new BlissSVGBuilder(input);
-      expect(secondWordX(input)).toBe(12);
-      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
-    });
-  });
-
-  describe('when a typed glyph spelled out to anonymous parts is saved as JSON', () => {
-    const customCodes = [];
-    afterEach(() => {
-      for (const code of customCodes) {
-        try { BlissSVGBuilder.removeDefinition(code); } catch { /* not defined */ }
-      }
-      customCodes.length = 0;
-    });
-
-    it('writes out the layout data a rebuild cannot re-derive, and not the identity', () => {
-      // regression: the glyph once had a code, so its layout data was dropped
-      // on the belief that its parts bring it back; a rebuild reads layout data
-      // from a glyph's own code only, so the digit kerning was lost
-      customCodes.push('DECORATEDDIGIT');
-      expect(BlissSVGBuilder.define({ DECORATEDDIGIT: { type: 'glyph', codeString: 'B9:1' } }).defined).toEqual(['DECORATEDDIGIT']);
-      const builder = new BlissSVGBuilder('DECORATEDDIGIT/B10');
-      const glyph = builder.toJSON().groups[0].glyphs[0];
-      expect(Object.keys(glyph)).toEqual(['parts', 'kerningRules']);
-      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
-    });
-
-    it('adds nothing when the character it is made of has no layout data of its own', () => {
-      customCodes.push('BLISSPAIR');
-      expect(BlissSVGBuilder.define({ BLISSPAIR: { type: 'glyph', codeString: 'B291;C8' } }).defined).toEqual(['BLISSPAIR']);
-      const glyph = new BlissSVGBuilder('BLISSPAIR/B291').toJSON().groups[0].glyphs[0];
-      expect(Object.keys(glyph)).toEqual(['parts']);
     });
   });
 
