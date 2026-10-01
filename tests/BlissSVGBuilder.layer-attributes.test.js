@@ -21,7 +21,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *
  * Does NOT cover:
  * - What the channel refuses (`xmlns`, the link attributes, an unknown layer,
- *   an unsafe name), see `BlissSVGBuilder.layer-attribute-refusals.test.js`.
+ *   an unsafe name), see `BlissSVGBuilder.layer-attribute-refusals.test.js`,
+ *   and what such a key reports below global scope, see
+ *   `BlissSVGBuilder.name-refusal-scope.test.js`.
  * - Bare global attributes, which target the root, see
  *   `BlissSVGBuilder.svg-structure.test.js`.
  * - Verbatim attribute-name emission, see

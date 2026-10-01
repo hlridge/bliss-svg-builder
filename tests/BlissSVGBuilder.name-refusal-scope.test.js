@@ -33,6 +33,9 @@
  *   report in each notation, see `BlissSVGBuilder.option-scope-wording.test.js`.
  * - The stamp refused on the root, and a name refused while its value is
  *   wrong as well, see `BlissSVGBuilder.text-option-values.test.js`.
+ * - A value with no text form on a refused name through the JavaScript
+ *   channels, an open 1.1.0 backlog row whose acceptance criteria are the
+ *   `it.todo` rows at the end of this file.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -157,6 +160,15 @@ describe('BlissSVGBuilder name refusal scope', () => {
       expect(reports(builder)).toEqual(globalForm('content--onclick'));
     });
 
+    it('words an unknown target in an overlay code for the part it was written on', () => {
+      // the overlay inspection hands the stage its own level; the advice is
+      // the one sentence of the report that depends on it
+      const builder = new BlissSVGBuilder('B291;;[nosuch--fill=x]>B99');
+
+      expect(builder.toString()).toBe('B291;;B99');
+      expect(reports(builder)).toEqual(globalForm('nosuch--fill').map(belowGlobal));
+    });
+
     it('reports the global form for a part added with a bracket', () => {
       const builder = afterMutating('B291', (b) => b.glyph(0).addPart('[content--xmlns=x]>B97'));
 
@@ -180,6 +192,7 @@ describe('BlissSVGBuilder name refusal scope', () => {
 
   describe("when the library's stamp is written where the root does not read it", () => {
     it.each([
+      ['on a word in a composition object', () => new BlissSVGBuilder(bagAt('word', { 'data-generator': null }))],
       ['on a character in a composition object', () => new BlissSVGBuilder(atCharacter({ 'data-generator': null }))],
       ['behind the content prefix in a composition object', () => new BlissSVGBuilder(atDocument({ 'content--data-generator': { a: 1 } }))],
       ['behind the content prefix in the builder options', () => new BlissSVGBuilder('B291', { 'content--data-generator': null })],
@@ -202,5 +215,15 @@ describe('BlissSVGBuilder name refusal scope', () => {
     ])('still refuses the name on the root when %s', (_where, build) => {
       expect(codes(build())).toEqual(['RESERVED_ATTRIBUTE_NAME']);
     });
+  });
+
+  // Acceptance criteria for an open 1.1.0 backlog row ("A value with no text
+  // form on a refused name is dropped in silence by the JavaScript channels"):
+  // today the options argument, the setters and the transient channel drop
+  // such a value before any pass can report the name, and an internal-only
+  // spelling carries it into the markup.
+  describe('when a refused name carries a value with no text form', () => {
+    it.todo('reports the name refusal through the builder options, setOptions and setTransientOptions, as a composition object does');
+    it.todo('keeps an internal-only spelling with no text value (autoVertical: null) out of the markup and the saved string');
   });
 });

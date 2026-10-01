@@ -52,6 +52,9 @@ import {
  *   survives a save, see `BlissSVGBuilder.refused-value-retention.test.js`.
  * - Which SPELLING of a name is resolved on the way in, see
  *   `BlissSVGBuilder.object-input-options.test.js`.
+ * - The library's stamp, `data-generator`, written below the root or behind a
+ *   target other than the root, where it is an ordinary name whose value this
+ *   gate judges, see `BlissSVGBuilder.name-refusal-scope.test.js`.
  */
 
 const build = (composition) => new BlissSVGBuilder(composition);

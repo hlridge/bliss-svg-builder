@@ -45,6 +45,9 @@
  *   `BlissSVGBuilder.option-admission-drift.test.js`.
  * - What becomes of a refused VALUE, see
  *   `BlissSVGBuilder.refused-value-retention.test.js`.
+ * - A target-prefixed key whose name the global form refuses as well, which
+ *   is dropped the same way but reported by that refusal, see
+ *   `BlissSVGBuilder.name-refusal-scope.test.js`.
  */
 
 import { describe, it, expect } from 'vitest';

@@ -78,8 +78,10 @@ const stageCalls = (text) => (text.match(/admitOptions\(/g) ?? []).length;
 
 const judgeCalls = (text) => (text.match(/\bscopeRefusal\(/g) ?? []).length;
 
-// Every scope refusal carries one of these codes, so a route judging scope for
-// itself has to write one, whatever it calls its table.
+// Every scope refusal of a usable name carries one of these codes, so a route
+// judging scope for itself has to write one, whatever it calls its table. (A
+// key whose name is refused as well is reported by that refusal, under codes
+// the render passes write too, so they cannot be counted here.)
 const scopeCodesWritten = (text) =>
   (text.match(/WARNING_CODES\.MISPLACED_(?:GLOBAL|KERNING|LAYER)_OPTION\b/g) ?? []).length;
 

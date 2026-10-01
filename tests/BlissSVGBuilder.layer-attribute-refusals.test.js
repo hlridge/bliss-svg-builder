@@ -35,7 +35,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.document-namespace.test.js`.
  * - The channel working: which element each prefix lands on, and the raw name
  *   emission, see `BlissSVGBuilder.layer-attributes.test.js`.
- * - A layer key written below global scope, see the same file.
+ * - A layer key written below global scope, see the same file, and one whose
+ *   name is refused here, which reports this file's refusal there too, see
+ *   `BlissSVGBuilder.name-refusal-scope.test.js`.
  * - The bare global `href` building an `<a>` wrap, see
  *   `BlissSVGBuilder.global-link-attributes.test.js`.
  */

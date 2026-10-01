@@ -24,6 +24,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.option-hardening.test.js`.
  * - Which element a safe attribute lands on, see
  *   `BlissSVGBuilder.layer-attributes.test.js`.
+ * - A target-prefixed key with an unsafe attribute written below global
+ *   scope, which is dropped and reported with the same refusal, see
+ *   `BlissSVGBuilder.name-refusal-scope.test.js`.
  */
 
 const unsafeWarnings = (builder) =>

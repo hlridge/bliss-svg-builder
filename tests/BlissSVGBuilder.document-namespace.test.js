@@ -24,7 +24,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *
  * Does NOT cover:
  * - The three layer spellings (`content--xmlns` and its siblings), which the
- *   layer channel owns, see `BlissSVGBuilder.layer-attribute-refusals.test.js`.
+ *   layer channel owns, see `BlissSVGBuilder.layer-attribute-refusals.test.js`,
+ *   and written below global scope, see
+ *   `BlissSVGBuilder.name-refusal-scope.test.js`.
+ * - A value with no text form on `data-generator` below the root, which is
+ *   judged like any name of your own, see the same file.
  * - The layer channel's other refusals (the link attributes, an unknown
  *   layer, an unsafe name), see the same file.
  * - Which element an accepted attribute lands on, see
