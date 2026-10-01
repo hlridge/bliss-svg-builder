@@ -1150,6 +1150,98 @@ export const judgeTextOptionValue = (key, rawValue) => {
   };
 };
 
+// What `source` carries, one rule for every refusal: THE WHOLE KEY when the
+// NAME is what was refused, `key=value` when the VALUE is what was refused.
+// `source` is documented as the fragment that triggered the warning, so it has
+// to be a fragment the author can find in their own input and it has to name
+// the thing that actually offended. `xmlns` is not a fragment of
+// `[content--xmlns=x]`, and two refusals in one bracket that report the same
+// string cannot be told apart; a value that was never looked at is noise.
+
+// Why a reserved name is refused, one reason per name: the two reserved sets
+// are guarded for different reasons and a single sentence covering both would
+// be true of neither. A Map rather than an object literal, so an inherited
+// name can never answer for a real one.
+const RESERVED_ATTRIBUTE_REASONS = new Map([
+  ['xmlns', 'declares what the file is rather than anything about the picture, and a second declaration moves everything under it out of SVG, where no renderer draws it'],
+  ['data-generator', "is the library's own stamp recording what produced the file, and a stamp anyone can overwrite tells its reader nothing; record your own pipeline under a name of your own"],
+]);
+
+/**
+ * The refusal of a reserved name, in words shared by every place that refuses
+ * one. The reason is looked up on the NAME and the sentence quotes the
+ * SPELLING. The two guards judge these names without regard to casing, since
+ * an SVG placed inline in an HTML page has its attribute names lowercased
+ * there, so a written `XMLNS` has to find `xmlns`'s reason while the author
+ * still reads back the spelling they typed.
+ */
+export const reservedAttributeMessage = (name) =>
+  `"${name}" ${RESERVED_ATTRIBUTE_REASONS.get(String(name).toLowerCase())}, so the written value was refused.`;
+
+/** The refusal of a name the safety gate rejects, in words shared by every place that rejects one. */
+export const unsafeAttributeNameMessage = (key) =>
+  `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`;
+
+// Why a target-prefixed key resolved to no target. All three shapes fail the
+// same way, so they share a code, but each fails for its own reason and a
+// message covering all three describes none of them: `content--` names a target
+// we know perfectly well, and `--x` names none at all. The same split
+// `parseLayerAttributeKey` makes, so the reason reported is the reason the key
+// was actually rejected. The closing advice says where the attribute lands
+// when written with no prefix, which is the root only in the global bracket:
+// anywhere lower it lands on the element it is written on.
+const unresolvedLayerKeyMessage = (key, level) => {
+  const layer = key.slice(0, key.lastIndexOf('--'));
+  const bareLandsOn = level === 'global' ? 'the root' : 'this element';
+  const targets = `A target is a class the library writes, without the "bliss-" prefix, and the attribute follows the LAST "--": ${[...LAYER_TARGETS].join(', ')}. Write the attribute with no prefix to put it on ${bareLandsOn}.`;
+  if (!LAYER_TARGETS.has(layer)) {
+    return layer === ''
+      ? `"${key}" has no target name before the "--", so there is nothing for it to target and nothing was emitted. ${targets}`
+      : `"${key}" names no target the library knows, so nothing was emitted for it. ${targets}`;
+  }
+  return `"${key}" names the ${layer} target but no attribute after the "--", so there was nothing to emit.`;
+};
+
+/**
+ * The report a target-prefixed key earns for its NAME, in the words of the
+ * global form, or null when its name is one the global form emits.
+ *
+ * Three askers, so that none of them can word or rule it differently: the
+ * global split, which reports it; the scope judge, which reports it IN PLACE
+ * OF the misplacement when the same key is written below global scope; and
+ * the name judge below. The lower report used to be the misplacement, whose
+ * advice to move the key into the global bracket led the author straight to
+ * this refusal without ever naming it.
+ *
+ * The order is the global form's: a key that resolves to no target is not
+ * judged as an attribute name at all, and an unsafe name is reported before a
+ * reserved one. The library's stamp is reserved behind the root prefix alone,
+ * since on any other target it collides with nothing. A link attribute is not
+ * here: the global form refuses it for what it does on a layer, not for its
+ * name. `level` changes one sentence, the unknown target's closing advice.
+ *
+ * Asked only of a key `isLayerAttributeKey` accepts; any other key would be
+ * read as a target that does not exist.
+ *
+ * @param {string} key - the stored option name, target-prefixed
+ * @param {OptionScope['level']} [level] - where the key is written
+ * @returns {{code: string, message: string, source: string} | null}
+ */
+export const layerKeyNameRefusal = (key, level = 'global') => {
+  const target = parseLayerAttributeKey(key);
+  if (!target) {
+    return { code: WARNING_CODES.UNKNOWN_LAYER, message: unresolvedLayerKeyMessage(key, level), source: key };
+  }
+  if (!isSafeAttributeName(target.attribute)) {
+    return { code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME, message: unsafeAttributeNameMessage(key), source: key };
+  }
+  if (isDocumentDefiningAttribute(target.attribute)
+      || (target.layer === 'root' && isLibraryOwnedRootAttribute(target.attribute))) {
+    return { code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME, message: reservedAttributeMessage(target.attribute), source: key };
+  }
+  return null;
+};
+
 /**
  * A key that will never carry a value, whatever was written in it, because a
  * gate has already refused the NAME.
@@ -1166,20 +1258,30 @@ export const judgeTextOptionValue = (key, rawValue) => {
  * layer-key split loop, and the whole-option shorthands in the pass-through
  * loop.
  *
+ * `level` is where the key is written, because one name is refused at one
+ * place only: the library's stamp, which the root alone reads, so it is
+ * refused written bare at global scope and behind the root prefix, and is an
+ * ordinary name anywhere else. Counting it refused everywhere let a value
+ * with no text form past the value gate, onto the markup as
+ * `data-generator="null"`. A caller that cannot know where the bag will act
+ * (a definition's defaults, which act where the code is used, never on the
+ * root) passes none.
+ *
  * Shared by the two places that must not disagree about it. At ingest it is why
  * such a key is ADMITTED whatever it holds: dropping the key would take the
  * name refusal down with it, since that refusal is raised by a later pass over
  * the bag and a dropped key is not in the bag. At render it is why the value
  * gate skips the key it is about to refuse for its name instead.
+ *
+ * @param {string} key - the stored option name
+ * @param {OptionScope['level']} [level] - where the key is written
  */
-export const optionNameIsAlreadyRefused = (key) => {
+export const optionNameIsAlreadyRefused = (key, level) => {
   if (INTERNAL_ONLY_SPELLINGS.has(key)) return true;
-  const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
-  if (isLayerAttributeKey(key) && !target) return true;
-  const name = target ? target.attribute : key;
-  return !isSafeAttributeName(name)
-    || isDocumentDefiningAttribute(name)
-    || isLibraryOwnedRootAttribute(name);
+  if (isLayerAttributeKey(key)) return layerKeyNameRefusal(key) !== null;
+  return !isSafeAttributeName(key)
+    || isDocumentDefiningAttribute(key)
+    || (level === 'global' && isLibraryOwnedRootAttribute(key));
 };
 
 /**
@@ -1203,9 +1305,9 @@ export const optionNameIsAlreadyRefused = (key) => {
  * would report a drop that did not happen, since the position gate reads and
  * honours that value.
  */
-const admissionRefusal = (key, value) => {
+const admissionRefusal = (key, value, level) => {
   if (hasAuthoredTextForm(value)) return null;
-  if (optionNameIsAlreadyRefused(key)) return null;
+  if (optionNameIsAlreadyRefused(key, level)) return null;
   return judgeNumericOptionValue(key, value)
     ?? judgeTextOptionValue(key, value)
     ?? judgeGeometryOptionValue(key, value);
@@ -1254,6 +1356,11 @@ const judgeGeometryOptionValue = (key, value) => {
  * every route. The second says where the key belongs, and it is written in the
  * notation the author was using, since a bracket to paste is no help to someone
  * writing a JavaScript object.
+ *
+ * A row whose keys can carry a name the home scope refuses names that refusal
+ * (`nameRefusal`) and the codes it can write (`nameRefusalCodes`). Sending such
+ * a key home would only trade this report for that one, so it gets that one
+ * here, and is dropped all the same, since no name would let it act here.
  */
 const SCOPE_BOUND_OPTIONS = [
   {
@@ -1280,6 +1387,8 @@ const SCOPE_BOUND_OPTIONS = [
     diagnosis: (written, level) => `Layer option (${written}) ignored at ${level} level: it names a layer of the whole SVG.`,
     fix: (written, scope) =>
       `${documentHome(written, scope)} to apply it, or write the attribute without a layer prefix to put it on this element.`,
+    nameRefusal: layerKeyNameRefusal,
+    nameRefusalCodes: [WARNING_CODES.UNKNOWN_LAYER, WARNING_CODES.UNSAFE_ATTRIBUTE_NAME, WARNING_CODES.RESERVED_ATTRIBUTE_NAME],
   },
 ];
 
@@ -1316,6 +1425,8 @@ const documentHome = (written, { notation, transient = false }) => {
  *
  * The report names the key as stored, and the value is written through
  * `textOfValue`, so building a report cannot throw on a value with no text form.
+ * A key whose name the home scope refuses is reported by that refusal instead,
+ * which names the key alone: it is the name that offended.
  *
  * @param {string} key - the stored (canonical) option name
  * @param {unknown} value - the value as written
@@ -1326,6 +1437,8 @@ const scopeRefusal = (key, value, scope) => {
   if (scope.transient && TRANSIENT_REFUSED_OPTION_KEYS.has(key)) return null;
   const rule = SCOPE_BOUND_OPTIONS.find((r) => r.home !== scope.level && r.has(key));
   if (!rule) return null;
+  const nameRefusal = rule.nameRefusal?.(key, scope.level);
+  if (nameRefusal) return nameRefusal;
   const written = value === true ? key : `${key}=${textOfValue(value)}`;
   return {
     code: rule.code,
@@ -1346,10 +1459,16 @@ const scopeRefusal = (key, value, scope) => {
  * bracket rather than ingesting it, and has to know whether the stage dropped a
  * key for its scope without re-deriving which keys are bound to one.
  *
+ * A name refusal counts, since the judge writes one for a misplaced key whose
+ * name is refused as well. Its codes are the judge's only among the stage's own
+ * reports: the passes that refuse a name at render raise the same codes for
+ * keys they keep, so this is asked of what the stage reported.
+ *
  * @param {{code: string}} warning
  * @returns {boolean}
  */
-export const isScopeRefusal = (warning) => SCOPE_BOUND_OPTIONS.some((r) => r.code === warning.code);
+export const isScopeRefusal = (warning) =>
+  SCOPE_BOUND_OPTIONS.some((r) => r.code === warning.code || r.nameRefusalCodes?.includes(warning.code));
 
 /**
  * The one stage an options bag passes through on its way INTO a composition:
@@ -1403,7 +1522,7 @@ export const admitOptions = (writtenEntries, warn, scope) => {
   for (const [writtenKey, value] of writtenEntries) {
     const key = canonicalOptionKey(writtenKey);
     const refusal = (scope ? scopeRefusal(key, value, scope) : null)
-      ?? admissionRefusal(key, value);
+      ?? admissionRefusal(key, value, scope?.level);
     if (refusal) {
       warn?.(refusal);
       continue;

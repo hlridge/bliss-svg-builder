@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, LAYER_TARGETS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { getBareCode, mergeWordIndicatorsOntoHead, partitionWordIndicators, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -112,47 +112,6 @@ function serializeOptionsWithPosition(node, skipKeys) {
 // every routed name. A restated copy there would only ever catch itself moving.
 export const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
 
-// Why a target key emitted nothing. All three shapes fail the same way, so they
-// share a code, but each fails for its own reason and a message covering all
-// three describes none of them: `content--` names a target we know perfectly
-// well, and `--x` names none at all.
-const unresolvedLayerKeyMessage = (key) => {
-  // The same split parseLayerAttributeKey makes, so the reason reported is the
-  // reason the key was actually rejected.
-  const layer = key.slice(0, key.lastIndexOf('--'));
-  const targets = `A target is a class the library writes, without the "bliss-" prefix, and the attribute follows the LAST "--": ${[...LAYER_TARGETS].join(', ')}. Write the attribute with no prefix to put it on the root.`;
-  if (!LAYER_TARGETS.has(layer)) {
-    return layer === ''
-      ? `"${key}" has no target name before the "--", so there is nothing for it to target and nothing was emitted. ${targets}`
-      : `"${key}" names no target the library knows, so nothing was emitted for it. ${targets}`;
-  }
-  return `"${key}" names the ${layer} target but no attribute after the "--", so there was nothing to emit.`;
-};
-
-// What `source` carries, one rule for every refusal: THE WHOLE KEY when the
-// NAME is what was refused, `key=value` when the VALUE is what was refused.
-// `source` is documented as the fragment that triggered the warning, so it has
-// to be a fragment the author can find in their own input and it has to name
-// the thing that actually offended. `xmlns` is not a fragment of
-// `[content--xmlns=x]`, and two refusals in one bracket that report the same
-// string cannot be told apart; a value that was never looked at is noise.
-//
-// Why a reserved name is refused, one reason per name: the two reserved sets
-// are guarded for different reasons and a single sentence covering both would
-// be true of neither. A Map rather than an object literal, so an inherited
-// name can never answer for a real one.
-const RESERVED_ATTRIBUTE_REASONS = new Map([
-  ['xmlns', 'declares what the file is rather than anything about the picture, and a second declaration moves everything under it out of SVG, where no renderer draws it'],
-  ['data-generator', "is the library's own stamp recording what produced the file, and a stamp anyone can overwrite tells its reader nothing; record your own pipeline under a name of your own"],
-]);
-// The reason is looked up on the NAME and the sentence quotes the SPELLING. The
-// two guards judge these names without regard to casing, since an SVG placed
-// inline in an HTML page has its attribute names lowercased there, so a written
-// `XMLNS` has to find `xmlns`'s reason while the author still reads back the
-// spelling they typed.
-const reservedAttributeMessage = (name) =>
-  `"${name}" ${RESERVED_ATTRIBUTE_REASONS.get(String(name).toLowerCase())}, so the written value was refused.`;
-
 // Renders one layer's attribute map as markup. An empty map yields an empty
 // string, so a tag built from it closes without a stray space.
 const formatAttributes = (attrs) =>
@@ -230,11 +189,12 @@ class BlissSVGBuilder {
   // is admitted, the built-in table is written straight into the registry) and
   // the error-placeholder parts. Both reach an author's composition, so the
   // backstop is kept and the two gates are held to one rule by sharing the
-  // predicate and the name test below.
-  #withoutRefusedTextValues(rawOptions) {
+  // predicate and the name test below. The name test is told whether the bag
+  // is the root's, the one place the library's stamp is a refused name.
+  #withoutRefusedTextValues(rawOptions, isRoot) {
     let kept = rawOptions;
     for (const [key, value] of Object.entries(rawOptions)) {
-      if (optionNameIsAlreadyRefused(key)) continue;
+      if (optionNameIsAlreadyRefused(key, isRoot ? 'global' : undefined)) continue;
       const refusal = judgeTextOptionValue(key, value);
       if (!refusal) continue;
       this.#warnings.push(refusal);
@@ -275,7 +235,7 @@ class BlissSVGBuilder {
     // for `grid` and wrong for `color`. Ingest resolves names and knows none of
     // that, and it sits upstream of the numeric half, so refusing there would
     // replace that half's well-worded refusals with one generic one.
-    rawOptions = this.#withoutRefusedTextValues(rawOptions);
+    rawOptions = this.#withoutRefusedTextValues(rawOptions, addBuilderDefaults);
 
     // stroke-width: honoured exactly as written, or refused and reported. The
     // old 0.1-1.5 clamp was what made the raw value unreachable: a name the
@@ -703,7 +663,7 @@ class BlissSVGBuilder {
         if (!isSafeAttributeName(name)) {
           this.#warnings.push({
             code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
-            message: `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`,
+            message: unsafeAttributeNameMessage(key),
             source: key,
           });
           continue;
@@ -1417,7 +1377,7 @@ class BlissSVGBuilder {
           const unsafe = Object.keys(bag).filter(k => !isSafeAttributeName(k));
           if (unsafe.length > 0) {
             drop(bag, unsafe, WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
-              (k) => `"${k.join('", "')}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`);
+              (k) => unsafeAttributeNameMessage(k.join('", "')));
           }
         }
         if (Object.keys(bag).length === 0) delete node.transientOptions;
@@ -1784,37 +1744,28 @@ class BlissSVGBuilder {
         // with no alias remapping and no kebab-casing. That is what makes an
         // attribute reachable whose name a named option has taken (`color`),
         // and what makes a camelCase SVG attribute expressible.
-        const target = parseLayerAttributeKey(key);
-        if (!target) {
-          // Kept in the options bag so it round-trips, on the UNKNOWN_ family's
-          // logic: `foo` may become a layer later, exactly as an unknown code
-          // may be define()d afterwards. Reported so it is never silently inert.
-          this.#warnings.push({
-            code: WARNING_CODES.UNKNOWN_LAYER,
-            message: unresolvedLayerKeyMessage(key),
-            source: key,
-          });
-          continue;
-        }
-        if (!isSafeAttributeName(target.attribute)) continue;
+        //
         // RAW means we do not rename or reinterpret the attribute. It does not
         // mean we will help write a file that cannot be parsed, or markup that
-        // reads as a working link and is not one, so two guards judge the NAME
-        // here. NEITHER of them matches what the root does, for opposite
-        // reasons: a name that declares the document breaks it wherever it
-        // lands, so that guard reaches further than the root; the anchor family
-        // has a real destination at the root (the <a> wrap) and none on a
-        // layer, so that guard exists here and nowhere else. The library's own
-        // root stamp is the third case, and collides with nothing one level
-        // down, so it is left alone here.
-        if (isDocumentDefiningAttribute(target.attribute)) {
-          this.#warnings.push({
-            code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
-            message: reservedAttributeMessage(target.attribute),
-            source: key,
-          });
+        // reads as a working link and is not one, so the NAME is judged first.
+        // The judge is the one a key written below global scope is reported
+        // by, so the same key says the same thing wherever it is written. A
+        // name that declares the document breaks it wherever it lands, so that
+        // refusal reaches further than the root; the library's own stamp
+        // collides with nothing below the root, so it is refused behind the
+        // root prefix alone. An unknown target is kept in the options bag so it
+        // round-trips, on the UNKNOWN_ family's logic: `foo` may become a layer
+        // later, exactly as an unknown code may be define()d afterwards. An
+        // unsafe name has already been reported by the options pass, which
+        // judges every key at every scope, so it is only skipped here.
+        const nameRefusal = layerKeyNameRefusal(key);
+        if (nameRefusal) {
+          if (nameRefusal.code !== WARNING_CODES.UNSAFE_ATTRIBUTE_NAME) this.#warnings.push(nameRefusal);
           continue;
         }
+        const target = parseLayerAttributeKey(key);
+        // The anchor family has a real destination at the root (the <a> wrap)
+        // and none on a layer, so this guard exists here and nowhere else.
         if (ANCHOR_ATTRIBUTE_NAMES.includes(target.attribute)) {
           this.#warnings.push({
             code: WARNING_CODES.MISPLACED_LINK_ATTRIBUTE,
@@ -1844,18 +1795,11 @@ class BlissSVGBuilder {
         }
         if (target.layer === 'root') {
           // The prefix suspends name RESOLUTION, never name GUARDS, so a
-          // prefixed root key faces every guard the bare branch faces. It goes
-          // into the same set the bare keys build, which is what lets the
-          // geometry displacement report and the root's attribute merge see it
-          // without knowing it arrived prefixed.
-          if (isLibraryOwnedRootAttribute(target.attribute)) {
-            this.#warnings.push({
-              code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME,
-              message: reservedAttributeMessage(target.attribute),
-              source: key,
-            });
-            continue;
-          }
+          // prefixed root key has faced every guard the bare branch faces (the
+          // stamp's among them, in the judge above). It goes into the same set
+          // the bare keys build, which is what lets the geometry displacement
+          // report and the root's attribute merge see it without knowing it
+          // arrived prefixed.
           setRootAttribute(target.attribute, key, true, value);
           continue;
         }
