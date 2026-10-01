@@ -20,6 +20,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.decorated-character-layout.test.js`.
  * - An indicator on them, centred over all three letters; see
  *   `BlissSVGBuilder.indicator-centering.test.js`.
+ * - A character bracket: `[color=red]B118` colours all three letters, while
+ *   `[color=red]Xa/Xb/Xc` colours only `Xa`, because a run is three
+ *   characters and B118 is one.
  * - Bliss strokes drawn after them, which are written at full precision and
  *   can differ from the run's in the eighth decimal; byte identity is not
  *   the contract.
