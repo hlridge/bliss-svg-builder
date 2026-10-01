@@ -314,7 +314,7 @@ const glyphData = {
     codeString: "B291;B459"
   },
   B118: {
-    codeString: "Xa;Xb:3.2354,0;Xc:6.4708,0"
+    codeString: "Xa;Xb:3.2353933,0;Xc:6.4707865,0"
   },
   B119: {
     codeString: "P4W:0,6;P4E:4,10;P4W:0,14",
@@ -3161,7 +3161,7 @@ const glyphData = {
     codeString: "B411;B457:2,0"
   },
   B972: {
-    codeString: "XA;XB:3.87;XC:7.75"
+    codeString: "XA;XB:3.8730337;XC:7.7460674"
   },
   B973: {
     codeString: "B651;LARR4S:0,14"
