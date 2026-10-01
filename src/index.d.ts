@@ -124,7 +124,9 @@ export interface BlissOptions {
   // prefix and the key splits at the LAST `--`
   // (`'grid-line--sky--stroke-dasharray': 2`). At element scope the key lands on
   // that element's own <g>; a target prefix has nothing to name there, so it is
-  // dropped and reported with `MISPLACED_LAYER_OPTION`, however it was written.
+  // dropped and reported with `MISPLACED_LAYER_OPTION`, however it was written,
+  // or with the refusal its name would get at global scope when it would get
+  // one there too (`UNKNOWN_LAYER` for `nosuch--fill`).
   // Includes `boolean` so the boolean options (`grid`, `center`,
   // `errorPlaceholder`) conform to the index signature; without it `tsc` rejects
   // this interface. It is also what keeps the kebab spelling of a curated option
@@ -569,7 +571,9 @@ export declare class ElementHandle {
    * the same key gets in a bracket there: a canvas-wide option such as `margin`
    * (`MISPLACED_GLOBAL_OPTION`), kerning anywhere but a character
    * (`MISPLACED_KERNING_OPTION`), a target-prefixed key such as `grid--opacity`
-   * (`MISPLACED_LAYER_OPTION`). It is not stored, so it is never saved.
+   * (`MISPLACED_LAYER_OPTION`, or the refusal its name would get at global
+   * scope when it would get one there too). It is not stored, so it is never
+   * saved.
    * @throws {TypeError} If `opts` is provided and is not an object.
    */
   setOptions(opts: BlissOptions | OptionLayers): this;

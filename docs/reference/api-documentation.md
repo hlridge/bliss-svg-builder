@@ -1086,7 +1086,7 @@ builder.glyph(0).setOptions({
 
 A non-object `opts` throws a `TypeError`; an empty `{}` is a no-op (see [error handling](#error-handling)).
 
-A key that cannot act at the element's level is dropped with the warning the same key gets in a bracket there, and is not saved: a canvas-wide option such as `margin` ([`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option)), kerning anywhere but a character ([`MISPLACED_KERNING_OPTION`](/reference/warning-codes#misplaced-kerning-option)), or a key naming a part of the picture such as `grid--opacity` ([`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option)). The same holds for the options of the adding and replacing methods.
+A key that cannot act at the element's level is dropped with the warning the same key gets in a bracket there, and is not saved: a canvas-wide option such as `margin` ([`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option)), kerning anywhere but a character ([`MISPLACED_KERNING_OPTION`](/reference/warning-codes#misplaced-kerning-option)), or a key naming a part of the picture such as `grid--opacity` ([`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option)). A prefixed key whose name would be refused at global scope too, such as `nosuch--fill` or `content--onclick`, is reported with that refusal instead. The same holds for the options of the adding and replacing methods.
 
 #### `.removeOptions(...keys)`
 

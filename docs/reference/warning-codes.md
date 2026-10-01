@@ -284,6 +284,14 @@ Any other option in the same bracket is kept, so `[grid--opacity=0.3;fill=red]|B
 
 Dropping it is what keeps it out of the drawing. An unrecognized key is passed through to the SVG as an attribute, so leaving the prefixed key in place would put `grid--opacity="0.3"` into the output, where it means nothing to any renderer. To style just that element, write the attribute without a prefix.
 
+When the key would be refused at global scope as well, because of its name, you get that refusal instead of this warning, since moving the key would only trade one warning for the other. The key is dropped all the same:
+
+```
+[nosuch--fill=x]B291      →  UNKNOWN_LAYER: names no target the library knows
+[content--onclick=x]B291  →  UNSAFE_ATTRIBUTE_NAME: an event handler
+[content--xmlns=x]B291    →  RESERVED_ATTRIBUTE_NAME: xmlns is refused everywhere
+```
+
 ### `MISPLACED_LINK_ATTRIBUTE`
 
 A link attribute written behind a target prefix: `href`, `target`, `rel`, `download`, `hreflang`, `type` or `referrerpolicy` after any target name, `root--` and the sub-element targets included. A link is an `<a>` element wrapping the content it links, and no target is one, so the attribute is dropped. The message names the target you wrote.
@@ -489,6 +497,8 @@ The test is a target this library **knows**, not one it happens to be drawing. `
 
 Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix.
 
+Written below global scope (`[foo--x=1]B291`), the key is reported with this code too, but dropped rather than kept, because a prefixed key cannot act there whatever its target (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). The message then says that the attribute without a prefix goes on the element you wrote it on, not on the root.
+
 ## Refused Because the Name Is the Library's
 
 ### `RESERVED_ATTRIBUTE_NAME`
@@ -570,7 +580,7 @@ builder.part(0).setTransientOptions({ 'on-click': 'x' });
 // warns, and nothing is emitted; other keys in the same call are kept
 ```
 
-Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace.
+Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. The one exception is a prefixed key written below global scope (`[content--onclick=x]B291`): it could not act there whatever its name, so it is dropped as [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option) describes, and reported with this code.
 
 ## Misplaced Channel
 
