@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
-import { getBareCode, mergeWordIndicatorsOntoHead, partitionWordIndicators, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
+import { getBareCode, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -842,8 +842,8 @@ class BlissSVGBuilder {
       getGeneration: () => this.#generation,
       getDefinitions: () => blissElementDefinitions,
       addMutationWarning: (warning) => this.#mutationWarnings.push(warning),
-      clearOwnOptions: (node, level) => BlissSVGBuilder.#clearOwnOptions(node, level),
-      ownLookAt: (node, level) => BlissSVGBuilder.#ownLookAt(node, level),
+      clearOwnOptions: (node, level, character) => BlissSVGBuilder.#clearOwnOptions(node, level, character),
+      ownLookAt: (node, level, character) => BlissSVGBuilder.#ownLookAt(node, level, character),
     };
   }
 
@@ -2598,9 +2598,9 @@ class BlissSVGBuilder {
    * saves what `toString({ omitOptions: true })` saved before. A character,
    * word or composition position goes with the rest; a part's coordinates and
    * a character's kerning stay, since the string writes those outside a
-   * bracket. `key`s and transient options are untouched, and a code the string
-   * can only name (a built-in, or a shape drawn by its own function) keeps the
-   * look its definition gives it.
+   * bracket. `key`s and transient options are untouched, and a part named by a
+   * definition keeps the options its definition gives it, inside the part
+   * included.
    *
    * @returns {this}
    */
@@ -3267,7 +3267,7 @@ class BlissSVGBuilder {
     // ahead of them bakes the overlay onto a glyph the clear then empties, and
     // a name judged ahead of them is judged on options that are about to go.
     if (options.omitOptions) {
-      BlissSVGBuilder.#clearOptionsFrom(obj, 0);
+      BlissSVGBuilder.#clearOptionsFrom(obj, 0, undefined, readings);
       for (const group of obj.groups ?? []) {
         for (const glyph of group.glyphs ?? []) {
           if (designationIsUnwritten(glyph)) delete glyph.isHeadGlyph;
@@ -3687,38 +3687,49 @@ class BlissSVGBuilder {
     return null; // Complex codeString — parts already expanded, no single code
   }
 
-  // What a code the canonical string can only name draws with by its own
-  // definition, or undefined. That is every built-in, and a custom shape drawn
-  // by its own function: neither is ever spelled out, so its own look is part
-  // of what the code is rather than an option on top of it, and clearing a
-  // part named by one returns it to that look instead of stripping it.
-  static #ownLookOf(code) {
+  // The options a defined code gives the part it names, or undefined: what the
+  // parser gives that part in a `;` slot, so every way a definition brings
+  // options counts alike (its defaultOptions, the character bracket leading
+  // its code string, what an alias's target brings). Built-in or custom, a
+  // definition's options are part of what its code is, like its strokes: a
+  // clear on a part named by one returns it to them instead of stripping them,
+  // and a save that writes the name does not repeat them. A code the registry
+  // does not hold names nothing.
+  static #ownLookOf(code, readings = new Map()) {
     if (!code || !Object.hasOwn(blissElementDefinitions, code)) return undefined;
-    const def = blissElementDefinitions[code];
-    if (!def.defaultOptions) return undefined;
-    return builtInCodes.has(code) || typeof def.getPath === 'function' ? def.defaultOptions : undefined;
+    return BlissSVGBuilder.#readingOf(code, 'part', readings)?.options;
   }
 
   // The own look of the element `node` at `level` (3 a part), read from the
-  // code that names it; undefined at every other level. A character named by a
-  // code holds that code as its one part, and the look belongs to that part,
-  // so a clear at character level leaves it off the character, where it would
-  // style every part added beside the code. Shared by the clear and by the
-  // removal of a named option, so both return an element to the same look.
-  static #ownLookAt(node, level) {
-    return BlissSVGBuilder.#ownLookOf(level === 3 ? node.codeName : undefined);
+  // code the part was written as; undefined at every other level. A character
+  // named by a code holds that code as its one part, and the look belongs to
+  // that part, so a clear at character level leaves it off the character,
+  // where it would style every part added beside the code. Shared by the clear
+  // and by the removal of a named option, so both return an element to the
+  // same look.
+  //
+  // A part a single-code rename resolved (a shape whose code string is `C8`
+  // is stored as `C8`) records the name it was written as, and the parser gave
+  // it that name's options. The same recording on the one part of a character
+  // written alone came down from the character, where the parser put the
+  // name's options instead, so that part was written as the code it holds.
+  // `character` is the character the part belongs to.
+  static #ownLookAt(node, level, character, readings) {
+    if (level !== 3) return undefined;
+    const renamed = node._aliasCodeName !== undefined && node._aliasCodeName !== character?._aliasCodeName;
+    return BlissSVGBuilder.#ownLookOf(renamed ? node._aliasCodeName : node.codeName, readings);
   }
 
-  // A part's `bag` without the values a code the string can only name supplies
-  // by its own name, wherever the part holds the same value: that look is part
-  // of what the code is, so the canonical string does not repeat it
-  // (`REFSQUARE`, not `[stroke-dasharray=0 0.999]>REFSQUARE`). A different
-  // value is an override and is written. `code` is what the string writes for
-  // the part, read in a `;` slot the way the reload reads it. Both bags hold
-  // the stored spelling of every key, so the keys compare as they stand.
+  // A part's `bag` without the values its code brings by its definition,
+  // wherever the part holds the same value: they are part of what the code is,
+  // so the canonical string does not repeat them (`REFSQUARE`, not
+  // `[stroke-dasharray=0 0.999]>REFSQUARE`, and likewise a custom name
+  // `preserve` keeps). A different value is an override and is written. `code`
+  // is what the string writes for the part, read in a `;` slot the way the
+  // reload reads it. Both bags hold the stored spelling of every key, so the
+  // keys compare as they stand.
   static #withoutOwnLook(bag, code, readings) {
-    if (!bag || !BlissSVGBuilder.#ownLookOf(getBareCode(code ?? ''))) return bag;
-    const own = BlissSVGBuilder.#readingOf(code, 'part', readings)?.options;
+    const own = bag && BlissSVGBuilder.#ownLookOf(code, readings);
     if (!own) return bag;
     return Object.fromEntries(Object.entries(bag).filter(([key, value]) =>
       !Object.hasOwn(own, key) || serializeOptionValue(own[key]) !== serializeOptionValue(value)));
@@ -3732,22 +3743,22 @@ class BlissSVGBuilder {
   //
   // What stays is what the string writes outside a bracket, or never writes:
   // a part's coordinates, a character's kerning (the JSON keeps it in the bag,
-  // the string writes it as an `RK:`/`AK:` marker), the runtime `key`, and what
-  // a code the string can only name draws with by its own definition. A
-  // character, word or composition position has no spelling outside a bracket,
-  // so it goes with the rest. Transient options sit in a bag of their own and
-  // are never touched.
+  // the string writes it as an `RK:`/`AK:` marker), the runtime `key`, and the
+  // options a part's own code brings by its definition. A character, word or
+  // composition position has no spelling outside a bracket, so it goes with
+  // the rest. Transient options sit in a bag of their own and are never
+  // touched. `character` is the character a part belongs to.
   //
   // A bag with nothing to take off is left exactly as it was, so a composition
   // with no options saves the same with the view as without it.
-  static #clearOwnOptions(node, level) {
+  static #clearOwnOptions(node, level, character, readings) {
     if (level === 3) BlissSVGBuilder.#expandLateShape(node);
     const bag = node.options ?? {};
     const kept = {};
     for (const [key, value] of Object.entries(bag)) {
       if (key === 'key' || (level === 2 && Object.hasOwn(KERNING_OPTION_KEYS, key))) kept[key] = value;
     }
-    Object.assign(kept, BlissSVGBuilder.#ownLookAt(node, level));
+    Object.assign(kept, BlissSVGBuilder.#ownLookAt(node, level, character, readings));
     const keptKeys = Object.keys(kept);
     const changed = keptKeys.length !== Object.keys(bag).length || keptKeys.some((key) => bag[key] !== kept[key]);
     if (changed) {
@@ -3788,11 +3799,21 @@ class BlissSVGBuilder {
   }
 
   // The same clear on `node` and on everything below it: a composition's words,
-  // a word's characters, and the parts of a character or a part at any depth.
-  static #clearOptionsFrom(node, level) {
-    BlissSVGBuilder.#clearOwnOptions(node, level);
+  // a word's characters, and the parts of a character or of a part at any
+  // depth, down to a part named by a definition with a code string. What sits
+  // inside that part is the definition's (part brackets in its code string
+  // included), so the clear returns the part to the definition's options and
+  // leaves its insides as they are. A part holding parts under no such name
+  // (object input) is cleared through. `character` is the character the parts
+  // below belong to.
+  static #clearOptionsFrom(node, level, character, readings = new Map()) {
+    BlissSVGBuilder.#clearOwnOptions(node, level, character, readings);
+    const named = level === 3 && Object.hasOwn(blissElementDefinitions, node.codeName ?? '');
+    if (named && typeof blissElementDefinitions[node.codeName].codeString === 'string') return;
     const children = level === 0 ? node.groups : level === 1 ? node.glyphs : node.parts;
-    for (const child of children ?? []) BlissSVGBuilder.#clearOptionsFrom(child, Math.min(level + 1, 3));
+    for (const child of children ?? []) {
+      BlissSVGBuilder.#clearOptionsFrom(child, Math.min(level + 1, 3), level === 2 ? node : character, readings);
+    }
   }
 
   // The parts a save writes for `parts`: a part named by a custom definition
@@ -3884,50 +3905,14 @@ class BlissSVGBuilder {
   // One word-level (`;;`) code without its options: the code and its position
   // stay, the position in the `:x,y` spelling. The overlay stores each code as
   // the text it was written as, brackets included, so its options live in the
-  // text rather than in a bag.
-  //
-  // A code that names a definition bringing options of its own is written as
-  // the code it draws, when that is a code a `;;` list accepts. A name with no
-  // such spelling (an indicator drawn from a shape that is not one) stays, and
-  // brings its definition's values back with it, as any code the string can
-  // only name does.
+  // text rather than in a bag. A code named by a definition keeps its name, and
+  // with it the options the definition brings, which are part of what the code
+  // is, as they are on a part named by one.
   static #wordIndicatorCodeWithoutOptions(code) {
+    if (!code.startsWith('[')) return code;
     const node = wordIndicatorNode(code, blissElementDefinitions, (text) => BlissParser.parse(text));
     if (!node) return code;
-    const spelled = BlissSVGBuilder.#optionFreeIndicatorSpelling(node);
-    if (spelled) return spelled;
-    if (!code.startsWith('[')) return code;
     return getBareCode(code) + BlissSVGBuilder.#positionSuffix(node.x, node.y);
-  }
-
-  // The single code a word-level indicator node draws, written with its
-  // position and no option; null when the node carries no option, or when
-  // what it draws has no spelling a `;;` list accepts. A custom name that
-  // brings options of its own is followed down to the one code it stands for,
-  // adding up the positions on the way, which is where the render places it.
-  static #optionFreeIndicatorSpelling(node) {
-    if (!BlissSVGBuilder.#carriesOptions(node)) return null;
-    const standsWithoutOptions = (code) => builtInCodes.has(code)
-      || typeof blissElementDefinitions[code]?.getPath === 'function'
-      || !BlissSVGBuilder.#carriesOptions(wordIndicatorNode(code, blissElementDefinitions, (text) => BlissParser.parse(text)));
-    const addAxis = (a, b) => (a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0));
-    let current = node;
-    let { x, y } = node;
-    while (current.codeName && !standsWithoutOptions(current.codeName)) {
-      if (current.parts?.length !== 1) return null;
-      current = current.parts[0];
-      x = addAxis(x, current.x);
-      y = addAxis(y, current.y);
-    }
-    if (!current.codeName) return null;
-    const spelled = current.codeName + BlissSVGBuilder.#positionSuffix(x, y);
-    return partitionWordIndicators([spelled], blissElementDefinitions).valid.length === 1 ? spelled : null;
-  }
-
-  // Whether a part node or anything inside it holds an option.
-  static #carriesOptions(node) {
-    return !!node && (Object.keys(node.options ?? {}).length > 0
-      || (node.parts ?? []).some((part) => BlissSVGBuilder.#carriesOptions(part)));
   }
 
   // Determine the type of a definition entry.

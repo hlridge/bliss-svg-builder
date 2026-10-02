@@ -4,19 +4,23 @@
  * writes in brackets and nothing else.
  *
  * Covers:
- * - A word losing its own options and position, and the options inside its
- *   `;;` codes, while its characters keep theirs.
+ * - A word losing its own options and position, and the options written inside
+ *   its `;;` codes, while its characters keep theirs; a `;;` code named by a
+ *   definition keeping its name and the definition's options.
  * - A character losing its options and position but keeping its kerning, and a
- *   custom glyph losing the default its definition gave it.
+ *   custom glyph written alone losing the default its definition gave it.
  * - A part losing its options but keeping its coordinates, where
  *   `removeOptions('x')` still removes one: the documented exception.
  * - What survives: `key`, transient options, a live handle, and no warning when
  *   there is nothing to clear.
  * - The builder-wide clear, the global bracket and a composition position
- *   included.
+ *   included; inside a part holding parts under no name, which a composition
+ *   object can hold; and a part named by text the registry does not hold
+ *   given nothing.
  * - A part naming a shape defined after the composition was built, whose
  *   definition's options sit in no bag until the clear puts the part's reading
- *   in the tree: cleared, it saves and draws what an early-built one does.
+ *   in the tree: cleared, it saves and draws what an early-built one does,
+ *   keeping the definition's options and what sits inside it.
  * - The parity anchor: clearing in place and then saving equals saving the
  *   original with the flag, for both serializers and every combination of
  *   `preserve` and `flattenIndicators`, and the cleared builder draws what its
@@ -26,7 +30,9 @@
  * - Which options each scope drops in the flagged string, see
  *   `BlissSVGBuilder.omit-options.test.js`.
  * - A built-in's own look surviving the clear, see
- *   `BlissSVGBuilder.builtin-own-look.test.js`.
+ *   `BlissSVGBuilder.builtin-own-look.test.js`, and a custom definition's
+ *   options on a part named by it, see
+ *   `BlissSVGBuilder.definition-options-kept.test.js`.
  * - `removeOptions` itself, see `BlissSVGBuilder.option-removal-naming.test.js`
  *   and `BlissSVGBuilder.position-option-removal.test.js`.
  */
@@ -69,6 +75,9 @@ const builtBeforeLateShape = (input) => {
   expect(defined).toEqual(['CO_LATESH']);
   return builders;
 };
+
+// A composition object holding one character made of `parts`.
+const objectWithParts = (parts) => ({ groups: [{ glyphs: [{ parts }] }] });
 
 // Every path and transform in the content group, joined, so a styled part drawn
 // as a <path> of its own compares equal to the same part merged into its neighbour.
@@ -117,11 +126,13 @@ describe('BlissSVGBuilder clear options', () => {
       expect(builder.toString()).toBe('B291/[color=blue]B313;;B81');
     });
 
-    it('writes a ;; code whose definition carries options out without them', () => {
+    it('keeps a ;; code named by a definition, and the definition\'s options with it', () => {
+      // note: a definition's options are part of what its code is, on a `;;`
+      // code as on a part, so the clear has nothing of the definition's to take
       const builder = new BlissSVGBuilder('B291;;CO_REDIND');
       builder.group(0).clearOptions();
-      expect(builder.toString()).toBe('B291;;B81');
-      expect(builder.svgCode).not.toContain('stroke="red"');
+      expect(builder.toString()).toBe('B291;;CO_REDIND');
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;;CO_REDIND').svgCode);
     });
   });
 
@@ -221,24 +232,48 @@ describe('BlissSVGBuilder clear options', () => {
 
     it('keeps what was changed inside a shape part', () => {
       // pins that a part already holding its parts is never read back from its
-      // name, which would put the definition's inner parts back over the change
+      // name, which would put the definition's inner parts back over the change;
+      // the clear stops at the part, so the shape's own red stays inside it
       const builder = new BlissSVGBuilder('B291;CO_STYSH');
       builder.glyph(0).part(1).part(0).setOptions({ x: 2 });
       builder.clearAllOptions();
-      expect(builder.toString()).toBe('B291;C8:2');
+      expect(builder.toString()).toBe('B291;[color=red]>C8:2');
+    });
+
+    it('clears inside a part that holds parts under no name', () => {
+      // pins the clear walking on below a part no definition names; it stops
+      // only at a part a definition names, whose insides are the definition's
+      const builder = new BlissSVGBuilder(objectWithParts([{ codeName: 'B291' }, { parts: [{ codeName: 'C8', options: { color: 'red' } }] }]));
+      builder.clearAllOptions();
+      expect(builder.svgCode).toBe(new BlissSVGBuilder(objectWithParts([{ codeName: 'B291' }, { parts: [{ codeName: 'C8' }] }])).svgCode);
+    });
+
+    it('gives a part named by text the registry does not hold nothing to keep', () => {
+      // pins that only a defined code is read for the options it brings: read
+      // as a code, the bracket text would hand the failed part a colour
+      const parts = [{ codeName: 'B291' }, { codeName: '[color=red]>C8' }];
+      const builder = new BlissSVGBuilder(objectWithParts(parts));
+      builder.clearAllOptions();
+      expect(builder.toJSON().groups[0].glyphs[0].parts).toEqual(parts);
     });
   });
 
   describe('when a part names a shape defined after the composition was built', () => {
-    it.each(OPTION_SETS)('writes what the flagged save of the same builder wrote, under %s', (_label, options) => {
+    it.each([
+      ['plain', {}, 'B291;[stroke-width=0.5;color=red]>C8:3'],
+      ['preserve', { preserve: true }, 'B291;CO_LATESH:3'],
+      ['flattenIndicators', { flattenIndicators: true }, 'B291;[stroke-width=0.5;color=red]>C8:3'],
+      ['preserve and flattenIndicators', { preserve: true, flattenIndicators: true }, 'B291;CO_LATESH:3'],
+    ])('writes what the flagged save of the same builder wrote, under %s', (_label, options, expected) => {
       // pins the expansion the clear makes first: the options that definition
       // brings sit in no bag, only in what every save reads the bare name as,
-      // so without it the clear left them written
-      // (`B291;[stroke-width=0.5;color=red]>C8:3`)
+      // so without it the bare name carried none of them and `preserve` could
+      // not keep it. They are the definition's own and stay, written as part
+      // brackets where the save spells the shape out.
       const [cleared, original] = builtBeforeLateShape('B291;CO_LATESH:3');
       cleared.clearAllOptions();
       expect(cleared.toString(options)).toBe(original.toString({ ...options, omitOptions: true }));
-      expect(cleared.toString(options)).toBe('B291;C8:3');
+      expect(cleared.toString(options)).toBe(expected);
       expect(cleared.toJSON(options)).toEqual(original.toJSON({ ...options, omitOptions: true }));
     });
 
@@ -261,14 +296,15 @@ describe('BlissSVGBuilder clear options', () => {
     });
 
     it('clears the part as it clears one built after the definition, leaving what sits inside it', () => {
-      // note: the bracket left is the inner part's own, the one the shape's
-      // code string writes; the part's own default is what goes
+      // note: the written blue goes; the part's own default and the inner
+      // part's red, the one the shape's code string writes, are the
+      // definition's and stay
       const [late] = builtBeforeLateShape('B291;[color=blue]>CO_LATESH');
       const early = new BlissSVGBuilder('B291;[color=blue]>CO_LATESH');
       late.glyph(0).part(1).clearOptions();
       early.glyph(0).part(1).clearOptions();
-      expect(late.toString()).toBe('B291;[color=red]>C8');
-      expect(early.toString()).toBe('B291;[color=red]>C8');
+      expect(late.toString()).toBe('B291;[stroke-width=0.5;color=red]>C8');
+      expect(early.toString()).toBe('B291;[stroke-width=0.5;color=red]>C8');
       expect(late.toString({ preserve: true })).toBe(early.toString({ preserve: true }));
     });
   });

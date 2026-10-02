@@ -557,6 +557,12 @@ export class ElementHandle {
     return false;
   }
 
+  // The character a part handle's part belongs to, at any depth; undefined
+  // for any other handle.
+  #owningCharacter() {
+    return this.#level === 3 ? this.#parentRef?.glyph : undefined;
+  }
+
   addGlyph(code, opts) {
     this.#assertReachable();
     if (this.#level !== 1) return this;
@@ -1508,14 +1514,14 @@ export class ElementHandle {
       if (resolved === 'x' || resolved === 'y') delete node[resolved];
       if (node.options) deleteOptionByName(node.options, key);
     }
-    // What a code the string can only name draws with by its own definition
-    // (a built-in's dotted line, a `getPath` shape's defaults) is part of what
-    // the code is, so removing one of its keys from the part the code names
-    // returns it to the definition's value instead of taking it off. Clearing
-    // does the same, so the two agree, and no look is made that no save could
-    // write back. The names are matched the way the deletion above matched
-    // them, on a copy of the look.
-    const ownLook = this.#ctx.ownLookAt(node, this.#level);
+    // The options a definition gives the part its code names (a built-in's
+    // dotted line, a custom definition's own options) are part of what the
+    // code is, so removing one of their keys from that part returns it to the
+    // definition's value instead of taking it off. Clearing does the same, so
+    // the two agree, and no look is made that no save could write back. The
+    // names are matched the way the deletion above matched them, on a copy of
+    // the look.
+    const ownLook = this.#ctx.ownLookAt(node, this.#level, this.#owningCharacter());
     if (ownLook) {
       const unnamed = { ...ownLook };
       for (const key of keys) deleteOptionByName(unnamed, key);
@@ -1536,17 +1542,17 @@ export class ElementHandle {
   // more: its options, a word's or a character's position, and the options
   // inside a word's `;;` codes. A part keeps its coordinates and a character its
   // kerning (both written outside a bracket), which is where this differs from
-  // removing `x` by name. `key`, transient options and what the element's code
-  // draws with by its own definition stay; what sits below it is its own
-  // element's to clear. The same function saves a composition without options,
-  // so what that save leaves out and what this takes away are one set.
+  // removing `x` by name. `key`, transient options and the options the element's
+  // code brings by its definition stay; what sits below it is its own element's
+  // to clear. The same function saves a composition without options, so what
+  // that save leaves out and what this takes away are one set.
   clearOptions() {
     this.#assertReachable();
     // Terminal fail-flagged word: mirrors setOptions (group-level exempt).
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
     if (!node) return this;
-    this.#ctx.clearOwnOptions(node, this.#level);
+    this.#ctx.clearOwnOptions(node, this.#level, this.#owningCharacter());
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;

@@ -7,18 +7,22 @@
  * - A `;;` code's own brackets, which the composition stores as written text:
  *   the options go, the code and its position stay (`[x=2]>B81` comes back as
  *   `B81:2`), on the DSL and through `applyIndicators()` on a word.
- * - A `;;` code naming a definition that carries options: written out without
- *   them under every serializer option, at the position the definition and the
- *   code add up to; and the one name that has no spelling a `;;` list accepts,
- *   which keeps its name and its colour.
+ * - A `;;` code naming a definition that carries options: the options are part
+ *   of what the code is, so the name stays, with its position, under every
+ *   serializer option but a flatten without `preserve`, which spells it out
+ *   with them as a part bracket; the reload draws what the original draws.
  * - An empty character that held its head marker only through its options: the
  *   marker goes with them, so a word-level indicator lands on the head that is
  *   left, flattened or not.
- * - A definition whose code string styles its parts: a styled glyph and a
- *   multi-part shape in the DSL, a styled shape as an object part, a styled
- *   shape defined after the composition was built, and a glyph object with no
- *   parts, which draws nothing and now saves as nothing.
- * - No `[` in any output of this file.
+ * - A definition whose code string styles its parts: a styled glyph written
+ *   alone, whose parts are the character's own, losing the styling; a part
+ *   named by such a definition keeping it (a multi-part shape in the DSL, a
+ *   styled shape as an object part, a styled shape defined after the
+ *   composition was built), as part brackets where a save spells the part out
+ *   and by the name alone under `preserve`; and a glyph object with no parts,
+ *   which draws nothing and now saves as nothing.
+ * - No `[` in any output of this file but a definition's own options, which a
+ *   save that spells the definition out writes as part brackets.
  *
  * Does NOT cover:
  * - Options written in brackets of the composition itself, see
@@ -79,10 +83,10 @@ const OVERLAY_ROWS = [
 ];
 
 const DEFINED_OVERLAY_ROWS = [
-  ['plain', {}, 'B291;;B81'],
-  ['preserve', { preserve: true }, 'B291;;B81'],
-  ['flattenIndicators', { flattenIndicators: true }, 'B291;B81'],
-  ['preserve and flattenIndicators', { preserve: true, flattenIndicators: true }, 'B291;B81'],
+  ['plain', {}, 'B291;;OE_REDIND'],
+  ['preserve', { preserve: true }, 'B291;;OE_REDIND'],
+  ['flattenIndicators', { flattenIndicators: true }, 'B291;[color=red]>B81'],
+  ['preserve and flattenIndicators', { preserve: true, flattenIndicators: true }, 'B291;OE_REDIND'],
 ];
 
 const EVERY_STRING_INPUT = [
@@ -90,7 +94,6 @@ const EVERY_STRING_INPUT = [
   'B291;;OE_REDIND',
   '[color=red]^/B291;;B81',
   'OE_STYGL',
-  'B291;OE_MSHP',
 ];
 
 describe('BlissSVGBuilder omit options edges', () => {
@@ -109,23 +112,27 @@ describe('BlissSVGBuilder omit options edges', () => {
   });
 
   describe('when a word-level indicator code names a definition that carries options', () => {
-    it.each(DEFINED_OVERLAY_ROWS)('writes the code out without them under %s', (_label, options, expected) => {
+    it.each(DEFINED_OVERLAY_ROWS)('keeps the definition\'s options under %s', (_label, options, expected) => {
+      // note: a definition's options are part of what its code is, so leaving
+      // options out has nothing of the definition's to take; a flatten
+      // without preserve spells the code out and writes them as a part bracket
       const saved = withoutOptions('B291;;OE_REDIND', options);
       expect(saved).toBe(expected);
-      expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(new BlissSVGBuilder('B291;;OE_REDIND').svgCode);
     });
 
-    it('writes the code out where the definition and the code together place it', () => {
-      // pins the positions adding up on the way down: the definition's own `:1`
-      // plus the code's `:2`, which is where the overlay draws it
+    it('keeps the name at the position written on it', () => {
+      // note: the definition's own `:1` stays inside the name, under the
+      // code's `:2`, which is where the overlay draws it
       const saved = withoutOptions('B291;;OE_OFFIND:2');
-      expect(saved).toBe('B291;;B81:3');
-      expect(inkOf(new BlissSVGBuilder(saved).svgCode)).toBe(inkOf(new BlissSVGBuilder('B291;;OE_OFFIND:2').svgCode));
+      expect(saved).toBe('B291;;OE_OFFIND:2');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(new BlissSVGBuilder('B291;;OE_OFFIND:2').svgCode);
     });
 
     it('keeps a name whose definition has no spelling a word-level list accepts, colour and all', () => {
-      // note: written out, OE_RINGIND would be C2, which a ;; list refuses as not
-      // an indicator, so the name stays and brings its definition's colour with it
+      // control: passes before and after a definition's options became part
+      // of its code; written out, OE_RINGIND would be C2, which a ;; list
+      // refuses as not an indicator
       const saved = withoutOptions('B291;;OE_RINGIND');
       expect(saved).toBe('B291;;OE_RINGIND');
       expect(new BlissSVGBuilder(saved).svgCode).toContain('stroke="red"');
@@ -145,24 +152,30 @@ describe('BlissSVGBuilder omit options edges', () => {
   });
 
   describe('when a definition\'s code string styles its parts', () => {
-    it.each([
-      ['a styled glyph written in the DSL', 'OE_STYGL', 'B291'],
-      ['a multi-part shape written in the DSL', 'B291;OE_MSHP', 'B291;C8;C8'],
-    ])('drops the options of %s', (_label, input, expected) => {
-      expect(withoutOptions(input)).toBe(expected);
+    it('drops the options of a styled glyph written alone, whose parts are the character\'s own', () => {
+      expect(withoutOptions('OE_STYGL')).toBe('B291');
     });
 
-    it('drops the options a styled shape brings as an object part', () => {
-      expect(styledShapePart().toString({ omitOptions: true })).toBe('B291;C8');
+    it('keeps the options inside a part named by a multi-part shape written in the DSL', () => {
+      // note: what sits inside a part named by a definition is the
+      // definition's, so leaving options out stops at that part
+      expect(withoutOptions('B291;OE_MSHP')).toBe('B291;C8;[color=red]>C8');
+      expect(withoutOptions('B291;OE_MSHP', { preserve: true })).toBe('B291;OE_MSHP');
+      expect(new BlissSVGBuilder(withoutOptions('B291;OE_MSHP')).svgCode).toBe(new BlissSVGBuilder('B291;OE_MSHP').svgCode);
     });
 
-    it('drops the options of a styled shape defined after the composition was built', () => {
-      // regression: the save copied the definition's text, bracket included
-      // (`B291;[color=red]>C8:3`)
+    it('keeps the options a styled shape brings as an object part', () => {
+      expect(styledShapePart().toString({ omitOptions: true })).toBe('B291;[color=red]>C8');
+      expect(styledShapePart().toString({ omitOptions: true, preserve: true })).toBe('B291;OE_STYSH');
+    });
+
+    it('keeps the options of a styled shape defined after the composition was built', () => {
+      // note: the save spells out the part the definition gives the bare name,
+      // so the bracket is the shape's own, at the part's position
       const builder = new BlissSVGBuilder('B291;OE_LATESH:3');
       BlissSVGBuilder.define({ OE_LATESH: { type: 'shape', codeString: '[color=red]>C8' } });
-      expect(builder.toString({ omitOptions: true })).toBe('B291;C8:3');
-      expect(builder.toString({ omitOptions: true, preserve: true })).not.toContain('[');
+      expect(builder.toString({ omitOptions: true })).toBe('B291;[color=red]>C8:3');
+      expect(builder.toString({ omitOptions: true, preserve: true })).toBe('B291;OE_LATESH:3');
     });
 
     it('saves a glyph object with no parts as nothing, which is what it draws', () => {
@@ -181,12 +194,9 @@ describe('BlissSVGBuilder omit options edges', () => {
       expect(withoutOptions(input, { preserve: true, flattenIndicators: true })).not.toContain('[');
     });
 
-    it.each([
-      ['a glyph object with no parts', partlessStyledGlyph],
-      ['a styled shape as an object part', styledShapePart],
-    ])('leaves no bracket in %s', (_label, build) => {
-      expect(build().toString({ omitOptions: true })).not.toContain('[');
-      expect(build().toString({ omitOptions: true, preserve: true })).not.toContain('[');
+    it('leaves no bracket in a glyph object with no parts', () => {
+      expect(partlessStyledGlyph().toString({ omitOptions: true })).not.toContain('[');
+      expect(partlessStyledGlyph().toString({ omitOptions: true, preserve: true })).not.toContain('[');
     });
   });
 });
