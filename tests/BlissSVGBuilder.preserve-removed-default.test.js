@@ -16,9 +16,10 @@
  * - Names kept while the keys are there: an overriding value, an untouched
  *   element, and a removed default written back; and a changed value on a part
  *   still spelled out by the anatomy comparison the key check adds to.
- * - A renamed part standing alone in its character, judged where its spelling
- *   puts the name's default: on the part in a part slot, on the character when
- *   written as the whole character.
+ * - A renamed part standing alone in its character: saved by its name alone,
+ *   the alias's default on the part not repeated, and the save's reload
+ *   saving the same; an option of the part's own written in a part bracket
+ *   beside the name.
  * - The JSON, which writes a character's parts out beside its name, keeping
  *   the name when only a part lost a default.
  * - A name the DSL cannot read (`define()` accepts one holding a separator,
@@ -38,11 +39,9 @@
  * - A composition object naming a custom glyph, see
  *   `BlissSVGBuilder.object-route-defaults.test.js`.
  * - A built-in's own look, see `BlissSVGBuilder.builtin-own-look.test.js`.
- * - An untouched character written by an alias that brings defaults, whose
- *   `toJSON({ preserve: true })` reload styles its part on its own, see
- *   backlog row "An untouched character written by a name that brings
- *   defaults reloads from `toJSON({ preserve: true })` with its part styled on
- *   its own".
+ * - An untouched character written by an alias that brings defaults,
+ *   reloading from `toJSON({ preserve: true })` as the builder draws it, see
+ *   `BlissSVGBuilder.alias-options-on-parts.test.js`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
@@ -169,14 +168,20 @@ describe('BlissSVGBuilder preserve removed default', () => {
       const saved = builder.toString({ preserve: true });
       expect(saved).toBe('PR_RING');
       expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
+      // an alias written alone holds its options on its part too (C23 D4), so
+      // the save's own reload saves the same
+      expect(new BlissSVGBuilder(saved).toString({ preserve: true })).toBe(saved);
     });
 
-    it('spells the part out when it carries options of its own and the default sits on the character', () => {
-      // note: a part with options of its own is written in a part slot
-      // (`[stroke-width=1]>NAME`), where the name would put its colour on the part
+    it('keeps the name with an option of the part\'s own written in a part bracket', () => {
+      // re-pinned at C23 (D4): was "spells the part out when it carries
+      // options of its own and the default sits on the character". An alias's
+      // default now sits on its part, where the part slot that a part bracket
+      // reads the name in puts it too, so the name is kept and the default is
+      // not repeated
       const builder = changed('PR_DOPT', (g) => g.part(0).setOptions({ 'stroke-width': 1 }));
       const saved = builder.toString({ preserve: true });
-      expect(saved).toBe('[color=red][stroke-width=1]>B431');
+      expect(saved).toBe('[stroke-width=1]>PR_DOPT');
       expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON({ preserve: true })).svgCode).toBe(builder.svgCode);
     });

@@ -445,6 +445,42 @@ describe('BlissParser part-slot character options', () => {
         BlissSVGBuilder.removeDefinition('_DUPWORD');
       }
     });
+
+    it('reports a doubled bracket on a multi-word alias, beside the misplaced one', () => {
+      // regression: the multi-word path reported the misplaced bracket alone
+      // and dropped the doubled one in silence
+      BlissSVGBuilder.define({ _DUPWORDS: { codeString: 'B291//B431' } });
+      try {
+        expect(codes('[color=red][fill=green]_DUPWORDS'))
+          .toEqual(['MULTIPLE_OPTION_BRACKETS', 'MISPLACED_CHARACTER_OPTION']);
+        expect(build('[color=red][fill=green]_DUPWORDS').svgCode).toBe(build('[color=red]_DUPWORDS').svgCode);
+      } finally {
+        BlissSVGBuilder.removeDefinition('_DUPWORDS');
+      }
+    });
+
+    it('reports a doubled bracket a code string bakes before a custom name, as before a built-in', () => {
+      // regression: before a custom name, only the first bracket was written
+      // back in front of what the name expands to, so the second was dropped in
+      // silence; before a built-in, both always reached the peel
+      const defs = {
+        _DUPALIAS: { codeString: 'B291' },
+        _DUPMULTI: { codeString: 'B291//B431' },
+        _DUPNEST: { codeString: '[color=red][fill=green]_DUPALIAS/C8' },
+        _DUPNESTW: { codeString: '[color=red][fill=green]_DUPMULTI/C8' },
+        _DUPBUILTIN: { codeString: '[color=red][fill=green]B291/C8' },
+      };
+      BlissSVGBuilder.define(defs);
+      try {
+        const reported = (name) => build(name).warnings.map((w) => [w.code, w.source]);
+        expect(reported('_DUPBUILTIN')).toEqual([['MULTIPLE_OPTION_BRACKETS', '[fill=green]']]);
+        expect(reported('_DUPNEST')).toEqual([['MULTIPLE_OPTION_BRACKETS', '[fill=green]']]);
+        expect(reported('_DUPNESTW')).toEqual([['MULTIPLE_OPTION_BRACKETS', '[fill=green]']]);
+        expect(build('_DUPNEST').svgCode).toBe(build('_DUPBUILTIN').svgCode);
+      } finally {
+        Object.keys(defs).forEach((k) => BlissSVGBuilder.removeDefinition(k));
+      }
+    });
   });
 
   // The legal adjacency the widened detector above must not break: two brackets
@@ -509,22 +545,45 @@ describe('BlissParser part-slot character options', () => {
   // different route. Every rule above must mean the same thing on both, which is
   // the divergence class the GH #37 chunk had to fix for letter runs.
   describe('when the same spelling is baked in a definition codeString', () => {
-    const DEFS = {
+    const TWINS = {
       _OPT_CHAR: { codeString: '[color=red]B291' },
       _OPT_DUP_CHAR: { codeString: '[color=red][fill=green]B291' },
       _OPT_PART: { codeString: '[color=red]>B291' },
       _OPT_DUP_PART: { codeString: '[color=red]>[fill=green]>B291' },
-      _OPT_CROSS: { codeString: '[color=red][fill=green]>B291' },
       _OPT_BARE: { codeString: '>B291' },
       _OPT_BARE_SLOT: { codeString: 'S8;>C8' },
     };
-    beforeAll(() => BlissSVGBuilder.define(DEFS));
-    afterAll(() => Object.keys(DEFS).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+    const CROSS = { codeString: '[color=red][fill=green]>B291' };
+    beforeAll(() => BlissSVGBuilder.define({ ...TWINS, _OPT_CROSS: CROSS }));
+    afterAll(() => [...Object.keys(TWINS), '_OPT_CROSS'].forEach(k => BlissSVGBuilder.removeDefinition(k)));
 
-    it.each(Object.entries(DEFS))('renders %s exactly like its written twin', (name, def) => {
+    // Each sub-path's ink with the styling that reaches it, the nearest group
+    // winning, in document order: one look reached through one group or
+    // through two nested ones compares equal.
+    const styledInkOf = (svg) => {
+      const content = svg.slice(svg.indexOf('class="bliss-content"'));
+      const flat = [1, 2, 3].reduce((text) => text.replace(/<g ([^>]*)>((?:(?!<\/?g[ >])[\s\S])*?)<\/g>/g,
+        (_, attrs, inner) => inner.replaceAll('<path ', `<path ${attrs} `)), content);
+      return [...flat.matchAll(/<path ([^>]*?)\/>/g)].map(([, attrs]) =>
+        Object.entries(Object.fromEntries([...attrs.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, k, v]) => [k, v]))).sort());
+    };
+
+    it.each(Object.entries(TWINS))('renders %s exactly like its written twin', (name, def) => {
       const viaDefinition = build(name);
       const written = build(def.codeString);
       expect(viaDefinition.svgCode).toBe(written.svgCode);
+      expect(viaDefinition.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
+    });
+
+    it('renders _OPT_CROSS with its written twin\'s ink, the leading bracket on its part', () => {
+      // re-pinned at C23 (D6, D4): a character bracket leading a code string
+      // that draws one character is the alias's own options, and an alias's
+      // options sit on the part it draws, so the colour joins the part's fill
+      // in one group where the written twin nests the part inside its character
+      const viaDefinition = build('_OPT_CROSS');
+      const written = build(CROSS.codeString);
+      expect(styledInkOf(viaDefinition.svgCode)).toEqual(styledInkOf(written.svgCode));
+      expect(viaDefinition.svgCode).toContain('<g stroke="red" fill="green">');
       expect(viaDefinition.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
     });
   });

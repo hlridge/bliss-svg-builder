@@ -215,7 +215,8 @@ describe('BlissSVGBuilder refused value retention', () => {
       BlissSVGBuilder.define({
         KEPTDEFAULT: { codeString: 'B291', defaultOptions: { color: 'red' } },
       });
-      expect(new BlissSVGBuilder('KEPTDEFAULT').toString()).toBe('[color=red]B291');
+      // re-pinned at C23 (D4): an alias's options sit on the part it draws
+      expect(new BlissSVGBuilder('KEPTDEFAULT').toString()).toBe('[color=red]>B291');
     });
 
     it('reports it on the call that carried it, naming the definition', () => {

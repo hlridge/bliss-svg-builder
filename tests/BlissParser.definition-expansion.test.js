@@ -20,8 +20,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Indicator replacement on custom glyph definitions considers only the
  *   indicator suffix, not the base part, when preserving semantic roots.
  * - Unknown bases remain parseable when empty `;;` syntax leaves the base bare.
- * - Definition defaultOptions merge with pending glyph options instead of
- *   replacing them.
+ * - A typed glyph's defaultOptions merge with pending glyph options instead
+ *   of replacing them; a bare alias's sit on its part, leaving the pending
+ *   kerning the character's alone.
  * - Word-break definitions do not synthesize an explicit head marker when the
  *   definition was not explicitly marked.
  * - Part-level bracket options and position suffixes survive expansion onto
@@ -346,11 +347,28 @@ describe('BlissParser definition expansion', () => {
       BlissSVGBuilder.define({ [code]: { codeString: 'B313', defaultOptions: { color: 'red' } } }, { overwrite: true });
 
       try {
-        const parsed = BlissParser.parse(`RK:1/${code}`);
-        const glyphOptions = parsed.groups[0].glyphs[0].options;
+        const [glyph] = BlissParser.parse(`RK:1/${code}`).groups[0].glyphs;
 
-        expect(glyphOptions).toMatchObject({ color: 'red', relativeKerning: 1 });
-        // pins option merge fallback; killed line 873 false-spread mutant in 2026-05 Stryker run.
+        // re-pinned at C23 (D4): a bare alias's defaults sit on the part it
+        // expands to, so the character keeps the pending kerning alone
+        expect(glyph.options).toEqual({ relativeKerning: 1 });
+        expect(glyph.parts[0].options).toEqual({ color: 'red' });
+      } finally {
+        BlissSVGBuilder.removeDefinition(code);
+      }
+    });
+
+    it('preserves pending relative kerning while applying a typed glyph\'s defaults', () => {
+      const code = 'DEFAULT_OPTIONS_TYPED_KERNING_PIN';
+      BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B313', defaultOptions: { color: 'red' } } }, { overwrite: true });
+
+      try {
+        const glyphOptions = BlissParser.parse(`RK:1/${code}`).groups[0].glyphs[0].options;
+
+        expect(glyphOptions).toEqual({ color: 'red', relativeKerning: 1 });
+        // pins option merge fallback; killed line 873 false-spread mutant in
+        // 2026-05 Stryker run. Moved here from the alias row above at C23: only
+        // a typed definition's defaults still merge onto the character
       } finally {
         BlissSVGBuilder.removeDefinition(code);
       }

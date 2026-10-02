@@ -1525,8 +1525,13 @@ export class ElementHandle {
     if (ownLook) {
       const unnamed = { ...ownLook };
       for (const key of keys) deleteOptionByName(unnamed, key);
-      for (const [key, value] of Object.entries(ownLook)) {
-        if (!Object.hasOwn(unnamed, key)) (node.options ??= {})[key] = value;
+      if (Object.keys(unnamed).length < Object.keys(ownLook).length) {
+        // Each value goes back where it sat: a definition's options lead the
+        // bag, as the parser puts them under what is written over them, so
+        // the element saves as it did.
+        const bag = node.options ?? {};
+        const lead = Object.entries(ownLook).filter(([key]) => !Object.hasOwn(unnamed, key) || Object.hasOwn(bag, key));
+        node.options = { ...Object.fromEntries(lead), ...bag };
       }
     }
     // Clean up empty options object

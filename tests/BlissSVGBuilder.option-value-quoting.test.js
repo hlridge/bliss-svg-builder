@@ -158,7 +158,9 @@ describe('BlissSVGBuilder option-value quoting', () => {
       const b = new BlissSVGBuilder('B291');
       b.addGlyph('QVAL_INJDEF');
       const emitted = b.toString();
-      expect(emitted).toBe('B291/[color="red;margin=2]||[color=blue"]B291');
+      // re-pinned at C23 (D4): an alias's options sit on the part it draws, so
+      // the quoted value is written in a part bracket
+      expect(emitted).toBe('B291/[color="red;margin=2]||[color=blue"]>B291');
 
       const reparsed = new BlissSVGBuilder(emitted);
       expect(reparsed.warnings).toEqual([]);

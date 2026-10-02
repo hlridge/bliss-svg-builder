@@ -999,6 +999,18 @@ export class BlissParser {
           crownWordChunk(chunk, label);
         };
 
+        // A bare alias is shorthand: it draws the parts it expands to, so its
+        // own options are theirs, on every part of every character it draws,
+        // never on a character, where they would style a part added beside
+        // them. Each expanded token carries them for the glyph loop, merged
+        // over what an inner link of the chain brought: the outer link wins a
+        // key both set. A space draws nothing and takes no option.
+        const giveAliasOptions = (parts, options) => {
+          for (const p of parts) {
+            if (!isSpaceGlyph(p._scanCode)) p.partOptions = { ...p.partOptions, ...options };
+          }
+        };
+
         // Helper: resolve codeString through aliases to check if it's a word.
         const resolveToFinalCodeString = (code) => finalCodeStringOf(code, definitions);
 
@@ -1400,6 +1412,21 @@ export class BlissParser {
             strippedBrackets.push(strippedBracket[1]);
             codeForLookup = codeForLookup.slice(strippedBracket[1].length);
           }
+          // Where a definition's expansion is written back, ALL the brackets go
+          // in front of it, so the glyph-level peel applies the first and
+          // reports the rest. Where the option is dropped as misplaced instead,
+          // the text reaches no peel, so the rest are reported here.
+          const writtenBrackets = strippedBrackets.join('');
+          const reportExtraBrackets = () => {
+            for (const dropped of strippedBrackets.slice(1)) {
+              const restored = restorePlaceholders(dropped);
+              parseWarnings.push({
+                code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+                message: `Multiple option brackets on one character: "${restored}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b].`,
+                source: restored,
+              });
+            }
+          };
 
           const [potentialBaseCodeRaw, ...rawIndicators] = codeForLookup.split(';');
           // Strict Indicator Separation: `;` is dumb part-composition, so the
@@ -1479,6 +1506,8 @@ export class BlissParser {
             // travel with its defaultOptions below.
             const { codeString: drawnCodeString, options: ownOptions } = BlissParser.#readDefinition(potentialBaseCode, definition, warn);
             const codeStringToExpand = processXCodes(drawnCodeString);
+            const isBareAlias = !definition.isBlissGlyph && !definition.isShape
+              && !definition.isExternalGlyph && !definition.glyphCode;
 
             // Built-in single-character codes: skip expansion, let parseParts handle it.
             // This eliminates the flatten-then-unflatten pattern where expand() substitutes
@@ -1529,18 +1558,22 @@ export class BlissParser {
                   firstReal.part = semiParts.join(';');
                 }
               }
+              // Only a bare alias can spell words (`define()` refuses a typed
+              // one), so its options go to the parts of every word.
+              if (ownOptions) giveAliasOptions(allParts, ownOptions);
               // A char-level option on a multi-word (//) alias is MISPLACED
               // (B4): a character option applies to a single character. Warn +
               // drop at top level; nested expansion keeps its prepend behavior.
               if (optionsPrefix && allParts.length > 0) {
                 if (isTopLevel) {
+                  reportExtraBrackets();
                   parseWarnings.push({
                     code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
                     message: `Character option (${restorePlaceholders(optionsPrefix)}) ignored on "${restorePlaceholders(potentialBaseCode)}": it applies to a single character, but this expands to multiple words. Use ${restorePlaceholders(optionsPrefix)}|| to apply it to the whole content.`,
                     source: restorePlaceholders(potentialBaseCode),
                   });
                 } else {
-                  allParts[0].part = optionsPrefix + allParts[0].part;
+                  allParts[0].part = writtenBrackets + allParts[0].part;
                 }
               }
               // A char-level `;`-part on a multi-word (//) alias is MISPLACED
@@ -1592,7 +1625,8 @@ export class BlissParser {
                   ...(expandedSubPart._frag !== undefined && { _frag: expandedSubPart._frag }),
                   ...(expandedSubPart._scanCode !== undefined && { _scanCode: expandedSubPart._scanCode }),
                   ...(expandedSubPart._aliasCodeName !== undefined && { _aliasCodeName: expandedSubPart._aliasCodeName }),
-                  ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions })
+                  ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions }),
+                  ...(expandedSubPart.partOptions && { partOptions: expandedSubPart.partOptions })
                 };
               });
 
@@ -1623,9 +1657,12 @@ export class BlissParser {
             }
 
             // Carry the definition's own options (its defaultOptions and the
-            // bracket leading its code string) as data on the first expanded part
-            if (ownOptions && expandedParts.length > 0) {
-              expandedParts[0].defaultOptions = ownOptions;
+            // bracket leading its code string): a bare alias's to every part
+            // it draws, a typed definition's as data on the first expanded
+            // part, for the character
+            if (ownOptions) {
+              if (isBareAlias) giveAliasOptions(expandedParts, ownOptions);
+              else if (expandedParts.length > 0) expandedParts[0].defaultOptions = ownOptions;
             }
 
             // Prepend options to the first expanded part. A char-level option
@@ -1639,21 +1676,14 @@ export class BlissParser {
                 // never reaches the glyph-level peel that reports duplicates.
                 // Report them here instead, or a second bracket on a word alias
                 // would vanish with nothing said about it.
-                for (const dropped of strippedBrackets.slice(1)) {
-                  const restored = restorePlaceholders(dropped);
-                  parseWarnings.push({
-                    code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
-                    message: `Multiple option brackets on one character: "${restored}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b].`,
-                    source: restored,
-                  });
-                }
+                reportExtraBrackets();
                 parseWarnings.push({
                   code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
                   message: `Character option (${restorePlaceholders(optionsPrefix)}) ignored on "${restorePlaceholders(potentialBaseCode)}": it applies to a single character, but this expands to a word. Use ${restorePlaceholders(optionsPrefix)}|| to apply it to the whole content.`,
                   source: restorePlaceholders(potentialBaseCode),
                 });
               } else {
-                expandedParts[0].part = optionsPrefix + expandedParts[0].part;
+                expandedParts[0].part = writtenBrackets + expandedParts[0].part;
               }
             }
 
@@ -1788,7 +1818,7 @@ export class BlissParser {
       // silent tie-break at layout time.
       let pendingKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, partOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
         // Lift a word-level fail-render flag onto its enclosing group (mirrors
         // the _wordIndicators lift below). A malformed `;;` makes the whole word
         // invalid; the element reads group.errorCode and collapses it to one
@@ -1892,7 +1922,8 @@ export class BlissParser {
           pendingKerning = undefined;
         }
 
-        // Merge defaultOptions carried from expand() (standalone/composition case)
+        // Merge a typed definition's options carried from expand() (a bare
+        // alias's ride to its parts instead, see partOptions)
         if (defaultOptions) {
           glyphObj.options = { ...defaultOptions, ...(glyphObj.options || {}) };
         }
@@ -2008,6 +2039,11 @@ export class BlissParser {
             twoPartPartString = head + twoPartPartString;
             const part = this.parsePartString(twoPartPartString, restorePlaceholders, warn, { level: 'part', notation: 'bracket' });
             if (part.options && !nonEmpty(part.options)) delete part.options;
+            // The options of the bare alias this character was expanded from,
+            // on each of its parts: under a part bracket the alias's code
+            // string writes there, and over what the part's own code brings
+            // (merged in below), as a link of the chain further in.
+            if (depth === 0 && partOptions) part.options = { ...partOptions, ...part.options };
 
             // A `;`-part slot sits inside a glyph, so the glyph-boundary
             // anchored expansion pass above never sees it: without this, a

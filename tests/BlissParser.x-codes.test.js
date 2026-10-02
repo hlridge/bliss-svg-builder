@@ -478,7 +478,10 @@ describe('BlissParser X-codes', () => {
       // pins that the key is looked for at the run, not at the start of the
       // string; a mutant reading offset 0 misses the prefixed form entirely
       const needed = new BlissSVGBuilder('DEFXOPTTEXTKEYNEEDED');
-      expect(needed.toString()).toBe('[color=red]Xhαllo');
+      // re-pinned at C23 (D6, D4): the key reads as ONE glyph, so the bracket
+      // leading the code string is the alias's own options, which sit on the
+      // part it draws
+      expect(needed.toString()).toBe('[color=red]>Xhαllo');
       expect(needed.warnings).toEqual([]);
       // read as letters, the option rides the FIRST of them, which is why the
       // remaining four are what re-collapses into a word

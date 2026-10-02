@@ -101,8 +101,11 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
     it('keeps the name on a defaultOptions-carrying alias with stable render', () => {
       defineAndTrack({ DOPT: { codeString: 'B431', defaultOptions: { color: 'red' } } });
       const b = new BlissSVGBuilder('DOPT');
-      expect(b.toString()).toBe('[color=red]B431');
-      expect(b.toString({ preserve: true })).toBe('[color=red]DOPT');
+      // re-pinned at C23: an alias's options sit on the part it draws (D4), so
+      // the default save writes them as a part bracket, and a save that keeps
+      // the name does not repeat them (D8)
+      expect(b.toString()).toBe('[color=red]>B431');
+      expect(b.toString({ preserve: true })).toBe('DOPT');
       expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
     });
 

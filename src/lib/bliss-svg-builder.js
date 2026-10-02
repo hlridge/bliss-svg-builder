@@ -2675,8 +2675,8 @@ class BlissSVGBuilder {
         // directly and they round-trip external-glyph navigation/spacing, so
         // restore them from the resolved code the same way the parser does.
         BlissSVGBuilder.#reapplyGlyphMetadata(glyph);
-        BlissSVGBuilder.#applyNamedOptions(glyph, readings);
         if (glyph.parts) BlissSVGBuilder.#normalizePartCodes(glyph.parts);
+        BlissSVGBuilder.#applyNamedOptions(glyph, readings);
       }
     }
   }
@@ -2684,17 +2684,31 @@ class BlissSVGBuilder {
   // A character named by a definition gets the options the name puts on a
   // character where the DSL reads it alone (the definition's defaultOptions,
   // or those of the definition it renames), under the ones the object writes,
-  // which win. It is the reading a `preserve` save judges a kept name by, so a
-  // save keeps a name only while its reload would bring back nothing the
-  // element lacks. Only a defined name is read: a code the registry does not
-  // hold is not a name, and reading it as DSL would turn a codeName holding
-  // bracket text into options. Object ingest only; a rebuild re-applying the
-  // defaults would bring back what an edit removed.
+  // which win. A bare alias puts its own on the parts it draws instead, so the
+  // parts the object writes get those, each under its own, where they begin
+  // with the parts the alias draws; a part it does not draw gets nothing. A
+  // typed definition's parts get nothing: the JSON writes them out with their
+  // options, so its name restores the character's alone, and an option removed
+  // from one of its parts stays removed. It is the reading a `preserve` save
+  // judges a kept name by, so a save keeps a name only while its reload would
+  // bring back nothing the element lacks. Only a defined name is read: a code
+  // the registry does not hold is not a name, and reading it as DSL would turn
+  // a codeName holding bracket text into options. Object ingest only; a rebuild
+  // re-applying the defaults would bring back what an edit removed.
   static #applyNamedOptions(glyph, readings) {
     const code = glyph.glyphCode;
     if (!code || !Object.hasOwn(blissElementDefinitions, code)) return;
-    const supplied = BlissSVGBuilder.#readingOf(code, 'glyph', readings)?.options;
-    if (supplied) glyph.options = { ...supplied, ...glyph.options };
+    const reading = BlissSVGBuilder.#readingOf(code, 'glyph', readings);
+    if (reading?.options) glyph.options = { ...reading.options, ...glyph.options };
+    if (!reading || !BlissSVGBuilder.#isBareAliasDefinition(blissElementDefinitions[code])) return;
+    const parts = glyph.parts ?? [];
+    const drawn = reading.parts.every((part, i) => parts[i] !== undefined
+      && BlissSVGBuilder.#drawnCode(parts[i].codeName) === BlissSVGBuilder.#drawnCode(part.codeName)
+      && parts[i].x === part.x && parts[i].y === part.y);
+    if (!drawn) return;
+    reading.parts.forEach((part, i) => {
+      if (part.options) parts[i].options = { ...part.options, ...parts[i].options };
+    });
   }
 
   static #normalizePartCodes(parts) {
@@ -2986,6 +3000,16 @@ class BlissSVGBuilder {
         || BlissSVGBuilder.#keepsNamedOptions(part, part.codeName, 'part', readings));
     };
 
+    // What a part's code brings by its definition, which the string does not
+    // repeat. A character's one part written by the name it records brings
+    // what the name gives the part of a character written alone: read back
+    // alone, the name brings it to the part directly; behind a part bracket,
+    // read in a slot, through the links it nests. Any other part is read in a
+    // `;` slot.
+    const lookOf = (part, parts) => (parts.length === 1 && part.codeName === part._aliasCodeName
+      ? BlissSVGBuilder.#loneLookOf(part.codeName, readings)
+      : BlissSVGBuilder.#ownLookOf(part.codeName, readings));
+
     // Serialize parts with ; delimiter and :x,y positions, each custom part
     // spelled out unless the save keeps its name. A spelled-out part's option
     // is written before EACH part it spells out into (`[opts]>B291;[opts]>C8`),
@@ -3015,7 +3039,7 @@ class BlissSVGBuilder {
         // Prefix part-level options with [opts]> syntax, less the look a code
         // the string can only name draws with by its own name
         const optPrefix = serializeOptions(
-          BlissSVGBuilder.#withoutOwnLook(part.options, part.codeName, readings));
+          BlissSVGBuilder.#withoutLook(part.options, part.options && lookOf(part, parts)));
         if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
       })
@@ -3130,6 +3154,21 @@ class BlissSVGBuilder {
           ? BlissSVGBuilder.#preservedWrittenName(name, glyph, readings)
           : null;
         if (written) code = written;
+      }
+
+      // A character whose one part is a name read in a `;` slot, written as
+      // that name and nothing more, reads back as the name standing alone.
+      // Where the name is shorthand that expands alone but nests in a slot (an
+      // alias of an alias, of a code with options of its own, of several
+      // codes), the two draw differently, so the empty base keeps the part in
+      // its slot.
+      if (options.preserve && glyph.parts?.length === 1) {
+        const [part] = glyph.parts;
+        const inSlot = part._aliasCodeName === undefined || part._aliasCodeName !== glyph._aliasCodeName;
+        if (inSlot && code === part.codeName && !builtInCodes.has(code) && !part.errorCode
+            && !BlissSVGBuilder.#readsAloneAsInSlot(code, readings)) {
+          code = `;${code}`;
+        }
       }
 
       // Prefix glyph-level options (skip internal kerning keys), as they stand:
@@ -3335,14 +3374,21 @@ class BlissSVGBuilder {
             const decorated = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0 || part.options;
             // The name also has to leave nothing to bring back. A sole part
             // carrying the character's own recording, with no options of its
-            // own to write, is written as the whole character, where the name
-            // puts its defaults on the character, so the character is what the
-            // name is judged against. Anywhere else the name is written in a
-            // part slot (`[opts]>NAME` included) and puts them on the part.
-            const writesOwnOptions = Object.entries(part.options ?? {})
+            // own to write, is written as the whole character, so the
+            // character is what the name is judged against. The string does
+            // not write what the name gives the one part of a character
+            // written alone (a bare alias's own options sit there; a typed
+            // definition's sit on the character); the public JSON writes every
+            // part in a slot, options and all. Anywhere else the name is
+            // written in a part slot (`[opts]>NAME` included) and puts its
+            // options on the part.
+            const soleRecord = parts.length === 1 && glyph?._aliasCodeName === part._aliasCodeName;
+            const ownOptions = soleRecord && options.deep
+              ? BlissSVGBuilder.#withoutLook(part.options, BlissSVGBuilder.#loneLookOf(part._aliasCodeName, readings))
+              : part.options;
+            const writesOwnOptions = Object.entries(ownOptions ?? {})
               .some(([key, value]) => key !== 'key' && value !== false);
-            const writtenAsCharacter = parts.length === 1 && !writesOwnOptions
-              && glyph?._aliasCodeName === part._aliasCodeName;
+            const writtenAsCharacter = soleRecord && !writesOwnOptions;
             const keepsOptions = writtenAsCharacter
               ? BlissSVGBuilder.#keepsNamedOptions(glyph, part._aliasCodeName, 'glyph', readings)
               : BlissSVGBuilder.#keepsNamedOptions(part, part._aliasCodeName, 'part', readings);
@@ -3700,6 +3746,19 @@ class BlissSVGBuilder {
     return BlissSVGBuilder.#readingOf(code, 'part', readings)?.options;
   }
 
+  // The options the parser gives the part of a character written as `code`
+  // alone, or undefined: #ownLookOf's question asked where the name stands
+  // alone rather than in a `;` slot. The answers differ where a single link
+  // renames a code that is a composition itself: alone, the rename dissolves
+  // into one part holding the options of every link; in a slot, each link
+  // nests as a part of its own. A bare alias's own options sit on that part;
+  // a typed definition's still sit on the character. Only a name that reads
+  // as one part records itself on that part, so the first is the one.
+  static #loneLookOf(code, readings = new Map()) {
+    if (!code || !Object.hasOwn(blissElementDefinitions, code)) return undefined;
+    return BlissSVGBuilder.#readingOf(code, 'glyph', readings)?.parts?.[0]?.options;
+  }
+
   // The own look of the element `node` at `level` (3 a part), read from the
   // code the part was written as; undefined at every other level. A character
   // named by a code holds that code as its one part, and the look belongs to
@@ -3711,28 +3770,27 @@ class BlissSVGBuilder {
   // A part a single-code rename resolved (a shape whose code string is `C8`
   // is stored as `C8`) records the name it was written as, and the parser gave
   // it that name's options. The same recording on the one part of a character
-  // written alone came down from the character, where the parser put the
-  // name's options instead, so that part was written as the code it holds.
-  // `character` is the character the part belongs to.
+  // written alone came down from the character, so that part holds what the
+  // name gives the one part of a character written alone. `character` is the
+  // character the part belongs to.
   static #ownLookAt(node, level, character, readings) {
     if (level !== 3) return undefined;
-    const renamed = node._aliasCodeName !== undefined && node._aliasCodeName !== character?._aliasCodeName;
-    return BlissSVGBuilder.#ownLookOf(renamed ? node._aliasCodeName : node.codeName, readings);
+    const name = node._aliasCodeName;
+    if (name !== undefined && name === character?._aliasCodeName) return BlissSVGBuilder.#loneLookOf(name, readings);
+    return BlissSVGBuilder.#ownLookOf(name ?? node.codeName, readings);
   }
 
-  // A part's `bag` without the values its code brings by its definition,
-  // wherever the part holds the same value: they are part of what the code is,
-  // so the canonical string does not repeat them (`REFSQUARE`, not
+  // A part's `bag` without the values `look`, what its code brings by its
+  // definition, holds the same of: they are part of what the code is, so the
+  // canonical string does not repeat them (`REFSQUARE`, not
   // `[stroke-dasharray=0 0.999]>REFSQUARE`, and likewise a custom name
-  // `preserve` keeps). A different value is an override and is written. `code`
-  // is what the string writes for the part, read in a `;` slot the way the
-  // reload reads it. Both bags hold the stored spelling of every key, so the
-  // keys compare as they stand.
-  static #withoutOwnLook(bag, code, readings) {
-    const own = bag && BlissSVGBuilder.#ownLookOf(code, readings);
-    if (!own) return bag;
+  // `preserve` keeps). A different value is an override and is written. Both
+  // bags hold the stored spelling of every key, so the keys compare as they
+  // stand.
+  static #withoutLook(bag, look) {
+    if (!bag || !look) return bag;
     return Object.fromEntries(Object.entries(bag).filter(([key, value]) =>
-      !Object.hasOwn(own, key) || serializeOptionValue(own[key]) !== serializeOptionValue(value)));
+      !Object.hasOwn(look, key) || serializeOptionValue(look[key]) !== serializeOptionValue(value)));
   }
 
   // One element's options emptied of everything the canonical string writes in
@@ -3993,6 +4051,20 @@ class BlissSVGBuilder {
     }
     readings.set(memoKey, reading);
     return reading;
+  }
+
+  // Whether `name` written alone draws what it draws as the one part of a
+  // character, read in a `;` slot. A typed definition, and an alias of one
+  // code drawn by no code string, read alike; an alias otherwise expands where
+  // it stands alone and nests where it sits in a slot, which can resolve a key
+  // two links set differently or group the parts differently. Drawn, not
+  // derived, so no rule about which links nest can drift from the renderer.
+  static #readsAloneAsInSlot(name, readings) {
+    const memoKey = `alone:${name}`;
+    if (!readings.has(memoKey)) {
+      readings.set(memoKey, new BlissSVGBuilder(name).svgCode === new BlissSVGBuilder(`;${name}`).svgCode);
+    }
+    return readings.get(memoKey);
   }
 
   // The parts a custom name reloads to as a character, or null.

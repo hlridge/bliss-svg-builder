@@ -7,7 +7,8 @@
  * Covers:
  * - `clearOptions()` on the part, `clearAllOptions()`, and `removeOptions` of
  *   each of the definition's keys in both spellings, on a typed shape and a
- *   typed glyph: the drawing unchanged and the name saved alone.
+ *   typed glyph: the drawing unchanged, the name saved alone, and the default
+ *   save unchanged down to the order of its keys.
  * - The `preserve` save writing the name alone and the default save spelling
  *   the definition out with its options as part brackets, options from
  *   `defaultOptions` and from a code string's leading character bracket alike.
@@ -28,8 +29,9 @@
  *
  * Does NOT cover:
  * - A definition written alone, whose options sit on its one part once that is
- *   how it is stored, see `BlissSVGBuilder.definition-is-a-part.test.js` and
- *   `BlissSVGBuilder.alias-options-on-parts.test.js`.
+ *   how it is stored, see `BlissSVGBuilder.definition-is-a-part.test.js`,
+ *   `BlissSVGBuilder.alias-options-on-parts.test.js` and
+ *   `BlissSVGBuilder.alias-options-kept.test.js`.
  * - A built-in's own look, see `BlissSVGBuilder.builtin-own-look.test.js`.
  * - A change made inside the named part through a deeper handle, see backlog
  *   row "A part saved by its name forgets a change made inside it".
@@ -90,6 +92,9 @@ describe('BlissSVGBuilder definition options kept', () => {
       const builder = changed(input, change);
       expect(builder.svgCode).toBe(new BlissSVGBuilder(input).svgCode);
       expect(builder.toString({ preserve: true })).toBe(input);
+      // pins a removed key's value going back where it was (C23 Task 6): put
+      // back after the rest, the default save wrote the keys in a new order
+      expect(builder.toString()).toBe(new BlissSVGBuilder(input).toString());
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
   });
