@@ -20,6 +20,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   (a misplaced option, a bracket value or a marker value it cannot read),
  *   indicator, head-marker and multi-word anatomy, and a name the DSL cannot
  *   spell, since the check reads through a stand-in.
+ * - A position or kerning key in the character bracket leading a
+ *   one-character code string, refused whatever its value: that bracket is
+ *   the definition's own options, judged as `defaultOptions` is.
  * - The registry after a refusal, the other definitions in the same call, an
  *   existing name, and the exact wording of each refusal.
  * - patchDefinition(): the same refusals, the definition left unchanged, and a
@@ -31,8 +34,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.define-codestring-content.test.js`.
  * - How a composition built before its definition saves, see
  *   `BlissSVGBuilder.codestring-decomposition.test.js`.
- * - A character bracket in a code string carrying a position, kerning or
- *   `key` to every use: readable, so not refused here; an open backlog row.
+ * - Every key that character bracket refuses, for each definition kind and
+ *   on both surfaces, see
+ *   `BlissSVGBuilder.code-string-own-bracket-refusals.test.js`.
  * - A part the reader cannot take for a code at all (`B291;!`, a stray space),
  *   or one a `;` slot cannot hold (`B291;Xabc`): accepted and reported where
  *   the code is used; an open backlog row, whose tripwire the letter-run row is.
@@ -180,14 +184,14 @@ describe('BlissSVGBuilder define readable code string', () => {
   });
 
   describe('when the code string holds decoration the use site reports', () => {
-    // note: a bracket's keys and values and a marker's value are decoration,
-    // judged where the code is used, which warns, drops it and still draws
+    // note: the keys and values of a part bracket, or of a character bracket
+    // that does not lead a one-character code string, and a marker's value
+    // are decoration, judged where the code is used, which warns, drops it
+    // and still draws
     it.each([
       ['glyph', '[x=.]>B291', 'MALFORMED_COORDINATES'],
-      ['glyph', '[x=abc]B291', 'MALFORMED_COORDINATES'],
       ['shape', '[y=1.2.3]>C8', 'MALFORMED_COORDINATES'],
-      ['glyph', '[relative-kerning=abc]B291', 'MALFORMED_KERNING_VALUE'],
-      ['glyph', '[relative-kerning=RK:3]B291', 'MALFORMED_KERNING_VALUE'],
+      ['bare', 'B291/[relative-kerning=abc]B313', 'MALFORMED_KERNING_VALUE'],
       ['bare', 'B291/RK:3/[relative-kerning=1]B313', 'MULTIPLE_KERNING_VALUES'],
       ['bare', 'B291/RK:x/B313', 'MALFORMED_KERNING_VALUE'],
       ['bare', 'RK:.5.5/B291', 'MALFORMED_KERNING_VALUE'],
@@ -196,6 +200,23 @@ describe('BlissSVGBuilder define readable code string', () => {
       const use = new BlissSVGBuilder('VALUED');
       expect(use.warnings.map((warning) => warning.code)).toContain(code);
       expect(use.svgCode).toContain('<path');
+    });
+  });
+
+  describe('when the character bracket leading a one-character code string holds a position or kerning key', () => {
+    // note: that bracket is the definition's own options, so define() judges
+    // its keys as it judges defaultOptions and refuses these whatever their
+    // value; they used to define, as decoration every use warned about
+    it.each([
+      ['[x=abc]B291', 'position', 'x'],
+      ['[relative-kerning=abc]B291', 'kerning', 'relative-kerning'],
+      ['[relative-kerning=RK:3]B291', 'kerning', 'relative-kerning'],
+    ])('refuses a glyph whose codeString is %s, naming the %s option %s', (codeString, kind, key) => {
+      const result = defineTracked('OWNBRACKET', { type: 'glyph', codeString });
+      expect(result.defined).toEqual([]);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(`the character bracket leading its codeString cannot include the ${kind} option "${key}"`);
+      expect(BlissSVGBuilder.isDefined('OWNBRACKET')).toBe(false);
     });
   });
 

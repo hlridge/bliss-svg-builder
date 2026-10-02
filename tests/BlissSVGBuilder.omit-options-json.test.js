@@ -10,7 +10,9 @@
  * - An emptied character's head designation going with its options.
  * - A definition whose code string carries an option bracket, or only its
  *   part-scope marker, never publishing that text as a `codeName`, with the
- *   flag or without it.
+ *   flag or without it; a character bracket leading it is the definition's
+ *   own options, so the glyph is named by the code behind it, as
+ *   `defaultOptions` would leave it named.
  * - The algebra: the flag is idempotent, changes nothing on a composition
  *   without options (a `;;` code's written spelling, a renamed `;;` code and
  *   an empty options bag included), composes with `preserve` and
@@ -115,13 +117,20 @@ describe('BlissSVGBuilder omit options JSON', () => {
       expect(new BlissSVGBuilder('OJ_STYGL').toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('OJ_STYGL');
     });
 
-    it.each([
-      ['a character bracket', 'OJ_CHARBR', { parts: [{ codeName: 'B291' }], options: { color: 'red' } }],
-      ['a lone part-scope marker', 'OJ_LONEGT', { parts: [{ codeName: 'B291' }] }],
-    ])('publishes no codeName when the code string holds only %s', (_label, code, glyph) => {
-      // pins `[` and `>` each on its own: removing either from the resolver's
-      // stop set publishes that definition's text as the glyph's codeName
-      expect(new BlissSVGBuilder(code).toJSON().groups[0].glyphs[0]).toEqual(glyph);
+    it('publishes no codeName when the code string holds only a lone part-scope marker', () => {
+      // pins `>` on its own: removing it from the resolver's stop set
+      // publishes that definition's text as the glyph's codeName
+      expect(new BlissSVGBuilder('OJ_LONEGT').toJSON().groups[0].glyphs[0]).toEqual({ parts: [{ codeName: 'B291' }] });
+    });
+
+    it('names the glyph by the code behind a character bracket leading the code string, as defaultOptions would', () => {
+      // note: that bracket is the definition's own options, not text the
+      // resolver could publish, so OJ_CHARBR is named as OJ_REDB is. It used
+      // to publish no codeName, and pinned the `[` in the resolver's stop set,
+      // which no longer meets a bracket on any route that keeps a glyph
+      const glyph = new BlissSVGBuilder('OJ_CHARBR').toJSON().groups[0].glyphs[0];
+      expect(glyph).toEqual({ parts: [{ codeName: 'B291' }], options: { color: 'red' }, codeName: 'B291' });
+      expect(glyph).toEqual(new BlissSVGBuilder('OJ_REDB').toJSON().groups[0].glyphs[0]);
     });
   });
 

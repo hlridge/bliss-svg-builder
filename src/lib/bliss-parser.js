@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, serializeOptionValue, textOfValue, writtenNumber } from "./bliss-constants.js";
+import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -431,10 +431,11 @@ export function classifyXCode(code) {
 }
 
 // The code the first character of a code string is made from, read as a part
-// slot reads it: without its part brackets, before any `;` part, and without
-// its coordinate.
+// slot reads it: behind its option brackets (a leading character bracket is a
+// definition's own options, see ownBracketOf), before any `;` part, and
+// without its coordinate.
 function firstBaseCode(codeString) {
-  let rest = codeString;
+  let rest = peelCharacterBrackets(codeString).body;
   let bracket;
   while ((bracket = rest.match(LEADING_PART_BRACKET_PATTERN)) !== null) rest = rest.slice(bracket[0].length);
   const [first] = rest.split(';');
@@ -451,8 +452,8 @@ function firstBaseCode(codeString) {
 // without an outline draws as its text-fallback glyph; a defined name that
 // stands for one character takes what it does not set itself from the
 // character its code string is made of, as its expansion does. Only as far as
-// a decorated use can read the name: a code string it fails on (a character
-// bracket, a letter without an outline) lends that failed character nothing.
+// a decorated use can read the name: a code string it fails on (a letter
+// without an outline) lends that failed character nothing.
 function layoutDefinitionOf(code, definitions, depth = 0) {
   if (code.startsWith('XTXT_')) return createTextFallbackGlyph(code.slice(5));
   const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
@@ -468,6 +469,48 @@ function layoutDefinitionOf(code, definitions, depth = 0) {
     kerningRules: definition.kerningRules ?? inner.kerningRules,
     shrinksPrecedingWordSpace: definition.shrinksPrecedingWordSpace ?? inner.shrinksPrecedingWordSpace,
   };
+}
+
+// The code string an alias chain starting at `code` ends in, or null when
+// `code` names no definition with a code string. A hop that is not itself a
+// registry key may still be a DECORATED reference ('[color=green]WORD',
+// 'WORD^', 'WORD:1,2'): the decoration is stripped and the chain followed, or
+// a decorated word alias would not be recognized as a word.
+function finalCodeStringOf(code, definitions, visited = new Set()) {
+  if (visited.has(code)) return null;
+  visited.add(code);
+  const def = definitions[code];
+  if (!def?.codeString) return null;
+  if (!definitions[def.codeString]) {
+    const core = stripReferenceDecoration(def.codeString);
+    if (core !== def.codeString && definitions[core]) {
+      return finalCodeStringOf(core, definitions, visited) ?? def.codeString;
+    }
+    return def.codeString;
+  }
+  return finalCodeStringOf(def.codeString, definitions, visited);
+}
+
+// Whether a code string draws one character: no word break written, and none
+// made by a letter run or by an alias its first code stands for.
+function drawsOneCharacter(codeString, definitions) {
+  if (processXCodes(codeString).includes('/')) return false;
+  const base = firstBaseCode(codeString);
+  return !processXCodes(finalCodeStringOf(base, definitions) ?? base).includes('/');
+}
+
+// A definition's code string read as what the definition is. A character
+// bracket leading a code string that draws one character is the definition's
+// own options, as its defaultOptions are: the definition is the one part it
+// draws, so the bracket styles that part wherever the code is used. Returns
+// the bracket, any further bracket at the same place (one bracket per scope,
+// so a use reports and drops those), and the code string behind them; null
+// when no bracket leads it, nothing follows the brackets, or it draws a word,
+// where the bracket stays its first character's, as written.
+function ownBracketOf(codeString, definitions) {
+  const { brackets, body } = peelCharacterBrackets(codeString);
+  if (brackets.length === 0 || body === '' || !drawsOneCharacter(codeString, definitions)) return null;
+  return { bracket: brackets[0], extras: brackets.slice(1), body };
 }
 
 export class BlissParser {
@@ -506,13 +549,44 @@ export class BlissParser {
   static #parseOptions(optionsString, warn, scope) {
     if (!optionsString) return;
 
+    const written = BlissParser.#writtenEntries(optionsString);
+    if (!written) return;
+
+    // Admitted HERE, where a bracket first becomes an options bag, so every
+    // gate, emitter and serializer downstream sees one spelling of a name the
+    // library or a standard owns and none of them learns a rule. The stage
+    // resolves each name before it judges the key's scope, which is what
+    // satisfies "canonicalize before the gates" by construction rather than by
+    // ordering discipline.
+    //
+    // The same stage every other entry point runs, scope included, so a key
+    // misplaced in a bracket is reported exactly as the same key misplaced in
+    // an object is, next to the same neighbours. A bracket can only ever
+    // produce a string or the `true` of a bare key, so the value arm never
+    // refuses anything here. It runs anyway, because that is what makes the
+    // routes unable to drift apart rather than merely agreeing today.
+    //
+    // The bag has no prototype: a bracket key is `[\w-]+`, which can spell
+    // `__proto__`, and on a plain object that assignment would be swallowed
+    // instead of stored.
+    const parsedObject = Object.create(null);
+    for (const [key, value] of admitOptions(written, warn, scope)) parsedObject[key] = value;
+
+    return parsedObject;
+  }
+
+  // The [key, value] pairs one option bracket writes, in order and as written,
+  // before any spelling is resolved: the option grammar's one tokenizer, which
+  // `define()` also reads a definition's own bracket with. Null for an empty
+  // bracket.
+  static #writtenEntries(optionsString) {
     const bracketMatch = optionsString.match(BRACKET_EXTRACT_PATTERN);
     // Stryker disable next-line all: internal invariant, unreachable from public API
     if (!bracketMatch) {
       throw new Error(`#parseOptions: expected bracketed input, got: ${optionsString}`);
     }
     const extractedContent = bracketMatch[1];
-    if (!extractedContent) return;
+    if (!extractedContent) return null;
 
     const written = [];
 
@@ -539,27 +613,42 @@ export class BlissParser {
       }
     }
 
-    // Admitted HERE, where a bracket first becomes an options bag, so every
-    // gate, emitter and serializer downstream sees one spelling of a name the
-    // library or a standard owns and none of them learns a rule. The stage
-    // resolves each name before it judges the key's scope, which is what
-    // satisfies "canonicalize before the gates" by construction rather than by
-    // ordering discipline.
-    //
-    // The same stage every other entry point runs, scope included, so a key
-    // misplaced in a bracket is reported exactly as the same key misplaced in
-    // an object is, next to the same neighbours. A bracket can only ever
-    // produce a string or the `true` of a bare key, so the value arm never
-    // refuses anything here. It runs anyway, because that is what makes the
-    // routes unable to drift apart rather than merely agreeing today.
-    //
-    // The bag has no prototype: a bracket key is `[\w-]+`, which can spell
-    // `__proto__`, and on a plain object that assignment would be swallowed
-    // instead of stored.
-    const parsedObject = Object.create(null);
-    for (const [key, value] of admitOptions(written, warn, scope)) parsedObject[key] = value;
+    return written;
+  }
 
-    return parsedObject;
+  /**
+   * The options a definition's code string writes in its own bracket (see
+   * ownBracketOf), as written, so `define()` and `patchDefinition()` can judge
+   * them as they judge `defaultOptions`. Null when the code string has no own
+   * bracket, or when that bracket is empty.
+   *
+   * @param {string} codeString
+   * @returns {Array<[string, string|true]>|null}
+   */
+  static ownBracketEntries(codeString) {
+    const own = ownBracketOf(codeString, blissElementDefinitions);
+    return own ? BlissParser.#writtenEntries(own.bracket) : null;
+  }
+
+  // What a definition is, read from its code string: the code string it draws
+  // (behind its own bracket) and its own options (its defaultOptions, with
+  // that bracket over them: the bracket wins, as it does where the definition
+  // stands alone). Read at part scope, since the definition is the part it
+  // draws. A further bracket at the same place is reported to `warn` and
+  // dropped; `code` names the definition in that report.
+  static #readDefinition(code, definition, warn) {
+    const { codeString, defaultOptions } = definition;
+    const own = typeof codeString === 'string' ? ownBracketOf(codeString, blissElementDefinitions) : null;
+    if (!own) return { codeString, options: defaultOptions };
+    for (const extra of own.extras) {
+      warn?.({
+        code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+        message: `Multiple option brackets lead the code string of "${code}": "${extra}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b].`,
+        source: extra,
+      });
+    }
+    const options = { ...defaultOptions, ...BlissParser.#parseOptions(own.bracket, warn, { level: 'part', notation: 'bracket' }) };
+    return { codeString: own.body, options: Object.keys(options).length > 0 ? options : undefined };
   }
 
   // Both callers read a bracket that sits on a part, and both pass that scope
@@ -911,24 +1000,7 @@ export class BlissParser {
         };
 
         // Helper: resolve codeString through aliases to check if it's a word.
-        // A hop that is not itself a registry key may still be a DECORATED
-        // reference ('[color=green]WORD', 'WORD^', 'WORD:1,2') — strip the
-        // decoration and keep resolving, else a decorated word alias escapes
-        // wordness detection (external review 2026-07-02 F2).
-        const resolveToFinalCodeString = (code, visited = new Set()) => {
-          if (visited.has(code)) return null;
-          visited.add(code);
-          const def = definitions[code];
-          if (!def?.codeString) return null;
-          if (!definitions[def.codeString]) {
-            const core = stripReferenceDecoration(def.codeString);
-            if (core !== def.codeString && definitions[core]) {
-              return resolveToFinalCodeString(core, visited) ?? def.codeString;
-            }
-            return def.codeString;
-          }
-          return resolveToFinalCodeString(def.codeString, visited);
-        };
+        const resolveToFinalCodeString = (code) => finalCodeStringOf(code, definitions);
 
         // An indicator (char-level `;` or word-level `;;`) binds to exactly one
         // word. When it is bound to a single ALIAS token that expands to MORE
@@ -1401,7 +1473,12 @@ export class BlissParser {
             // point every definition passes through at every nesting depth.
             // The pass is identity for any string without an X-run, and no
             // built-in definition contains one.
-            const codeStringToExpand = processXCodes(definition.codeString);
+            //
+            // What is expanded is the code the definition draws: a bracket
+            // leading its code string is the definition's own options, which
+            // travel with its defaultOptions below.
+            const { codeString: drawnCodeString, options: ownOptions } = BlissParser.#readDefinition(potentialBaseCode, definition, warn);
+            const codeStringToExpand = processXCodes(drawnCodeString);
 
             // Built-in single-character codes: skip expansion, let parseParts handle it.
             // This eliminates the flatten-then-unflatten pattern where expand() substitutes
@@ -1545,9 +1622,10 @@ export class BlissParser {
               expandedParts[0].part = semiParts.join(';');
             }
 
-            // Carry defaultOptions from the definition as data on the first expanded part
-            if (definition.defaultOptions && expandedParts.length > 0) {
-              expandedParts[0].defaultOptions = definition.defaultOptions;
+            // Carry the definition's own options (its defaultOptions and the
+            // bracket leading its code string) as data on the first expanded part
+            if (ownOptions && expandedParts.length > 0) {
+              expandedParts[0].defaultOptions = ownOptions;
             }
 
             // Prepend options to the first expanded part. A char-level option
@@ -1954,7 +2032,10 @@ export class BlissParser {
             const definition = part.codeName?.startsWith('XTXT_')
               ? (() => { const g = createTextFallbackGlyph(part.codeName.slice(5)); g.isShape = true; return g; })()
               : (blissElementDefinitions[part.codeName] || {});
-            const codeString = definition.codeString;
+            // The code the definition draws, behind the bracket that leads its
+            // code string, which is the definition's own options and so this
+            // part's.
+            const { codeString, options: ownOptions } = BlissParser.#readDefinition(part.codeName, definition, warn);
 
             if (codeString) {
               if (codeString.includes('/')) {
@@ -1963,7 +2044,7 @@ export class BlissParser {
               } else if (codeString.includes(';') || codeString.includes(':')
                   || PART_OPTION_CODESTRING.test(codeString)
                   || blissElementDefinitions[codeString]?.codeString ) {
-                part.parts = parseParts(definition.codeString, depth + 1);
+                part.parts = parseParts(codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {
                 // Single-code rename to a primitive replaces codeName, which
@@ -1971,7 +2052,7 @@ export class BlissParser {
                 // (Phase 2.3b). Record it so preserve-mode serialization can
                 // restore it; default output keeps the resolved target.
                 part._aliasCodeName = part.codeName;
-                part.codeName = definition.codeString;
+                part.codeName = codeString;
               }
             }
 
@@ -1981,7 +2062,7 @@ export class BlissParser {
               part.errorCode = 'WORD_AS_PART';
             }
 
-            BlissParser.#applyDefinitionMetadata(part, definition);
+            BlissParser.#applyDefinitionMetadata(part, definition, ownOptions);
             BlissParser.#applyEffectiveMetadata(part, definition);
             BlissParser.#flagCompositePart(part, partIndex);
             partIndex++;
@@ -2151,24 +2232,28 @@ export class BlissParser {
    * is transparent, so the resolved target's indicator-ness and anchor
    * metadata must reach the part (GH #35 — indicator-ness carries through an
    * alias). Runs second so explicit part options and the alias's own
-   * defaultOptions keep precedence over the target's. A no-op whenever no
+   * options keep precedence over the target's. A no-op whenever no
    * rename chain applies (effective === immediate).
    */
   static #applyEffectiveMetadata(part, definition) {
     const effective = resolveEffectiveDefinition(definition, blissElementDefinitions);
     if (effective !== definition) {
-      BlissParser.#applyDefinitionMetadata(part, effective);
+      // Read without reporting: the code string that was read for this part
+      // has reported already.
+      BlissParser.#applyDefinitionMetadata(part, effective, BlissParser.#readDefinition(undefined, effective).options);
     }
   }
 
   /**
-   * Copy definition metadata (defaultOptions, indicator, anchor offsets)
+   * Copy definition metadata (its own options, indicator, anchor offsets)
    * onto a part object. Shared by parseParts, #expandPartRecursive, and
-   * #parseCodeStringToParts to keep the logic in one place.
+   * #parseCodeStringToParts to keep the logic in one place. `options` are the
+   * definition's own, as #readDefinition reads them where its code string is
+   * read.
    */
-  static #applyDefinitionMetadata(part, definition) {
-    if (definition.defaultOptions) {
-      part.options = { ...definition.defaultOptions, ...(part.options || {}) };
+  static #applyDefinitionMetadata(part, definition, options) {
+    if (options) {
+      part.options = { ...options, ...(part.options || {}) };
     }
     if (definition.isIndicator) {
       part.isIndicator = true;
@@ -2194,7 +2279,8 @@ export class BlissParser {
     const definition = blissElementDefinitions[part.codeName];
     if (!definition) return;
 
-    const codeString = definition.codeString;
+    // Read as parseParts reads it: behind the definition's own bracket.
+    const { codeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
     if (codeString) {
       // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
       if (codeString.includes('/')) return;
@@ -2210,7 +2296,7 @@ export class BlissParser {
       }
     }
 
-    BlissParser.#applyDefinitionMetadata(part, definition);
+    BlissParser.#applyDefinitionMetadata(part, definition, options);
     BlissParser.#applyEffectiveMetadata(part, definition);
   }
 
@@ -2234,7 +2320,7 @@ export class BlissParser {
       if (part.options && Object.keys(part.options).length === 0) delete part.options;
 
       const definition = blissElementDefinitions[part.codeName] || {};
-      const innerCodeString = definition.codeString;
+      const { codeString: innerCodeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
 
       if (innerCodeString) {
         if (innerCodeString.includes('/')) {
@@ -2250,7 +2336,7 @@ export class BlissParser {
         }
       }
 
-      BlissParser.#applyDefinitionMetadata(part, definition);
+      BlissParser.#applyDefinitionMetadata(part, definition, options);
       BlissParser.#applyEffectiveMetadata(part, definition);
       parts.push(part);
     }

@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { OPTION_BRACKET_CONTENT, SEMANTIC_INDICATOR_ROOTS } from './bliss-constants.js';
+import { OPTION_BRACKET_CONTENT, SEMANTIC_INDICATOR_ROOTS, peelCharacterBrackets } from './bliss-constants.js';
 
 // Quote-aware option-prefix matchers: overlay codes arrive RESTORED, so a
 // quoted value may carry ']'/';'/':' and a lazy `\[.*?\]` would cut inside
@@ -27,9 +27,12 @@ export const SINGLE_CODE_TOKEN = /^\w+$/;
 /**
  * Resolve a definition to its EFFECTIVE definition by following pure-rename
  * bare aliases: a definition whose whole content is a single-code codeString
- * (no `/`, `;`, `:`, options, `^`) and which carries no identity or metadata
- * of its own (no glyph/shape/externalGlyph flags, no getPath, no isIndicator)
- * is transparent, so indicator-ness and layout metadata read through it.
+ * (no `/`, `;`, `:`, part options, `^`) and which carries no identity or
+ * metadata of its own (no glyph/shape/externalGlyph flags, no getPath, no
+ * isIndicator) is transparent, so indicator-ness and layout metadata read
+ * through it. A character bracket leading the codeString is the definition's
+ * own options, as its defaultOptions are, so the code behind it is the one it
+ * renames.
  * The chain stops at the first definition with identity (a flagged glyph, a
  * shape, an external glyph, an indicator) or whose codeString is not a single
  * clean token — so a multi-code composition NEVER resolves through (the
@@ -55,13 +58,13 @@ export function resolveEffectiveDefinition(definition, definitions) {
     current.isIndicator !== true &&
     !current.isBlissGlyph && !current.isShape && !current.isExternalGlyph &&
     !current.glyphCode && typeof current.getPath !== 'function' &&
-    typeof current.codeString === 'string' &&
-    SINGLE_CODE_TOKEN.test(current.codeString) &&
-    !seen.has(current.codeString) &&
-    Object.prototype.hasOwnProperty.call(definitions, current.codeString)
+    typeof current.codeString === 'string'
   ) {
-    seen.add(current.codeString);
-    current = definitions[current.codeString];
+    const target = peelCharacterBrackets(current.codeString).body;
+    if (!SINGLE_CODE_TOKEN.test(target) || seen.has(target)
+        || !Object.prototype.hasOwnProperty.call(definitions, target)) break;
+    seen.add(target);
+    current = definitions[target];
   }
   return current ?? definition;
 }
@@ -433,7 +436,8 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
  * @returns {Object|undefined} a fresh part node, or undefined when the code reads as nothing
  */
 export function wordIndicatorNode(code, definitions, parse) {
-  const parsedParts = parse(code)?.groups?.[0]?.glyphs?.[0]?.parts;
+  const parsedGlyph = parse(code)?.groups?.[0]?.glyphs?.[0];
+  const parsedParts = parsedGlyph?.parts;
   const bare = getBareCode(code);
   // A custom flagged compound indicator (e.g. define COMBI = 'B97;B99:3,0')
   // parses at GLYPH level into multiple decomposed parts, unlike a built-in
@@ -477,13 +481,15 @@ export function wordIndicatorNode(code, definitions, parse) {
       if (effective.anchorOffsetX !== undefined) node.anchorOffsetX = effective.anchorOffsetX;
     }
   }
-  // A standalone parse of an alias code lands the alias definition's
-  // defaultOptions at GLYPH level, so the extracted part node would
-  // silently lose them (`;;` diverging from the `;`-part slot). Merge them
-  // here with the same precedence as #applyDefinitionMetadata: explicit
-  // options on the code win.
-  if (immediate?.defaultOptions) {
-    node.options = { ...immediate.defaultOptions, ...(node.options || {}) };
+  // A standalone parse of a defined code lands the options the definition
+  // brings of its own (its defaultOptions, the character bracket leading its
+  // code string, and those of an alias it renames) at GLYPH level, so the
+  // extracted part node would silently lose them (`;;` diverging from the
+  // `;`-part slot). A stored `;;` code carries no character bracket (the store
+  // strips it), so nothing else reaches that level. Merge them here with the
+  // same precedence as the slot: explicit options on the code win.
+  if (parsedGlyph.options) {
+    node.options = { ...parsedGlyph.options, ...(node.options || {}) };
   }
   return node;
 }

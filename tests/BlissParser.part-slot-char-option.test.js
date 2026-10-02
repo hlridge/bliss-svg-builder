@@ -54,6 +54,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   DUPLICATE_KEY noise on that surface, unrelated to the peel).
  * - Global-only KEYS inside an otherwise valid bracket
  *   (MISPLACED_GLOBAL_OPTION), see `BlissParser.global-option-scope.test.js`.
+ * - A character bracket LEADING a definition's codeString, which is the
+ *   definition's own options rather than a misplaced bracket wherever the
+ *   code is used, see `BlissSVGBuilder.code-string-own-bracket.test.js`.
  */
 describe('BlissParser part-slot character options', () => {
   beforeAll(() => {
@@ -528,25 +531,38 @@ describe('BlissParser part-slot character options', () => {
 
   // A definition used in a LATER part slot is re-parsed by a nested pass that
   // no glyph-level peel has run over, so a doubled bracket baked in its
-  // codeString still reaches the raw string. Parity breaks there: the written
-  // twin renders, the definition does not. Pre-existing (both spellings failed
-  // before GH #40 too) and it belongs to the registered "definition-side
-  // ingestion is quote-unaware" family, so it is pinned, not fixed here. The
-  // active tests pin the floor that DOES hold, visible-not-silent, and they are
-  // also what kills the surviving lazy-bracket-class mutant recorded in
-  // mutation-testing.md.
+  // codeString reaches that pass raw. A character bracket leading the
+  // codeString is the definition's own options and is read off first, so a
+  // doubled part bracket behind it reads as the written one does: the first
+  // applies, the second is reported. A quoted `]` inside a part bracket still
+  // breaks parity: the written twin renders, the definition does not.
+  // Pre-existing (both spellings failed before GH #40 too) and it belongs to
+  // the registered "definition-side ingestion is quote-unaware" family, so it
+  // is pinned, not fixed here. That row pins the floor that DOES hold,
+  // visible-not-silent, and it is also what kills the surviving
+  // lazy-bracket-class mutant recorded in mutation-testing.md.
   describe('when a definition bakes a doubled bracket and is used as a later part', () => {
     const NESTED = {
       _DUP_NESTED: { codeString: '[color=red][fill=green]>[stroke-width=2]>C8' },
       _DUP_QUOTED: { codeString: '[data-x="a]b"]>[fill=green]>C8' },
     };
-    beforeAll(() => BlissSVGBuilder.define(NESTED));
-    afterAll(() => Object.keys(NESTED).forEach(k => BlissSVGBuilder.removeDefinition(k)));
+    const SINGLE = { _DUP_ONCE: { codeString: '[color=red][fill=green]>C8' } };
+    beforeAll(() => BlissSVGBuilder.define({ ...NESTED, ...SINGLE }));
+    afterAll(() => [...Object.keys(NESTED), ...Object.keys(SINGLE)].forEach(k => BlissSVGBuilder.removeDefinition(k)));
 
-    it.each(Object.keys(NESTED))('fails %s visibly rather than applying a bracket silently', (name) => {
-      const b = build(`S8;${name}`);
+    it('fails _DUP_QUOTED visibly rather than applying a bracket silently', () => {
+      const b = build('S8;_DUP_QUOTED');
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
       expect(b.toString()).toBe('S8');
+    });
+
+    it('reports the doubled part bracket of _DUP_NESTED and draws it as the definition without that bracket', () => {
+      // regression: failed with UNKNOWN_CODE, as the quoted one still does,
+      // until its leading character bracket was read as the definition's own
+      // options; the part brackets behind it then sit at one scope
+      const b = build('S8;_DUP_NESTED');
+      expect(b.warnings.map(w => [w.code, w.source])).toEqual([['MULTIPLE_OPTION_BRACKETS', '[stroke-width=2]']]);
+      expect(b.svgCode).toBe(build('S8;_DUP_ONCE').svgCode);
     });
 
     it('renders the written twin of each, which is what parity would give', () => {
@@ -555,6 +571,6 @@ describe('BlissParser part-slot character options', () => {
       }
     });
 
-    it.todo('renders a definition-baked doubled bracket like its written twin in a part slot');
+    it.todo('renders a definition-baked part bracket holding a quoted ] like its written twin in a part slot');
   });
 });

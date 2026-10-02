@@ -15,10 +15,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - The digit read behind a part bracket, a coordinate or `;` parts in the
  *   code string of a decorated typed glyph.
  * - A kerning table the definition sets winning over the digit it is made of.
- * - A name whose code string a decorated use cannot read lending the failed
- *   character nothing, so its save still reloads the same drawing, and a
- *   tripwire on that failure, which a later parser fix has to carry into the
- *   layout lookup.
+ * - A typed glyph whose code string leads with a character bracket, read
+ *   behind that bracket (the definition's own options) by a decorated use
+ *   and by the layout lookup alike, each save reloading the same drawing.
  * - The JSON of a typed glyph spelled out to anonymous parts: its layout data
  *   written out, its identity not, and nothing added for a Bliss character.
  *
@@ -28,8 +27,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - A kerning table a definition sets is lost by the default save, bare or
  *   decorated: definition metadata does not travel in the default string (see
  *   the custom-codes handbook page); `preserve` keeps the name.
- * - Why a name with a character bracket in its code string, or one naming a
- *   letter without an outline, fails where it stands decorated.
+ * - Why a name naming a letter without an outline fails where it stands
+ *   decorated.
+ * - How such a bracket draws and saves, see
+ *   `BlissSVGBuilder.code-string-own-bracket.test.js`.
  */
 
 const customCodes = [];
@@ -123,27 +124,22 @@ describe('BlissSVGBuilder named character layout', () => {
       expect(gapAfterFirst('OWNKERN:1/B10')).toBe(2);
     });
 
-    it('lends nothing to a name its use cannot read, so the save still reloads the same drawing', () => {
-      // a character bracket in a code string is not read where the name stands
-      // decorated, so the character fails there; the spacing its neighbours
-      // get must match what the save reloads to
+    it.each([
+      ['a coordinate', 'CHARBRACKETDIGIT:1/B10'],
+      ['a `;` part', 'CHARBRACKETDIGIT;B86/B10'],
+      ['a part bracket', '[color=blue]>CHARBRACKETDIGIT/B10'],
+    ])('reads the digit behind the character bracket leading the code string of a name decorated with %s (%s), and its save reloads the same drawing', (_label, input) => {
+      // regression: the name failed with UNKNOWN_CODE wherever it stood
+      // decorated. That bracket is the definition's own options, so the use
+      // reads the digit behind it, and the layout lookup must read the same
+      // digit or the working use draws without the digit's kerning
       customCodes.push('CHARBRACKETDIGIT');
       expect(BlissSVGBuilder.define({ CHARBRACKETDIGIT: { type: 'glyph', codeString: '[color=red]B9' } }).defined).toEqual(['CHARBRACKETDIGIT']);
-      const builder = new BlissSVGBuilder('[color=blue]>CHARBRACKETDIGIT/B10');
+      const builder = new BlissSVGBuilder(input);
+      expect(builder.warnings).toEqual([]);
+      expect(gapAfterFirst(input)).toBe(1);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
-
-    it.each(['CHARBRACKETDIGIT:1/B10', 'CHARBRACKETDIGIT;B86/B10', '[color=blue]>CHARBRACKETDIGIT/B10'])(
-      'still fails the name in %s where it stands decorated', (input) => {
-        // tripwire: a shipped parser limit (backlog, "Definition-reference
-        // hygiene nits", niche 2). When a decorated use learns to read a
-        // character bracket in a code string, the layout lookup has to read it
-        // too (firstBaseCode strips part brackets only), or the newly working
-        // use draws without the name's spacing
-        customCodes.push('CHARBRACKETDIGIT');
-        expect(BlissSVGBuilder.define({ CHARBRACKETDIGIT: { type: 'glyph', codeString: '[color=red]B9' } }).defined).toEqual(['CHARBRACKETDIGIT']);
-        expect(new BlissSVGBuilder(input).warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
-      });
   });
 
   describe('when a typed glyph spelled out to anonymous parts is saved as JSON', () => {

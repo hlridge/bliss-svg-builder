@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { getBareCode, mergeWordIndicatorsOntoHead, partitionWordIndicators, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -3734,12 +3734,16 @@ class BlissSVGBuilder {
     const def = blissElementDefinitions[code];
     if (!def?.codeString) return code;
     // Only a code string that is one code reference resolves further. A
-    // separator, a coordinate, an option bracket or its part-scope marker
-    // makes it a composition no single code draws, and its text would
-    // otherwise be published as a code name (`[color=red]>B291`).
-    if (!/[;/:[>]/.test(def.codeString)) {
-      if (builtInCodes.has(def.codeString)) return def.codeString;
-      return BlissSVGBuilder.#resolveToBuiltInCode(def.codeString, visited);
+    // separator, a coordinate, a part bracket or its part-scope marker makes
+    // it a composition no single code draws, and its text would otherwise be
+    // published as a code name (`[color=red]>B291`). A character bracket
+    // leading it is the definition's own options, not part of what it draws,
+    // so it is read off first; any other bracket comes with a `>`, `;` or `/`,
+    // and the `[` stays only so that no bracket text can ever be published.
+    const renamed = BlissSVGBuilder.#renamedCode(def.codeString);
+    if (!/[;/:[>]/.test(renamed)) {
+      if (builtInCodes.has(renamed)) return renamed;
+      return BlissSVGBuilder.#resolveToBuiltInCode(renamed, visited);
     }
     return null; // Complex codeString — parts already expanded, no single code
   }
@@ -3944,8 +3948,9 @@ class BlissSVGBuilder {
           || typeof def.getPath === 'function') {
         identityDef = def;
       }
-      if (!SINGLE_CODE_TOKEN.test(def.codeString)) break;
-      code = def.codeString;
+      const renamed = BlissSVGBuilder.#renamedCode(def.codeString);
+      if (!SINGLE_CODE_TOKEN.test(renamed)) break;
+      code = renamed;
     }
     if (!identityDef || !Array.isArray(parts)) return null;
     const named = BlissSVGBuilder.#partsNamedBy(name, readings);
@@ -4051,8 +4056,9 @@ class BlissSVGBuilder {
     const seen = new Set();
     while (!seen.has(code)) {
       seen.add(code);
-      const next = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
+      const written = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
         ? blissElementDefinitions[code].codeString : undefined;
+      const next = typeof written === 'string' ? BlissSVGBuilder.#renamedCode(written) : undefined;
       if (typeof next !== 'string' || !Object.prototype.hasOwnProperty.call(blissElementDefinitions, next)) break;
       code = next;
     }
@@ -4085,10 +4091,19 @@ class BlissSVGBuilder {
       const def = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
         ? blissElementDefinitions[code] : undefined;
       if (!def || typeof def.codeString !== 'string') return true;
-      if (!SINGLE_CODE_TOKEN.test(def.codeString)) return false;
-      code = def.codeString;
+      const renamed = BlissSVGBuilder.#renamedCode(def.codeString);
+      if (!SINGLE_CODE_TOKEN.test(renamed)) return false;
+      code = renamed;
     }
     return true;
+  }
+
+  // The code a definition's code string renames, read behind the character
+  // brackets leading it: such a bracket is the definition's own options, as its
+  // defaultOptions are, so it does not turn a rename into a composition. The
+  // same reading the alias resolution and the parser make.
+  static #renamedCode(codeString) {
+    return peelCharacterBrackets(codeString).body;
   }
 
   // Check if a codeString references only allowed types
@@ -4271,7 +4286,10 @@ class BlissSVGBuilder {
       }
     }
 
-    if (!hasGetPath) BlissSVGBuilder.#assertCodeStringReadable('define', code, 'shape', entry);
+    if (!hasGetPath) {
+      BlissSVGBuilder.#assertOwnBracketDescribesTheCharacter('define', code, entry.codeString);
+      BlissSVGBuilder.#assertCodeStringReadable('define', code, 'shape', entry);
+    }
 
     blissElementDefinitions[code] = entry;
   }
@@ -4326,7 +4344,11 @@ class BlissSVGBuilder {
   // caller typed. The translation to the stored spelling runs after this guard,
   // so a canvas key is checked in both spellings and a use-site key by the name
   // it will be stored under.
-  static #assertDefaultOptionsDescribeTheCharacter(callName, code, defaultOptions) {
+  //
+  // `subject` names where the options were written: `defaultOptions`, or the
+  // character bracket leading a code string, which is the definition's own
+  // options too and so is judged by this same guard.
+  static #assertDefaultOptionsDescribeTheCharacter(callName, code, defaultOptions, subject = 'defaultOptions') {
     for (const key of Object.keys(defaultOptions)) {
       // Trim before matching: the serializer emits a padded key as
       // '[ margin=2]' and #parseOptions reads that as plain 'margin', so a
@@ -4339,7 +4361,7 @@ class BlissSVGBuilder {
       // where the parser can read a key this guard never saw
       // ('margin=2;color' emits as '[margin=2;color=red]').
       if (!isSafeAttributeName(normalized)) {
-        throw new Error(`${callName}("${code}"): defaultOptions key "${key}" is not a valid option name.`);
+        throw new Error(`${callName}("${code}"): ${subject} cannot include "${key}": it is not a valid option name.`);
       }
       // The two internal names have no curated kebab twin, so neither spelling
       // test below can see that they mean `crop`, which IS global-only:
@@ -4354,26 +4376,38 @@ class BlissSVGBuilder {
         const named = internalOnly
           ? `"${key}", the library's internal name for the global-only option "${internalOnly}"`
           : `the global-only option "${key}"`;
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include ${named}; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
+        throw new Error(`${callName}("${code}"): ${subject} cannot include ${named}; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
       // Same reasoning one step along: a layer key targets a layer of the whole
       // SVG, so it is inert wherever a definition's defaults attach.
       if (isLayerAttributeKey(normalized)) {
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include the layer option "${key}"; it targets a layer of the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
+        throw new Error(`${callName}("${code}"): ${subject} cannot include the layer option "${key}"; it targets a layer of the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
       // The stored name is the one that acts where the definition is used, and
       // it is not always the typed one: `X` is stored as `x`.
       const stored = canonicalOptionKey(normalized);
       if (stored === 'x' || stored === 'y') {
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include the position option "${key}"; a position says where one use of a character sits, not what the character is. Set it where the code is used instead, as a coordinate (${code}:x,y) or the ${stored} option on that element.`);
+        throw new Error(`${callName}("${code}"): ${subject} cannot include the position option "${key}"; a position says where one use of a character sits, not what the character is. Set it where the code is used instead, as a coordinate (${code}:x,y) or the ${stored} option on that element.`);
       }
       if (Object.hasOwn(KERNING_OPTION_KEYS, stored)) {
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include the kerning option "${key}"; kerning is the gap before one use of a character, not part of what the character is. Set it where the code is used instead, with an RK:/AK: marker before it or in that character's options, or in the kerningRules of the character before it when the gap depends on the pair.`);
+        throw new Error(`${callName}("${code}"): ${subject} cannot include the kerning option "${key}"; kerning is the gap before one use of a character, not part of what the character is. Set it where the code is used instead, with an RK:/AK: marker before it or in that character's options, or in the kerningRules of the character before it when the gap depends on the pair.`);
       }
       if (stored === 'key') {
-        throw new Error(`${callName}("${code}"): defaultOptions cannot include "${key}"; a key identifies one element, so every use of the definition would share it. Set it on the element where the code is used instead.`);
+        throw new Error(`${callName}("${code}"): ${subject} cannot include "${key}"; a key identifies one element, so every use of the definition would share it. Set it on the element where the code is used instead.`);
       }
     }
+  }
+
+  // A character bracket leading a code string that draws one character is the
+  // definition's own options, as its defaultOptions are, so the same guard
+  // judges its keys, in the spelling the author wrote them. The parser says
+  // which bracket that is, so define() and every use agree: over a word the
+  // bracket stays its first character's, decoration the use reports.
+  static #assertOwnBracketDescribesTheCharacter(callName, code, codeString) {
+    const written = BlissParser.ownBracketEntries(codeString);
+    if (!written) return;
+    BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter(
+      callName, code, Object.fromEntries(written), 'the character bracket leading its codeString');
   }
 
   static #defineGlyph(code, definition, options = {}, warnings) {
@@ -4452,6 +4486,8 @@ class BlissSVGBuilder {
         entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
+
+    BlissSVGBuilder.#assertOwnBracketDescribesTheCharacter('define', code, entry.codeString);
 
     if (entry.isIndicator === true) {
       BlissSVGBuilder.#assertNoIndicatorBakeDependents('define', code, entry);
@@ -4613,15 +4649,18 @@ class BlissSVGBuilder {
     }
   }
 
-  // The parser's reading of `entry` as written input names a code, with the
-  // entry in the registry under the stand-in for exactly as long as the read
-  // takes. Null when the read throws, which only a runaway reference chain can
-  // make it do, and that is not what #assertCodeStringReadable judges.
+  // The parser's reading of `entry`'s code string as written input that names
+  // it, with the code string in the registry under the stand-in for exactly as
+  // long as the read takes. The stand-in is a bare alias of the code string
+  // alone, which every use expands as written, so what is judged is the code
+  // string whatever kind of definition holds it and however a use of that kind
+  // is stored. Null when the read throws, which only a runaway reference chain
+  // can make it do, and that is not what #assertCodeStringReadable judges.
   static #readAsUsed(entry) {
     const standIn = BlissSVGBuilder.#READING_STAND_IN;
     const hadStandIn = Object.hasOwn(blissElementDefinitions, standIn);
     const displaced = blissElementDefinitions[standIn];
-    blissElementDefinitions[standIn] = entry;
+    blissElementDefinitions[standIn] = { codeString: entry.codeString };
     try {
       return BlissParser.parse(standIn);
     } catch {
@@ -4706,6 +4745,8 @@ class BlissSVGBuilder {
         entry.defaultOptions = BlissSVGBuilder.#toCuratedSpelling(defaultOptionsSnapshot, code, warnings);
       }
     }
+
+    BlissSVGBuilder.#assertOwnBracketDescribesTheCharacter('define', code, entry.codeString);
 
     if (resolveEffectiveDefinition(entry, blissElementDefinitions)?.isIndicator === true) {
       BlissSVGBuilder.#assertNoIndicatorBakeDependents('define', code, entry);
@@ -5040,6 +5081,7 @@ class BlissSVGBuilder {
     }
 
     if ('codeString' in changes) {
+      BlissSVGBuilder.#assertOwnBracketDescribesTheCharacter('patchDefinition', code, changes.codeString);
       BlissSVGBuilder.#assertCodeStringReadable('patchDefinition', code, type, { ...def, ...changes });
     }
 

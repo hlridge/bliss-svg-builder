@@ -549,6 +549,36 @@ export const serializeOptionValue = (value) => {
 export const OPTION_BRACKET_CONTENT = String.raw`(?:(?=(?<atom>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\]]))\k<atom>)*`;
 
 /**
+ * One character-scope option bracket (no `>` after it) at the start of a
+ * definition's code string: group 1 the bracket, group 2 the grammar's
+ * internal atom, group 3 the text behind it. A code string is raw text, so the
+ * bracket is read with the quote-aware grammar above: a quoted `]` does not end
+ * it, and a part bracket holding one (`[data-x="a]b"]>C8`) is not mistaken for
+ * a character bracket followed by junk.
+ */
+const CHARACTER_BRACKET_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.*)`);
+
+/**
+ * A definition's code string split into the character brackets leading it, in
+ * order, and the text behind them. Shared by the parser's reading of a
+ * definition's own options and by the alias resolution that reads through
+ * them, so the two cannot disagree about where such a bracket ends.
+ *
+ * @param {string} codeString
+ * @returns {{ brackets: string[], body: string }}
+ */
+export const peelCharacterBrackets = (codeString) => {
+  const brackets = [];
+  let body = codeString;
+  let match;
+  while ((match = body.match(CHARACTER_BRACKET_PATTERN)) !== null) {
+    brackets.push(match[1]);
+    body = match[3];
+  }
+  return { brackets, body };
+};
+
+/**
  * Generates a random 8-character key for element identity.
  * ~2.8 trillion combinations — negligible collision probability.
  */
