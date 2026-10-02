@@ -242,11 +242,15 @@ describe('BlissParser option placement', () => {
     // regression: external review 2026-07-02 F1 — the nest-parse fix covered
     // only the string parser; the object-rebuild paths (default toJSON strips
     // nested parts) still turned the baked option into one unknown codeName.
-    it('rebuilds identically from default toJSON()', () => {
+    // The default toJSON() now spells the alias out as the string does, so its
+    // rebuild draws what the string's reload draws: the same ink, without the
+    // outer group the alias's own part kept. The `preserve` row below still
+    // rebuilds through the alias.
+    it('rebuilds from default toJSON() as its string reloads', () => {
       const orig = build('[color=blue]>OPTG_INNEROPT');
       const rebuilt = new BlissSVGBuilder(orig.toJSON());
       expect(rebuilt.warnings).toEqual([]);
-      expect(rebuilt.svgCode).toBe(orig.svgCode);
+      expect(rebuilt.svgCode).toBe(build(orig.toString()).svgCode);
     });
 
     it('rebuilds identically from preserve toJSON()', () => {

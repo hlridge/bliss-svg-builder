@@ -1,7 +1,8 @@
 /**
  * Pins that a key misplaced inside a definition's code string is reported and
  * dropped however the composition names the definition: in a string, or in a
- * composition object such as a saved `toJSON()`.
+ * composition object such as a saved `toJSON({ preserve: true })` (the default
+ * `toJSON()` spells a custom code out, so it names none).
  *
  * A code string is DSL text, so its brackets are brackets wherever the
  * definition is expanded, and a key a part bracket cannot act on (a canvas-wide
@@ -84,8 +85,9 @@ const FAMILIES = [
 const namedInString = (code) => new BlissSVGBuilder(`B313;${code}`);
 
 // A real save reloaded: the saved part names the definition and holds none of
-// its content, so reloading is what expands it.
-const namedInObject = (code) => new BlissSVGBuilder(namedInString(code).toJSON());
+// its content, so reloading is what expands it. The `preserve` save, because
+// the default save spells a custom code out and so names no definition.
+const namedInObject = (code) => new BlissSVGBuilder(namedInString(code).toJSON({ preserve: true }));
 
 const everySave = (builder) =>
   `${builder.toString()} ${JSON.stringify(builder.toJSON())} ${JSON.stringify(builder.toJSON({ deep: true }))}`;
@@ -93,7 +95,7 @@ const everySave = (builder) =>
 describe('BlissSVGBuilder definition scope admission', () => {
   describe('when a saved composition names a definition whose code string misplaces a key', () => {
     it.each(FAMILIES)('reports %s exactly as the string naming the definition does', (_family, code, report) => {
-      const saved = namedInString(code).toJSON();
+      const saved = namedInString(code).toJSON({ preserve: true });
 
       // the row only tests the expansion while the save names the definition
       expect(saved.groups[0].glyphs[0].parts[1]).toEqual({ codeName: code });

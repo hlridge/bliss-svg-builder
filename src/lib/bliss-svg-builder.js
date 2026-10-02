@@ -2970,105 +2970,34 @@ class BlissSVGBuilder {
     // A code reads the same way throughout one save, so it is parsed once.
     const readings = new Map();
 
-    // Serialize a part with ; delimiter and :x,y positions.
-    // Recursively decomposes custom shapes and glyphs unless preserve is set.
-    function serializeParts(parts, offsetX = 0, offsetY = 0, writtenX = false, writtenY = false) {
-      return parts.map((part, partIndex) => {
+    // Where the save writes a custom part by its name rather than spelling it
+    // out. Only `preserve` keeps a name, and only one the reload reads back as
+    // the same part. A BASE-slot bare alias with `;`-siblings is spelled out:
+    // a bare-alias base drops its appended parts on reparse (strict
+    // separation), so writing the name would shed the siblings, while a typed
+    // base dumb-appends and keeps its name. A name that no longer carries what
+    // it supplies is spelled out too. A name the save restored was judged where
+    // it was restored, against the reading its spelling reloads as.
+    const keepsName = (part, partIndex, parts) => {
+      if (!options.preserve) return false;
+      const isBareAliasBase = partIndex === 0 && parts.length > 1
+        && BlissSVGBuilder.#isBareAliasDefinition(blissElementDefinitions[part.codeName]);
+      return !isBareAliasBase && (part._aliasCodeName === part.codeName
+        || BlissSVGBuilder.#keepsNamedOptions(part, part.codeName, 'part', readings));
+    };
+
+    // Serialize parts with ; delimiter and :x,y positions, each custom part
+    // spelled out unless the save keeps its name. A spelled-out part's option
+    // is written before EACH part it spells out into (`[opts]>B291;[opts]>C8`),
+    // since `[opts]>` binds to one code: render applied it to the whole
+    // `;`-character, and per-part emission computes to the same ink.
+    function serializeParts(parts) {
+      return BlissSVGBuilder.#spelledOutParts(parts, keepsName, readings).map((part) => {
         // An invalid part (no codeName, e.g. the `!B81` in `B291;[x=2]>!B81`)
         // must not let a coordinate suffix or `[opts]>` prefix decorate it into
         // a truthy literal-`undefined` string; drop it before decoration. It
-        // already warned UNKNOWN_CODE at parse. (F3.)
+        // already warned UNKNOWN_CODE at parse.
         if (!part.codeName) return '';
-        // Presence, not value: an axis nobody wrote is unset, not zero. An
-        // unset axis leaves the part wherever it sits on its own, which is the
-        // origin for an ordinary shape but a computed placement for an
-        // indicator, so filling in a `0` the author never wrote reloads as a
-        // different picture. The two questions are asked separately from here.
-        //
-        // A non-zero parent offset forces a value either way: when a nested
-        // composite decomposes, an unset axis would have to be emitted as that
-        // part's own default plus the offset, and only the layout knows the
-        // default. Approximated as 0, which is exact for every ordinary part
-        // and off by the anchor placement for an indicator.
-        //
-        // An axis written on the composite, a zero included, is written on
-        // each ordinary part it spells out into. Such a part sits at the
-        // composite's origin unless it wrote its own place, so the written
-        // axis says exactly where it is, and the part stays a position the
-        // leading-indicator rule reads: dropping the zero made the reload
-        // drop an indicator the builder had kept. An indicator's place is the
-        // indicator layout's, so under a zero offset it is left to the reload.
-        //
-        // The addition below is arithmetic only because the positioning
-        // invariant guarantees it: an axis on the authoring structure is a
-        // finite number or absent, whichever channel wrote it. Without that
-        // guarantee `+` concatenates, and a string `'3'` under a zero offset
-        // becomes `30`. Any new route that writes an axis belongs behind
-        // normalizePositionFields, not behind a second coercion here.
-        const takesWrittenAxis = part.isIndicator !== true;
-        const hasX = part.x !== undefined || offsetX !== 0 || (writtenX && takesWrittenAxis);
-        const hasY = part.y !== undefined || offsetY !== 0 || (writtenY && takesWrittenAxis);
-        const x = (part.x ?? 0) + offsetX;
-        const y = (part.y ?? 0) + offsetY;
-        // Under preserve a BASE-slot custom name with `;`-siblings still
-        // decomposes when the name is a bare alias: a bare-alias base drops
-        // its appended parts on reparse (strict separation), so emitting the
-        // name would silently shed the siblings. A typed custom base keeps
-        // its name (a typed base dumb-appends on reparse).
-        const isBareAliasBase = options.preserve && partIndex === 0 && parts.length > 1
-          && BlissSVGBuilder.#isBareAliasDefinition(blissElementDefinitions[part.codeName]);
-        // A failed part (COMPOSITE_AS_PART keeps its expanded `.parts`) must
-        // re-emit by its written name, never decomposed: decomposing a
-        // composite alias (`_X` -> `B291;B81`) changes what the warned string
-        // re-parses to (the buried baked indicator resurfaces, the whole-char
-        // failure becomes a different valid character). preserve already keeps
-        // the name; this makes default agree. (Row 80.) WORD_AS_PART has no
-        // `.parts`, so it already round-tripped; the guard just unifies them.
-        // Under preserve a custom name is also spelled out when it no longer
-        // carries what it supplies. A name the save restored was judged where
-        // it was restored, against the reading its spelling reloads as.
-        const restored = part._aliasCodeName === part.codeName;
-        if ((!options.preserve || isBareAliasBase
-            || (!restored && !BlissSVGBuilder.#keepsNamedOptions(part, part.codeName, 'part', readings)))
-            && !builtInCodes.has(part.codeName) && !part.errorCode) {
-          // Custom code with nested parts (e.g., positioned custom glyph)
-          if (part.parts) {
-            // A part-level option on the custom base must survive decomposition,
-            // but `[opts]>` binds to ONE code, so a multi-code (`;`) result
-            // re-emits the option before EACH decomposed part
-            // (`[opts]>B291;[opts]>C8`): render applied it to the whole
-            // `;`-character, and per-part emission computes to the same ink.
-            // Merging structurally, inner keys winning, keeps a part's own
-            // option authoritative, the order nested <g> attribute inheritance
-            // resolves to. Keys collide at the ATTRIBUTE level, not the key
-            // level: `color` aliases `stroke` (and camel `strokeWidth` its
-            // kebab form), and the renderer dedupes explicit-beats-alias, so an
-            // outer `stroke` merged next to a part's own `color` would flip the
-            // part's paint on round-trip unless it yields here. (TF-3G / TF-3.)
-            const attrChannel = (k) =>
-              k === 'color' ? 'stroke' : k === 'strokeWidth' ? 'stroke-width' : k;
-            const innerParts = part.options
-              ? part.parts.map(p => {
-                  const ownChannels = new Set(Object.keys(p.options ?? {}).map(attrChannel));
-                  const outer = Object.entries(part.options)
-                    .filter(([k]) => !ownChannels.has(attrChannel(k)));
-                  return { ...p, options: { ...Object.fromEntries(outer), ...p.options } };
-                })
-              : part.parts;
-            return serializeParts(innerParts, x, y, hasX, hasY);
-          }
-          // A custom shape part with no parts of its own: its definition arrived
-          // after the composition was built, so the tree still holds the bare
-          // name. It is written as the node it would hold had the definition
-          // existed at parse time, so the late save writes what the early one
-          // does, and no definition text is copied that a save without options
-          // would have to strip. (That save never gets here: its clear already
-          // made the same expansion on its working copy.)
-          const node = structuredClone(part);
-          if (BlissSVGBuilder.#expandLateShape(node, readings)) {
-            return serializeParts([node], offsetX, offsetY, writtenX, writtenY);
-          }
-        }
         // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
         let str = part.codeName.startsWith('XTXT_')
           ? 'X' + part.codeName.slice(5)
@@ -3082,7 +3011,7 @@ class BlissSVGBuilder {
         // (Canonicalize within a level, preserve across levels: a glyph, a word
         // and the composition have no coordinate spelling of their own, so a
         // position at those levels stays a bracket.)
-        str += BlissSVGBuilder.#positionSuffix(hasX ? x : undefined, hasY ? y : undefined);
+        str += BlissSVGBuilder.#positionSuffix(part.x, part.y);
         // Prefix part-level options with [opts]> syntax, less the look a code
         // the string can only name draws with by its own name
         const optPrefix = serializeOptions(
@@ -3487,7 +3416,17 @@ class BlissSVGBuilder {
             delete glyph.transientOptions;
             if (glyph.options) delete glyph.options.key;
             publishOptionSpellings(glyph);
-            if (glyph.parts) stripParts(glyph.parts, glyph);
+            if (glyph.parts) {
+              // The public JSON spells a custom code out as the string does,
+              // so another instance can read it without the definition: a
+              // part named by one is published as the parts it draws.
+              // `preserve` keeps the names, and `deep` output feeds the
+              // string, which spells them out itself.
+              if (!options.preserve && !options.deep) {
+                glyph.parts = BlissSVGBuilder.#spelledOutParts(glyph.parts, () => false, readings);
+              }
+              stripParts(glyph.parts, glyph);
+            }
 
             // Did this glyph ever have an identity code? Read it BEFORE the
             // rename below, which drops the code for a custom glyph decomposed
@@ -3854,6 +3793,92 @@ class BlissSVGBuilder {
     BlissSVGBuilder.#clearOwnOptions(node, level);
     const children = level === 0 ? node.groups : level === 1 ? node.glyphs : node.parts;
     for (const child of children ?? []) BlissSVGBuilder.#clearOptionsFrom(child, Math.min(level + 1, 3));
+  }
+
+  // The parts a save writes for `parts`: a part named by a custom definition
+  // with a code string gives way to the parts it holds, recursively, so no
+  // instance needs the definition to read the save. One step for both saves,
+  // so the string and the public JSON spell a custom code out alike; the
+  // string then formats the parts, the JSON publishes them. `keepsName(part,
+  // index, parts)` says where the save writes the name instead.
+  //
+  // A built-in is never spelled out, nor a part that failed: it re-reads by
+  // the name it was written with, and spelling out a composite alias
+  // (`_X` -> `B291;B81`) would change what the warned text reloads to. A code
+  // drawn by its own function has nothing to spell out into. A shape defined
+  // after the composition was built still holds the bare name, so it is first
+  // given the node it would hold had the definition existed then, and spelled
+  // out from there. A part with no code is left as it stands: the string drops
+  // it, the JSON publishes it.
+  //
+  // A spelled-out part's options go under each inner part's own, and its
+  // position is added to theirs. Presence, not value: an axis nobody wrote is
+  // unset, not zero. An unset axis leaves the part wherever it sits on its
+  // own, which is the origin for an ordinary shape but a computed placement
+  // for an indicator, so filling in a `0` the author never wrote reloads as a
+  // different picture. The two questions are asked separately from here.
+  //
+  // A non-zero offset forces a value either way: an unset axis would have to
+  // be written as that part's own default plus the offset, and only the
+  // layout knows the default. Approximated as 0, which is exact for every
+  // ordinary part and off by the anchor placement for an indicator.
+  //
+  // An axis written on the spelled-out part, a zero included, is written on
+  // each ordinary part it spells out into. Such a part sits at the composite's
+  // origin unless it wrote its own place, so the written axis says exactly
+  // where it is, and the part stays a position the leading-indicator rule
+  // reads: dropping the zero made the reload drop an indicator the builder had
+  // kept. An indicator's place is the indicator layout's, so under a zero
+  // offset it is left to the reload.
+  //
+  // The addition is arithmetic only because the positioning invariant
+  // guarantees it: an axis on the authoring structure is a finite number or
+  // absent, whichever channel wrote it. Without that guarantee `+`
+  // concatenates, and a string `'3'` under a zero offset becomes `30`. Any new
+  // route that writes an axis belongs behind normalizePositionFields, not
+  // behind a second coercion here.
+  static #spelledOutParts(parts, keepsName, readings, offsetX = 0, offsetY = 0, writtenX = false, writtenY = false) {
+    const placesThrough = offsetX !== 0 || offsetY !== 0 || writtenX || writtenY;
+    return parts.flatMap((part, partIndex) => {
+      if (!part.codeName) return [part];
+      const takesWrittenAxis = part.isIndicator !== true;
+      const hasX = part.x !== undefined || offsetX !== 0 || (writtenX && takesWrittenAxis);
+      const hasY = part.y !== undefined || offsetY !== 0 || (writtenY && takesWrittenAxis);
+      const x = (part.x ?? 0) + offsetX;
+      const y = (part.y ?? 0) + offsetY;
+      if (!builtInCodes.has(part.codeName) && !part.errorCode && !keepsName(part, partIndex, parts)) {
+        if (part.parts) {
+          return BlissSVGBuilder.#spelledOutParts(BlissSVGBuilder.#underOuterOptions(part.parts, part.options),
+            keepsName, readings, x, y, hasX, hasY);
+        }
+        const node = structuredClone(part);
+        if (BlissSVGBuilder.#expandLateShape(node, readings)) {
+          return BlissSVGBuilder.#spelledOutParts([node], keepsName, readings, offsetX, offsetY, writtenX, writtenY);
+        }
+      }
+      if (!placesThrough) return [part];
+      const placed = { ...part };
+      if (hasX) placed.x = x;
+      if (hasY) placed.y = y;
+      return [placed];
+    });
+  }
+
+  // `parts`, each with `outer` under its own options: a part's own value wins,
+  // the order nested <g> attribute inheritance resolves to. Keys meet by the
+  // attribute they write, not by name: `color` writes `stroke` (and camel
+  // `strokeWidth` its kebab form), and the renderer lets the explicit key beat
+  // its alias, so an outer `stroke` beside a part's own `color` would flip the
+  // part's paint on reload unless it yields here. A part `outer` adds nothing
+  // to is left as it stands.
+  static #underOuterOptions(parts, outer) {
+    if (!outer) return parts;
+    const channel = (key) => (key === 'color' ? 'stroke' : key === 'strokeWidth' ? 'stroke-width' : key);
+    return parts.map((part) => {
+      const own = new Set(Object.keys(part.options ?? {}).map(channel));
+      const inherited = Object.entries(outer).filter(([key]) => !own.has(channel(key)));
+      return inherited.length > 0 ? { ...part, options: { ...Object.fromEntries(inherited), ...part.options } } : part;
+    });
   }
 
   // One word-level (`;;`) code without its options: the code and its position
