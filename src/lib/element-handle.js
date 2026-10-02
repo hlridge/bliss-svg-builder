@@ -1509,11 +1509,12 @@ export class ElementHandle {
       if (node.options) deleteOptionByName(node.options, key);
     }
     // What a code the string can only name draws with by its own definition
-    // (a built-in's dotted line, a `getPath` shape's defaults) is part of the
-    // character, so removing one of its keys returns it to the definition's
-    // value instead of taking it off. Clearing does the same, so the two agree,
-    // and no look is made that no save could write back. The names are matched
-    // the way the deletion above matched them, on a copy of the look.
+    // (a built-in's dotted line, a `getPath` shape's defaults) is part of what
+    // the code is, so removing one of its keys from the part the code names
+    // returns it to the definition's value instead of taking it off. Clearing
+    // does the same, so the two agree, and no look is made that no save could
+    // write back. The names are matched the way the deletion above matched
+    // them, on a copy of the look.
     const ownLook = this.#ctx.ownLookAt(node, this.#level);
     if (ownLook) {
       const unnamed = { ...ownLook };

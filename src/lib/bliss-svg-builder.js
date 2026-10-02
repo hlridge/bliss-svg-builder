@@ -3086,7 +3086,7 @@ class BlissSVGBuilder {
         // Prefix part-level options with [opts]> syntax, less the look a code
         // the string can only name draws with by its own name
         const optPrefix = serializeOptions(
-          BlissSVGBuilder.#withoutOwnLook(part.options, part.codeName, 'part', readings));
+          BlissSVGBuilder.#withoutOwnLook(part.options, part.codeName, readings));
         if (optPrefix) str = `${optPrefix}>${str}`;
         return str;
       })
@@ -3203,13 +3203,10 @@ class BlissSVGBuilder {
         if (written) code = written;
       }
 
-      // Prefix glyph-level options (skip internal kerning keys), less the look
-      // a code the string can only name supplies to the character written as
-      // `code`, which reading it back supplies again.
-      const optPrefix = serializeOptionsWithPosition(
-        { ...glyph, options: BlissSVGBuilder.#withoutOwnLook(glyph.options, code, 'glyph', readings) },
-        GLYPH_INTERNAL_KEYS,
-      );
+      // Prefix glyph-level options (skip internal kerning keys), as they stand:
+      // the look a code the string can only name draws with sits on its part,
+      // never on the character, so there is none here to leave out.
+      const optPrefix = serializeOptionsWithPosition(glyph, GLYPH_INTERNAL_KEYS);
       result.push(optPrefix + code);
       return result;
     }
@@ -3750,8 +3747,8 @@ class BlissSVGBuilder {
   // What a code the canonical string can only name draws with by its own
   // definition, or undefined. That is every built-in, and a custom shape drawn
   // by its own function: neither is ever spelled out, so its own look is part
-  // of the character rather than an option on top of it, and clearing an
-  // element named by one returns it to that look instead of stripping it.
+  // of what the code is rather than an option on top of it, and clearing a
+  // part named by one returns it to that look instead of stripping it.
   static #ownLookOf(code) {
     if (!code || !Object.hasOwn(blissElementDefinitions, code)) return undefined;
     const def = blissElementDefinitions[code];
@@ -3759,24 +3756,26 @@ class BlissSVGBuilder {
     return builtInCodes.has(code) || typeof def.getPath === 'function' ? def.defaultOptions : undefined;
   }
 
-  // The own look of the element `node` at `level` (2 a character, 3 a part),
-  // read from the code that names it there; undefined for a word or the
-  // composition, which no code names. Shared by the clear and by the removal
-  // of a named option, so both return an element to the same look.
+  // The own look of the element `node` at `level` (3 a part), read from the
+  // code that names it; undefined at every other level. A character named by a
+  // code holds that code as its one part, and the look belongs to that part,
+  // so a clear at character level leaves it off the character, where it would
+  // style every part added beside the code. Shared by the clear and by the
+  // removal of a named option, so both return an element to the same look.
   static #ownLookAt(node, level) {
-    return BlissSVGBuilder.#ownLookOf(level === 2 ? node.glyphCode : level === 3 ? node.codeName : undefined);
+    return BlissSVGBuilder.#ownLookOf(level === 3 ? node.codeName : undefined);
   }
 
-  // `bag` without the values a code the string can only name supplies by its
-  // own name at this level, wherever the element holds the same value: that
-  // look is part of the character, so the canonical string does not repeat it
-  // (`REFSQUARE`, not `[stroke-dasharray=0 0.999]...REFSQUARE`). A different
+  // A part's `bag` without the values a code the string can only name supplies
+  // by its own name, wherever the part holds the same value: that look is part
+  // of what the code is, so the canonical string does not repeat it
+  // (`REFSQUARE`, not `[stroke-dasharray=0 0.999]>REFSQUARE`). A different
   // value is an override and is written. `code` is what the string writes for
-  // the element, read at `level` the way the reload reads it. Both bags hold
+  // the part, read in a `;` slot the way the reload reads it. Both bags hold
   // the stored spelling of every key, so the keys compare as they stand.
-  static #withoutOwnLook(bag, code, level, readings) {
+  static #withoutOwnLook(bag, code, readings) {
     if (!bag || !BlissSVGBuilder.#ownLookOf(getBareCode(code ?? ''))) return bag;
-    const own = BlissSVGBuilder.#readingOf(code, level, readings)?.options;
+    const own = BlissSVGBuilder.#readingOf(code, 'part', readings)?.options;
     if (!own) return bag;
     return Object.fromEntries(Object.entries(bag).filter(([key, value]) =>
       !Object.hasOwn(own, key) || serializeOptionValue(own[key]) !== serializeOptionValue(value)));

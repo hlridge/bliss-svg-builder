@@ -220,7 +220,7 @@ describe('BlissSVGBuilder preserve removed default', () => {
       expect(optionBagsIn(new BlissSVGBuilder(saved))).toEqual([]);
     });
 
-    it('keeps a built-in\'s code, whose own look is part of the character', () => {
+    it('keeps a built-in\'s code, whose own look is part of the code', () => {
       expect(new BlissSVGBuilder('[color=red]REFSQUARE').toString({ preserve: true, omitOptions: true })).toBe('REFSQUARE');
     });
   });

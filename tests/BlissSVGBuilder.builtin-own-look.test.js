@@ -1,5 +1,5 @@
 /**
- * Pins a code's own look as part of the character: what a built-in's definition
+ * Pins a code's own look as part of the code: what a built-in's definition
  * (`REFSQUARE`'s and `ANCHORRING`'s dotted line) or a shape drawn by its own
  * function supplies by name is not written back as an option, not removed by
  * the options methods, and not dropped by `omitOptions`.
@@ -104,7 +104,7 @@ describe('BlissSVGBuilder built-in own look', () => {
       ['clearing everything', (b) => b.clearAllOptions()],
     ])('keeps the dotted line of REFSQUARE after %s', (_label, change) => {
       // note: the options methods take off what was written on top of a
-      // built-in; its own look is part of the character, like its strokes
+      // built-in; its own look is part of the code, like its strokes
       const builder = changed('REFSQUARE', change);
       expect(builder.svgCode).toBe(new BlissSVGBuilder('REFSQUARE').svgCode);
       expect(builder.toString()).toBe('REFSQUARE');

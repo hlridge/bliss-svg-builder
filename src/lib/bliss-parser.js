@@ -1408,6 +1408,11 @@ export class BlissParser {
             // a B-code's codeString (e.g. B291 → "S8:0,8") only for a later wrapping patch
             // to reconstruct the nesting. Word codes (codeString with /) must still be
             // expanded here because word decomposition produces multiple glyphs.
+            //
+            // The definition's own options are not carried to the character:
+            // parseParts gives them to the part the code names, so they style
+            // what the code draws and never a part added beside it (`REFSQUARE`'s
+            // dotted line stays off an indicator, however the indicator is added).
             if (builtInCodes.has(potentialBaseCode)
                 && !codeStringToExpand.includes('/')) {
               return [{
@@ -1420,7 +1425,6 @@ export class BlissParser {
                 ...(definition.kerningRules && { kerningRules: definition.kerningRules }),
                 ...(definition.glyphCode && { glyphCode: definition.glyphCode }),
                 ...(definition.isBlissGlyph && { isBlissGlyph: definition.isBlissGlyph }),
-                ...(definition.defaultOptions && { defaultOptions: definition.defaultOptions }),
               }];
             }
 

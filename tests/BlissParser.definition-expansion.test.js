@@ -27,11 +27,12 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Part-level bracket options and position suffixes survive expansion onto
  *   word-alias parts; trailing-junk and leading-invalid position suffixes
  *   record an `Invalid format` error on the part.
- * - Built-in glyph identity (glyphCode, isBlissGlyph), indicator metadata,
- *   head markers, and defaultOptions propagate from definitions onto the
- *   parsed glyph; a non-indicator built-in carries no isIndicator through the
- *   fast-path; an explicit `isIndicator: false` declared by a definition
- *   is dropped rather than propagated.
+ * - Built-in glyph identity (glyphCode, isBlissGlyph), indicator metadata and
+ *   head markers propagate from definitions onto the parsed glyph, while a
+ *   built-in's defaultOptions stay on its part and never reach the glyph; a
+ *   non-indicator built-in carries no isIndicator through the fast-path; an
+ *   explicit `isIndicator: false` declared by a definition is dropped rather
+ *   than propagated.
  * - Base-case metadata (shrinksPrecedingWordSpace, isIndicator,
  *   isExternalGlyph, char, kerningRules) propagates from no-codeString
  *   definitions onto the parsed glyph alongside empty-strip options and a
@@ -456,7 +457,7 @@ describe('BlissParser definition expansion', () => {
       }));
     });
 
-    it('preserves built-in indicator identity, head marker, and default options', () => {
+    it('preserves built-in indicator identity and head marker, and keeps default options on the part', () => {
       const r = BlissParser.parse('ANCHORRING^');
       const glyph = r.groups[0].glyphs[0];
 
@@ -464,7 +465,10 @@ describe('BlissParser definition expansion', () => {
       expect(glyph.glyphCode).toBe('ANCHORRING');
       expect(glyph.isBlissGlyph).toBe(true);
       expect(glyph.isHeadGlyph).toBe(true);
-      expect(glyph.options).toEqual({ 'stroke-dasharray': '0 0.777' });
+      // regression: the character held a copy of the dotted line, which then
+      // styled every part added beside the code (a `;;` indicator drew dotted)
+      expect(glyph.options).toBeUndefined();
+      expect(glyph.parts[0].options).toEqual({ 'stroke-dasharray': '0 0.777' });
     });
 
     it('does not mark a non-indicator built-in glyph as an indicator', () => {
