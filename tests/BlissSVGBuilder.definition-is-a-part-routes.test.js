@@ -11,8 +11,13 @@
  *   `<name>;B99`, flatten-saving to its string.
  * - The reloads of both flattened saves, which spell the definition out as
  *   built-in codes: the same string, and the same ink and colours.
+ * - A glyph that places indicators by its own anchor (`anchorOffsetY`, a wrap
+ *   of B138): every save that spells it out loses that anchor, an accepted
+ *   loss pinned so a fix flips it; `preserve` keeps it.
  *
  * Does NOT cover:
+ * - The routes on a glyph with an anchor of its own, see
+ *   `BlissSVGBuilder.definition-is-a-part.test.js`.
  * - The same routes on a built-in's own look, see
  *   `BlissSVGBuilder.builtin-look-routes.test.js`.
  * - The same routes on a bare alias, see
@@ -32,14 +37,21 @@ const FIXTURES = {
   DR_RED: { type: 'glyph', codeString: '[color=red]B291' },
 };
 
+// Glyphs that place an indicator by an anchor of their own: one moved by
+// `anchorOffsetY`, and a wrap of B138, which does not take B138's anchor.
+const ANCHORED = {
+  DR_ANC: { type: 'glyph', codeString: 'B291', anchorOffsetY: 2 },
+  DR_WRAP: { type: 'glyph', codeString: 'B138' },
+};
+
 beforeAll(() => {
-  const { defined, errors } = BlissSVGBuilder.define(FIXTURES);
+  const { defined, errors } = BlissSVGBuilder.define({ ...FIXTURES, ...ANCHORED });
   expect(errors).toEqual([]);
-  expect(defined).toEqual(Object.keys(FIXTURES));
+  expect(defined).toEqual([...Object.keys(FIXTURES), ...Object.keys(ANCHORED)]);
 });
 
 afterAll(() => {
-  for (const code of Object.keys(FIXTURES)) BlissSVGBuilder.removeDefinition(code);
+  for (const code of [...Object.keys(FIXTURES), ...Object.keys(ANCHORED)]) BlissSVGBuilder.removeDefinition(code);
 });
 
 // A builder for `input` after `change` has been applied to it.
@@ -107,5 +119,23 @@ describe('BlissSVGBuilder definition is a part routes', () => {
         expect(builder.toString({ flattenIndicators: true })).toBe(target.toString());
         expect(styledInkOf(builder.svgCode)).toEqual(styledInkOf(target.svgCode));
       });
+  });
+
+  describe('when a lone glyph that places indicators by its own anchor is saved spelled out', () => {
+    it.each(Object.keys(ANCHORED).flatMap((base) => [
+      [base, 'the string', (builder) => builder.toString()],
+      [base, 'the JSON', (builder) => builder.toJSON()],
+      [base, 'the flattened string', (builder) => builder.toString({ flattenIndicators: true })],
+      [base, 'the flattened JSON', (builder) => builder.toJSON({ flattenIndicators: true })],
+    ]))('reloads %s given B99 from %s with B99 placed by the built-in code\'s anchor instead', (base, _save, save) => {
+      // note: pins an accepted loss, so a fix or a ruling flips it visibly
+      // (backlog row "The saves that break a custom glyph down lose its own
+      // anchor"). Every route places B99 by the glyph's own anchor, as `;`
+      // does, but a save in built-in codes has no way to write that anchor;
+      // `preserve` keeps the name, and with it the placement
+      const builder = new BlissSVGBuilder(`${base};;B99`);
+      expect(new BlissSVGBuilder(save(builder)).svgCode).not.toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
+    });
   });
 });

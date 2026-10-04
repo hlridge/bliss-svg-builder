@@ -1508,11 +1508,16 @@ export class BlissParser {
             //
             // What is expanded is the code the definition draws: a bracket
             // leading its code string is the definition's own options, which
-            // travel with its defaultOptions below.
-            const { codeString: drawnCodeString, options: ownOptions } = BlissParser.#readDefinition(potentialBaseCode, definition, warn);
+            // travel with its defaultOptions below. What the read reports is
+            // held until the definition is known not to become one named part
+            // (below), whose own read in parseParts reports it instead. A code
+            // string has a bracket of its own only where it draws one
+            // character, and no built-in's does, so the branches returning
+            // before that point have nothing held.
+            const heldReports = [];
+            const { codeString: drawnCodeString, options: ownOptions } = BlissParser.#readDefinition(potentialBaseCode, definition, (report) => heldReports.push(report));
             const codeStringToExpand = processXCodes(drawnCodeString);
-            const isBareAlias = !definition.isBlissGlyph && !definition.isShape
-              && !definition.isExternalGlyph && !definition.glyphCode;
+            const isBareAlias = BlissParser.#isBareAlias(definition);
 
             // Built-in single-character codes: skip expansion, let parseParts handle it.
             // This eliminates the flatten-then-unflatten pattern where expand() substitutes
@@ -1663,6 +1668,7 @@ export class BlissParser {
                 ...(definition.isShape && { _aliasCodeName: potentialBaseCode }),
               }];
             }
+            for (const report of heldReports) warn?.(report);
 
             // Strict Indicator Separation: a char-level `;`-part on a multi-glyph
             // word is handled up front -- a real part is MISPLACED and dropped
@@ -2093,12 +2099,7 @@ export class BlissParser {
                 part.parts = parseParts(codeString, depth + 1);
                 // Keep part.codeName to preserve identifier alongside expansion
               } else {
-                // Single-code rename to a primitive replaces codeName, which
-                // would lose the user-written name even under `preserve`
-                // (Phase 2.3b). Record it so preserve-mode serialization can
-                // restore it; default output keeps the resolved target.
-                part._aliasCodeName = part.codeName;
-                part.codeName = codeString;
+                BlissParser.#renameToDrawnCode(part, codeString, definition);
               }
             }
 
@@ -2291,6 +2292,34 @@ export class BlissParser {
   }
 
   /**
+   * Rename a part to the one code its definition draws, when that code has no
+   * code string to hold as a part of its own (a primitive, or a shape drawn by
+   * its own function). The written name is recorded so a `preserve` save can
+   * restore it (Phase 2.3b); default output keeps the code drawn.
+   *
+   * A typed glyph or shape holds what it draws, so the drawn code's own
+   * options are this part's too, and win over the definition's own where both
+   * set a key, as a held code's options win over its holder's. A bare alias is
+   * the code it names instead, and #applyEffectiveMetadata gives it that
+   * code's options under the alias's own.
+   */
+  static #renameToDrawnCode(part, code, definition) {
+    part._aliasCodeName = part.codeName;
+    part.codeName = code;
+    if (BlissParser.#isBareAlias(definition)) return;
+    const drawn = blissElementDefinitions[code];
+    const drawnOptions = drawn && BlissParser.#readDefinition(code, drawn).options;
+    if (drawnOptions) part.options = { ...drawnOptions, ...part.options };
+  }
+
+  // A definition with a code string and no identity of its own (no glyph,
+  // shape or external-glyph flag, no glyph code): shorthand for what it names.
+  static #isBareAlias(definition) {
+    return !definition.isBlissGlyph && !definition.isShape
+      && !definition.isExternalGlyph && !definition.glyphCode;
+  }
+
+  /**
    * Copy definition metadata (its own options, indicator, anchor offsets)
    * onto a part object. Shared by parseParts, #expandPartRecursive, and
    * #parseCodeStringToParts to keep the logic in one place. `options` are the
@@ -2336,9 +2365,7 @@ export class BlissParser {
           || blissElementDefinitions[codeString]?.codeString) {
         part.parts = BlissParser.#parseCodeStringToParts(codeString, warn);
       } else {
-        // Same single-code rename recording as parseParts (Phase 2.3b).
-        part._aliasCodeName = part.codeName;
-        part.codeName = codeString;
+        BlissParser.#renameToDrawnCode(part, codeString, definition);
       }
     }
 
@@ -2376,9 +2403,7 @@ export class BlissParser {
             || blissElementDefinitions[innerCodeString]?.codeString) {
           part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, warn, depth + 1);
         } else {
-          // Same single-code rename recording as parseParts (Phase 2.3b).
-          part._aliasCodeName = part.codeName;
-          part.codeName = innerCodeString;
+          BlissParser.#renameToDrawnCode(part, innerCodeString, definition);
         }
       }
 

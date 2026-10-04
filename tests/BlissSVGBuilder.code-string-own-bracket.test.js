@@ -22,6 +22,9 @@
  * - The bracket under a part bracket written behind it in the same code
  *   string (a `;;` indicator), and over the options of a shape drawn by its
  *   own function that an alias names.
+ * - A second bracket leading the code string, reported once in every use (the
+ *   definition written alone, decorated, in a word, in a slot, under an
+ *   alias) and dropped.
  * - A composition object naming such a definition as a part, directly or
  *   inside another definition, drawing as the DSL.
  * - Control: a word alias keeps a leading bracket on its first character.
@@ -41,6 +44,9 @@ import { BlissSVGBuilder } from '../src/index.js';
 // bracket, with the uses its twins are compared in (`%` stands for the name).
 const BASE_USES = ['%', 'B291;%', '%:1', '%;B99', '[color=blue]%', '[color=blue]>%', '%/B291'];
 const INDICATOR_USES = ['%', 'B291;%', 'B291;;%'];
+// The uses a doubled bracket is checked in: no `;` part after the name, which
+// an alias refuses in its own way.
+const BASE_DOUBLE_USES = ['%', '[color=green]%', '%/B291', 'B291;%', '[color=green]>%'];
 const TWIN_KINDS = [
   ['a typed glyph', 'OB_TW_GLYPH', { type: 'glyph' }, 'B291', BASE_USES],
   ['a typed shape', 'OB_TW_SHAPE', { type: 'shape' }, 'C8', BASE_USES],
@@ -87,6 +93,12 @@ const FIXTURES = {
   OB_IND_PART: { type: 'glyph', isIndicator: true, codeString: '[color=red][color=blue]>B81' },
   OB_FN: { type: 'shape', getPath: () => 'M0,0 L4,0', width: 4, height: 0, defaultOptions: { color: 'red' } },
   OB_FN_ALIAS: { codeString: '[stroke-width=0.5]OB_FN' },
+  OB_DOUBLE: { type: 'glyph', codeString: '[color=red][color=blue]B291' },
+  OB_DOUBLE_SHAPE: { type: 'shape', codeString: '[color=red][color=blue]C8' },
+  OB_DOUBLE_ALIAS: { codeString: 'OB_DOUBLE' },
+  OB_RED_ALIAS: { codeString: 'OB_RED' },
+  OB_DOUBLE_IND: { type: 'glyph', isIndicator: true, codeString: '[color=red][color=blue]B81' },
+  OB_RED_IND: { type: 'glyph', isIndicator: true, codeString: '[color=red]B81' },
   ...TWINS,
 };
 
@@ -213,6 +225,25 @@ describe('BlissSVGBuilder code string own bracket', () => {
       const builder = new BlissSVGBuilder('B291;OB_FN_ALIAS');
       expect(builder.warnings).toEqual([]);
       expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;[color=red;stroke-width=0.5]>OB_FN').svgCode);
+    });
+  });
+
+  describe('when the code string leads with a second character bracket', () => {
+    it.each([
+      ['OB_DOUBLE', 'OB_RED', BASE_DOUBLE_USES],
+      ['OB_DOUBLE_SHAPE', 'OB_SHAPE', BASE_DOUBLE_USES],
+      ['OB_DOUBLE_ALIAS', 'OB_RED_ALIAS', BASE_DOUBLE_USES],
+      ['OB_DOUBLE_IND', 'OB_RED_IND', INDICATOR_USES],
+    ])('reports it once in every use of %s, which draws as %s does', (name, twin, uses) => {
+      // regression: a typed glyph or shape written alone, named by an alias
+      // or after `;;`, is read where its name is expanded and again where its
+      // one named part is built, and both reads reported the second bracket
+      for (const use of uses) {
+        const builder = new BlissSVGBuilder(use.replace('%', name));
+        const doubled = builder.warnings.filter((warning) => warning.code === 'MULTIPLE_OPTION_BRACKETS');
+        expect(doubled.map((warning) => warning.source)).toEqual(['[color=blue]']);
+        expect(styledInkOf(builder.svgCode)).toEqual(styledInkOf(new BlissSVGBuilder(use.replace('%', twin)).svgCode));
+      }
     });
   });
 

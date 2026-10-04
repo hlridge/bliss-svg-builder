@@ -34,7 +34,9 @@ const FIXTURES = {
 };
 
 beforeAll(() => {
-  BlissSVGBuilder.define(FIXTURES);
+  const { defined, errors } = BlissSVGBuilder.define(FIXTURES);
+  expect(errors).toEqual([]);
+  expect(defined).toEqual(Object.keys(FIXTURES));
 });
 
 afterAll(() => {
@@ -68,7 +70,6 @@ describe('BlissSVGBuilder built-in own look', () => {
       // `[stroke-dasharray=0 0.999][stroke-dasharray=0 0.999]>REFSQUARE`
       const builder = new BlissSVGBuilder(input);
       expect(builder.toString()).toBe(expected);
-      expect(new BlissSVGBuilder(expected).svgCode).toBe(builder.svgCode);
     });
 
     it('writes a flattened word-level ANCHORRING by its code alone', () => {
@@ -88,7 +89,6 @@ describe('BlissSVGBuilder built-in own look', () => {
       const builder = new BlissSVGBuilder(input);
       expect(builder.toString()).toBe(input);
       expect(dashesOf(builder.svgCode)).toEqual(dashes);
-      expect(new BlissSVGBuilder(input).svgCode).toBe(builder.svgCode);
     });
   });
 
