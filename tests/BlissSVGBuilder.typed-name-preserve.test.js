@@ -238,11 +238,16 @@ describe('BlissSVGBuilder typed-name preserve', () => {
       expect(new BlissSVGBuilder(emitted).svgCode).toBe(b.svgCode);
     });
 
-    it('decomposes a diverged shape instead of keeping a stale name', () => {
+    it('writes a diverged shape as its delta instead of a stale name', () => {
+      // re-pinned at C23 (D3): was "decomposes a diverged shape" to
+      // `C8;C2:3,3;B81`. The shape written alone is one part named after it,
+      // which keeps its name beside the added part
       defineTypedFixtures();
       const b = new BlissSVGBuilder('MYSH2');
       b.glyph(0).addPart('B81');
-      expect(b.toString({ preserve: true })).toBe('C8;C2:3,3;B81');
+      const saved = b.toString({ preserve: true });
+      expect(saved).toBe('MYSH2;B81');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(b.svgCode);
     });
 
     it('saves a saved object that names a shape but carries no parts, on both surfaces, without throwing', () => {
@@ -295,14 +300,17 @@ describe('BlissSVGBuilder typed-name preserve', () => {
   });
 
   describe('when toJSON carries the restored name', () => {
-    it('restores the name at glyph level and keeps parts resolved', () => {
+    it('restores the name at glyph level, over the one part the definition is', () => {
+      // re-pinned at C23 (D2, D3): was "... and keeps parts resolved" (`C8`,
+      // and `C8`, `C2`). A typed definition written alone is one part named
+      // after it, which the JSON writes by its own name
       defineTypedFixtures();
       const alias = new BlissSVGBuilder('ALGL').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(alias.codeName).toBe('ALGL');
-      expect(alias.parts[0].codeName).toBe('C8');
+      expect(alias.parts.map(p => p.codeName)).toEqual(['MYGL1']);
       const shape = new BlissSVGBuilder('MYSH2').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(shape.codeName).toBe('MYSH2');
-      expect(shape.parts.map(p => p.codeName)).toEqual(['C8', 'C2']);
+      expect(shape.parts.map(p => p.codeName)).toEqual(['MYSH2']);
       // pins one consult for both surfaces: toJSON must judge a decorated part
       // the way toString does, or the two preserve surfaces diverge
       // (preserve-completeness review, 2026-07-23)
@@ -347,8 +355,8 @@ describe('BlissSVGBuilder typed-name preserve', () => {
     it('keeps deep output raw so the delta pipeline sees the typed target', () => {
       defineTypedFixtures();
       // pins the deep/public restore split: deep keeps the resolved typed
-      // name plus the recording (serializeCustomGlyphDelta must compute
-      // divergence against the typed definition), public restores the name
+      // name plus the recording (the string's preserve writer reads the glyph
+      // against the typed definition), public restores the name
       const deep = new BlissSVGBuilder('ALGL').toJSON({ preserve: true, deep: true }).groups[0].glyphs[0];
       expect(deep.codeName).toBe('MYGL1');
       expect(deep._aliasCodeName).toBe('ALGL');

@@ -439,17 +439,11 @@ export function wordIndicatorNode(code, definitions, parse) {
   const parsedGlyph = parse(code)?.groups?.[0]?.glyphs?.[0];
   const parsedParts = parsedGlyph?.parts;
   const bare = getBareCode(code);
-  // A custom flagged compound indicator (e.g. define COMBI = 'B97;B99:3,0')
-  // parses at GLYPH level into multiple decomposed parts, unlike a built-in
-  // compound (B98) which the parser keeps as one nested part. Taking parts[0]
-  // dropped the rest of the anatomy from render AND flatten (`;;COMBI` rendered
-  // only B97; backlog: custom compound `;;` anatomy truncation). Wrap the whole
-  // anatomy back into one atomic part, mirroring the `;`-slot form (`B291;COMBI`);
-  // the shared indicator-metadata stamp below then flags it, so `;` and `;;`
-  // agree for the same definition.
-  const node = parsedParts?.length > 1
-    ? { codeName: bare, parts: parsedParts }
-    : parsedParts?.[0];
+  // A code an overlay stores is one indicator, so it parses as one part: a
+  // compound indicator, built-in (B98) or custom (define COMBI = 'B97;B99:3,0'),
+  // is one part named after it holding its anatomy, as in the `;` slot
+  // (`B291;COMBI`), so `;` and `;;` agree for the same definition.
+  const node = parsedParts?.[0];
   if (!node) return undefined;
   const immediate = Object.prototype.hasOwnProperty.call(definitions, bare)
     ? definitions[bare]
@@ -459,17 +453,17 @@ export function wordIndicatorNode(code, definitions, parse) {
   // restores it (Phase 2.3b). This stamp is load-bearing for the `;;`
   // surface: the standalone parse resolves the alias at glyph level, so the
   // parser's own single-ref rename recording never fires for this node
-  // (unlike an object-input part, where it does). A multi-part wrap keeps its
-  // own code (its codeName is already `bare`): stamping the alias on just the
-  // first part would mislabel it.
+  // (unlike an object-input part, where it does). A code reading as several
+  // parts (none that an overlay stores) is not one rename: stamping the alias
+  // on its first part would mislabel it.
   if (parsedParts.length === 1 && node.codeName !== bare) {
     node._aliasCodeName = bare;
   }
   // The `;;` overlay parses its code standalone, which (unlike the `;`-slot's
   // #applyDefinitionMetadata) does not carry a single-code alias's own
   // indicator metadata onto the node when the alias target is not itself an
-  // indicator (MYIND -> C2, isIndicator on the definition); the compound wrap
-  // above also starts bare. Apply it here from the effective definition so
+  // indicator (MYIND -> C2, isIndicator on the definition). Apply it here from
+  // the effective definition so
   // `;` and `;;` place the indicator identically and the flatten+preserve
   // round-trip is svg-stable (external review MAJOR-1). Built-in indicators
   // already carry the flag, so the guard makes this a no-op for them.
@@ -481,15 +475,9 @@ export function wordIndicatorNode(code, definitions, parse) {
       if (effective.anchorOffsetX !== undefined) node.anchorOffsetX = effective.anchorOffsetX;
     }
   }
-  // A standalone parse of a defined code lands the options the definition
-  // brings of its own (its defaultOptions, the character bracket leading its
-  // code string, and those of an alias it renames) at GLYPH level, so the
-  // extracted part node would silently lose them (`;;` diverging from the
-  // `;`-part slot). A stored `;;` code carries no character bracket (the store
-  // strips it), so nothing else reaches that level. Merge them here with the
-  // same precedence as the slot: explicit options on the code win.
-  if (parsedGlyph.options) {
-    node.options = { ...parsedGlyph.options, ...(node.options || {}) };
-  }
+  // The options a definition brings of its own sit on the part a standalone
+  // parse gives the code, as they do in a `;` slot, never on the character, and
+  // a stored `;;` code carries no character bracket (the store strips it), so
+  // the part node holds everything the code draws with.
   return node;
 }

@@ -179,11 +179,14 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
       defineAndTrack({ MYGL1: { type: 'glyph', codeString: 'C8' } });
       defineAndTrack({ ALGL: { codeString: 'MYGL1' } });
       // preserve-completeness chunk: the written token wins on the glyphCode
-      // identity path too (glyph-level recording); the part stays resolved
+      // identity path too (glyph-level recording)
       expect(new BlissSVGBuilder('ALGL').toString({ preserve: true })).toBe('ALGL');
       const glyph = new BlissSVGBuilder('ALGL').toJSON({ preserve: true }).groups[0].glyphs[0];
       expect(glyph.codeName).toBe('ALGL');
-      expect(glyph.parts[0].codeName).toBe('C8');
+      // re-pinned at C23 (D2): was `C8`. The typed glyph the alias names is
+      // one part named after it, which the JSON writes by its own name; the
+      // alias's name stays on the character
+      expect(glyph.parts.map((part) => part.codeName)).toEqual(['MYGL1']);
     });
 
     it('keeps the written name for an alias to a custom typed sole-part shape', () => {

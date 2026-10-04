@@ -195,7 +195,10 @@ describe('BlissSVGBuilder built-in own look', () => {
 
   describe('when a custom glyph carries defaults', () => {
     it('still writes them as options, since the glyph can be written without them', () => {
-      expect(new BlissSVGBuilder('BL_REDB').toString()).toBe('[color=red]B291');
+      // re-pinned at C23 (D2, D8): written alone the glyph is one part named
+      // after it, so the save that spells it out writes its defaults as that
+      // part's bracket (was `[color=red]B291`, a character bracket)
+      expect(new BlissSVGBuilder('BL_REDB').toString()).toBe('[color=red]>B291');
     });
   });
 });

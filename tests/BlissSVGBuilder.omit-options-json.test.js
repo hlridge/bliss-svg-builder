@@ -13,7 +13,10 @@
  *   flag or without it; a character bracket leading it is the definition's
  *   own options, so the glyph is named by the code behind it, as
  *   `defaultOptions` would leave it named.
- * - The algebra: the flag is idempotent, changes nothing on a composition
+ * - The algebra: the flag is idempotent wherever no definition's options are
+ *   spelled out (a save that spells one out writes them as part brackets,
+ *   which the next pass takes as the composition's own; under `preserve` the
+ *   name stays and the flag is idempotent), changes nothing on a composition
  *   without options (a `;;` code's written spelling, a renamed `;;` code and
  *   an empty options bag included), composes with `preserve` and
  *   `flattenIndicators`, and the string equals a rebuild of the JSON written
@@ -117,10 +120,12 @@ describe('BlissSVGBuilder omit options JSON', () => {
       expect(new BlissSVGBuilder('OJ_STYGL').toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('OJ_STYGL');
     });
 
-    it('publishes no codeName when the code string holds only a lone part-scope marker', () => {
-      // pins `>` on its own: removing it from the resolver's stop set
-      // publishes that definition's text as the glyph's codeName
-      expect(new BlissSVGBuilder('OJ_LONEGT').toJSON().groups[0].glyphs[0]).toEqual({ parts: [{ codeName: 'B291' }] });
+    it('names the glyph by the code behind a lone part-scope marker, never by the marker\'s text', () => {
+      // re-pinned at C23 (Task 7): was "publishes no codeName when the code
+      // string holds only a lone part-scope marker". A `>` with nothing before
+      // it is an empty option region, so `>B291` names B291, as OJ_CHARBR's
+      // code string is named below; the text `>B291` is never published
+      expect(new BlissSVGBuilder('OJ_LONEGT').toJSON().groups[0].glyphs[0]).toEqual({ codeName: 'B291', parts: [{ codeName: 'B291' }] });
     });
 
     it('names the glyph by the code behind a character bracket leading the code string, as defaultOptions would', () => {
@@ -129,19 +134,34 @@ describe('BlissSVGBuilder omit options JSON', () => {
       // to publish no codeName, and pinned the `[` in the resolver's stop set,
       // which no longer meets a bracket on any route that keeps a glyph
       const glyph = new BlissSVGBuilder('OJ_CHARBR').toJSON().groups[0].glyphs[0];
-      expect(glyph).toEqual({ parts: [{ codeName: 'B291' }], options: { color: 'red' }, codeName: 'B291' });
+      // re-pinned at C23 (D2): the options sit on the one part the glyph is,
+      // which the JSON spells out, not on the character
+      expect(glyph).toEqual({ codeName: 'B291', parts: [{ codeName: 'B291', options: { color: 'red' } }] });
       expect(glyph).toEqual(new BlissSVGBuilder('OJ_REDB').toJSON().groups[0].glyphs[0]);
     });
   });
 
   describe('when the flag is applied to its own output', () => {
-    it.each([DESIGN_EXAMPLE, DECORATED_CUSTOM_WORD, 'OJ_REDB', '[color=red]^/B291;;B81'])(
+    it.each([DESIGN_EXAMPLE, DECORATED_CUSTOM_WORD, '[color=red]^/B291;;B81'])(
       'writes the same string again for %s',
       (input) => {
         const once = new BlissSVGBuilder(input).toString({ omitOptions: true });
         expect(new BlissSVGBuilder(once).toString({ omitOptions: true })).toBe(once);
       },
     );
+
+    it('writes OJ_REDB\'s own options where it spells OJ_REDB out, and the same name again under preserve', () => {
+      // re-pinned at C23 (D2, D8): OJ_REDB left the row above. Its options are
+      // part of what its code is, so the flag keeps them; the save without
+      // `preserve` spells it out with them as a part bracket, which a reload
+      // reads as the composition's own, so a second pass takes them
+      const once = new BlissSVGBuilder('OJ_REDB').toString({ omitOptions: true });
+      expect(once).toBe('[color=red]>B291');
+      expect(new BlissSVGBuilder(once).toString({ omitOptions: true })).toBe('B291');
+      const preserved = new BlissSVGBuilder('OJ_REDB').toString({ omitOptions: true, preserve: true });
+      expect(preserved).toBe('OJ_REDB');
+      expect(new BlissSVGBuilder(preserved).toString({ omitOptions: true, preserve: true })).toBe(preserved);
+    });
   });
 
   describe('when a composition carries no options', () => {

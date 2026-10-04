@@ -8,7 +8,8 @@
  *   its `;;` codes, while its characters keep theirs; a `;;` code named by a
  *   definition keeping its name and the definition's options.
  * - A character losing its options and position but keeping its kerning, and a
- *   custom glyph written alone losing the default its definition gave it.
+ *   custom glyph written alone keeping the default its definition gives the
+ *   one part it is.
  * - A part losing its options but keeping its coordinates, where
  *   `removeOptions('x')` still removes one: the documented exception.
  * - What survives: `key`, transient options, a live handle, and no warning when
@@ -143,12 +144,15 @@ describe('BlissSVGBuilder clear options', () => {
       expect(builder.toString()).toBe('B313/RK:2/B291;[color=blue]>C8');
     });
 
-    it('drops the default a custom glyph\'s definition gave it, and every save follows', () => {
+    it('keeps the default a custom glyph\'s definition gives the part it is, and every save follows', () => {
+      // re-pinned at C23 (D2, D8): was "drops the default ...". Written alone
+      // the glyph is one part named after it, which carries the default, so
+      // the character holds none of it to clear
       const builder = new BlissSVGBuilder('CO_REDB');
       builder.glyph(0).clearOptions();
-      expect(builder.svgCode).not.toContain('stroke="red"');
-      expect(builder.toString()).toBe('B291');
-      expect(builder.toString({ preserve: true })).toBe('B291');
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('CO_REDB').svgCode);
+      expect(builder.toString()).toBe('[color=red]>B291');
+      expect(builder.toString({ preserve: true })).toBe('CO_REDB');
     });
   });
 

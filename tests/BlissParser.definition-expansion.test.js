@@ -20,9 +20,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Indicator replacement on custom glyph definitions considers only the
  *   indicator suffix, not the base part, when preserving semantic roots.
  * - Unknown bases remain parseable when empty `;;` syntax leaves the base bare.
- * - A typed glyph's defaultOptions merge with pending glyph options instead
- *   of replacing them; a bare alias's sit on its part, leaving the pending
- *   kerning the character's alone.
+ * - A definition's defaultOptions, a typed glyph's or a bare alias's, sit on
+ *   the part it is or draws, leaving the pending kerning the character's alone.
  * - Word-break definitions do not synthesize an explicit head marker when the
  *   definition was not explicitly marked.
  * - Part-level bracket options and position suffixes survive expansion onto
@@ -30,7 +29,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   record an `Invalid format` error on the part.
  * - Built-in glyph identity (glyphCode, isBlissGlyph), indicator metadata and
  *   head markers propagate from definitions onto the parsed glyph, while a
- *   built-in's defaultOptions stay on its part and never reach the glyph; a
+ *   definition's defaultOptions, a built-in's or a custom composite's, stay on
+ *   its part and never reach the glyph; a
  *   non-indicator built-in carries no isIndicator through the fast-path; an
  *   explicit `isIndicator: false` declared by a definition is dropped rather
  *   than propagated.
@@ -341,7 +341,7 @@ describe('BlissParser definition expansion', () => {
     });
   });
 
-  describe('when defaultOptions merge onto a glyph with pending options', () => {
+  describe('when a definition\'s defaultOptions meet a glyph with pending options', () => {
     it('preserves pending relative kerning while applying definition defaults', () => {
       const code = 'DEFAULT_OPTIONS_KERNING_PIN';
       BlissSVGBuilder.define({ [code]: { codeString: 'B313', defaultOptions: { color: 'red' } } }, { overwrite: true });
@@ -363,12 +363,14 @@ describe('BlissParser definition expansion', () => {
       BlissSVGBuilder.define({ [code]: { type: 'glyph', codeString: 'B313', defaultOptions: { color: 'red' } } }, { overwrite: true });
 
       try {
-        const glyphOptions = BlissParser.parse(`RK:1/${code}`).groups[0].glyphs[0].options;
+        const [glyph] = BlissParser.parse(`RK:1/${code}`).groups[0].glyphs;
 
-        expect(glyphOptions).toEqual({ color: 'red', relativeKerning: 1 });
-        // pins option merge fallback; killed line 873 false-spread mutant in
-        // 2026-05 Stryker run. Moved here from the alias row above at C23: only
-        // a typed definition's defaults still merge onto the character
+        // re-pinned at C23 (D2): a typed glyph written alone is one part named
+        // after it, carrying its defaults, so the character keeps the pending
+        // kerning alone. The character-level merge this row pinned (the line
+        // 873 false-spread mutant, 2026-05 Stryker run) is gone with it
+        expect(glyph.options).toEqual({ relativeKerning: 1 });
+        expect(glyph.parts.map((part) => [part.codeName, part.options])).toEqual([[code, { color: 'red' }]]);
       } finally {
         BlissSVGBuilder.removeDefinition(code);
       }
@@ -498,11 +500,14 @@ describe('BlissParser definition expansion', () => {
       expect(Object.hasOwn(glyph, 'isIndicator')).toBe(false);
     });
 
-    it('propagates glyphCode and defaultOptions from a custom composite definition', () => {
+    it('propagates glyphCode from a custom composite definition and keeps its defaultOptions on its part', () => {
       const glyph = BlissParser.parse('_C15B_DEFAULTS').groups[0].glyphs[0];
 
       expect(glyph.glyphCode).toBe('_C15B_DEFAULTS');
-      expect(glyph.options).toEqual({ color: 'orange' });
+      // re-pinned at C23 (D2): the definition written alone is one part named
+      // after it, which carries its defaults; the character carries none
+      expect(Object.hasOwn(glyph, 'options')).toBe(false);
+      expect(glyph.parts.map((part) => [part.codeName, part.options])).toEqual([['_C15B_DEFAULTS', { color: 'orange' }]]);
       expect(Object.hasOwn(glyph, 'isIndicator')).toBe(false);
     });
 
@@ -536,8 +541,11 @@ describe('BlissParser definition expansion', () => {
       const glyph = r.groups[0].glyphs[0];
 
       expect(glyph.glyphCode).toBe('_C15B_NESTED_REPLACE_GUARD');
-      expect(partCodes(glyph)).toEqual(['_C15B_SINGLE_WITH_SEMANTIC', 'B81']);
-      expect(partCodes(glyph.parts[0])).toEqual(['B291', 'B97']);
+      // re-pinned at C23 (D2): the definition written alone is one part named
+      // after it, so what it holds sits one level down, untouched
+      expect(partCodes(glyph)).toEqual(['_C15B_NESTED_REPLACE_GUARD']);
+      expect(partCodes(glyph.parts[0])).toEqual(['_C15B_SINGLE_WITH_SEMANTIC', 'B81']);
+      expect(partCodes(glyph.parts[0].parts[0])).toEqual(['B291', 'B97']);
     });
 
     it('keeps per-glyph identity for multi-glyph custom words', () => {

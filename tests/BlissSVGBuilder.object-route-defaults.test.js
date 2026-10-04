@@ -4,8 +4,10 @@
  * DSL applies them, whichever definition it is.
  *
  * Covers:
- * - A custom glyph's defaults on an object that names it, with and without an
- *   empty options bag, and an option the object writes winning over them.
+ * - A custom glyph's defaults on an object that names it, on the one part the
+ *   glyph is, as in the DSL, with and without an empty options bag; an option
+ *   the object writes on the character drawing as the DSL draws it, under
+ *   them, and one written on the definition's part winning over them.
  * - The saved JSON of such an object carrying the default as the DSL's does.
  * - A built-in whose definition carries values (`REFSQUARE`).
  * - A shape drawn by its own function (`getPath`), as a part, alone and named
@@ -13,9 +15,9 @@
  * - A codeName that is not a defined name (bracket text) supplying nothing, and
  *   a defined name the DSL cannot read (one holding a separator) likewise.
  * - `merge()` of an object naming a custom glyph, and of a builder whose
- *   character had lost its default.
- * - A default removed from an object-built character staying removed through
- *   later edits.
+ *   definition's part had its default overridden.
+ * - A default overridden on an object-built character's definition part
+ *   staying overridden through later edits.
  *
  * Does NOT cover:
  * - Saves of a glyph whose default was removed, which must not name it once the
@@ -54,12 +56,22 @@ describe('BlissSVGBuilder object route defaults', () => {
       expect(fromGlyphObject(glyph).svgCode).toBe(new BlissSVGBuilder('OR_REDB').svgCode);
     });
 
-    it('lets an option the object writes win over the default', () => {
+    it('draws an option the object writes on the character as the DSL does, under the default', () => {
+      // re-pinned at C23 (D7): was "lets an option the object writes win over
+      // the default". The default is the definition's part's own, which a
+      // character option does not restyle; a part option does, below
       const builder = fromGlyphObject({ codeName: 'OR_REDB', parts: [{ codeName: 'B291' }], options: { color: 'blue' } });
       expect(builder.svgCode).toBe(new BlissSVGBuilder('[color=blue]OR_REDB').svgCode);
     });
 
-    it('saves the default in the glyph\'s options as the DSL does', () => {
+    it('lets an option the object writes on the definition\'s part win over the default', () => {
+      const builder = fromGlyphObject({ codeName: 'OR_REDB', parts: [{ codeName: 'OR_REDB', options: { color: 'blue' } }] });
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('[color=blue]>OR_REDB').svgCode);
+    });
+
+    it('saves the default on its part as the DSL does', () => {
+      // re-pinned at C23 (D2): was "saves the default in the glyph's options";
+      // the DSL keeps it on the one part the glyph is, and so does the object
       const builder = fromGlyphObject({ codeName: 'OR_REDB', parts: [{ codeName: 'B291' }] });
       expect(builder.toJSON().groups[0].glyphs[0]).toEqual(new BlissSVGBuilder('OR_REDB').toJSON().groups[0].glyphs[0]);
     });
@@ -114,23 +126,29 @@ describe('BlissSVGBuilder object route defaults', () => {
       expect(mergedObject.svgCode).toBe(mergedBuilder.svgCode);
     });
 
-    it('does not bring back a default the merged builder had removed', () => {
-      // pins reading the character's written code, not the name its deep save records beside it
+    it('does not bring back a default the merged builder had overridden', () => {
+      // re-pinned at C23 (D8): was "... had removed", with the removal on the
+      // character. The default is the definition's part's own, which
+      // removeOptions returns it to, so an override on that part is what the
+      // merge must keep, whatever name the deep save records beside it
       const source = new BlissSVGBuilder('OR_REDB');
-      source.glyph(0).removeOptions('color');
+      source.glyph(0).part(0).setOptions({ color: 'blue' });
       const merged = new BlissSVGBuilder('B313').merge(source);
-      expect(merged.svgCode).toBe(new BlissSVGBuilder('B313').merge(new BlissSVGBuilder('B291')).svgCode);
+      expect(merged.svgCode).toBe(new BlissSVGBuilder('B313').merge(new BlissSVGBuilder('[color=blue]>OR_REDB')).svgCode);
     });
   });
 
-  describe('when a default is removed from an object-built character', () => {
-    it('stays removed through later edits', () => {
-      // note: the defaults apply where the object is read, never on a rebuild,
-      // which would undo the removal
+  describe('when a default is overridden on an object-built character', () => {
+    it('stays overridden through later edits', () => {
+      // re-pinned at C23 (D8): was "when a default is removed from an
+      // object-built character / stays removed through later edits", for the
+      // reason the merge row above gives. Note: the object is built into the
+      // DSL's shape where it is read, never on a rebuild, which would undo
+      // the override
       const builder = fromGlyphObject({ codeName: 'OR_REDB', parts: [{ codeName: 'B291' }] });
-      builder.glyph(0).removeOptions('color');
+      builder.glyph(0).part(0).setOptions({ color: 'blue' });
       builder.addGlyph('B313');
-      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291/B313').svgCode);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('[color=blue]>OR_REDB/B313').svgCode);
     });
   });
 });

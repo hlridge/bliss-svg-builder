@@ -11,11 +11,13 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   built-in (`{codeString:'B291'}` -> codeName `B291`) after `applyIndicators`
  *   must decompose its parts, not emit the bare built-in (the `if(!code)`
  *   fallback in `serializeGlyph`). [external Review #5, F-INFO-2]
- * - Preserve mode: the base-only `name;codes` delta in `serializeCustomGlyphDelta`
- *   writes each APPENDED part as its bare code, so an appended indicator coord
- *   or part-option would be dropped; it must fall back to decomposition when an
- *   appended part carries one. A baked base offset is the definition's own and
- *   rides the name, which reloads it. [external Review #5, F-D / F-A / F-B]
+ * - Preserve mode: a modified custom glyph is written by its parts, so an
+ *   appended indicator's coordinate or part option is written as it stands
+ *   beside the name (a typed definition written alone is one part named after
+ *   it since C23; the earlier `name;codes` delta wrote each appended part as
+ *   its bare code and dropped them). A baked base offset is the definition's
+ *   own and rides the name, which reloads it. [external Review #5, F-D / F-A /
+ *   F-B]
  *
  * Covers:
  * - Default `toString()` of a built-in-identity custom glyph + applied indicator
@@ -23,8 +25,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Preserve `toString()` of a base-only custom glyph round-trips when the parts
  *   carry a baked base offset, a per-instance indicator coordinate, or a
  *   part-level option (the value survives in the output).
- * - Preserve still keeps the LOCAL name for the bare case (R3b2-2 orthogonality
- *   is not regressed by the new decompose-on-coords/options fallback).
+ * - Preserve still keeps the LOCAL name for the bare case (R3b2-2
+ *   orthogonality).
  * - Default `toString()` of a multi-base custom glyph re-emits a part-level
  *   option before EACH decomposed part (`[opts]>B291;[opts]>C8`), reparse-stable;
  *   an outer option merges beneath a part's own options (inner keys win, the
@@ -131,7 +133,7 @@ describe('BlissSVGBuilder serializer fidelity', () => {
     });
 
     it('keeps the local name under preserve when every modified part is bare', () => {
-      // R3b2-2: the decompose-on-coords/options fallback must NOT fire for the
+      // R3b2-2: writing a modified part as it stands must not spell out the
       // bare case; the local name is still kept.
       expect(applied('_FID_PLAIN', 'B81').toString({ preserve: true })).toBe('_FID_PLAIN;B81');
     });

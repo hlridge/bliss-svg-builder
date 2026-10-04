@@ -197,11 +197,16 @@ describe('BlissSVGBuilder code string own bracket', () => {
 
   describe('when the bracket meets options from elsewhere', () => {
     it('lets the part bracket in the code string of a ;; indicator win over its own, as the ; slot does', () => {
-      // control: passes before C23. Pins the merge order of a ;; indicator's
-      // own options under what its code string writes on its part
+      // Pins the merge order of a ;; indicator's own options under what its
+      // code string writes on its part. Re-pinned at C23 (D2, D9): the
+      // compound indicator is one part named after it on both surfaces, its
+      // own colour on that part and the bracket's on the part inside, so the
+      // ;; form draws as the ; slot does, the same ink and colour as the
+      // bracket written alone in one more group (was byte-identical to it)
       const builder = new BlissSVGBuilder('B291;;OB_IND_PART');
       expect(builder.warnings).toEqual([]);
-      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;;[color=blue]>B81').svgCode);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;OB_IND_PART').svgCode);
+      expect(styledInkOf(builder.svgCode)).toEqual(styledInkOf(new BlissSVGBuilder('B291;;[color=blue]>B81').svgCode));
     });
 
     it('lays an alias\'s bracket over the options of the shape it names, the shape drawn by its own function', () => {

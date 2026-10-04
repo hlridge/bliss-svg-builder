@@ -368,11 +368,16 @@ describe('BlissParser word-indicator syntax', () => {
       const result = BlissParser.parse('TestCompositeInd1');
 
       expect(result.groups[0].glyphs.length).toBe(1);
-      expect(result.groups[0].glyphs[0].parts.length).toBe(2);
-      expect(result.groups[0].glyphs[0].parts[0].codeName).toBe('C3');
-      expect(result.groups[0].glyphs[0].parts[1].codeName).toBe('C5');
-      expect(result.groups[0].glyphs[0].parts[1].x).toBe(1.5);
-      expect(result.groups[0].glyphs[0].parts[1].y).toBe(0);
+      // re-pinned at C23 (D2, D9): a custom compound indicator written alone
+      // is one part named after it, as B914 is below, holding its parts
+      const parts = result.groups[0].glyphs[0].parts;
+      expect(parts.length).toBe(1);
+      expect(parts[0].codeName).toBe('TestCompositeInd1');
+      expect(parts[0].parts.length).toBe(2);
+      expect(parts[0].parts[0].codeName).toBe('C3');
+      expect(parts[0].parts[1].codeName).toBe('C5');
+      expect(parts[0].parts[1].x).toBe(1.5);
+      expect(parts[0].parts[1].y).toBe(0);
     });
 
     it('preserves a nested composite indicator structure', () => {
@@ -382,7 +387,12 @@ describe('BlissParser word-indicator syntax', () => {
       const result = BlissParser.parse('TestCompositeInd3');
 
       expect(result.groups[0].glyphs.length).toBe(1);
-      const parts = result.groups[0].glyphs[0].parts;
+      // re-pinned at C23 (D2, D9): TestCompositeInd3 written alone is one part
+      // named after it, as B914 is below, holding TestCompositeInd2 and E
+      const [own] = result.groups[0].glyphs[0].parts;
+      expect(result.groups[0].glyphs[0].parts.length).toBe(1);
+      expect(own.codeName).toBe('TestCompositeInd3');
+      const parts = own.parts;
       // Should have TestCompositeInd2 expanded (with C3 and C5) plus E
       expect(parts.length).toBe(2);
       // First part is TestCompositeInd2 which contains C3 and C5

@@ -10,7 +10,7 @@ import {
   resolveHeadIndex
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, writtenNumber } from "./bliss-constants.js";
+import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -635,11 +635,16 @@ export class BlissParser {
   // that bracket over them: the bracket wins, as it does where the definition
   // stands alone). Read at part scope, since the definition is the part it
   // draws. A further bracket at the same place is reported to `warn` and
-  // dropped; `code` names the definition in that report.
+  // dropped; `code` names the definition in that report. A `>` leading the
+  // code string with nothing before it is an empty option region, so the code
+  // behind it is what the definition draws (`>B291` draws `B291`) wherever the
+  // definition is read, as the DSL reads one.
   static #readDefinition(code, definition, warn) {
     const { codeString, defaultOptions } = definition;
     const own = typeof codeString === 'string' ? ownBracketOf(codeString, blissElementDefinitions) : null;
-    if (!own) return { codeString, options: defaultOptions };
+    if (!own) {
+      return { codeString: typeof codeString === 'string' ? withoutEmptyRegion(codeString) : codeString, options: defaultOptions };
+    }
     for (const extra of own.extras) {
       warn?.({
         code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
@@ -1625,7 +1630,6 @@ export class BlissParser {
                   ...(expandedSubPart._frag !== undefined && { _frag: expandedSubPart._frag }),
                   ...(expandedSubPart._scanCode !== undefined && { _scanCode: expandedSubPart._scanCode }),
                   ...(expandedSubPart._aliasCodeName !== undefined && { _aliasCodeName: expandedSubPart._aliasCodeName }),
-                  ...(expandedSubPart.defaultOptions && { defaultOptions: expandedSubPart.defaultOptions }),
                   ...(expandedSubPart.partOptions && { partOptions: expandedSubPart.partOptions })
                 };
               });
@@ -1638,6 +1642,27 @@ export class BlissParser {
             // Resolve its written markers now (head resolution rule 4); the
             // call mutates expandedParts in place, so its return is not needed.
             sealFragment(expandedParts, potentialBaseCode);
+
+            // A typed glyph or shape that draws one character is one part
+            // named after it, as a built-in is (the branch above): the
+            // character holds that part, the part holds what the definition
+            // draws and carries the definition's own options, so they style
+            // what it draws and never a part added beside it. The token is the
+            // code as written here, its character brackets and coordinate
+            // included, with the character data the expansion gave it
+            // (identity, indicator flag, layout, head designation); parseParts
+            // reads the definition again where it builds the part, so nothing
+            // the expansion carried for the parts inside rides along. A shape
+            // has no glyphCode, so the name it was written as is recorded
+            // instead, the identity a lone shape is saved by.
+            if (!isBareAlias && !builtInCodes.has(potentialBaseCode) && expandedParts.length === 1) {
+              const { partOptions, _aliasCodeName, ...character } = expandedParts[0];
+              return [{
+                ...character,
+                part: str.replace(/;$/, ''),
+                ...(definition.isShape && { _aliasCodeName: potentialBaseCode }),
+              }];
+            }
 
             // Strict Indicator Separation: a char-level `;`-part on a multi-glyph
             // word is handled up front -- a real part is MISPLACED and dropped
@@ -1656,14 +1681,12 @@ export class BlissParser {
               expandedParts[0].part = semiParts.join(';');
             }
 
-            // Carry the definition's own options (its defaultOptions and the
-            // bracket leading its code string): a bare alias's to every part
-            // it draws, a typed definition's as data on the first expanded
-            // part, for the character
-            if (ownOptions) {
-              if (isBareAlias) giveAliasOptions(expandedParts, ownOptions);
-              else if (expandedParts.length > 0) expandedParts[0].defaultOptions = ownOptions;
-            }
+            // The definition's own options (its defaultOptions and the bracket
+            // leading its code string) ride to every part it draws, never to a
+            // character. Only a bare alias reaches here, or a typed definition
+            // a forward reference turned into several characters (define()
+            // refuses a typed word).
+            if (ownOptions) giveAliasOptions(expandedParts, ownOptions);
 
             // Prepend options to the first expanded part. A char-level option
             // is valid on a single character only: on an alias expanding to a
@@ -1706,13 +1729,6 @@ export class BlissParser {
                   || typeof effective.getPath === 'function')) {
                 expandedParts[0]._aliasCodeName = potentialBaseCode;
               }
-            } else if (expandedParts.length === 1 && definition.isShape) {
-              // A typed shape has no glyphCode identity channel, so its own
-              // written name dissolves into this expansion too. Record it the
-              // same way (a typed definition keeps its name whatever its
-              // anatomy, per the ratified preserve statement); built-in
-              // shapes never reach this branch (early return above).
-              expandedParts[0]._aliasCodeName = potentialBaseCode;
             }
 
             return expandedParts;
@@ -1818,7 +1834,7 @@ export class BlissParser {
       // silent tie-break at layout time.
       let pendingKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, defaultOptions, partOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, partOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
         // Lift a word-level fail-render flag onto its enclosing group (mirrors
         // the _wordIndicators lift below). A malformed `;;` makes the whole word
         // invalid; the element reads group.errorCode and collapses it to one
@@ -1920,12 +1936,6 @@ export class BlissParser {
         if (markerKerning) {
           (glyphObj.options ??= {})[markerKerning.key] = markerKerning.value;
           pendingKerning = undefined;
-        }
-
-        // Merge a typed definition's options carried from expand() (a bare
-        // alias's ride to its parts instead, see partOptions)
-        if (defaultOptions) {
-          glyphObj.options = { ...defaultOptions, ...(glyphObj.options || {}) };
         }
 
         let glyphCodeString = part;

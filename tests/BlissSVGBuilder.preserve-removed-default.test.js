@@ -4,18 +4,22 @@
  * name reaches, so a default you removed does not come back on reload.
  *
  * Covers:
- * - A glyph default removed through `removeOptions`, and a part default set to
- *   `false`: every save route reloads what the builder draws. A definition's
- *   options are part of what its code is, so `removeOptions` on a part named
- *   by one returns them; `false` is how a part leaves one out.
+ * - A default set to `false` on the one part a glyph written alone is, and on
+ *   a part named by a definition: every save route reloads what the builder
+ *   draws. A definition's options are part of what its code is, so
+ *   `removeOptions` on a part named by one returns them; `false` is how a part
+ *   leaves one out.
  * - A default set to `false` inside a part saved by its own name, or inside a
  *   part of a glyph saved by its own name: the `preserve` string spells it out.
- * - A default set to `false`, which no save writes, counting as removed.
+ * - A default set to `false`, which no save writes, counting as removed; the
+ *   same key set to `false` on the character reaching no option of the
+ *   definition's, so the name stays.
  * - A flattened word-level indicator's head that lost its default, saved as a
  *   save without `preserve` saves it.
- * - Names kept while the keys are there: an overriding value, an untouched
- *   element, and a removed default written back; and a changed value on a part
- *   still spelled out by the anatomy comparison the key check adds to.
+ * - Names kept while the keys are there: a value of the key on the character,
+ *   an overriding part value, an untouched element, and a removed default
+ *   written back; and a changed value on a part still written out by the
+ *   anatomy comparison the key check adds to.
  * - A renamed part standing alone in its character: saved by its name alone,
  *   the alias's default on the part not repeated, and the save's reload
  *   saving the same; an option of the part's own written in a part bracket
@@ -24,11 +28,10 @@
  *   the name when only a part lost a default.
  * - A name the DSL cannot read (`define()` accepts one holding a separator,
  *   which only a composition object can name), spelled out in the JSON.
- * - Under `omitOptions`, a character written alone by a name whose definition
- *   carries options spelled out (glyph defaults, a code string's brackets, a
- *   flattened head) with no reload carrying an option; a part named by such a
- *   definition keeping its name, since its options are the definition's (part
- *   defaults, a styled nested shape); and a built-in keeping its code.
+ * - Under `omitOptions`, a name whose definition carries options kept, since
+ *   its options are the definition's: written alone (glyph defaults, a code
+ *   string's brackets, a flattened head) or naming a part (part defaults, a
+ *   styled nested shape); and a built-in keeping its code.
  *
  * Does NOT cover:
  * - A part-level change without a removed key (moved, recoloured, removed), see
@@ -90,9 +93,6 @@ const SAVE_ROUTES = [
   ['toJSON({ preserve: true })', (builder) => new BlissSVGBuilder(builder.toJSON({ preserve: true }))],
 ];
 
-// Every options bag a deep save of `builder` carries, as JSON text.
-const optionBagsIn = (builder) => JSON.stringify(builder.toJSON({ deep: true })).match(/"options":\{[^}]+\}/g) ?? [];
-
 // Every path and transform in the content group, joined, so a styled part drawn
 // as a <path> of its own compares equal to the same part merged into its neighbour.
 const inkOf = (svg) => [...svg.slice(svg.indexOf('class="bliss-content"')).matchAll(/ (?:d|transform)="([^"]*)"/g)]
@@ -102,8 +102,13 @@ const inkOf = (svg) => [...svg.slice(svg.indexOf('class="bliss-content"')).match
 describe('BlissSVGBuilder preserve removed default', () => {
   describe('when a default the name supplies has been removed', () => {
     it.each(SAVE_ROUTES)('reloads a glyph without its removed default through %s', (_route, reload) => {
-      const builder = changed('PR_REDB', (g) => g.removeOptions('color'));
-      expect(reload(builder).svgCode).toBe(builder.svgCode);
+      // re-pinned at C23 (D2, D8): was `removeOptions('color')` on the
+      // character, which removes nothing now: the default is on the one part
+      // the glyph is, where `false` is how it is left out, so the reload is
+      // compared as the part rows below compare theirs
+      const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
+      expect(inkOf(reload(builder).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(reload(builder).svgCode).not.toContain('stroke="red"');
     });
 
     it.each(SAVE_ROUTES)('reloads a part without a default set to false through %s', (_route, reload) => {
@@ -117,8 +122,10 @@ describe('BlissSVGBuilder preserve removed default', () => {
     });
 
     it('spells the glyph out in the preserve string', () => {
-      // regression: the name reloaded red
-      const builder = changed('PR_REDB', (g) => g.removeOptions('color'));
+      // regression: the name reloaded red. Re-pinned at C23 (D2, D8): the
+      // default is left out on the one part the glyph is, not removed from
+      // the character, which holds none of it
+      const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
       expect(builder.toString({ preserve: true })).toBe('B291');
     });
 
@@ -138,25 +145,47 @@ describe('BlissSVGBuilder preserve removed default', () => {
 
     it('spells a glyph out when a default was set to false inside one of its parts', () => {
       // note: the string writes the glyph's name alone, and reading it back
-      // restores every level the name reaches, its parts' own parts included
-      const builder = changed('PR_GLMULTI', (g) => g.part(1).part(0).setOptions({ color: false }));
+      // restores every level the name reaches, its parts' own parts included.
+      // Re-pinned at C23 (D2): the glyph's parts are inside the one part it
+      // is, so the part is reached one level further down
+      const builder = changed('PR_GLMULTI', (g) => g.part(0).part(1).part(0).setOptions({ color: false }));
       const saved = builder.toString({ preserve: true });
       expect(saved).toBe('B291;C8;HL8:0,8');
       expect(inkOf(new BlissSVGBuilder(saved).svgCode)).toBe(inkOf(builder.svgCode));
       expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
     });
 
-    it('counts a default set to false as removed, since no save writes false', () => {
-      const builder = changed('PR_REDB', (g) => g.setOptions({ color: false }));
+    it('counts a default set to false on its part as removed, since no save writes false', () => {
+      // re-pinned at C23 (D2): was `false` on the character, which the default
+      // no longer sits on (that case is the row below)
+      const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
       const saved = builder.toString({ preserve: true });
       expect(saved).toBe('B291');
       expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
     });
 
+    it('keeps the name when the character sets the default\'s key to false, which reaches no option of the definition\'s', () => {
+      // re-pinned at C23 (D2, D7): was "counts a default set to false as
+      // removed" (saved `B291`). A character option does not restyle the
+      // definition's part, so the colour stays, and so does the name
+      const builder = changed('PR_REDB', (g) => g.setOptions({ color: false }));
+      const saved = builder.toString({ preserve: true });
+      expect(saved).toBe('PR_REDB');
+      expect(builder.svgCode).toContain('stroke="red"');
+      expect(inkOf(new BlissSVGBuilder(saved).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(new BlissSVGBuilder(saved).svgCode).toContain('stroke="red"');
+    });
+
     it('saves a flattened head that lost its default as a save without preserve does', () => {
-      const builder = changed('PR_REDB;;B81', (g) => g.removeOptions('color'));
+      // re-pinned at C23 (D2, D8): was `removeOptions('color')` on the
+      // character, and the JSON equal to the save without preserve. The
+      // default is left out on the head's named part now, so the JSON keeps
+      // the name beside the part it writes out, as the row on the JSON below
+      // says, and reloads what the builder draws
+      const builder = changed('PR_REDB;;B81', (g) => g.part(0).setOptions({ color: false }));
       expect(builder.toString({ preserve: true, flattenIndicators: true })).toBe('B291;B81');
-      expect(builder.toJSON({ preserve: true, flattenIndicators: true })).toEqual(builder.toJSON({ flattenIndicators: true }));
+      expect(builder.toString({ preserve: true, flattenIndicators: true })).toBe(builder.toString({ flattenIndicators: true }));
+      expect(new BlissSVGBuilder(builder.toJSON({ preserve: true, flattenIndicators: true })).svgCode).toBe(builder.svgCode);
     });
   });
 
@@ -190,10 +219,15 @@ describe('BlissSVGBuilder preserve removed default', () => {
   describe('when the JSON writes the parts out beside the name', () => {
     it('keeps the name when only a part lost a default the name supplies', () => {
       // note: the parts are written out, so the name brings back only the
-      // character's own options; the string spells this glyph out instead
-      const builder = changed('PR_TWO', (g) => g.part(1).removeOptions('color'));
+      // character's own options; the string spells this glyph out instead.
+      // Re-pinned at C23 (D2): was `part(1).removeOptions('color')` on a lone
+      // PR_TWO, whose bracketed parts sit inside the one part it is now, where
+      // a change is backlog row "A part saved by its name forgets a change
+      // made inside it"; the part a lone PR_REDB is leaves its default out
+      const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
       const json = builder.toJSON({ preserve: true });
-      expect(json.groups[0].glyphs[0].codeName).toBe('PR_TWO');
+      expect(json.groups[0].glyphs[0].codeName).toBe('PR_REDB');
+      expect(builder.toString({ preserve: true })).toBe('B291');
       expect(new BlissSVGBuilder(json).svgCode).toBe(builder.svgCode);
     });
   });
@@ -209,13 +243,21 @@ describe('BlissSVGBuilder preserve removed default', () => {
   });
 
   describe('when the element still carries every key the name supplies', () => {
+    // re-pinned at C23 (D2, D7, D8): a lone PR_REDB is one part named after it,
+    // carrying the default, so the character holds none. A character value of
+    // the key is the author's own, saved as written, and does not override
+    // the default (was "an overriding value"); the part bracket does; the
+    // untouched glyph is saved by its name alone (was `[color=red]PR_REDB`);
+    // the default is written back on the part (was removed and written back
+    // on the character, which removes nothing now)
     it.each([
-      ['an overriding value', () => new BlissSVGBuilder('[color=blue]PR_REDB'), '[color=blue]PR_REDB'],
-      ['an untouched glyph', () => new BlissSVGBuilder('PR_REDB'), '[color=red]PR_REDB'],
+      ['a value of the key on the character', () => new BlissSVGBuilder('[color=blue]PR_REDB'), '[color=blue]PR_REDB'],
+      ['an overriding value', () => new BlissSVGBuilder('[color=blue]>PR_REDB'), '[color=blue]>PR_REDB'],
+      ['an untouched glyph', () => new BlissSVGBuilder('PR_REDB'), 'PR_REDB'],
       // note: the part's defaults are the definition's own, so the name alone
       // brings them back
       ['an untouched part', () => new BlissSVGBuilder('B291;PR_SHAPE'), 'B291;PR_SHAPE'],
-      ['a removed default written back', () => changed('PR_REDB', (g) => { g.removeOptions('color'); g.setOptions({ color: 'red' }); }), '[color=red]PR_REDB'],
+      ['a removed default written back', () => changed('PR_REDB', (g) => { g.part(0).setOptions({ color: false }); g.part(0).setOptions({ color: 'red' }); }), 'PR_REDB'],
     ])('keeps the name for %s', (_label, build, expected) => {
       const builder = build();
       const saved = builder.toString({ preserve: true });
@@ -225,32 +267,33 @@ describe('BlissSVGBuilder preserve removed default', () => {
 
     it('still spells a glyph out when a part keeps its key with another value', () => {
       // pins the key check as an addition to the anatomy comparison, not a
-      // replacement: presence alone would keep PR_TWO and lose the green
-      const builder = changed('PR_TWO', (g) => g.part(1).setOptions({ color: 'green' }));
-      expect(builder.toString({ preserve: true })).toBe('[color=red]>B291;[color=green]>C8');
+      // replacement: presence alone would keep PR_REDB and lose the green.
+      // Re-pinned at C23 (D2): was part 1 of a lone PR_TWO, for the reason the
+      // JSON row above gives; the glyph's own part keeps its name with the
+      // green beside it (was `[color=red]>B291;[color=green]>C8`)
+      const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: 'green' }));
+      expect(builder.toString({ preserve: true })).toBe('[color=green]>PR_REDB');
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
     });
   });
 
   describe('when the flag removes every option from a preserve save', () => {
     it.each([
-      ['a glyph with a default', 'PR_REDB', {}, 'B291'],
-      ['a glyph whose code string styles its part', 'PR_STYGL', {}, 'B291'],
-      ['a glyph whose code string styles two parts', 'PR_TWO', {}, 'B291;C8'],
-      ['a flattened head with a default', 'PR_REDB;;B81', { flattenIndicators: true }, 'B291;B81'],
-    ])('spells out %s', (_label, input, options, expected) => {
-      const saved = new BlissSVGBuilder(input).toString({ ...options, preserve: true, omitOptions: true });
-      expect(saved).toBe(expected);
-      expect(optionBagsIn(new BlissSVGBuilder(saved))).toEqual([]);
-    });
-
-    it.each([
-      ['a part with defaults', 'B291;PR_SHAPE'],
-      ['a shape whose inner part has a default', 'B291;PR_MULTI'],
-    ])('keeps the name of %s, whose options are the definition\'s', (_label, input) => {
+      ['a part with defaults', 'B291;PR_SHAPE', {}, 'B291;PR_SHAPE'],
+      ['a shape whose inner part has a default', 'B291;PR_MULTI', {}, 'B291;PR_MULTI'],
+      // re-pinned at C23 (D2, D8): these four were spelled out (`B291`,
+      // `B291`, `B291;C8`, `B291;B81`) with no option left in the reload.
+      // Written alone, each is one part named after its definition, whose
+      // options are the definition's, as a part's are above
+      ['a glyph with a default', 'PR_REDB', {}, 'PR_REDB'],
+      ['a glyph whose code string styles its part', 'PR_STYGL', {}, 'PR_STYGL'],
+      ['a glyph whose code string styles two parts', 'PR_TWO', {}, 'PR_TWO'],
+      ['a flattened head with a default', 'PR_REDB;;B81', { flattenIndicators: true }, 'PR_REDB;B81'],
+    ])('keeps the name of %s, whose options are the definition\'s', (_label, input, options, expected) => {
       // note: what a part named by a definition brings is part of its code,
       // and what sits inside it is the definition's, so nothing is left out
-      const saved = new BlissSVGBuilder(input).toString({ preserve: true, omitOptions: true });
-      expect(saved).toBe(input);
+      const saved = new BlissSVGBuilder(input).toString({ ...options, preserve: true, omitOptions: true });
+      expect(saved).toBe(expected);
       expect(new BlissSVGBuilder(saved).svgCode).toBe(new BlissSVGBuilder(input).svgCode);
     });
 

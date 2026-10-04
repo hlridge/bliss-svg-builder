@@ -3,20 +3,26 @@ import { BlissSVGBuilder } from '../src/index.js';
 
 /**
  * Pins `toString({ preserve: true })` keeping a custom glyph's name only while
- * the glyph still has the parts that name reloads to.
+ * the glyph still has the parts that name reloads to. A typed glyph written
+ * alone is one part named after it (C23), so a change to that part declines
+ * the character's name, and the save writes the part, under its own name, as
+ * it stands.
  *
  * Covers:
- * - A part-level change (a part removed, recoloured, moved on either axis, given
- *   an axis the definition never wrote, or stripped of an option the definition
- *   wrote) spelling the glyph out instead of saving the stale name, on an
- *   ordinary glyph, on a compound indicator, and through your own short name.
- * - A saved object naming the glyph over a part it does not have.
+ * - A change to the part a lone glyph is (recoloured, moved on either axis,
+ *   given an axis the definition never wrote, or removed once an indicator
+ *   stands beside it) never saved as the bare name, on an ordinary glyph, on a
+ *   compound indicator, and through your own short name.
+ * - A saved object naming the glyph over parts it does not have: a part of
+ *   another code, or one without an option the definition writes on it.
  * - Appended parts: a bare one keeps the name as `NAME;code`, including when
- *   the definition positions its own parts; one written at a position (the
- *   origin included), moved or coloured spells the glyph out.
+ *   the definition positions its own parts, when the part draws with a look of
+ *   its own, and when a saved object appends a decorated custom glyph; one
+ *   written at a position (the origin included), moved or coloured is written
+ *   as it stands beside the name; a compound indicator stays whole.
  * - Controls that keep the name: an untouched glyph on each route that builds
- *   one, a part moved back onto the definition's own position, options rewritten
- *   to the definition's values in another order, a definition naming another
+ *   one, a part given a key, a saved object writing a part on the definition's
+ *   own position or its options in another order, a definition naming another
  *   custom glyph as a part, and decoration at character level.
  * - Every saved string reloading to the drawing the builder shows.
  *
@@ -25,9 +31,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   from how it is saved, see `BlissSVGBuilder.typed-name-preserve.test.js`.
  * - `toJSON({ preserve: true })`, which saves the parts beside the name and
  *   rebuilds from the parts, see `BlissSVGBuilder.custom-glyphs.test.js`.
- * - A change made inside a part that is saved by its own name (`part(0).part(0)`
- *   recoloured or moved): the part's name brings it back on every save, see
- *   backlog row "A part saved by its name forgets a change made inside it".
+ * - A change made inside a part that is saved by its own name (`part(0).part(1)`
+ *   of a lone glyph recoloured or moved): the part's name brings it back on
+ *   every save, see backlog row "A part saved by its name forgets a change made
+ *   inside it", which C23 widened to every lone custom glyph.
  * - A default option the name supplies, removed at any level, see
  *   `BlissSVGBuilder.preserve-removed-default.test.js`.
  * - A glyph authored as object input with a name and no parts, see backlog row
@@ -79,53 +86,73 @@ const preserveSave = (builder) => {
 
 describe('BlissSVGBuilder preserve divergence', () => {
   describe('when a part of a custom glyph has changed', () => {
+    // re-pinned at C23 (D2): each change was made to part 1 of the two parts a
+    // lone PDBASE held, and spelled the glyph out (`B291;[color=red]>C8`). The
+    // glyph is one part named after it now, so the change is made to that
+    // part, and the save writes the part under its own name with the change; a
+    // removal needs another part beside it, or the character goes with it
     it.each([
-      ['removePart(1)', (g) => g.removePart(1), 'B291'],
-      ['part(1).remove()', (g) => g.part(1).remove(), 'B291'],
-      ['recolouring part 1', (g) => g.part(1).setOptions({ color: 'red' }), 'B291;[color=red]>C8'],
-      ['moving part 1 on both axes', (g) => g.part(1).setOptions({ x: 3, y: 4 }), 'B291;C8:3,4'],
-      ['moving part 1 on y alone', (g) => g.part(1).setOptions({ y: 4 }), 'B291;C8:,4'],
-    ])('spells the glyph out after %s', (_label, change, expected) => {
+      ['removePart(0) beside an indicator', (g) => { g.applyIndicators('B86'); g.removePart(0); }, 'B86'],
+      ['part(0).remove() beside an indicator', (g) => { g.applyIndicators('B86'); g.part(0).remove(); }, 'B86'],
+      ['recolouring its part', (g) => g.part(0).setOptions({ color: 'red' }), '[color=red]>PDBASE'],
+      ['moving its part on both axes', (g) => g.part(0).setOptions({ x: 3, y: 4 }), 'PDBASE:3,4'],
+      ['moving its part on y alone', (g) => g.part(0).setOptions({ y: 4 }), 'PDBASE:,4'],
+    ])('never writes the bare name after %s', (_label, change, expected) => {
       const builder = changed('PDBASE', change);
       const { saved, reloaded } = preserveSave(builder);
       expect(saved).toBe(expected);
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out when a part gains an axis the definition never wrote, even at 0', () => {
+    it('never writes the bare name when its part gains an axis the definition never wrote, even at 0', () => {
       // note: the ruling counts axis PRESENCE, so an inert 0 still diverges;
-      // spelling out is faithful, keeping the name is the direction that can move ink
-      const builder = changed('PDBASE', (g) => g.part(1).setOptions({ x: 0 }));
+      // writing the axis is faithful, the bare name is the direction that can
+      // move ink. Re-pinned at C23 (D2): was part 1 of two, saved `B291;C8:0`
+      const builder = changed('PDBASE', (g) => g.part(0).setOptions({ x: 0 }));
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B291;C8:0');
+      expect(saved).toBe('PDBASE:0');
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out when an option the definition wrote is removed from its part', () => {
-      const builder = changed('PDCOLOURED', (g) => g.part(1).removeOptions('color'));
+    it('spells the glyph out when a saved object holds its parts without an option the definition writes on one', () => {
+      // re-pinned at C23 (D2, D11): was "... when an option the definition
+      // wrote is removed from its part", `part(1)` of a lone PDCOLOURED. That
+      // part sits inside the one part the glyph is now, where the option is the
+      // definition's (D8), so only an object can still hold the glyph's parts
+      // without it; the name brings nothing to parts it does not describe
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: 'PDCOLOURED', parts: [{ codeName: 'B291' }, { codeName: 'C8' }] }] }],
+      });
       const { saved, reloaded } = preserveSave(builder);
       expect(saved).toBe('B291;C8');
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells a compound indicator out when one of its parts is recoloured', () => {
+    it('never writes a compound indicator\'s bare name when its part is recoloured', () => {
+      // re-pinned at C23 (D2, D9): the compound written alone is one part, kept
+      // whole, so the recolour is written on it (was `[color=red]>B86;B97`)
       const builder = changed('PDCOMPOUND', (g) => g.part(0).setOptions({ color: 'red' }));
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('[color=red]>B86;B97');
+      expect(saved).toBe('[color=red]>PDCOMPOUND');
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells a compound indicator out when one of its parts is removed', () => {
-      const builder = changed('PDCOMPOUND', (g) => g.removePart(1));
+    it('never writes a compound indicator\'s bare name when its part is removed beside an indicator', () => {
+      // re-pinned at C23 (D2, D9): was `removePart(1)`, one of the compound's
+      // own parts (saved `B86`); its parts are inside the one part it is now
+      const builder = changed('PDCOMPOUND', (g) => { g.applyIndicators('B81'); g.removePart(0); });
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B86');
+      expect(saved).toBe('B81');
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out through your own short name for it', () => {
-      const builder = changed('PDALIAS', (g) => g.removePart(1));
+    it('never writes your own short name for the glyph once its part has changed', () => {
+      // re-pinned at C23 (D2): was "spells the glyph out through your own
+      // short name for it", after `removePart(1)` (saved `B291`). The part the
+      // alias draws is the glyph's one named part, which keeps its own name
+      const builder = changed('PDALIAS', (g) => g.part(0).setOptions({ color: 'red' }));
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B291');
+      expect(saved).toBe('[color=red]>PDBASE');
       expect(reloaded).toBe(builder.svgCode);
     });
 
@@ -147,13 +174,15 @@ describe('BlissSVGBuilder preserve divergence', () => {
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out when the appended indicator draws with a look of its own', () => {
-      // note: the string does not write ANCHORRING's dotted line, but the
-      // renderer draws a character holding a styled part part by part, so
-      // `PDBASE;ANCHORRING` would reload with the base's paths merged into one
+    it('keeps the name when the appended indicator draws with a look of its own', () => {
+      // re-pinned at C23 (D2): was "spells the glyph out ..." (`B291;C8;
+      // ANCHORRING`), because a reload of `PDBASE;ANCHORRING` merged the
+      // base's paths into one where the builder drew them apart. The glyph is
+      // one part named after it in the builder and in the reload alike, so
+      // both draw it the same way
       const builder = changed('PDBASE', (g) => g.applyIndicators('ANCHORRING'));
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B291;C8;ANCHORRING');
+      expect(saved).toBe('PDBASE;ANCHORRING');
       expect(reloaded).toBe(builder.svgCode);
     });
 
@@ -176,36 +205,44 @@ describe('BlissSVGBuilder preserve divergence', () => {
     });
 
     it.each([
-      ['written at the origin', (g) => g.applyIndicators('B86:0,0'), 'B291;C8;B86:0,0'],
-      ['written at x alone', (g) => g.applyIndicators('B86:0'), 'B291;C8;B86:0'],
-      ['written at y alone', (g) => g.applyIndicators('B86:,0'), 'B291;C8;B86:,0'],
-      ['then moved', (g) => { g.applyIndicators('B86'); g.part(2).setOptions({ x: 3, y: 4 }); }, 'B291;C8;B86:3,4'],
-      ['then coloured', (g) => { g.applyIndicators('B86'); g.part(2).setOptions({ color: 'red' }); }, 'B291;C8;[color=red]>B86'],
-    ])('spells the glyph out when the appended indicator is %s', (_label, change, expected) => {
+      ['written at the origin', (g) => g.applyIndicators('B86:0,0'), 'PDBASE;B86:0,0'],
+      ['written at x alone', (g) => g.applyIndicators('B86:0'), 'PDBASE;B86:0'],
+      ['written at y alone', (g) => g.applyIndicators('B86:,0'), 'PDBASE;B86:,0'],
+      ['then moved', (g) => { g.applyIndicators('B86'); g.part(1).setOptions({ x: 3, y: 4 }); }, 'PDBASE;B86:3,4'],
+      ['then coloured', (g) => { g.applyIndicators('B86'); g.part(1).setOptions({ color: 'red' }); }, 'PDBASE;[color=red]>B86'],
+    ])('writes the appended indicator as it stands when it is %s', (_label, change, expected) => {
       // regression (origin row): `NAME;B86` reloads the indicator re-centred,
-      // because an indicator with no position is placed, and one at 0,0 is pinned
+      // because an indicator with no position is placed, and one at 0,0 is
+      // pinned. Re-pinned at C23 (D2): was "spells the glyph out ..."
+      // (`B291;C8;B86:0,0`); the glyph is one part named after it, which keeps
+      // its name beside the indicator, now part 1 where it was part 2
       const builder = changed('PDBASE', change);
       const { saved, reloaded } = preserveSave(builder);
       expect(saved).toBe(expected);
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out when only one of two appended indicators carries a position', () => {
+    it('writes both appended indicators as they stand when only one of them carries a position', () => {
+      // re-pinned at C23 (D2): was "spells the glyph out ..." (`B291;C8;B86;
+      // B81:0,0`), for the reason the rows above give
       const builder = changed('PDBASE', (g) => g.applyIndicators('B86;B81:0,0'));
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B291;C8;B86;B81:0,0');
+      expect(saved).toBe('PDBASE;B86;B81:0,0');
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out when a saved object appends a custom glyph whose own anatomy is decorated', () => {
-      // regression: the appended part is bare at its own level,
-      // but `NAME;PDCOLOURED` reloads with the base's paths merged into one
-      // where the builder drew them apart, so the SVG differed from what it saved
+    it('keeps the name when a saved object appends a custom glyph whose own anatomy is decorated', () => {
+      // regression: the appended part is bare at its own level, but
+      // `NAME;PDCOLOURED` reloaded with the base's paths merged into one where
+      // the builder drew them apart, so the SVG differed from what it saved.
+      // Re-pinned at C23 (D2, D11): was "spells the glyph out ..." (`B291;C8;
+      // PDCOLOURED`); the object's PDBASE is built into the one part the DSL
+      // builds, so the builder and the reload draw it alike
       const builder = new BlissSVGBuilder({
         groups: [{ glyphs: [{ codeName: 'PDBASE', parts: [{ codeName: 'B291' }, { codeName: 'C8' }, { codeName: 'PDCOLOURED' }] }] }],
       });
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B291;C8;PDCOLOURED');
+      expect(saved).toBe('PDBASE;PDCOLOURED');
       expect(reloaded).toBe(builder.svgCode);
     });
 
@@ -218,31 +255,37 @@ describe('BlissSVGBuilder preserve divergence', () => {
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells the glyph out when a flattened word-level indicator is decorated inside its own definition', () => {
-      // regression, reachable from the DSL alone: flattening
-      // `;;PDDECIND` appends the indicator whole, and its definition colours one
-      // of its parts
+    it('keeps the name when a flattened word-level indicator is decorated inside its own definition', () => {
+      // regression, reachable from the DSL alone: flattening `;;PDDECIND`
+      // appends the indicator whole, and its definition colours one of its
+      // parts. Re-pinned at C23 (D2): was "spells the glyph out ..."
+      // (`B291;C8;PDDECIND`), for the reason the row above gives
       const builder = new BlissSVGBuilder('PDBASE;;PDDECIND');
       const saved = builder.toString({ preserve: true, flattenIndicators: true });
-      expect(saved).toBe('B291;C8;PDDECIND');
+      expect(saved).toBe('PDBASE;PDDECIND');
       expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
     });
 
-    it('spells a compound indicator out when an indicator is applied to it', () => {
+    it('keeps a compound indicator whole when an indicator is applied to it', () => {
+      // re-pinned at C23 (D9): was "spells a compound indicator out ..."
+      // (`B86;B81;B97`, its baked parts reordered by the API). Written alone it
+      // is one part named after it, kept whole, as `B98` is
       const builder = changed('PDCOMPOUND', (g) => g.applyIndicators('B81'));
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B86;B81;B97');
+      expect(saved).toBe('PDCOMPOUND;B81');
       expect(reloaded).toBe(builder.svgCode);
     });
 
-    it('spells a compound indicator out even when a saved object appends a bare indicator after its own', () => {
-      // note: a compound indicator is one atomic unit, so nothing is ever
-      // appended to its name, even where its own parts come through untouched
+    it('keeps a compound indicator whole when a saved object appends a bare indicator after its own parts', () => {
+      // note: a compound indicator is one atomic unit. Re-pinned at C23 (D9,
+      // D11): was "spells a compound indicator out even when ..." (`B86;B97;
+      // B81`); the object's own parts are built into the one part the DSL
+      // builds, so the indicator is appended to the unit, never inside it
       const builder = new BlissSVGBuilder({
         groups: [{ glyphs: [{ codeName: 'PDCOMPOUND', parts: [{ codeName: 'B86' }, { codeName: 'B97' }, { codeName: 'B81' }] }] }],
       });
       const { saved, reloaded } = preserveSave(builder);
-      expect(saved).toBe('B86;B97;B81');
+      expect(saved).toBe('PDCOMPOUND;B81');
       expect(reloaded).toBe(builder.svgCode);
     });
   });
@@ -281,21 +324,32 @@ describe('BlissSVGBuilder preserve divergence', () => {
 
     it('keeps the name on both surfaces when a part is given a key', () => {
       // note: a key names the part for getElementByKey and draws nothing, and
-      // both saves strip it
-      const builder = changed('PDBASE', (g) => g.part(1).setOptions({ key: 'mine' }));
+      // both saves strip it. Re-pinned at C23 (D2): was part 1 of two; the
+      // glyph is one part named after it now
+      const builder = changed('PDBASE', (g) => g.part(0).setOptions({ key: 'mine' }));
       expect(preserveSave(builder).saved).toBe('PDBASE');
       expect(builder.toJSON({ preserve: true }).groups[0].glyphs[0].codeName).toBe('PDBASE');
     });
 
-    it('keeps the name when a part is moved back onto the definition\'s own position', () => {
-      const builder = changed('PDOWNSPOS', (g) => g.part(1).setOptions({ x: 3, y: 4 }));
+    it('keeps the name when a saved object writes a part on the definition\'s own position', () => {
+      // re-pinned at C23 (D2, D11): was "... when a part is moved back onto
+      // the definition's own position", `part(1)` of a lone PDOWNSPOS. That
+      // part sits inside the one part the glyph is now, so only an object can
+      // still hold the glyph's own parts, built into the DSL's shape where the
+      // positions match
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: 'PDOWNSPOS', parts: [{ codeName: 'B291' }, { codeName: 'C8', x: 3, y: 4 }] }] }],
+      });
       expect(preserveSave(builder).saved).toBe('PDOWNSPOS');
     });
 
-    it('keeps the name when a part\'s options are rewritten to the definition\'s values in another order', () => {
-      const builder = changed('PDTWOOPT', (g) => {
-        g.part(1).removeOptions('color');
-        g.part(1).setOptions({ color: 'blue' });
+    it('keeps the name when a saved object writes a part\'s options as the definition\'s values in another order', () => {
+      // re-pinned at C23 (D2, D11): was "... when a part's options are
+      // rewritten ...", `part(1)` of a lone PDTWOOPT, for the reason the row
+      // above gives. The part is written as the code it draws, so the options
+      // reach the comparison in the order written
+      const builder = new BlissSVGBuilder({
+        groups: [{ glyphs: [{ codeName: 'PDTWOOPT', parts: [{ codeName: 'B291' }, { codeName: 'C8', options: { 'stroke-width': 0.5, color: 'blue' } }] }] }],
       });
       const { saved, reloaded } = preserveSave(builder);
       expect(saved).toBe('PDTWOOPT');

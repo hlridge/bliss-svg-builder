@@ -559,17 +559,31 @@ export const OPTION_BRACKET_CONTENT = String.raw`(?:(?=(?<atom>"(?:[^"\\]|\\.)*"
 const CHARACTER_BRACKET_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.*)`);
 
 /**
+ * A definition's code string without the `>` leading it with no bracket before
+ * it: an option region carrying nothing, which the DSL consumes before it reads
+ * anything else (`>B291` is `B291`, `>[color=red]B291` is `[color=red]B291`).
+ * Exactly one is consumed, as there.
+ *
+ * @param {string} codeString
+ * @returns {string}
+ */
+export const withoutEmptyRegion = (codeString) => codeString.replace(/^>/, '');
+
+/**
  * A definition's code string split into the character brackets leading it, in
- * order, and the text behind them. Shared by the parser's reading of a
- * definition's own options and by the alias resolution that reads through
- * them, so the two cannot disagree about where such a bracket ends.
+ * order, and the text behind them, an empty option region before them read as
+ * nothing (see withoutEmptyRegion). Shared by every reader of a definition's
+ * code string as written: the parser's reading of a definition's own options
+ * and of the code its first character is made of, the alias resolution that
+ * reads through them, and the saves' reading of a rename, so none of them can
+ * disagree about where such a bracket ends or what the code behind it is.
  *
  * @param {string} codeString
  * @returns {{ brackets: string[], body: string }}
  */
 export const peelCharacterBrackets = (codeString) => {
   const brackets = [];
-  let body = codeString;
+  let body = withoutEmptyRegion(codeString);
   let match;
   while ((match = body.match(CHARACTER_BRACKET_PATTERN)) !== null) {
     brackets.push(match[1]);

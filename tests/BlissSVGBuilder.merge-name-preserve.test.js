@@ -16,15 +16,13 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   codeName stays the resolved built-in so the delta pipeline is
  *   unaffected).
  * - Divergence guardrail: a merged glyph that no longer matches its
- *   definition's anatomy decomposes instead of keeping a stale name.
+ *   definition's anatomy is written as its typed delta (`MYGL1;B81`, the
+ *   name on the one part the definition is) instead of a stale name.
  *
  * Does NOT cover:
  * - Alias-over-typed-target precedence through merge (ALGL stays ALGL) and
  *   typed SHAPES through merge (no glyphCode identity; the parser-side
  *   recording carries them), see `BlissSVGBuilder.typed-name-preserve.test.js`.
- * - A glyph diverged BEFORE merge keeping its typed delta ('MYGL1;B81'):
- *   the recording restores clean instances only, so the merged tree emits
- *   decomposed parts (residual of the merge-name-loss backlog row).
  */
 
 const customCodes = [];
@@ -117,13 +115,19 @@ describe('BlissSVGBuilder merge name preserve', () => {
   });
 
   describe('when the merged glyph has diverged from its definition', () => {
-    it('declines the written name and decomposes', () => {
+    it('writes the typed delta instead of a stale name', () => {
+      // re-pinned at C23 (D2): was "declines the written name and decomposes"
+      // to `B208//C8;B81`. The glyph is one part named after its definition,
+      // which keeps its name through the merge, so the save is the delta
+      // against it, never the bare name
       defineGlyphFixtures();
       const diverged = new BlissSVGBuilder('MYGL1');
       diverged.glyph(0).applyIndicators('B81');
       const host = new BlissSVGBuilder('B208');
       host.merge(diverged);
-      expect(host.toString({ preserve: true })).toBe('B208//C8;B81');
+      const saved = host.toString({ preserve: true });
+      expect(saved).toBe('B208//MYGL1;B81');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(host.svgCode);
       expect(host.toString()).toBe('B208//C8;B81');
     });
   });

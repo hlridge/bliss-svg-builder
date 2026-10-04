@@ -1169,9 +1169,11 @@ export class ElementHandle {
 
   #updateGlyphIdentityAfterIndicatorChange(glyph, definitions) {
     // A custom (non-built-in) Bliss glyph keeps its identity through indicator
-    // changes so { preserve: true } can re-emit the delta against the baked
-    // definition state, matching the DSL replacement path (DSL/API parity).
-    // Built-in glyphs decompose, so they fall through to the reset logic below.
+    // changes: written alone it is one part named after it, which the
+    // indicators are appended beside, so { preserve: true } writes that name
+    // and the indicators after it, as the DSL `;` spelling reads (DSL/API
+    // parity). Built-in glyphs decompose, so they fall through to the reset
+    // logic below.
     if (glyph.isBlissGlyph === true
         && typeof glyph.glyphCode === 'string'
         && !builtInCodes.has(glyph.glyphCode)) {

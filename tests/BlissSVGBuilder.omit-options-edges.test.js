@@ -14,11 +14,10 @@
  * - An empty character that held its head marker only through its options: the
  *   marker goes with them, so a word-level indicator lands on the head that is
  *   left, flattened or not.
- * - A definition whose code string styles its parts: a styled glyph written
- *   alone, whose parts are the character's own, losing the styling; a part
- *   named by such a definition keeping it (a multi-part shape in the DSL, a
- *   styled shape as an object part, a styled shape defined after the
- *   composition was built), as part brackets where a save spells the part out
+ * - A definition whose code string styles its parts keeping that styling,
+ *   written alone (the one part it is) or naming a part (a multi-part shape in
+ *   the DSL, a styled shape as an object part, a styled shape defined after
+ *   the composition was built), as part brackets where a save spells it out
  *   and by the name alone under `preserve`; and a glyph object with no parts,
  *   which draws nothing and now saves as nothing.
  * - No `[` in any output of this file but a definition's own options, which a
@@ -89,11 +88,12 @@ const DEFINED_OVERLAY_ROWS = [
   ['preserve and flattenIndicators', { preserve: true, flattenIndicators: true }, 'B291;OE_REDIND'],
 ];
 
+// note: `OE_STYGL` left at C23 (D2): its plain save holds the definition's
+// own bracket, pinned exactly in its row
 const EVERY_STRING_INPUT = [
   ...OVERLAY_ROWS.map(([, input]) => input),
   'B291;;OE_REDIND',
   '[color=red]^/B291;;B81',
-  'OE_STYGL',
 ];
 
 describe('BlissSVGBuilder omit options edges', () => {
@@ -152,8 +152,14 @@ describe('BlissSVGBuilder omit options edges', () => {
   });
 
   describe('when a definition\'s code string styles its parts', () => {
-    it('drops the options of a styled glyph written alone, whose parts are the character\'s own', () => {
-      expect(withoutOptions('OE_STYGL')).toBe('B291');
+    it('keeps the options inside a styled glyph written alone, the one part it is', () => {
+      // re-pinned at C23 (D2): was "drops the options of a styled glyph
+      // written alone, whose parts are the character's own" (`B291`). Written
+      // alone the glyph is one part named after it, so what sits inside it is
+      // the definition's, as in a part slot
+      expect(withoutOptions('OE_STYGL')).toBe('[color=red]>B291');
+      expect(withoutOptions('OE_STYGL', { preserve: true })).toBe('OE_STYGL');
+      expect(new BlissSVGBuilder(withoutOptions('OE_STYGL')).svgCode).toBe(new BlissSVGBuilder('OE_STYGL').svgCode);
     });
 
     it('keeps the options inside a part named by a multi-part shape written in the DSL', () => {
