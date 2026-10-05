@@ -10,9 +10,10 @@
  *   no options on the character, one part carrying them; one part handle.
  * - A compound indicator written alone kept whole when an indicator is
  *   applied to it, as `B98` is.
- * - An indicator added to a glyph with an anchor of its own, or wrapping one
- *   with an anchor, placed by the glyph's own anchor on every route, as `;`
- *   places it; a definition positioning its own part laid out as written.
+ * - An indicator added to a glyph with an anchor of its own, or wrapping a
+ *   code with one (whose anchor it takes), placed the same way on every
+ *   route, as `;` places it; a definition positioning its own part laid out
+ *   as written.
  * - A lone custom glyph changed through its handle (an indicator applied or a
  *   part added; an indicator applied and cleared; its only part replaced)
  *   keeping or dropping its name as the DSL spelling of the result would.
@@ -151,8 +152,9 @@ describe('BlissSVGBuilder definition is a part', () => {
       ['DP_WRAP', 'glyph(0).applyIndicators', (base) => changed(base, (b) => b.glyph(0).applyIndicators('B81'))],
       ['DP_WRAP', 'group(0).applyIndicators', (base) => changed(base, (b) => b.group(0).applyIndicators('B81'))],
     ])('places B81 on %s by %s where its ; spelling does', (base, _route, build) => {
-      // note: a typed glyph is placed by its own anchor, never by the anchor of
-      // the code it wraps, so DP_WRAP has none although B138 has one
+      // note: a typed glyph is placed by its own anchor on every route; where
+      // it sets none and draws one code it takes that code's, so DP_WRAP is
+      // placed by B138's (see BlissSVGBuilder.wrapped-code-anchor.test.js)
       expect(build(base).svgCode).toBe(new BlissSVGBuilder(`${base};B81`).svgCode);
     });
 

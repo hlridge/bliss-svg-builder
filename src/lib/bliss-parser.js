@@ -430,17 +430,29 @@ export function classifyXCode(code) {
   return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
 
-// The code the first character of a code string is made from, read as a part
-// slot reads it: behind its option brackets (a leading character bracket is a
-// definition's own options, see ownBracketOf), before any `;` part, and
-// without its coordinate.
-function firstBaseCode(codeString) {
+// A code string as a part slot reads it: behind its option brackets (a leading
+// character bracket is a definition's own options, see ownBracketOf).
+function slotBodyOf(codeString) {
   let rest = peelCharacterBrackets(codeString).body;
   let bracket;
   while ((bracket = rest.match(LEADING_PART_BRACKET_PATTERN)) !== null) rest = rest.slice(bracket[0].length);
-  const [first] = rest.split(';');
+  return rest;
+}
+
+// The code the first character of a code string is made from, read as a part
+// slot reads it: behind its option brackets, before any `;` part, and without
+// its coordinate.
+function firstBaseCode(codeString) {
+  const [first] = slotBodyOf(codeString).split(';');
   const coordinate = first.match(COORD_SUFFIX_PATTERN);
   return coordinate && coordinate.index > 0 ? first.slice(0, coordinate.index) : first;
+}
+
+// The code a code string of one part is made of, read as firstBaseCode reads
+// it; null when it holds several parts.
+function onlyCodeOf(codeString) {
+  const segments = slotBodyOf(codeString).split(';').filter((segment) => segment !== '');
+  return segments.length === 1 ? firstBaseCode(segments[0]) : null;
 }
 
 // The layout data a code draws with, as its bare spelling gets it. Layout data
@@ -2330,15 +2342,37 @@ export class BlissParser {
     if (options) {
       part.options = { ...options, ...(part.options || {}) };
     }
+    const anchor = BlissParser.#anchorOf(definition);
     if (definition.isIndicator) {
       part.isIndicator = true;
       part.width = definition.width ?? 2;
-    } else if (definition.anchorOffsetY !== undefined) {
-      part.anchorOffsetY = definition.anchorOffsetY;
+    } else if (anchor.anchorOffsetY !== undefined) {
+      part.anchorOffsetY = anchor.anchorOffsetY;
     }
-    if (definition.anchorOffsetX !== undefined) {
-      part.anchorOffsetX = definition.anchorOffsetX;
+    if (anchor.anchorOffsetX !== undefined) {
+      part.anchorOffsetX = anchor.anchorOffsetX;
     }
+  }
+
+  /**
+   * The anchor a definition places what is added beside it by. A definition
+   * that draws one code takes what it does not set itself from that code,
+   * axis by axis, so it stands in for the code (as layoutDefinitionOf gives it
+   * the code's layout data) and draws as its spelled-out form reloads. A code
+   * string of several codes has no single base and keeps the default anchor,
+   * as written out it would.
+   */
+  static #anchorOf(definition, depth = 0) {
+    const own = { anchorOffsetX: definition.anchorOffsetX, anchorOffsetY: definition.anchorOffsetY };
+    if (typeof definition.codeString !== 'string' || depth >= MAX_RECURSION_DEPTH) return own;
+    const code = onlyCodeOf(definition.codeString);
+    const held = code !== null && Object.hasOwn(blissElementDefinitions, code) ? blissElementDefinitions[code] : undefined;
+    if (!held) return own;
+    const inherited = BlissParser.#anchorOf(held, depth + 1);
+    return {
+      anchorOffsetX: own.anchorOffsetX ?? inherited.anchorOffsetX,
+      anchorOffsetY: own.anchorOffsetY ?? inherited.anchorOffsetY,
+    };
   }
 
   /**

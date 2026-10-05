@@ -24,8 +24,8 @@
  *   `BlissSVGBuilder.alias-options-kept.test.js`.
  * - The shape used by its own name, see
  *   `BlissSVGBuilder.definition-options-kept.test.js`.
- * - The anchor of a code a typed glyph wraps, which the glyph does not take,
- *   see `BlissSVGBuilder.definition-is-a-part.test.js`.
+ * - The anchor of a code a typed glyph wraps, which the glyph takes, see
+ *   `BlissSVGBuilder.wrapped-code-anchor.test.js`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
