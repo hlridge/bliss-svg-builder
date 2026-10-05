@@ -589,10 +589,11 @@ export declare class ElementHandle {
    * `clearOptions()` differs here: it leaves a part's coordinates, and a
    * character's kerning, in place.
    *
-   * A built-in's own look is not removed: the dotted line `REFSQUARE` and
-   * `ANCHORRING` draw with by definition, and likewise the `defaultOptions` of
-   * a shape drawn by its own `getPath` function. Naming one of those keys
-   * returns it to the definition's value. To change it, override it instead:
+   * The options a code brings by its definition are part of the code and are
+   * not removed: a built-in's own look (the dotted line `REFSQUARE` and
+   * `ANCHORRING` draw with), and a custom definition's `defaultOptions` or the
+   * bracket that starts its `codeString`. Naming one of those keys returns it
+   * to the definition's value. To change it, override it instead:
    * `[stroke-dasharray=none]>REFSQUARE` draws the square solid.
    *
    * Naming no key at all asks for nothing and is not an error. Every key is
@@ -611,9 +612,9 @@ export declare class ElementHandle {
    * which removes a part's coordinate too.
    *
    * What sits inside the element keeps its own options, so a character's parts
-   * stay styled. `key` and transient options are untouched, and so is a
-   * built-in's own look (see `removeOptions`). Clearing an element that has no
-   * options is not an error.
+   * stay styled. `key` and transient options are untouched, and so are the
+   * options a code brings by its definition (see `removeOptions`). Clearing an
+   * element that has no options is not an error.
    */
   clearOptions(): this;
 
@@ -672,6 +673,11 @@ export interface GlyphDefinition {
    * (`XOH` is shorthand for `XO/XH`). Define a word as a {@link BareDefinition}
    * alias. A run that renders as one text element (`Xaλ`, where a letter has no
    * embedded outline) is a single character and is accepted.
+   *
+   * A character bracket at its start (`[color=red]B291`, no `>` after it)
+   * gives the definition options of its own, exactly as `defaultOptions`
+   * does, and wins where both set a key. It refuses the keys `defaultOptions`
+   * refuses.
    */
   codeString: string;
   /**
@@ -682,15 +688,28 @@ export interface GlyphDefinition {
    * (e.g. `{ codeString: 'B81' }`).
    */
   isIndicator?: boolean;
+  /**
+   * Adjusts the anchor point an indicator attached to this glyph is placed
+   * against. A glyph whose `codeString` draws one code takes that code's value
+   * where it sets none of its own, so it places indicators as that code does.
+   */
   anchorOffsetX?: number;
+  /** See {@link GlyphDefinition.anchorOffsetX}; each axis is taken on its own. */
   anchorOffsetY?: number;
   width?: number;
   shrinksPrecedingWordSpace?: boolean;
   kerningRules?: Record<string, any>;
   /**
-   * Default options merged into each use of the definition. Keys must be
-   * well-formed option names (letters, digits, hyphens; names beginning with
-   * `on` are rejected, as for any attribute), and two kinds of key are refused:
+   * The definition's own options. They are the options of the part the code
+   * is, so they style what the definition draws and never a part added beside
+   * it. An option written on the character, the word or the whole composition
+   * does not override them; a part bracket where the code is used does
+   * (`[color=blue]>MYGLYPH`). They stay through `clearOptions()` and
+   * `removeOptions()`, and a save that keeps the name does not write them.
+   *
+   * Keys must be well-formed option names (letters, digits, hyphens; names
+   * beginning with `on` are rejected, as for any attribute), and two kinds of
+   * key are refused:
    * - One that acts on the whole SVG: a global-only (builder-canvas) key such
    *   as `margin` or `grid`, or a target-prefixed key such as `content--fill`
    *   or `grid-line--sky--stroke`. It would be inert on a definition.
@@ -721,14 +740,14 @@ export interface ShapeDefinition {
   /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
   isIndicator?: never;
   getPath?: (ctx: ShapeContext) => string;
-  /** A shape is a single character; the same word rule as {@link GlyphDefinition.codeString} applies. */
+  /** A shape is a single character; the rules of {@link GlyphDefinition.codeString} apply, its leading bracket included. */
   codeString?: string;
   width?: number;
   height?: number;
   x?: number;
   y?: number;
   extraPathOptions?: Record<string, any>;
-  /** Default options merged into each use; the keys a glyph definition refuses are refused here too (see {@link GlyphDefinition.defaultOptions}). */
+  /** The shape's own options, exactly as for a glyph, refusing the same keys (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
@@ -744,16 +763,29 @@ export interface ExternalGlyphDefinition {
   y?: number;
   height?: number;
   kerningRules?: Record<string, any>;
-  /** Default options merged into each use; the keys a glyph definition refuses are refused here too (see {@link GlyphDefinition.defaultOptions}). */
+  /** The glyph's own options, exactly as for a {@link GlyphDefinition}, refusing the same keys (see {@link GlyphDefinition.defaultOptions}). */
   defaultOptions?: BlissOptions;
 }
 
 /** Bare alias definition (maps a code name to a code string). */
 export interface BareDefinition {
+  /**
+   * The code string the name stands for. Where it draws one character, a
+   * character bracket at its start gives the alias options of its own, as for
+   * {@link GlyphDefinition.codeString}; over a word it styles the first
+   * character, as written.
+   */
   codeString: string;
   /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
   isIndicator?: never;
-  /** Default options merged into each use; the keys a glyph definition refuses are refused here too (see {@link GlyphDefinition.defaultOptions}). */
+  /**
+   * Options for every part the alias draws, in every character of every word
+   * it spells, never for the character itself. Where the alias names one code
+   * they stay with that code as a glyph's own options do (see
+   * {@link GlyphDefinition.defaultOptions}); where it spells several codes
+   * they are ordinary options of the parts, which a clear removes. The keys a
+   * glyph definition refuses are refused here too.
+   */
   defaultOptions?: BlissOptions;
 }
 
@@ -1217,8 +1249,9 @@ export declare class BlissSVGBuilder {
    * what `toString({ omitOptions: true })` saved before, with either
    * serializer. The positions of characters, words and the whole composition
    * go with the rest; a part's coordinates and a character's kerning stay.
-   * `key`s and transient options are untouched, and so is a built-in's own look
-   * (the dotted line of `REFSQUARE`).
+   * `key`s and transient options are untouched, and so are the options a code
+   * brings by its definition (the dotted line of `REFSQUARE`, a custom
+   * definition's `defaultOptions`; see `ElementHandle.removeOptions`).
    */
   clearAllOptions(): this;
 
@@ -1226,14 +1259,18 @@ export declare class BlissSVGBuilder {
 
   /**
    * Returns a portable DSL string. Custom codes are decomposed to built-in
-   * codes by default. `{ preserve: true }` keeps a custom name that stands
-   * for a single glyph, indicator, or shape: every `type`d definition
-   * (whatever its anatomy) and every bare alias renaming one existing code;
-   * multi-code shorthand always serializes expanded. A name is kept only while
-   * the glyph still has the parts it names and every option key the name
-   * brings (a different value counts, a removed one does not): after a part is
-   * removed, moved or recoloured, or a default option removed, the glyph is
-   * written out in full.
+   * codes by default, the options a definition gives written as part brackets
+   * on what they style (`[color=red]>B291`); a shape drawn by its own `getPath`
+   * function, or an external glyph, has no built-in form and keeps its name.
+   * `{ preserve: true }` keeps a custom name that stands for a single glyph,
+   * indicator, or shape: every `type`d definition (whatever its anatomy) and
+   * every bare alias renaming one existing code; multi-code shorthand always
+   * serializes expanded. A name is kept only where reading it back draws what
+   * you have: a change made where the name is used is written beside it
+   * (`[color=blue]>MYGLYPH`, `MYGLYPH:3,4`, `MYGLYPH;B81`), the options its
+   * definition gives are not repeated, and a glyph the name no longer
+   * describes (such as a composition object whose parts are not the ones the
+   * definition draws) is written out in full.
    *
    * The output uses the compact shorthand wherever it means the same thing: a
    * space that matches the default for its position is written as a bare
@@ -1244,9 +1281,10 @@ export declare class BlissSVGBuilder {
    * authored it: the number is normalized (`[x=5.0]` and `[x=+5]` come back as
    * `[x=5]`) and it leads the option keys in its bracket. A kerning value is not
    * an option key: it is written as its marker in front of the bracket
-   * (`[absolute-kerning=5;x=3]B291` → `AK:5/[x=3]B291`). A built-in's own
-   * look is part of the code and is not written as options (`REFSQUARE` comes
-   * back as `REFSQUARE`, dotted line and all). Output is therefore not a
+   * (`[absolute-kerning=5;x=3]B291` → `AK:5/[x=3]B291`). The options a code
+   * brings by its definition are part of the code, so a built-in's own look is
+   * never written as options (`REFSQUARE` comes back as `REFSQUARE`, dotted line
+   * and all). Output is therefore not a
    * byte-copy of the input; compare a round trip against `toString()` output,
    * not against stored text.
    *
@@ -1261,15 +1299,21 @@ export declare class BlissSVGBuilder {
    * pass-through attributes, and the position of a character, a word or the
    * whole composition. A part's coordinates and a character's kerning stay,
    * since they are written outside a bracket (`[x=1]>C8` comes back as `C8:1`),
-   * and a character that held nothing but options goes with them, a head
-   * marker on it included. `clearAllOptions()` makes the same change in place.
+   * and so do the options a code brings by its definition, which are part of
+   * the code (where a custom code is decomposed, its definition's options are
+   * still written, as part brackets). A character that held nothing but
+   * options goes with them, a head marker on it included. `clearAllOptions()`
+   * makes the same change in place.
    */
   toString(options?: { preserve?: boolean; flattenIndicators?: boolean; omitOptions?: boolean }): string;
 
   /**
    * Returns a normalized parsed structure (plain object). Custom codes are
-   * decomposed to built-in codes by default; `{ preserve: true }` keeps
-   * custom names under the same rule as `toString()`.
+   * decomposed to built-in codes by default, wherever they are used, each
+   * part carrying the options its definition gives (a shape drawn by its own
+   * `getPath` function, or an external glyph, keeps its name, as in
+   * `toString()`); `{ preserve: true }` keeps custom names under the same rule
+   * as `toString()`.
    *
    * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
    * omits the `wordIndicators` field (see `toString`).
@@ -1283,8 +1327,9 @@ export declare class BlissSVGBuilder {
    * `omitOptions` leaves out the options `toString` leaves out: no options bag
    * keeps one, and characters, words and the composition lose their `x`/`y`,
    * while a part keeps its own. Two things stay: a character's kerning, which
-   * saved JSON always keeps in its options bag, and a built-in's own look (the
-   * dotted line of `REFSQUARE`).
+   * saved JSON always keeps in its options bag, and the options a code brings
+   * by its definition (the dotted line of `REFSQUARE`; a custom definition's
+   * options, on the parts it is decomposed into).
    */
   toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean; omitOptions?: boolean }): BlissJSON;
 
@@ -1323,9 +1368,11 @@ export declare class BlissSVGBuilder {
    * the returned `{ defined, skipped, errors }`. Rejected entries include names with
    * invisible characters, the reserved names (`X` + letters, `RK`, `AK`, `SP`),
    * a define that would make an existing glyph definition bake an indicator (deferred
-   * validation of a forward reference), and a `codeString` holding content no use
+   * validation of a forward reference), a `codeString` holding content no use
    * could draw: a coordinate the DSL cannot read (`C8:.`), a kerning marker used as
-   * a part (`C8;RK:3`), or a glyph or shape with no character in it (`RK:3`).
+   * a part (`C8;RK:3`), or a glyph or shape with no character in it (`RK:3`), and
+   * a key a definition cannot hold, in `defaultOptions` or in the character
+   * bracket that starts a `codeString` (see {@link GlyphDefinition.defaultOptions}).
    */
   static define(
     definitions: Record<string, CodeDefinition>,
@@ -1364,7 +1411,8 @@ export declare class BlissSVGBuilder {
    *   a `codeString` holding content no use could draw (see {@link BlissSVGBuilder.define});
    *   a patch that would leave a shape with both `getPath` and `codeString`;
    *   a patch that would turn an already-referenced code into an indicator; or a
-   *   `defaultOptions` key a definition cannot hold (see {@link GlyphDefinition.defaultOptions}).
+   *   key a definition cannot hold, in `defaultOptions` or in the character bracket
+   *   that starts `codeString` (see {@link GlyphDefinition.defaultOptions}).
    */
   static patchDefinition(code: string, changes: Partial<CodeDefinition>): { patched: true; warnings: Warning[] };
 }

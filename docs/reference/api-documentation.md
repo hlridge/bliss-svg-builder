@@ -144,7 +144,7 @@ builder.toJSON({ deep: true });
 ```
 
 Custom code behavior:
-- Default output decomposes custom names to built-in codes where a resolved form exists: a standalone alias resolves to its target, and a multi-code `codeString` is always expanded. One kind of name stays even by default: a `;`-part alias whose target is a composed glyph (re-parsing that name needs the same definition registered).
+- Default output decomposes custom names to built-in codes wherever they are used, a part of another character included, and each part it produces carries the options its definition gives. A shape drawn by its own `getPath` function and an external glyph have no built-in form, so they keep their names even by default (re-parsing those needs the same definition registered).
 - Pass `{ preserve: true }` to keep custom names, under the same rule as [`toString()`](#tostring-options): a name is kept when it stands for a single glyph, indicator, or shape.
 
 ```js
@@ -168,7 +168,7 @@ flat.groups[0].glyphs[0].parts.map(p => p.codeName);      // ['B313', 'B81']
 ```
 
 Options behavior:
-- Pass `{ omitOptions: true }` to save the composition [without its options](#saving-without-options), the same ones `toString()` leaves out: no options bag keeps one, and characters, words and the composition lose their `x` and `y`, while a part keeps its own. Two things stay: a character's kerning, which saved JSON always keeps in its options bag, and a built-in's own look (the dotted line of `REFSQUARE`).
+- Pass `{ omitOptions: true }` to save the composition [without its options](#saving-without-options), the same ones `toString()` leaves out: no options bag keeps one, and characters, words and the composition lose their `x` and `y`, while a part keeps its own. Two things stay: a character's kerning, which saved JSON always keeps in its options bag, and the options a code brings by its definition (the dotted line of `REFSQUARE`, or a custom definition's own options on the parts it is decomposed into).
 
 ### Indicators in the tree
 
@@ -190,9 +190,9 @@ Serialized spacing always matches rendered spacing: adjacent space groups serial
 
 A word written with the `X` shorthand comes back in that shorthand. `Xhello` parses into one glyph per letter and serializes as `Xhello`, not as `Xh/Xe/Xl/Xl/Xo`. A letter that carries something of its own (an option, a coordinate, a head marker) is written out on its own, because the compact form has nowhere to put it, but the letters beside it still join up: `Xa/[color=red]>Xb` stays as written, while `Xa^/Xb/Xc` comes back as `Xa^/Xbc`. Both spellings render the same image and parse back to the same composition; the compact one is just the one you would have typed.
 
-A built-in's own look is part of the code, so it is not written out as options. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and `REFSQUARE` comes back as `REFSQUARE`, dotted line and all. A look you set yourself is written as usual (`[stroke-dasharray=4 4]>REFSQUARE`); to draw the square solid, write `[stroke-dasharray=none]>REFSQUARE`.
+The options a code brings by its definition are part of the code, so they are not written out where the name brings them. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and `REFSQUARE` comes back as `REFSQUARE`, dotted line and all. A look you set yourself is written as usual (`[stroke-dasharray=4 4]>REFSQUARE`); to draw the square solid, write `[stroke-dasharray=none]>REFSQUARE`. A [custom definition's own options](/handbook/writing/custom-codes#a-definition-s-own-options) work the same way under `preserve`; where the default output spells the code out in built-in codes, they are written as a part bracket on what they style (`[color=red]>B291`).
 
-Custom code behavior: custom names are decomposed to built-in codes by default. `{ preserve: true }` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`. A name is kept only while the glyph still has the parts it names: after you remove, move or recolour one of them, the glyph is written out in full, so the string reloads to what you see. The same holds for an option the name brings with it (its definition's `defaultOptions`): remove one and the glyph is written out in full, while a different value keeps the name, since the value is written beside it.
+Custom code behavior: custom names are decomposed to built-in codes by default. `{ preserve: true }` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`. A name is kept only while reading it back draws what you have: a change you make where the name is used is written beside it (`[color=blue]>SMILEY`, `SMILEY:3,4`, `SMILEY;B81`), and the options its definition gives are not written again. A glyph the name no longer describes, such as a composition object holding other parts than the definition draws, is written out in full, so the string reloads to what you see.
 
 ```js
 BlissSVGBuilder.define({
@@ -211,7 +211,7 @@ Which mode to use:
 - **Default** for output that leaves your environment: files, APIs, other Bliss tools. It contains only built-in codes, so any receiver renders it without your definitions.
 - **`{ preserve: true }`** for output that stays where your definitions live: app-local storage, a document you reload in the same app. You get your own names back on re-parse, including a name that aliases a single primitive (`MYIND` for `C2`).
 
-Definition *metadata* does not travel in the default **string**: decomposition keeps the ink but the `toString()` form drops fields like `isIndicator`, so a custom indicator serializes to its plain anatomy, which re-parses as ordinary ink, not as an indicator. (`toJSON()` is different: it carries the full part tree, `isIndicator` and `width` included, so an object round trip preserves indicator placement.) When the string form must stay an indicator, run the same `define()` calls in the receiving environment, or keep the string local and use `preserve`. See [Serializing Custom Indicators and Shapes](/handbook/writing/custom-codes#serializing-custom-indicators-and-shapes) for the full behavior table.
+Definition *metadata* does not travel in the default **string**: decomposition keeps the ink but the `toString()` form drops fields like `isIndicator`, so a custom indicator serializes to its plain anatomy, which re-parses as ordinary ink, not as an indicator. (`toJSON()` is different: each part it decomposes into keeps `isIndicator` and `width`, so a rebuilt builder places a custom indicator as an indicator, though a compound one arrives as separate parts rather than one unit.) When the string form must stay an indicator, run the same `define()` calls in the receiving environment, or keep the string local and use `preserve`. See [Serializing Custom Indicators and Shapes](/handbook/writing/custom-codes#serializing-custom-indicators-and-shapes) for the full behavior table.
 
 ### Word-level indicators in the output
 
@@ -246,9 +246,7 @@ That hands back what was written without the styling somebody added, so your app
 
 A part's position or a kerning value entered as an option keeps its own spelling, which sits outside a bracket: `[x=1]>C8` comes back as `C8:1`, and `B291/[relative-kerning=2]B313` as `B291/RK:2/B313`. The position of a character, a word or the whole composition has no spelling outside a bracket, so it goes, and ink that an option placed or spaced moves: `[char-space=4]||B291/B291` comes back as `B291/B291`, with the two characters closer together. Options written inside a word-level indicator go too (`B291;;[x=2;color=red]>B81` comes back as `B291;;B81:2`), and a character that holds nothing but options goes with them, a head marker on it included: `[color=red]^/B291;;B81` comes back as `B291;;B81`, so the indicator moves to `B291`.
 
-A built-in's own look is not an option, so `REFSQUARE` keeps its dotted line.
-
-With `preserve`, a custom name is kept only while the element still has every option the name brings, so a name whose definition brings options is written out: a character defined as `{ type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } }` comes back as `B291`.
+The options a code brings by its definition are part of the code, not options in this sense, so they stay: `REFSQUARE` keeps its dotted line, and `REDGLYPH`, defined `{ type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } }`, comes back as `[color=red]>B291`, or as `REDGLYPH` with `preserve`.
 
 To take the options off the builder itself, call [`clearAllOptions()`](#clearalloptions): afterwards it saves what `toString({ omitOptions: true })` saved before. [`clearOptions()`](#clearoptions) takes them off one element. [`toJSON()`](#tojson-options) takes the same flag.
 
@@ -584,7 +582,7 @@ builder.clearAllOptions();
 builder.toString(); // 'B291/B313'
 ```
 
-It removes exactly what [`omitOptions`](#saving-without-options) leaves out of a save, so afterwards the builder saves what `toString({ omitOptions: true })` saved before, with either serializer. The position of a character, a word or the whole composition goes with the other options; a part's coordinates and a character's kerning stay. It is also the one way to remove the global options, or the composition's own position, from a builder that already exists. `key`s and transient options are left alone, and so is a built-in's own look. For one element, use [`clearOptions()`](#clearoptions).
+It removes exactly what [`omitOptions`](#saving-without-options) leaves out of a save, so afterwards the builder saves what `toString({ omitOptions: true })` saved before, with either serializer. The position of a character, a word or the whole composition goes with the other options; a part's coordinates and a character's kerning stay. It is also the one way to remove the global options, or the composition's own position, from a builder that already exists. `key`s and transient options are left alone, and so are the options a code brings by its definition (see [`removeOptions`](#removeoptions-keys)). For one element, use [`clearOptions()`](#clearoptions).
 
 ### Raw Element Methods
 
@@ -1100,7 +1098,7 @@ A key that is not a string throws a `TypeError`. Every key is read before any is
 
 Naming `x` or `y` removes the element's position, including a part's `CODE:x,y` coordinate, since that is the same value written another way.
 
-A built-in's own look is not removed. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and a shape you define with its own `getPath` function draws with its `defaultOptions` the same way; naming one of those keys returns it to the definition's value. To change the look, override it: `[stroke-dasharray=none]>REFSQUARE` draws the square solid.
+The options a code brings by its definition are part of the code and are not removed. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and a code you define draws with its [own options](/handbook/writing/custom-codes#a-definition-s-own-options) (its `defaultOptions`, or the bracket that starts its `codeString`) the same way; naming one of those keys returns it to the definition's value. To change the look, override it: `[stroke-dasharray=none]>REFSQUARE` draws the square solid.
 
 #### `.clearOptions()`
 
@@ -1112,7 +1110,7 @@ builder.group(0).clearOptions();
 builder.toString(); // 'B291/[color=blue]B313;;B81'
 ```
 
-A word loses its options, its position and the options inside its word-level indicators; a character its options and position; a part its options. What sits inside the element keeps its own, which is why `B313` above stays blue. A part keeps its coordinates and a character its kerning, since the string writes those outside a bracket: on `B291;[x=3;color=red]>C8`, clearing the part gives `B291;C8:3`, while `removeOptions('x')` on it would remove the coordinate. `key` and transient options are left alone, and so is a built-in's own look. Clearing an element that has no options is not an error. To clear the whole composition, global options included, use [`clearAllOptions()`](#clearalloptions).
+A word loses its options, its position and the options inside its word-level indicators; a character its options and position; a part its options. What sits inside the element keeps its own, which is why `B313` above stays blue. A part keeps its coordinates and a character its kerning, since the string writes those outside a bracket: on `B291;[x=3;color=red]>C8`, clearing the part gives `B291;C8:3`, while `removeOptions('x')` on it would remove the coordinate. `key` and transient options are left alone, and so are the options a code brings by its definition. Clearing an element that has no options is not an error. To clear the whole composition, global options included, use [`clearAllOptions()`](#clearalloptions).
 
 ### Transient Options
 
@@ -1255,17 +1253,17 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `codeString` | `string` | yes | Composition using existing codes |
-| `defaultOptions` | `object` | no | Default options, overridable per-element |
+| `defaultOptions` | `object` | no | Options for every part the alias draws (see [own options](#a-definition-s-own-options)) |
 
 **type: 'glyph': Bliss character with glyph metadata:**
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `codeString` | `string` | yes | Composition using existing codes |
-| `defaultOptions` | `object` | no | Default options, overridable per-element |
+| `defaultOptions` | `object` | no | The glyph's own options (see [own options](#a-definition-s-own-options)) |
 | `isIndicator` | `boolean` | no | Marks this glyph as an indicator |
-| `anchorOffsetX` | `number` | no | Horizontal anchor adjustment |
-| `anchorOffsetY` | `number` | no | Vertical anchor adjustment |
+| `anchorOffsetX` | `number` | no | Horizontal anchor adjustment; unset on a glyph that draws one code, that code's |
+| `anchorOffsetY` | `number` | no | Vertical anchor adjustment; unset on a glyph that draws one code, that code's |
 | `width` | `number` | no | Width override |
 | `shrinksPrecedingWordSpace` | `boolean` | no | Auto-shrink word space before this glyph (like punctuation) |
 
@@ -1280,7 +1278,7 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | `x` | `number` | no | Default x offset |
 | `y` | `number` | no | Default y offset |
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
-| `defaultOptions` | `object` | no | Default options, overridable per-element |
+| `defaultOptions` | `object` | no | The shape's own options (see [own options](#a-definition-s-own-options)) |
 
 Give a shape `getPath` or `codeString`, not both: `define()` keeps the function, and `patchDefinition()` refuses a patch that would leave a shape with both.
 
@@ -1301,6 +1299,16 @@ For adding characters from external font systems. Requires providing your own SV
 - Has `getPath` + `char` → external glyph
 - Has `getPath` (no `char`) → shape
 
+### A definition's own options
+
+A definition's `defaultOptions`, and a character bracket at the start of its `codeString` (`[color=red]B291`, with no `>` after it), are its own options; where both set a key, the bracket wins. They are the options of the part the code is:
+
+- They style what the definition draws, and never a part added beside it, whether by `;`, `;;` or the API.
+- An option on the character, the word or the whole composition does not override them. A part bracket where the code is used does (`[color=blue]>MYGLYPH`).
+- They are part of the code: `removeOptions()`, `clearOptions()`, `clearAllOptions()` and `omitOptions` leave them, and `preserve` does not write them again. The default output, which spells a custom code out in built-in codes, writes them as a part bracket (`[color=red]>B291`).
+
+An alias's options go on every part it draws, in every character of every word it spells. Where the alias names one code they behave as above; where it spells several codes they are ordinary options of those parts once it is spelled out, so a clear removes them. More examples: [A Definition's Own Options](/handbook/writing/custom-codes#a-definition-s-own-options).
+
 ### Definition validation
 
 `define()` validates each entry and reports failures per code in `result.errors` (other entries in the same call still register). The rules:
@@ -1315,6 +1323,7 @@ For adding characters from external font systems. Requires providing your own SV
 - **Spaces spell out as `//` or explicit space codes.** The shorthand `SP` has meaning only in top-level input (punctuation context resolves it), so an `SP` segment in a stored codeString is normalized to `//` at registration.
 - **`defaultOptions` keys must be valid option names**, and cannot include the canvas-wide global-only options (`margin`, `grid`, `svg-title`, …) or a key that names a part of the picture (`grid--opacity`): those act on the whole SVG and would be inert on a definition. Set them in the global bracket (`[opts]||`) or the builder options instead.
 - **`defaultOptions` cannot hold what belongs to one use of the character**: a position (`x`, `y`), kerning (`relativeKerning`, `absoluteKerning`, in either spelling) or `key`. A definition says what a character is, so these are written where the code is used: `MYCHAR:2,0` or `[x=2]MYCHAR`, `B313/RK:1/MYCHAR`, `[key=subject]MYCHAR`. A gap that depends on which character comes next belongs in `kerningRules` on the definition of the first.
+- **A character bracket at the start of a `codeString` is held to the same rules**, since it is the definition's [own options](#a-definition-s-own-options) too: `{ type: 'glyph', codeString: '[x=2]B291' }` is rejected as `defaultOptions: { x: 2 }` is, and so is a canvas-wide or target-prefixed key there. Over a word (`[color=red]B291/C8`, in a bare code) the bracket styles the first character, as written, and a use reports what it cannot apply.
 - References are checked: circular reference chains are rejected. A reference to a not-yet-defined code is allowed, so definitions can be registered in any order; the pending checks complete when the missing code is defined (see the indicator rule above).
 
 `patchDefinition()` applies the same rules and validates before changing anything, so a rejected patch leaves the definition untouched.
@@ -1328,14 +1337,14 @@ parser output (`toJSON()`), rendering (`svgCode`), serialization
 
 | Field | Affects | Surfaced as |
 |-------|---------|-------------|
-| `codeString` | parser, rendering, serialization | the composition; a non-glyph code decomposes to it on export, a `type: 'glyph'` keeps its name in the tree but still decomposes on export |
+| `codeString` | parser, rendering, serialization | the composition; a non-glyph code decomposes to it on export, a `type: 'glyph'` keeps its name in the tree (one part, named after it, when written alone) but still decomposes on export |
 | `getPath` / `width` / `height` | rendering, measurements | path geometry and `width`/`height`/`bounds` on snapshot nodes and handles |
-| `anchorOffsetX` / `anchorOffsetY` | rendering (composition) | the anchor point an applied indicator positions against |
+| `anchorOffsetX` / `anchorOffsetY` | rendering (composition) | the anchor point an applied indicator positions against; a glyph whose `codeString` draws one code takes that code's for an axis it does not set |
 | `isIndicator: true` | parser (part-merge, head-glyph exclusion) | `indicatorKind` / `indicatorLevel` on the resolved part; an `isIndicator` glyph is an atomic indicator unit. Indicator-ness also reads through single-code bare aliases: an alias resolving to an indicator behaves as that indicator in every indicator slot (`;;`, `;`-parts, `applyIndicators`) |
 | `char` | rendering (text path) | the rendered Unicode character on the snapshot node's `.char` (external glyphs) |
 | `kerningRules` | rendering | inter-glyph positions only (no field on the tree) |
 | `shrinksPrecedingWordSpace: true` | rendering (spacing) | the auto-shrunk word space before the glyph |
-| `defaultOptions` | rendering | merged into the element's options at construction; any per-element option overrides it |
+| `defaultOptions` | rendering, serialization | the [own options](#a-definition-s-own-options) of the part the code is: they style what the definition draws, a part bracket where it is used overrides them, and a character, word or global option does not |
 
 Public output surface: the handle/snapshot booleans `.isGlyph`,
 `.isBlissGlyph`, `.isExternalGlyph`, `.isIndicator`, plus `.codeName`,
@@ -1355,8 +1364,8 @@ BlissSVGBuilder.define({ SMILEY: { type: 'glyph', codeString: 'C8:0,8;DOT:2,11' 
 const b = new BlissSVGBuilder('B313/SMILEY');
 b.glyph(1).codeName;   // 'SMILEY'  (handle keeps the name)
 b.toString();          // 'B313/C8:0,8;DOT:2,11'  (export decomposes)
-new BlissSVGBuilder('SMILEY').toJSON().groups[0].glyphs[0];
-// { parts: [...], isBlissGlyph: true, codeName: 'SMILEY' }  — no isIndicator key (falsey, omitted)
+new BlissSVGBuilder('SMILEY').toJSON({ preserve: true }).groups[0].glyphs[0];
+// { parts: [{ codeName: 'SMILEY' }], codeName: 'SMILEY' }: no isIndicator key (falsey, omitted)
 
 // External glyph: char surfaces on the snapshot node.
 const x = new BlissSVGBuilder('Xa').snapshot().children[0].children[0];
@@ -1441,7 +1450,7 @@ Allowed properties by type:
 
 Patching `defaultOptions` replaces the entire sub-object (not a deep merge). Patching `codeString` validates references and checks for circular dependencies.
 
-**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; a glyph `codeString` that bakes an indicator (or an `isIndicator` change that leaves one baked); internal coordinates in a multi-character bare `codeString` (kerning markers stay allowed); a `codeString` holding content no use could draw (see [Definition validation](#definition-validation)); a patch that would leave a shape with both `getPath` and `codeString`; a patch that would turn an already-referenced code into an indicator; or a `defaultOptions` key a definition cannot hold (see [Definition validation](#definition-validation)). A rejected patch leaves the definition untouched (validation runs before any change is applied).
+**Throws** if the code is not defined or is built-in, `changes` is not an object, or a change violates the definition rules: an unknown property or internal/type flag (e.g. `type`, `isBuiltIn`) for the definition; `getPath` not a function; empty/non-string `codeString`; a `;;` in `codeString`; a `/` in a glyph-or-shape `codeString`; a disallowed reference type; a circular reference; a `;`-part that is itself a composition; a glyph `codeString` that bakes an indicator (or an `isIndicator` change that leaves one baked); internal coordinates in a multi-character bare `codeString` (kerning markers stay allowed); a `codeString` holding content no use could draw (see [Definition validation](#definition-validation)); a patch that would leave a shape with both `getPath` and `codeString`; a patch that would turn an already-referenced code into an indicator; or a key a definition cannot hold, in `defaultOptions` or in the character bracket that starts `codeString` (see [Definition validation](#definition-validation)). A rejected patch leaves the definition untouched (validation runs before any change is applied).
 
 ### `listDefinitions(filter?)`
 

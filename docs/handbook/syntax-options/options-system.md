@@ -94,6 +94,8 @@ An option is anything `toString()` writes inside a `[...]` bracket, at any scope
 
 A part's position and a character's kerning can be written as options (`[x=3]>C8`, `[relative-kerning=2]B313`), but they are saved in their own spelling outside the bracket (`C8:3`, `RK:2/B313`), so they belong to the content and stay. A character's, a word's or the composition's position has no other spelling (`[x=2]B313`), so it is an option like any other. A `key` and a [transient option](/reference/api-documentation#transient-options) are never saved at all, so neither counts as one here.
 
+The options a code brings by its definition are not options in this sense either: they are part of the code. A built-in's own look, such as the dotted line of `REFSQUARE`, is never written in a bracket. A [custom definition's own options](/handbook/writing/custom-codes#a-definition-s-own-options) are written in one only where a save spells the code out in built-in codes (`[color=red]>B291`), and they stay there too.
+
 ## Scope Levels
 
 Options can be applied at four levels, from broadest to most specific:
@@ -164,6 +166,15 @@ More specific options override broader ones:
 2. Character options override word and global
 3. Word options override global
 4. Global options are the default
+
+A code's own options, the ones it brings by its definition, are options of the part it is. A built-in's own look (the dotted line of `REFSQUARE`) and a [custom definition's own options](/handbook/writing/custom-codes#a-definition-s-own-options) therefore win over character, word and global options, and style nothing added beside the code. A part bracket where you use the code overrides them:
+
+```
+[color=blue]REDGLYPH;B81      the glyph keeps its red, B81 is blue
+[color=blue]>REDGLYPH;B81     the glyph is blue, B81 black
+```
+
+Here `REDGLYPH` is defined `{ type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } }`.
 
 ### Cascading Example
 

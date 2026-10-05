@@ -76,7 +76,7 @@ new BlissSVGBuilder('B2661').toJSON();
 // (built-in codes, no custom names)
 ```
 
-For output like this the receiver doesn't need your definitions: it is built-in codes all the way down. Not every name can decompose, though: a `getPath` primitive has no built-in form, and a `;`-part alias to a composed glyph keeps its name even in default output. A custom name that stays in serialized output needs its `define()` wherever the output is read; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes).
+For output like this the receiver doesn't need your definitions: it is built-in codes all the way down, wherever a custom code was used, a part of another character included. Not every name can decompose, though: a `getPath` primitive has no built-in form, so it keeps its name even in default output. A custom name that stays in serialized output needs its `define()` wherever the output is read; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes).
 
 If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. `preserve` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`:
 
@@ -88,7 +88,7 @@ new BlissSVGBuilder('B2661').toString({ preserve: true });
 // 'B1103;B81' (multi-code shorthand always expands)
 ```
 
-A name is kept only while it still describes what you have. Remove, move or recolour one of a custom character's own parts and `preserve` writes the character out in full instead, because reading the name back would bring the old parts with it. The same goes for an option the name brings through its definition's `defaultOptions`: remove it and the character is written out in full, since the name would bring it back. Set a different value instead and the name stays, with your value written beside it.
+A name is kept only while reading it back draws what you have. A change you make where the name is used is written beside it (`[color=blue]>LOVE`, `LOVE:2,0`), and the options a definition gives its code are not written again, since the name brings them (see [A Definition's Own Options](#a-definition-s-own-options)). A character the name no longer describes, such as a composition object holding other parts than the definition draws, is written out in full, because reading the name back would bring the definition's parts with it.
 
 As a rule of thumb: the default is for output that leaves your app, `preserve` is for output that stays where your definitions live. Custom indicators and shapes have a few extra wrinkles worth knowing; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes) below.
 
@@ -126,6 +126,17 @@ builder.toString({ preserve: true });
 // 'B313/SMILEY'
 ```
 
+Like a built-in character, a glyph written alone is a character holding one part, named after it. Anything you add to the character goes beside that part:
+
+```js
+const smiley = new BlissSVGBuilder('SMILEY;B81');
+
+smiley.glyph(0).part(0).codeName;  // 'SMILEY'
+smiley.glyph(0).part(1).codeName;  // 'B81'
+```
+
+What the definition draws sits inside that one part and belongs to the definition: to change it, change the definition.
+
 ### When to Use Which
 
 Use an **alias** (no type) when you just want a shortcut or a word-level mapping. The name is a convenience that disappears at parse time.
@@ -134,7 +145,7 @@ Use a **glyph** (`type: 'glyph'`) when you're defining a proper Bliss character 
 
 ### Character Properties
 
-Most glyphs only need `type` and `codeString`. Some characters use `anchorOffsetX` and `anchorOffsetY` to adjust their anchor point in compositions. Indicators need additional properties like `isIndicator` and `width`. See the [API Documentation](/reference/api-documentation#define-definitions-options) for all available properties, and [Metadata propagation](/reference/api-documentation#metadata-propagation) for how each field shows up in parser output, rendering, serialization, and handles.
+Most glyphs only need `type` and `codeString`. Some characters use `anchorOffsetX` and `anchorOffsetY` to adjust their anchor point in compositions. A glyph whose `codeString` draws one code takes that code's anchor wherever it sets none of its own, so `{ type: 'glyph', codeString: 'B138' }` places an indicator exactly where `B138` does. Indicators need additional properties like `isIndicator` and `width`. See the [API Documentation](/reference/api-documentation#define-definitions-options) for all available properties, and [Metadata propagation](/reference/api-documentation#metadata-propagation) for how each field shows up in parser output, rendering, serialization, and handles.
 
 ## Shapes
 
@@ -231,7 +242,8 @@ The rules keep definitions portable and unambiguous:
 - **A codeString must hold content a use can draw.** A definition is read the way a use of it would be. A coordinate the DSL cannot read (`C8:.`) is rejected, and so is a kerning marker standing as a part (`C8;RK:3`) and a glyph or shape with no character in it (`RK:3` alone): every use of such a definition drew nothing for it. What a use only warns about and drops, a bracket value like `[x=.]` or a kerning marker's value, is reported where the code is used instead. A bare code may be a lone marker, `{ codeString: 'RK:3' }`, which spaces two characters like `RK:3` does.
 - **Spaces spell out as `//` or explicit space codes.** The top-level shorthand `SP` normalizes to `//` when stored.
 - **`defaultOptions` keys must be valid option names**, and cannot include canvas-wide global-only options like `margin` or `grid`, or a key that names a part of the picture like `grid--opacity` (they act on the whole SVG and would be inert on a definition). A key is read here exactly as it is anywhere else, so `{ strokeWidth: 2 }` and `{ 'stroke-width': 2 }` are one option, and a name SVG or ARIA owns is stored under that standard's spelling: `{ strokeDasharray: '2 1' }` sets `stroke-dasharray` and `{ ariaLabel: 'water' }` sets `aria-label`. See [which name is emitted](/handbook/syntax-options/svg-pass-through#which-name-is-emitted).
-- **`defaultOptions` describe the character, not one use of it.** A position (`x`, `y`), kerning (`relativeKerning`, `absoluteKerning`) or `key` is rejected: each says where one use of the character sits or which element it is, so write it where the code is used, as in `MYCHAR:2,0`, `[x=2]MYCHAR`, `B313/RK:1/MYCHAR` or `[key=subject]MYCHAR`. A gap that depends on which character comes next belongs in `kerningRules` on the definition of the first.
+- **`defaultOptions` describe what the definition draws, not one use of it.** A position (`x`, `y`), kerning (`relativeKerning`, `absoluteKerning`) or `key` is rejected: each says where one use of the character sits or which element it is, so write it where the code is used, as in `MYCHAR:2,0`, `[x=2]MYCHAR`, `B313/RK:1/MYCHAR` or `[key=subject]MYCHAR`. A gap that depends on which character comes next belongs in `kerningRules` on the definition of the first.
+- **A character bracket at the start of a `codeString` is the definition's own options**, exactly as if they were in `defaultOptions` (see [A Definition's Own Options](#a-definition-s-own-options)), so the same keys are rejected there: `{ type: 'glyph', codeString: '[x=2]B291' }` fails as `defaultOptions: { x: 2 }` does. Over a word, in a bare code such as `'[color=red]B291/C8'`, the bracket styles the first character, as written.
 
 `patchDefinition()` enforces the same rules and validates before applying, so a rejected patch changes nothing.
 
@@ -242,6 +254,32 @@ Custom codes take indicators and options at the use site just like built-ins:
 - `SMILEY;B81` attaches the action indicator to the custom character; `B313/SMILEY;;B81` puts a word-level indicator on the word. Indicator positioning is computed from the glyph's actual rendered ink, including glyphs whose definition displaces its parts.
 - An alias to an indicator works as that indicator. After `define({ '6436': { codeString: 'B6436' } })`, writing `MYWORD;;6436` applies the indicator exactly like `MYWORD;;B6436`, on every surface (`;;`, `;`-parts, `applyIndicators`). Only single-code aliases resolve this way; to make an alias to a multi-code composition act as an indicator, define it as a `type: 'glyph'` flagged `isIndicator: true` instead.
 - `[color=blue]>SMILEY` styles the whole glyph as one part. On serialization the option is re-emitted before each decomposed part so the styling survives portably; see [Part Options on Custom Glyphs](/handbook/syntax-options/options-system#part-options-on-custom-glyphs).
+
+### A Definition's Own Options
+
+A definition can carry options of its own, in `defaultOptions` or in a character bracket at the start of its `codeString`. The two mean the same thing, and where both set a key the bracket wins:
+
+```js
+BlissSVGBuilder.define({
+  'REDGLYPH': { type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } },
+  'REDGLYPH2': { type: 'glyph', codeString: '[color=red]B291' }  // the same glyph
+});
+```
+
+They are the options of the part the code is, the way `REFSQUARE` draws its own dotted line:
+
+- **They style exactly what the definition draws.** An indicator or a part added beside it keeps its own look, however it is added: `REDGLYPH;B81`, `REDGLYPH;;B81` and `applyIndicators('B81')` all draw `B81` black.
+- **An option on the character, the word or the whole composition does not override them.** `[color=blue]REDGLYPH` still draws the glyph red, while anything added to that character is blue. To restyle the glyph where you use it, write a part bracket: `[color=blue]>REDGLYPH`. To restyle it everywhere, change the definition. The dot options (`dot-extra-width` and the others) still reach a dot inside a definition.
+- **They are part of the code.** `clearOptions()`, `clearAllOptions()`, `removeOptions()` and a save [without options](/reference/api-documentation#saving-without-options) leave them in place, and `preserve` does not write them again: `REDGLYPH` comes back as `REDGLYPH`. The default output, which spells the glyph out in built-in codes, writes them as a part bracket: `[color=red]>B291`.
+
+```js
+const builder = new BlissSVGBuilder('[color=blue]REDGLYPH;B81');
+
+builder.toString();                    // '[color=blue][color=red]>B291;B81'
+builder.toString({ preserve: true });  // '[color=blue]REDGLYPH;B81'
+```
+
+An alias's options work the same way on every part it draws, in every character of every word it spells: `{ codeString: 'B291/C8', defaultOptions: { color: 'red' } }` comes back as `[color=red]>B291/[color=red]>C8`. Where an alias stands for one code, its options stay with that code as a glyph's do. Where it spells several codes, it is shorthand, so once spelled out its options are ordinary options of those parts, and a clear removes them.
 
 ## Serializing Custom Indicators and Shapes
 
@@ -265,20 +303,20 @@ What travels through the default **string** output (`toString()`):
 |---|---|
 | The ink (the `codeString` composition) | Yes, decomposed to built-in codes |
 | Baked and use-site coordinates | Yes, as explicit `:x,y` suffixes |
-| `defaultOptions` | Yes, materialized as explicit options (`[color=red]>C2`). A `getPath` primitive's are its own look, like a built-in's, and stay with its name |
+| `defaultOptions` | Yes, written as a part bracket on what they style (`[color=red]>C2`). A `getPath` primitive's stay with its name, like a built-in's own look |
 | `isIndicator` and `width` | No. The receiver sees plain parts |
 | `getPath` geometry (primitives) | No. A primitive keeps its bare name and needs its definition to render |
 
-That table is about the `toString()` string. `toJSON()` carries more: it serializes the full part tree, so it *does* include `isIndicator` and `width`, and a builder rebuilt from that object applies them, preserving indicator placement across an object round trip in the same environment (your definitions still registered). To move a custom indicator to an environment that does not have your definitions, register the same `define()` calls there; that is the reliable path (a custom name that stays in the serialized output needs its definition wherever the output is read).
+That table is about the `toString()` string. `toJSON()` carries more: it breaks a custom code down into built-in codes too, but each part keeps `isIndicator` and `width`, so a builder rebuilt from the default JSON places a custom indicator as an indicator even where your definitions are not registered. A compound indicator arrives as its parts, each one an indicator, rather than as one unit. To keep a custom indicator whole, register the same `define()` calls wherever the output is read and save with `preserve` (a custom name that stays in the serialized output needs its definition wherever the output is read).
 
 Per definition shape, that works out to:
 
-| Definition | Default output | `preserve` output |
-|---|---|---|
-| Alias of one built-in indicator (`{ codeString: 'B6436' }`) | the target code, still a real indicator | your name |
-| Own indicator over plain ink (`type: 'glyph', isIndicator: true, codeString: 'C2'`) | the plain shape, indicator behavior lost | your name |
-| Compound indicator (`type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts, no longer one atomic unit | your name |
-| New primitive (`getPath`) | your bare name, unrenderable elsewhere | your bare name |
+| Definition | Default `toString()` | Default `toJSON()` | `preserve` output |
+|---|---|---|---|
+| Alias of one built-in indicator (`{ codeString: 'B6436' }`) | the target code, still a real indicator | the target code, still a real indicator | your name |
+| Own indicator over plain ink (`type: 'glyph', isIndicator: true, codeString: 'C2'`) | the plain shape, indicator behavior lost | the plain shape, marked as an indicator | your name |
+| Compound indicator (`type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts, no longer one atomic unit | the decomposed parts, each marked as an indicator, no longer one atomic unit | your name |
+| New primitive (`getPath`) | your bare name, unrenderable elsewhere | your bare name, unrenderable elsewhere | your bare name |
 
 Two remedies when the default output is not enough:
 

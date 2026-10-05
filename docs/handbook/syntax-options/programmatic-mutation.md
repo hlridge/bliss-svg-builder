@@ -51,6 +51,8 @@ builder.group(0).glyph(1);  // B1103 within first group
 builder.glyph(0).part(0);   // first part of B313
 ```
 
+A glyph you [define](/handbook/writing/custom-codes#characters-glyphs) with `type: 'glyph'` is one part too, named after it, as a built-in character is: in `SMILEY;B81`, `glyph(0).part(0)` is `SMILEY` and `part(1)` is `B81`. What the definition draws belongs to the definition, so to change it, change the definition.
+
 Negative indices count from the end:
 
 ```js
@@ -237,7 +239,7 @@ Either spelling removes a name the library or a standard owns, whichever way it 
 
 Naming `x` or `y` removes a position, and a position has a second spelling that is not an option at all: a part's `CODE:x,y` coordinate. Both are cleared, since they are [one value](/handbook/appearance/positioning#one-value-two-spellings).
 
-A built-in's own look stays: `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and removing `stroke-dasharray` returns it to that line. Override it instead to change it (`[stroke-dasharray=none]>REFSQUARE` draws the square solid).
+The options a code brings by its definition stay, because they are part of the code: `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, a code you define draws with its [own options](/handbook/writing/custom-codes#a-definition-s-own-options), and removing one of those keys returns it to the definition's value. Override it instead to change it (`[stroke-dasharray=none]>REFSQUARE` draws the square solid).
 
 ### Clearing Options
 
@@ -255,7 +257,7 @@ builder.toString(); // 'B291;C8:3'
 
 An option here is anything `toString()` writes inside a bracket. The part keeps its coordinate, because the string writes that outside one (`C8:3`), and a character keeps its kerning the same way. Removing by name is different there: `removeOptions('x')` on that part would take the coordinate, and `removeOptions('relativeKerning')` takes a character's kerning. A character's or a word's own position is written in a bracket (`[x=2]B291`), so clearing takes it with the other options.
 
-Clearing an element leaves what sits inside it alone, so a character's parts keep their own options, while a word's clear also reaches the options inside its word-level (`;;`) indicators. Neither call touches `key`s, transient options or a built-in's own look. After `clearAllOptions()` the builder saves exactly what `toString({ omitOptions: true })` saved before: see [Saving without options](/reference/api-documentation#saving-without-options).
+Clearing an element leaves what sits inside it alone, so a character's parts keep their own options, while a word's clear also reaches the options inside its word-level (`;;`) indicators. Neither call touches `key`s, transient options or the options a code brings by its definition. After `clearAllOptions()` the builder saves exactly what `toString({ omitOptions: true })` saved before: see [Saving without options](/reference/api-documentation#saving-without-options).
 
 ### Transient Options
 
