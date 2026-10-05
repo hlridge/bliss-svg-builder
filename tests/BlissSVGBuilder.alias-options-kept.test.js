@@ -6,9 +6,9 @@
  * reloads in its slot.
  *
  * Covers:
- * - A clear or a key removal on the part of an alias written alone keeping
- *   what the name gives that part: an alias, every link of a chain, and the
- *   look of the built-in an alias renames.
+ * - A clear (of the part, or of everything) or a key removal on the part of an
+ *   alias written alone keeping what the name gives that part: an alias, every
+ *   link of a chain, and the look of the built-in an alias renames.
  * - An alias that draws several parts or characters losing its options to a
  *   clear, as written ones are lost.
  * - The `preserve` save of an alias written alone: the name alone for a chain
@@ -71,6 +71,10 @@ describe('BlissSVGBuilder alias options kept', () => {
   describe('when the part of an alias written alone is cleared or has a key removed', () => {
     it.each([
       ['AK_ALIAS', 'clearing everything', (b) => b.clearAllOptions()],
+      // a chain is where the name alone and the name in a slot give the part
+      // different options, so this row needs the clear to know the character
+      // the part belongs to
+      ['AK_A2', 'clearing everything', (b) => b.clearAllOptions()],
       ['AK_A2', 'clearing its part', (b) => b.glyph(0).part(0).clearOptions()],
       ['AK_A2', 'removing color from its part', (b) => b.glyph(0).part(0).removeOptions('color')],
       ['AK_RS', 'clearing its part', (b) => b.glyph(0).part(0).clearOptions()],

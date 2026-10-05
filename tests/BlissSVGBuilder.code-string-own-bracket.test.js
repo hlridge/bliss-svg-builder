@@ -17,7 +17,8 @@
  *   defaultOptions, for a typed glyph, a typed shape, a bare alias of a Bliss
  *   character, a custom glyph, a letter or an indicator, a compound
  *   indicator, and a typed glyph holding such a shape, and an empty bracket
- *   from none: drawing, warnings, both saves and the JSON in every use, a `;;`
+ *   from none (a typed glyph, a bare alias, a typed shape): drawing, warnings,
+ *   both saves and the JSON with and without `preserve` in every use, a `;;`
  *   indicator included.
  * - The bracket under a part bracket written behind it in the same code
  *   string (a `;;` indicator), and over the options of a shape drawn by its
@@ -58,9 +59,9 @@ const TWIN_KINDS = [
 ];
 
 // Each kind twice: its options in the bracket leading its code string
-// (`_B`), and the same options as defaultOptions (`_D`). Then two pairs made
-// by hand: a typed glyph holding each typed shape twin, and an empty bracket
-// beside no options at all.
+// (`_B`), and the same options as defaultOptions (`_D`). Then pairs made by
+// hand: a typed glyph holding each typed shape twin, and an empty bracket
+// beside no options at all on a typed glyph, a bare alias and a typed shape.
 const TWINS = {
   ...Object.fromEntries(TWIN_KINDS.flatMap(([, name, kind, body]) => [
     [`${name}_B`, { ...kind, codeString: `[color=red;stroke-width=0.5]${body}` }],
@@ -70,12 +71,18 @@ const TWINS = {
   OB_TW_HOLDER_D: { type: 'glyph', codeString: 'OB_TW_SHAPE_D;C8' },
   OB_TW_EMPTY_B: { type: 'glyph', codeString: '[]B291' },
   OB_TW_EMPTY_D: { type: 'glyph', codeString: 'B291' },
+  OB_TW_EMPTYALIAS_B: { codeString: '[]B291' },
+  OB_TW_EMPTYALIAS_D: { codeString: 'B291' },
+  OB_TW_EMPTYSHAPE_B: { type: 'shape', codeString: '[]C8' },
+  OB_TW_EMPTYSHAPE_D: { type: 'shape', codeString: 'C8' },
 };
 
 const TWIN_ROWS = [
   ...TWIN_KINDS.map(([label, name, , , uses]) => [label, name, uses]),
   ['a typed glyph holding such a typed shape', 'OB_TW_HOLDER', BASE_USES],
   ['a typed glyph whose bracket is empty', 'OB_TW_EMPTY', BASE_USES],
+  ['a bare alias whose bracket is empty', 'OB_TW_EMPTYALIAS', BASE_USES],
+  ['a typed shape whose bracket is empty', 'OB_TW_EMPTYSHAPE', BASE_USES],
 ];
 
 const FIXTURES = {
@@ -121,7 +128,9 @@ const gapAfterFirst = (input) => {
 
 // What one use of a definition draws, warns, saves and publishes, with every
 // twin's name written without its `_B` or `_D`, so the uses of two twins
-// compare equal when they behave alike.
+// compare equal when they behave alike. The preserve JSON is where a lone
+// shape keeps the name it is saved by, and where an empty bracket would show
+// as an empty options bag on the part.
 const useOf = (use, name) => {
   const builder = new BlissSVGBuilder(use.replaceAll('%', name));
   const unnamed = (text) => text.replace(/(OB_TW_[A-Z]+)_[BD]\b/g, '$1');
@@ -131,6 +140,7 @@ const useOf = (use, name) => {
     saved: unnamed(builder.toString()),
     preserved: unnamed(builder.toString({ preserve: true })),
     json: unnamed(JSON.stringify(builder.toJSON())),
+    preservedJson: unnamed(JSON.stringify(builder.toJSON({ preserve: true }))),
     svg: builder.svgCode,
   };
 };
@@ -202,7 +212,7 @@ describe('BlissSVGBuilder code string own bracket', () => {
     it.each(TWIN_ROWS)('draws, warns, saves and publishes %s exactly as its twin with defaultOptions, in every use', (_kind, name, uses) => {
       // note: the bracket is the definition's own options, so nothing tells
       // it from defaultOptions: not the drawing, the warnings, the saves, the
-      // name a preserve save keeps, or the JSON
+      // name a preserve save keeps, or the JSON with or without preserve
       expect(uses.map((use) => useOf(use, `${name}_B`))).toEqual(uses.map((use) => useOf(use, `${name}_D`)));
     });
   });
