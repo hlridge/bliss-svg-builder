@@ -459,8 +459,10 @@ export class BlissElement {
 
         // Only calculate overhang if we have both glyph parts and indicator parts
         if (glyphParts.length > 0 && indicatorParts.length > 0 && !firstCharacter.isIndicator) {
-          // Find how far the leftmost indicator extends left of x=0 (glyph start)
-          const indicatorLeftX = indicatorParts[0].#relativeToParentX;
+          // Find how far the first indicator's ink (the leftmost in the default
+          // layout) extends left of x=0, the glyph start. Its ink, not its frame:
+          // a compound indicator's parts can start away from its own origin.
+          const indicatorLeftX = indicatorParts[0].#relativeToParentX + indicatorParts[0].#inkStartX;
           if (indicatorLeftX < 0) {
             this.#childStartOffset = -indicatorLeftX;
           }
