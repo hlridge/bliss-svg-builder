@@ -8,9 +8,9 @@
  *   the options go, the code and its position stay (`[x=2]>B81` comes back as
  *   `B81:2`), on the DSL and through `applyIndicators()` on a word.
  * - A `;;` code naming a definition that carries options: the options are part
- *   of what the code is, so the name stays, with its position, under every
- *   serializer option but a flatten without `preserve`, which spells it out
- *   with them as a part bracket; the reload draws what the original draws.
+ *   of what the code is, so they stay: `preserve` keeps the name, with its
+ *   position, and every other save spells it out with them as a part bracket,
+ *   where it is drawn; the reload draws what the original draws.
  * - An empty character that held its head marker only through its options: the
  *   marker goes with them, so a word-level indicator lands on the head that is
  *   left, flattened or not.
@@ -82,18 +82,25 @@ const OVERLAY_ROWS = [
 ];
 
 const DEFINED_OVERLAY_ROWS = [
-  ['plain', {}, 'B291;;OE_REDIND'],
+  // re-pinned (C25 Task 5, 2026-10-08): the plain save spells the `;;` name
+  // out as a flatten does, the definition's options as a part bracket
+  ['plain', {}, 'B291;;[color=red]>B81'],
   ['preserve', { preserve: true }, 'B291;;OE_REDIND'],
   ['flattenIndicators', { flattenIndicators: true }, 'B291;[color=red]>B81'],
   ['preserve and flattenIndicators', { preserve: true, flattenIndicators: true }, 'B291;OE_REDIND'],
 ];
 
+// Each string input, with the brackets its save without options keeps: only
+// a definition's own options, which a save that spells the definition out
+// writes as part brackets.
 // note: `OE_STYGL` left at C23 (D2): its plain save holds the definition's
 // own bracket, pinned exactly in its row
 const EVERY_STRING_INPUT = [
-  ...OVERLAY_ROWS.map(([, input]) => input),
-  'B291;;OE_REDIND',
-  '[color=red]^/B291;;B81',
+  ...OVERLAY_ROWS.map(([, input]) => [input, []]),
+  // re-pinned (C25 Task 5, 2026-10-08): the plain save spells the `;;` name
+  // out, its definition's options with it
+  ['B291;;OE_REDIND', ['[color=red]']],
+  ['[color=red]^/B291;;B81', []],
 ];
 
 describe('BlissSVGBuilder omit options edges', () => {
@@ -114,18 +121,19 @@ describe('BlissSVGBuilder omit options edges', () => {
   describe('when a word-level indicator code names a definition that carries options', () => {
     it.each(DEFINED_OVERLAY_ROWS)('keeps the definition\'s options under %s', (_label, options, expected) => {
       // note: a definition's options are part of what its code is, so leaving
-      // options out has nothing of the definition's to take; a flatten
-      // without preserve spells the code out and writes them as a part bracket
+      // options out has nothing of the definition's to take; a save without
+      // preserve spells the code out and writes them as a part bracket
       const saved = withoutOptions('B291;;OE_REDIND', options);
       expect(saved).toBe(expected);
       expect(new BlissSVGBuilder(saved).svgCode).toBe(new BlissSVGBuilder('B291;;OE_REDIND').svgCode);
     });
 
-    it('keeps the name at the position written on it', () => {
-      // note: the definition's own `:1` stays inside the name, under the
-      // code's `:2`, which is where the overlay draws it
+    it('writes the drawn position of a code written with one', () => {
+      // re-pinned (C25 Task 5, 2026-10-08): the save wrote the name at the
+      // code's `:2`; spelled out, the code is written where the overlay draws
+      // it, the definition's own `:1` added to the code's `:2`
       const saved = withoutOptions('B291;;OE_OFFIND:2');
-      expect(saved).toBe('B291;;OE_OFFIND:2');
+      expect(saved).toBe('B291;;[color=red]>B81:3');
       expect(new BlissSVGBuilder(saved).svgCode).toBe(new BlissSVGBuilder('B291;;OE_OFFIND:2').svgCode);
     });
 
@@ -195,8 +203,8 @@ describe('BlissSVGBuilder omit options edges', () => {
   });
 
   describe('when any input of this file is written without options', () => {
-    it.each(EVERY_STRING_INPUT)('leaves no bracket in %s', (input) => {
-      expect(withoutOptions(input)).not.toContain('[');
+    it.each(EVERY_STRING_INPUT)('leaves no bracket but a definition\'s own in %s', (input, ownBrackets) => {
+      expect(withoutOptions(input).match(/\[[^\]]*\]/g) ?? []).toEqual(ownBrackets);
       expect(withoutOptions(input, { preserve: true, flattenIndicators: true })).not.toContain('[');
     });
 

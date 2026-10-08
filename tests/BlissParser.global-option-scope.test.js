@@ -290,10 +290,15 @@ describe('BlissParser global option scope', () => {
       const gated = build('B303;;GOPT_BAKEDIND');
       expect(gated.warnings.map((w) => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
       expect(gated.svgCode).toBe(build('B303;;B81').svgCode);
-      // the name (not the key) round-trips; the definition still carries the
-      // key, so each use re-warns — the def-baked accepted class
-      expect(gated.toString()).toBe('B303;;GOPT_BAKEDIND');
-      expect(build(gated.toString()).warnings.map((w) => w.code))
+      // re-pinned (C25 Task 5, 2026-10-08): the default save spells the code
+      // out as the built-in code it draws, without the key the render drops,
+      // so its reload warns nothing
+      expect(gated.toString()).toBe('B303;;B81');
+      expect(build(gated.toString()).warnings).toEqual([]);
+      // preserve keeps the name (not the key); the definition still carries
+      // the key, so each use re-warns — the def-baked accepted class
+      expect(gated.toString({ preserve: true })).toBe('B303;;GOPT_BAKEDIND');
+      expect(build(gated.toString({ preserve: true })).warnings.map((w) => w.code))
         .toEqual(['MISPLACED_GLOBAL_OPTION']);
     });
   });

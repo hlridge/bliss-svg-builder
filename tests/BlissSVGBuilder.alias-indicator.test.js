@@ -61,7 +61,11 @@ describe('BlissSVGBuilder alias indicator carry', () => {
       const alias = defineActionAlias('WIALIAS1');
       const builder = new BlissSVGBuilder(`B291;;${alias}`);
       expect(warningCodes(builder)).toEqual([]);
-      expect(builder.toString()).toBe(`B291;;${alias}`);
+      // re-pinned (C25 Task 5, 2026-10-08): the default save writes the
+      // built-in code the alias names, which any instance reads; preserve
+      // keeps the name
+      expect(builder.toString()).toBe('B291;;B81');
+      expect(builder.toString({ preserve: true })).toBe(`B291;;${alias}`);
     });
 
     it('renders the alias overlay byte-identically to the direct indicator', () => {

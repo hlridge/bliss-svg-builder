@@ -20,7 +20,8 @@
  *   the parts inside it.
  * - A word-level (`;;`) code naming a definition: the clears and the view
  *   without options keep its name, and with it the definition's options, so it
- *   draws as the same definition in a `;` slot does.
+ *   draws as the same definition in a `;` slot does; the name under
+ *   `preserve`, spelled out by default.
  * - Controls: a `getPath` shape keeps its options when cleared, as it always
  *   has; a key set to `false` saves without the definition's value; clearing
  *   or removing a key on the one part of a typed shape or an alias written
@@ -219,15 +220,21 @@ describe('BlissSVGBuilder definition options kept', () => {
       ['clearing the word', (b) => b.group(0).clearOptions()],
     ])('keeps the definition\'s options on B291;;[color=green]>KO_IND after %s', (_label, change) => {
       // regression: the clear wrote the name down to the code it draws and
-      // dropped the definition's colour with the override
+      // dropped the definition's colour with the override.
+      // re-pinned (C25 Task 5, 2026-10-08): the stored code keeps its name,
+      // which preserve shows; the default save spells it out with the
+      // definition's options as a part bracket
       const builder = changed('B291;;[color=green]>KO_IND', change);
       expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;;KO_IND').svgCode);
-      expect(builder.toString()).toBe('B291;;KO_IND');
+      expect(builder.toString({ preserve: true })).toBe('B291;;KO_IND');
+      expect(builder.toString()).toBe('B291;;[color=red]>B81');
     });
 
-    it('keeps the name when omitOptions leaves out the override', () => {
+    it('keeps the definition\'s options when omitOptions leaves out the override', () => {
+      // re-pinned (C25 Task 5, 2026-10-08): the default save spells the name
+      // out, the definition's options with it; preserve keeps the name
       const builder = new BlissSVGBuilder('B291;;[color=green]>KO_IND');
-      expect(builder.toString({ omitOptions: true })).toBe('B291;;KO_IND');
+      expect(builder.toString({ omitOptions: true })).toBe('B291;;[color=red]>B81');
       expect(builder.toString({ preserve: true, omitOptions: true })).toBe('B291;;KO_IND');
     });
 

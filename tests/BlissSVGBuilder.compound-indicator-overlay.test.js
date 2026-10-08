@@ -13,10 +13,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  * Covers:
  * - `;;COMBI` rendering the full B97+B99 anatomy, byte-identical to `;;B98`.
- * - flattenIndicators decomposing the baked compound (`B291;B97;B99:3,0`) and
- *   preserve keeping the custom name (`B291;COMBI`), parity with the `;`-slot.
- * - The correct render emitting no warnings and the default overlay code
- *   round-tripping unchanged (`B291;;COMBI`).
+ * - flattenIndicators decomposing the baked compound, each part where it was
+ *   drawn (`B291;B97;B99:4.5,0`), and preserve keeping the custom name
+ *   (`B291;COMBI`), parity with the `;`-slot.
+ * - The correct render emitting no warnings, and the default save spelling
+ *   the overlay code out the same way (`B291;;B97;B99:4.5,0`).
  * - Built-in compound (`;;B98`) and single-code alias (`;;BAREIND`) overlays
  *   staying unaffected by the multi-part reassembly.
  *
@@ -68,9 +69,14 @@ describe('BlissSVGBuilder compound indicator overlay', () => {
       expect(new BlissSVGBuilder('B291;;COMBI').warnings).toEqual([]);
     });
 
-    it('round-trips the overlay code in default serialization', () => {
+    it('spells the overlay code out in default serialization', () => {
+      // re-pinned (C25 Task 5, 2026-10-08): the save wrote the name, which an
+      // instance without the definition draws as no indicator; it writes the
+      // built-in codes, each where it was drawn
       defineCombi();
-      expect(new BlissSVGBuilder('B291;;COMBI').toString()).toBe('B291;;COMBI');
+      const builder = new BlissSVGBuilder('B291;;COMBI');
+      expect(builder.toString()).toBe('B291;;B97;B99:4.5,0');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
 
     it('decomposes the whole baked anatomy under flattenIndicators', () => {

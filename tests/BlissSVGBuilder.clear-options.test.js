@@ -130,9 +130,13 @@ describe('BlissSVGBuilder clear options', () => {
     it('keeps a ;; code named by a definition, and the definition\'s options with it', () => {
       // note: a definition's options are part of what its code is, on a `;;`
       // code as on a part, so the clear has nothing of the definition's to take
+      // re-pinned (C25 Task 5, 2026-10-08): the stored code keeps its name,
+      // which preserve shows; the default save spells it out with the
+      // definition's options as a part bracket
       const builder = new BlissSVGBuilder('B291;;CO_REDIND');
       builder.group(0).clearOptions();
-      expect(builder.toString()).toBe('B291;;CO_REDIND');
+      expect(builder.toString({ preserve: true })).toBe('B291;;CO_REDIND');
+      expect(builder.toString()).toBe('B291;;[color=red]>B81');
       expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;;CO_REDIND').svgCode);
     });
   });
