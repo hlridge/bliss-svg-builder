@@ -19,6 +19,8 @@
  * - A compound holding a plain part whose parts cannot settle where they were
  *   drawn, after another indicator on a base narrower than it: saved as
  *   before, no position written (its reload still differs, a residue).
+ * - The same compound alone on that base: its parts written where they were
+ *   drawn, the reload's ink identical but its character wider (a residue).
  * - `preserve`, which keeps every name.
  * - Controls: a lone compound, a compound as a character's base, an
  *   unpositioned compound of indicators on a character.
@@ -74,6 +76,9 @@ const codesOfJson = (json) => json.groups.flatMap((group) => [
 
 // The codes only an instance holding their definitions can draw.
 const notBuiltIn = (codes) => codes.filter((code) => BlissSVGBuilder.getDefinition(code)?.isBuiltIn !== true);
+
+// An SVG without its root tag, which holds the drawing's size: the ink alone.
+const inkOf = (svg) => svg.replace(/^<svg[^>]*>/, '');
 
 const PLACED = [
   ['B291;PC_BAKED', 'B291;B97;B99:4.5,0'],
@@ -141,6 +146,22 @@ describe('BlissSVGBuilder portable compound indicators', () => {
       expect(builder.toString()).toBe('B4;B81;B270;B86');
       expect(parts.filter((part) => part.x !== undefined || part.y !== undefined)).toEqual([]);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).not.toBe(builder.svgCode);
+    });
+  });
+
+  describe('when a compound\'s plain part settles left of a narrower base', () => {
+    it('saves B4;PC_MIXED as B4;B270:-1;B86:-1, its ink where drawn but its reload wider', () => {
+      // note: the reload counts the plain B270 as base, so its character comes
+      // back wider (backlog: "Mixed-base compound indicator doesn't round-trip
+      // through primitive decomposition", the residue it keeps).
+      // pins the string's span guard judging only a part drawn as an
+      // indicator by its flag alone: B270 holds no flag of its own, and
+      // judging it would write the string from before, B4;B270;B86
+      const builder = new BlissSVGBuilder('B4;PC_MIXED');
+      const reloaded = new BlissSVGBuilder(builder.toString());
+      expect(builder.toString()).toBe('B4;B270:-1;B86:-1');
+      expect(inkOf(reloaded.svgCode)).toBe(inkOf(builder.svgCode));
+      expect(reloaded.svgCode).not.toBe(builder.svgCode);
     });
   });
 

@@ -15,7 +15,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   alias metadata in either toJSON mode.
  * - Indicator metadata loss through default decomposition pinned as designed
  *   (metadata never travels; a decomposed custom indicator reparses as plain
- *   ink), with preserve as the same-environment remedy.
+ *   ink, written where it was drawn), with preserve as the same-environment
+ *   remedy.
  * - Preserved names surviving mutation rebuilds and merge().
  * - Reparse of a preserved name without its definition (warn + stable string).
  *
@@ -97,7 +98,9 @@ describe('BlissSVGBuilder custom definition serialization', () => {
       defineMyind();
       const b = new BlissSVGBuilder('B291;;MYIND');
       expect(b.toString()).toBe('B291;;MYIND');
-      expect(b.toString({ flattenIndicators: true })).toBe('B291;C2');
+      // re-pinned (C25 Task 4, 2026-10-08): the flattened string writes the
+      // circle where it was drawn, since a reload reads `C2` as plain ink
+      expect(b.toString({ flattenIndicators: true })).toBe('B291;C2:3');
       expect(b.toString({ flattenIndicators: true, preserve: true })).toBe('B291;MYIND');
       // review MAJOR-1: the flatten+preserve output re-parses to the SVG the
       // original renders (the ;; overlay carries the alias's indicator metadata
@@ -150,8 +153,10 @@ describe('BlissSVGBuilder custom definition serialization', () => {
     it('emits the resolved primitive and stays byte-stable across reparses', () => {
       defineMyind();
       const b = new BlissSVGBuilder('B291;MYIND');
-      expect(b.toString()).toBe('B291;C2');
-      expect(new BlissSVGBuilder(b.toString()).toString()).toBe('B291;C2');
+      // re-pinned (C25 Task 4, 2026-10-08): the primitive is written where it
+      // was drawn, and the reparse, plain ink at that position, writes the same
+      expect(b.toString()).toBe('B291;C2:3');
+      expect(new BlissSVGBuilder(b.toString()).toString()).toBe('B291;C2:3');
     });
 
     it('keeps default toJSON free of alias metadata', () => {
@@ -190,8 +195,13 @@ describe('BlissSVGBuilder custom definition serialization', () => {
     it('reparses the decomposed single reference as plain ink', () => {
       defineMyind();
       const b = new BlissSVGBuilder('B291;MYIND');
-      // metadata never travels: 'B291;C2' carries no indicator flag
-      expect(new BlissSVGBuilder(b.toString()).svgCode).not.toBe(b.svgCode);
+      // re-pinned (C25 Task 4, 2026-10-08): metadata still never travels
+      // ('B291;C2:3' carries no indicator flag, so the circle reloads as plain
+      // ink), but the save now writes it where it was drawn, so the plain ink
+      // reloads as drawn
+      const reloaded = new BlissSVGBuilder(b.toString());
+      expect(reloaded.toJSON().groups[0].glyphs[0].parts[1]).toEqual({ codeName: 'C2', x: 3 });
+      expect(reloaded.svgCode).toBe(b.svgCode);
       expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
     });
 
