@@ -1272,6 +1272,15 @@ export declare class BlissSVGBuilder {
    * describes (such as a composition object whose parts are not the ones the
    * definition draws) is written out in full.
    *
+   * A position or a head marker appears where needed to keep an indicator
+   * where it was drawn: on an indicator the built-in codes alone would draw
+   * elsewhere, on that part and axis only (`B291;B81:,2` for a glyph whose own
+   * anchor sits 2 lower than `B291`'s), and on the character that carries a
+   * word's `;;` indicators where a reload would pick another head
+   * (`B937^/B291;;B81`). A `;;` code named by a custom definition is written
+   * as the built-in indicator codes it draws, or by its name where no
+   * built-in code can stand in for it (an indicator drawn from a plain shape).
+   *
    * The output uses the compact shorthand wherever it means the same thing: a
    * space that matches the default for its position is written as a bare
    * separator (`H//QSP/H`, not `H/TSP/QSP/H`), and consecutive single external
@@ -1313,7 +1322,10 @@ export declare class BlissSVGBuilder {
    * part carrying the options its definition gives (a shape drawn by its own
    * `getPath` function, or an external glyph, keeps its name, as in
    * `toString()`); `{ preserve: true }` keeps custom names under the same rule
-   * as `toString()`.
+   * as `toString()`. As there, a part or a `wordIndicators` code carries the
+   * position it was drawn at, and a glyph `isHeadGlyph: true`, where needed to
+   * keep an indicator where it was drawn, and a `;;` code named by a custom
+   * definition is written as built-in codes wherever they can stand in for it.
    *
    * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
    * omits the `wordIndicators` field (see `toString`).

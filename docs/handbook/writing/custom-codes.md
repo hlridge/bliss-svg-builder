@@ -76,7 +76,7 @@ new BlissSVGBuilder('B2661').toJSON();
 // (built-in codes, no custom names)
 ```
 
-For output like this the receiver doesn't need your definitions: it is built-in codes all the way down, wherever a custom code was used, a part of another character included. Not every name can decompose, though: a `getPath` primitive has no built-in form, so it keeps its name even in default output. A custom name that stays in serialized output needs its `define()` wherever the output is read; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes).
+For output like this the receiver doesn't need your definitions: it is built-in codes all the way down, wherever a custom code was used, a part of another character included. Where those codes alone would draw an indicator somewhere else than your code did, the output also says where it goes: a position on the indicator, or a head marker (`^`) on the character that carries a word's `;;` indicators. Not every name can decompose, though: a `getPath` primitive has no built-in form, so it keeps its name even in default output, and so does a word-level indicator that no built-in code can stand in for. A custom name that stays in serialized output needs its `define()` wherever the output is read; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes).
 
 If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. `preserve` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`:
 
@@ -291,11 +291,26 @@ BlissSVGBuilder.define({
 });
 
 const builder = new BlissSVGBuilder('B291;MYIND');
-builder.toString();                    // 'B291;C2'    — portable, but plain ink
-builder.toString({ preserve: true });  // 'B291;MYIND' — your name, local use
+builder.toString();                    // 'B291;C2:3'  (portable, but plain ink)
+builder.toString({ preserve: true });  // 'B291;MYIND' (your name, local use)
 ```
 
-The default string `B291;C2` renders anywhere, but the receiver sees an ordinary circle part: `isIndicator` is metadata on your definition, and the decomposed string carries none of it. Re-parsing `B291;C2` places `C2` like any part, not like an indicator.
+The default string `B291;C2:3` renders anywhere, with the circle where your indicator drew it, but the receiver sees an ordinary circle part: `isIndicator` is metadata on your definition, and the decomposed string carries none of it. Re-parsing `B291;C2:3` places `C2` at the position written on it, like any part, not like an indicator. Where the circle reaches outside the rest of its character, as over `B4` (a full stop), a plain part cannot be drawn the same way, so `B4;MYIND` is written `B4;C2`, which reloads the circle starting at the point instead of centred over it; the default JSON (below) and `preserve` keep it where it was drawn.
+
+The same goes for an indicator your definitions place in other ways: wherever the built-in codes alone would draw it elsewhere, the output writes the position it was drawn at, only on the part, and the axis, that needs one:
+
+```js
+BlissSVGBuilder.define({
+  'ANC': { type: 'glyph', codeString: 'B291', anchorOffsetY: 2 },
+  'PAIR': { type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0' }
+});
+
+new BlissSVGBuilder('ANC;B81').toString();
+// 'B291;B81:,2' (B81 where ANC's own anchor placed it, 2 below B291's)
+
+new BlissSVGBuilder('B291;PAIR').toString();
+// 'B291;B97;B99:4.5,0' (B99 sits 3 into PAIR, which is drawn 1.5 into the character)
+```
 
 What travels through the default **string** output (`toString()`):
 
@@ -303,27 +318,46 @@ What travels through the default **string** output (`toString()`):
 |---|---|
 | The ink (the `codeString` composition) | Yes, decomposed to built-in codes |
 | Baked and use-site coordinates | Yes, as explicit `:x,y` suffixes |
+| Where an indicator is drawn (a glyph's own anchor, a compound indicator's layout) | Yes, as a position on the indicator wherever the built-in codes alone would draw it elsewhere |
 | `defaultOptions` | Yes, written as a part bracket on what they style (`[color=red]>C2`). A `getPath` primitive's stay with its name, like a built-in's own look |
 | `isIndicator` and `width` | No. The receiver sees plain parts |
 | `getPath` geometry (primitives) | No. A primitive keeps its bare name and needs its definition to render |
 
-That table is about the `toString()` string. `toJSON()` carries more: it breaks a custom code down into built-in codes too, but each part keeps `isIndicator` and `width`, so a builder rebuilt from the default JSON places a custom indicator as an indicator even where your definitions are not registered. A compound indicator arrives as its parts, each one an indicator, rather than as one unit. To keep a custom indicator whole, register the same `define()` calls wherever the output is read and save with `preserve` (a custom name that stays in the serialized output needs its definition wherever the output is read).
+That table is about the `toString()` string. `toJSON()` carries more: it breaks a custom code down into built-in codes too, and writes a position wherever the string does, but each part keeps `isIndicator` and `width`, so a builder rebuilt from the default JSON places a custom indicator as an indicator even where your definitions are not registered. A compound indicator arrives as its parts, each one an indicator, rather than as one unit. To keep a custom indicator whole, register the same `define()` calls wherever the output is read and save with `preserve` (a custom name that stays in the serialized output needs its definition wherever the output is read).
 
 Per definition shape, that works out to:
 
 | Definition | Default `toString()` | Default `toJSON()` | `preserve` output |
 |---|---|---|---|
 | Alias of one built-in indicator (`{ codeString: 'B6436' }`) | the target code, still a real indicator | the target code, still a real indicator | your name |
-| Own indicator over plain ink (`type: 'glyph', isIndicator: true, codeString: 'C2'`) | the plain shape, indicator behavior lost | the plain shape, marked as an indicator | your name |
-| Compound indicator (`type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts, no longer one atomic unit | the decomposed parts, each marked as an indicator, no longer one atomic unit | your name |
+| Own indicator over plain ink (`type: 'glyph', isIndicator: true, codeString: 'C2'`) | the plain shape where it was drawn (while it stays inside the rest of its character), indicator behavior lost | the plain shape, marked as an indicator | your name |
+| Compound indicator (`type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0'`) | the decomposed parts where they were drawn, no longer one atomic unit | the decomposed parts where they were drawn, each marked as an indicator, no longer one atomic unit | your name |
 | New primitive (`getPath`) | your bare name, unrenderable elsewhere | your bare name, unrenderable elsewhere | your bare name |
 
-Two remedies when the default output is not enough:
+Word-level indicators are written the same way. A `;;` code named by a custom definition is saved as the built-in indicator codes it draws, with the definition's options as a part bracket and a position where one is needed, in both default outputs, and `preserve` keeps your name:
 
-- **Define at both ends.** Run the same `define()` calls in the receiving environment and send `preserve` output (or `;;` strings). Everything then means the same thing on both sides.
-- **Compose with explicit coordinates.** If you only need the *ink* to arrive exactly, skip the flag and write the anatomy with explicit positions (`B291;C2:3,0`): explicitly positioned parts render at their coordinates in any environment, no definition needed.
+```js
+BlissSVGBuilder.define({ 'PLURAL': { codeString: 'B99' } });
 
-Word-level indicators are the asymmetry to remember: `B291;;MYIND` keeps your code in **default** output too, because `;;` is a live overlay resolved at render, not a baked part. A `;;` string that references a custom code therefore always needs the definition at the receiving end. Without it, the receiver warns `UNKNOWN_CODE`, renders the word without the overlay, and drops the unknown code from its own re-serialized output. (A `;`-part with an unknown name is kept in serialized output but fails its whole character at render, or shows a placeholder with the `error-placeholder` option; see [UNKNOWN_CODE](/reference/warning-codes#unknown-code).)
+new BlissSVGBuilder('B291;;PLURAL').toString();                    // 'B291;;B99'
+new BlissSVGBuilder('B291;;PLURAL').toString({ preserve: true });  // 'B291;;PLURAL'
+```
+
+Where no built-in code can stand in for your code, the name stays in the default output too: an indicator drawn from a plain shape (`B291;;MYIND`, since a `;;` list holds indicators only), or one whose built-in codes would combine differently with the indicators the character already carries. Such a string needs the definition at the receiving end. Without it, the receiver warns `UNKNOWN_CODE`, renders the word without the overlay, and drops the unknown code from its own re-serialized output. (A `;`-part with an unknown name is kept in serialized output but fails its whole character at render, or shows a placeholder with the `error-placeholder` option; see [UNKNOWN_CODE](/reference/warning-codes#unknown-code).)
+
+A word's `;;` indicators go on its head character, and a custom glyph can head a word where the built-in code it is saved as would not, because the automatic head pick passes over some characters (see [the head glyph algorithm](/handbook/writing/words-sentences#the-head-glyph-algorithm)). The default output then marks the head, so the indicators reload on the same character:
+
+```js
+BlissSVGBuilder.define({ 'MORE': { type: 'glyph', codeString: 'B937' } });
+
+new BlissSVGBuilder('MORE/B291;;B81').toString();
+// 'B937^/B291;;B81' (a reload passes over B937, comparative "more", when it picks the head)
+```
+
+When the default output is not enough:
+
+- **Define at both ends.** Run the same `define()` calls in the receiving environment and send `preserve` output. Everything then means the same thing on both sides.
+- **Flatten the word-level indicators.** `{ flattenIndicators: true }` writes a word's `;;` indicators onto its head character as parts, which the default output spells out and places like any other part, so a `;;` code that kept its name arrives in built-in codes: `B291;;MYIND` comes back as `B291;C2:3`.
 
 ## Coordinates in Definitions
 
