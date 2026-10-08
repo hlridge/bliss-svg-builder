@@ -12,14 +12,16 @@
  * - The reloads of both flattened saves, which spell the definition out as
  *   built-in codes: the same string, and the same ink and colours.
  * - A glyph that places indicators by an anchor of its own (`anchorOffsetY`):
- *   every save that spells it out loses that anchor, an accepted loss pinned
- *   so chunk C25's fix flips it; `preserve` keeps it. A wrap of B138, which
- *   takes B138's anchor, reloads from each of those saves as drawn.
+ *   every save that spells it out writes the indicator where that anchor
+ *   placed it, so it reloads as drawn; `preserve` keeps the name. A wrap of
+ *   B138, which takes B138's anchor, reloads from each of those saves as drawn.
  *
  * Does NOT cover:
  * - The routes on a glyph with an anchor of its own, see
  *   `BlissSVGBuilder.definition-is-a-part.test.js`; a wrap taking the anchor
- *   of the code it draws, see `BlissSVGBuilder.wrapped-code-anchor.test.js`.
+ *   of the code it draws, see `BlissSVGBuilder.wrapped-code-anchor.test.js`;
+ *   the strings a save writes for an anchored glyph, see
+ *   `BlissSVGBuilder.portable-indicator-placement.test.js`.
  * - The same routes on a built-in's own look, see
  *   `BlissSVGBuilder.builtin-look-routes.test.js`.
  * - The same routes on a bare alias, see
@@ -138,14 +140,14 @@ describe('BlissSVGBuilder definition is a part routes', () => {
 
   describe('when a lone glyph that places indicators by its own anchor is saved spelled out', () => {
     it.each(Object.keys(ANCHORED).flatMap((base) => SPELLED_OUT_SAVES.map(([save, write]) => [base, save, write])))(
-      'reloads %s given B99 from %s with B99 placed by the built-in code\'s anchor instead', (base, _save, save) => {
-        // note: pins an accepted loss, so chunk C25's fix flips it visibly
-        // (backlog row "The saves that break a custom glyph down lose its own
-        // anchor"). Every route places B99 by the glyph's own anchor, as `;`
-        // does, but a save in built-in codes has no way to write that anchor;
-        // `preserve` keeps the name, and with it the placement
+      'reloads %s given B99 from %s as drawn', (base, _save, save) => {
+        // re-pinned (C25 Task 3, 2026-10-08): these rows pinned the loss while
+        // a save in built-in codes placed B99 by B291's anchor; the save now
+        // writes B99's drawn position, so the reload places it where the
+        // glyph's own anchor did. `preserve` keeps the name, and with it the
+        // anchor
         const builder = new BlissSVGBuilder(`${base};;B99`);
-        expect(new BlissSVGBuilder(save(builder)).svgCode).not.toBe(builder.svgCode);
+        expect(new BlissSVGBuilder(save(builder)).svgCode).toBe(builder.svgCode);
         expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
       });
   });

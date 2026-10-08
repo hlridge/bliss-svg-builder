@@ -74,9 +74,11 @@ describe('BlissSVGBuilder compound indicator overlay', () => {
     });
 
     it('decomposes the whole baked anatomy under flattenIndicators', () => {
+      // re-pinned (C25 Task 3, 2026-10-08): the compound's own `:3,0` written
+      // on the character moved B99 to 3 into B291; it is written where drawn
       defineCombi();
       expect(new BlissSVGBuilder('B291;;COMBI').toString({ flattenIndicators: true }))
-        .toBe('B291;B97;B99:3,0');
+        .toBe('B291;B97;B99:4.5,0');
     });
 
     it('keeps the custom name under flattenIndicators with preserve', () => {

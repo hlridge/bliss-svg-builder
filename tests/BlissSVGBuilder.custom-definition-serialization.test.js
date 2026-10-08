@@ -198,10 +198,12 @@ describe('BlissSVGBuilder custom definition serialization', () => {
     it('reparses the decomposed compound indicator as plain parts', () => {
       defineAndTrack({ COMBI: { type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0' } });
       const b = new BlissSVGBuilder('B291;COMBI');
-      expect(b.toString()).toBe('B291;B97;B99:3,0');
-      // the atomic indicator flag does not survive decomposition (designed;
-      // supersedes the former Phase 2.5 row)
-      expect(new BlissSVGBuilder(b.toString()).svgCode).not.toBe(b.svgCode);
+      // re-pinned (C25 Task 3, 2026-10-08): the atomic indicator flag still
+      // does not survive decomposition (designed; supersedes the former Phase
+      // 2.5 row), but the save now writes each part where it was drawn, so
+      // the plain parts reload as drawn
+      expect(b.toString()).toBe('B291;B97;B99:4.5,0');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
       expect(new BlissSVGBuilder(b.toString({ preserve: true })).svgCode).toBe(b.svgCode);
     });
   });

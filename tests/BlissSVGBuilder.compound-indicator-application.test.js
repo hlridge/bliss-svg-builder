@@ -124,8 +124,11 @@ describe('BlissSVGBuilder compound indicator application', () => {
       // at x=5, so the from-origin baseless-stack layout (which would place it at
       // width+gap=3) must NOT override it. Removing the guard regresses the render
       // to the from-origin form.
+      // re-pinned (C25 Task 3, 2026-10-08): the save wrote B81 unplaced, and a
+      // reload of the spelled-out parts stacks it at 6, as if B97 sat where
+      // the row puts it, not at 8 after the compound; it is written where drawn
       const baked = new BlissSVGBuilder('CI_OFFSET;B81');
-      expect(baked.toString()).toBe('B86;B97:5,0;B81');
+      expect(baked.toString()).toBe('B86;B97:5,0;B81:8');
       expect(baked.svgCode).not.toBe(new BlissSVGBuilder('B86;B97;B81').svgCode);
     });
   });

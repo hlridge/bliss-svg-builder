@@ -376,13 +376,24 @@ export function classifyIndicatorKind(code, definitions) {
  * tagged `_indicatorOrigin: 'word'`. The input glyph is not mutated. A head
  * whose parts hold a non-indicator after an indicator is returned unchanged.
  *
+ * A caller that has to read the merged parts back against the head and the
+ * codes they came from (a save checking where a reload draws each one) passes
+ * `trace`, which the merge fills with what it decided, so the caller never
+ * restates the merge's rules: `applied` (false where the head is returned
+ * unchanged), and where applied, `baseCount` (the head parts kept in front),
+ * `finalCodes` (the resolved code list) and `indicators`, one entry per merged
+ * indicator part in order, `{ finalIndex, reusedFrom }`: its index in
+ * `finalCodes`, and the index of the head part it reuses, or -1 for a part
+ * parsed fresh. The merged parts are the same with or without a trace.
+ *
  * @param {{parts: Array}} headGlyph - the head glyph node (has .parts)
  * @param {{codes: string[], stripSemantic?: boolean}} overlay
  * @param {Object} definitions
  * @param {(code: string) => Object} parse - parser used to build part nodes
+ * @param {Object} [trace] - filled with the merge's decisions, as above
  * @returns {Array} the resolved parts array
  */
-export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, parse) {
+export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, parse, trace) {
   const parts = headGlyph?.parts ?? [];
   // The first part is always the base, even when it is itself an indicator
   // (e.g. a head whose bareCode is B85): scan for the first trailing indicator
@@ -394,7 +405,10 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
 
   // A non-indicator after the first indicator is not a clean base+indicator
   // shape; leave the glyph untouched rather than guess where the boundary is.
-  if (!existingIndicatorParts.every(p => p.isIndicator === true)) return parts.slice();
+  if (!existingIndicatorParts.every(p => p.isIndicator === true)) {
+    if (trace) trace.applied = false;
+    return parts.slice();
+  }
 
   const existingIndicatorCodes = existingIndicatorParts.map(p => p.codeName);
   const finalCodes = resolveIndicatorCodes(
@@ -409,18 +423,25 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
   // getElementByKey round-trip it) and its true 'character' origin, instead of
   // re-parsing into a fresh keyless node tagged 'word'. A code with no existing
   // match is genuinely overlay-added, so it is parsed fresh and tagged 'word'.
-  const reusable = existingIndicatorParts.slice();
+  const reusable = existingIndicatorParts.map((part, index) => ({ part, headIndex: baseParts.length + index }));
   const indicatorParts = [];
-  for (const code of finalCodes) {
-    const reuseIndex = reusable.findIndex(p => p.codeName === code);
+  const indicatorTrace = [];
+  for (const [finalIndex, code] of finalCodes.entries()) {
+    const reuseIndex = reusable.findIndex(r => r.part.codeName === code);
     if (reuseIndex !== -1) {
-      indicatorParts.push({ ...reusable.splice(reuseIndex, 1)[0] });
+      const [reused] = reusable.splice(reuseIndex, 1);
+      indicatorParts.push({ ...reused.part });
+      indicatorTrace.push({ finalIndex, reusedFrom: reused.headIndex });
       continue;
     }
     const node = wordIndicatorNode(code, definitions, parse);
-    if (node) indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
+    if (node) {
+      indicatorParts.push({ ...node, _indicatorOrigin: 'word' });
+      indicatorTrace.push({ finalIndex, reusedFrom: -1 });
+    }
   }
 
+  if (trace) Object.assign(trace, { applied: true, baseCount: baseParts.length, finalCodes, indicators: indicatorTrace });
   return [...baseParts, ...indicatorParts];
 }
 

@@ -25,6 +25,9 @@ import { mergeWordIndicatorsOntoHead } from '../src/lib/indicator-utils.js';
  * - The defensive guard: parts with a non-indicator after an indicator are
  *   returned unchanged.
  * - Non-mutation of the input glyph.
+ * - The optional trace: the same parts with or without it, and what it
+ *   records (the base count, the resolved codes, each merged part's place in
+ *   them and the head part it reuses; no merge where the guard applies).
  *
  * Does NOT cover:
  * - The decision logic itself, see
@@ -106,6 +109,41 @@ describe('indicator-utils.mergeWordIndicatorsOntoHead', () => {
       const before = codesOf(head.parts);
       merge(head, { codes: ['B81'] });
       expect(codesOf(head.parts)).toEqual(before);
+    });
+  });
+
+  describe('when a trace is passed', () => {
+    it.each([
+      ['B291;C8;B97', ['B81']],
+      ['B291;B81', ['B86', 'B81']],
+    ])('returns for %s with %j the same parts as without a trace', (dsl, codes) => {
+      const traced = mergeWordIndicatorsOntoHead(headFrom(dsl), { codes }, blissElementDefinitions, parse, {});
+      expect(traced).toEqual(merge(headFrom(dsl), { codes }));
+    });
+
+    it('records the base count, the resolved codes and the head part a merged part reuses', () => {
+      // pins the reused part's index in the head, base parts counted: C8 is a base part
+      const trace = {};
+      mergeWordIndicatorsOntoHead(headFrom('B291;C8;B97'), { codes: ['B81'] }, blissElementDefinitions, parse, trace);
+      expect(trace).toEqual({
+        applied: true,
+        baseCount: 2,
+        finalCodes: ['B81', 'B97'],
+        indicators: [{ finalIndex: 0, reusedFrom: -1 }, { finalIndex: 1, reusedFrom: 2 }],
+      });
+    });
+
+    it('records a reused part at its own place in the resolved codes', () => {
+      const trace = {};
+      mergeWordIndicatorsOntoHead(headFrom('B291;B81'), { codes: ['B86', 'B81'] }, blissElementDefinitions, parse, trace);
+      expect(trace.indicators).toEqual([{ finalIndex: 0, reusedFrom: -1 }, { finalIndex: 1, reusedFrom: 1 }]);
+    });
+
+    it('records that nothing merged where the guard returns the parts unchanged', () => {
+      const trace = {};
+      const messy = { parts: [{ codeName: 'B291' }, { codeName: 'B81', isIndicator: true }, { codeName: 'B291' }] };
+      mergeWordIndicatorsOntoHead(messy, { codes: ['B86'] }, blissElementDefinitions, parse, trace);
+      expect(trace).toEqual({ applied: false });
     });
   });
 });
