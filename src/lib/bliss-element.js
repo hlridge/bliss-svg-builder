@@ -903,12 +903,22 @@ export class BlissElement {
         : this.#children;
     if (layoutChildren.length === 0) return 0;
 
-    const minRelativeX = Math.min(...layoutChildren.map(child => child.#relativeToParentX));
+    // A character spans its parts' ink, not their frames: a compound
+    // indicator whose parts start away from its own origin has a frame that
+    // reaches past its ink, before it or after it, and the spacing that reads
+    // this width (absolute kerning, a kerning rule, the gap between letters)
+    // would count that blank.
+    const minRelativeX = this.#level === 2
+      ? Math.min(...layoutChildren.map(child => child.#relativeToParentX + child.#inkStartX))
+      : Math.min(...layoutChildren.map(child => child.#relativeToParentX));
 
     let maxRelativeXPlusWidth;
     if (this.#level === 1) {
       maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
         child.#relativeToParentX + child.rightExtendedGlyphWidth));
+    } else if (this.#level === 2) {
+      maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
+        child.#relativeToParentX + child.#inkEndX));
     } else {
       maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
         child.#relativeToParentX + child.width));
@@ -939,7 +949,10 @@ export class BlissElement {
     const spacingParts = glyphParts.length > 0 ? glyphParts : parts;
 
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
-    const maxRelativeXPlusWidth = Math.max(...parts.map(part => part.#relativeToParentX + part.width));
+    // The right edge is where the parts' ink stops: a compound indicator whose
+    // parts reach left of its own origin reports the span of its parts as its
+    // width, which added to its position runs past its ink.
+    const maxRelativeXPlusWidth = Math.max(...parts.map(part => part.#relativeToParentX + part.#inkEndX));
     // When minRelativeX > 0, the left boundary is still the element's origin (0).
     // Only subtract negative offsets (e.g., indicator overhang).
     const rightExtendedGlyphWidth = maxRelativeXPlusWidth - Math.min(0, minRelativeX);

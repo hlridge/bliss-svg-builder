@@ -1,7 +1,8 @@
 /**
- * Pins the first character's overhang reading the leading indicator's ink: a
- * custom compound indicator whose parts start away from its own origin adds
- * no blank space before the first character.
+ * Pins the layout reading a custom compound indicator's ink, not its frame,
+ * where the two differ: the first character's overhang, a character's width
+ * and a word's extent add no blank space for one whose parts start away from
+ * its own origin.
  *
  * Covers:
  * - A compound flagged as an indicator whose parts sit away from its origin
@@ -11,14 +12,23 @@
  * - A compound whose parts reach left of its origin (`B86:-6,0;B97:-3,0`),
  *   leading the first character: drawn as its parts written where they are
  *   drawn, its ink inside the drawing rather than past its left edge.
+ * - Spacing that measures a character's width (absolute kerning, a digit's
+ *   kerning rule) and a word's extent, around such a compound: drawn as its
+ *   parts written where they are drawn.
+ * - A default save spelling such a compound out of a word's `;;` codes, with
+ *   a character after the head spaced by its width (absolute kerning, a
+ *   letter pair): the save reloads as drawn.
  * - Controls: the same compound on a later character, where no overhang
  *   applies; compounds whose frame starts at their ink (one nesting the
  *   displaced compound, one with a baked offset); a built-in indicator
- *   reaching left of a narrow character, still shifting the drawing.
+ *   reaching left of a narrow character, still shifting the drawing and still
+ *   counted in the character's width.
  *
  * Does NOT cover:
- * - Where the saves write such a compound's parts, see
- *   `BlissSVGBuilder.portable-compound-indicators.test.js`.
+ * - Where the saves write such a compound's parts in the other slots and
+ *   routes, see `BlissSVGBuilder.portable-compound-indicators.test.js`.
+ * - A character's advance under plain spacing, which reads its base parts
+ *   only, never an indicator: `BlissSVGBuilder.spacing.test.js`.
  * - Built-in indicators in leading positions: none starts away from its
  *   origin, and `BlissSVGBuilder.visual-regression.e2e.test.js` holds their
  *   drawings.
@@ -96,6 +106,46 @@ describe('BlissSVGBuilder indicator overhang', () => {
       // unit left of it, and the drawing still takes that unit up
       expect(svgOf('B4;B81')).toBe(svgOf('B4:1;B81:0,0'));
       expect(svgOf('B4;B81')).toBe(svgOf('B4;B81:-1'));
+    });
+
+    it('places B291 at x 6 in B4;B81/AK:3/B291, the unit B81 reaches left of B4 counted in the width', () => {
+      // control: passes before C25; the overhang (1) plus the width B81 spans
+      // from its left edge (2) plus the kerning (3)
+      expect(new BlissSVGBuilder('B4;B81/AK:3/B291').group(0).glyph(1).x).toBe(6);
+    });
+  });
+
+  describe('when spacing measures the width of a character holding such a compound', () => {
+    it.each([
+      // absolute kerning places the next character from the width
+      ['B291;PO_INNER/AK:3/B291', 'B291;B86:4.5,0;B97:6.5,0/AK:3/B291'],
+      // a digit's kerning rule with the next digit does too
+      ['B9;PO_LEFT/B9', 'B9;B86:-7.5,0;B97:-4.5,0/B9'],
+    ])('draws %s as %s', (input, twin) => {
+      // regression: the width read the compound's frame, which reaches past
+      // its ink, so the next character moved (identical on v1.0.0)
+      expect(svgOf(input)).toBe(svgOf(twin));
+    });
+
+    it('draws B4;PO_LEFT as B4;B86:-8.5,0;B97:-5.5,0, the drawing ending where its ink does', () => {
+      // regression: the word's extent read the compound's frame, so the
+      // drawing ran on past the ink (identical on v1.0.0)
+      expect(svgOf('B4;PO_LEFT')).toBe(svgOf('B4;B86:-8.5,0;B97:-5.5,0'));
+    });
+  });
+
+  describe('when a default save spells such a compound out of a word\'s ;; codes', () => {
+    it('saves B291/AK:3/B291;;PO_INNER as B291/AK:3/B291;;B86:4.5,0;B97:6.5,0, which reloads as drawn', () => {
+      const builder = new BlissSVGBuilder('B291/AK:3/B291;;PO_INNER');
+      expect(builder.toString()).toBe('B291/AK:3/B291;;B86:4.5,0;B97:6.5,0');
+      expect(svgOf(builder.toString())).toBe(builder.svgCode);
+    });
+
+    it('saves Xa/Xb/B291;;PO_INNER in built-in codes, which reload with Xb where it was drawn', () => {
+      // note: the head is Xa, and Xb is spaced by Xa's width
+      const builder = new BlissSVGBuilder('Xa/Xb/B291;;PO_INNER');
+      expect(builder.toString()).not.toContain('PO_INNER');
+      expect(svgOf(builder.toString())).toBe(builder.svgCode);
     });
   });
 });
