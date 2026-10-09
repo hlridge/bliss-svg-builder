@@ -39,6 +39,9 @@ import {
  *   keeps the numeric half's own refusal byte for byte, a boolean switch stays
  *   silent because absence is how it is turned off, and a kerning value the
  *   parser promoted keeps its own `MALFORMED_KERNING_VALUE` gate.
+ * - An internal name written as an option (`autoVertical`), which refuses
+ *   nothing: a value with no text form refused as on a name of your own, text
+ *   kept with the hint that names the option that works.
  * - The two refusal messages, which differ by whether the library curates the
  *   name: a curated option falls back, an uncurated one is simply never
  *   emitted.
@@ -152,7 +155,6 @@ describe('BlissSVGBuilder text option values', () => {
       ['a name the library stamps itself', 'data-generator', 'RESERVED_ATTRIBUTE_NAME'],
       ['a name that declares what the file is', 'xmlns', 'RESERVED_ATTRIBUTE_NAME'],
       ['an event handler', 'onclick', 'UNSAFE_ATTRIBUTE_NAME'],
-      ['a whole option spelled as one word', 'autoVertical', 'MISPLACED_OPTION_SPELLING'],
     ])('keeps the report about the name for %s', (_kind, key, expected) => {
       // The name is the report worth having. Told only that `null` is not a text
       // value, an author fixes the value and `nosuch--fill` is just as dead,
@@ -165,6 +167,24 @@ describe('BlissSVGBuilder text option values', () => {
       const scope = key === 'xmlns' ? atCharacter : atDocument;
       expect(codes(build(scope({ [key]: null })))).toEqual([expected]);
       expect(codes(build(scope({ [key]: 'x' })))).toEqual([expected]);
+    });
+  });
+
+  describe('when an internal name is written as an option', () => {
+    it('refuses a value with no text form as on a name of your own, and names the option that works for text', () => {
+      // note: `autoVertical` is the library's internal name for
+      // `crop=auto-vertical`, not an option and not a refused name. A written
+      // value passes through with a hint naming the option that works, so it
+      // refuses nothing, and a value with no text form is refused as on any
+      // name of your own.
+      const withNull = build(atDocument({ autoVertical: null }));
+
+      expect(codes(withNull)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(withNull.warnings[0].message).toBe(
+        '"autoVertical" needs a text value and null is not one, so it was dropped and will not be emitted.'
+      );
+      expect(withNull.svgCode).toBe(unwritten());
+      expect(codes(build(atDocument({ autoVertical: 'x' })))).toEqual(['MISPLACED_OPTION_SPELLING']);
     });
   });
 

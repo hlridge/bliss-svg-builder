@@ -33,9 +33,9 @@
  *   report in each notation, see `BlissSVGBuilder.option-scope-wording.test.js`.
  * - The stamp refused on the root, and a name refused while its value is
  *   wrong as well, see `BlissSVGBuilder.text-option-values.test.js`.
- * - A value with no text form on a refused name through the JavaScript
- *   channels, an open 1.1.0 backlog row whose acceptance criteria are the
- *   `it.todo` rows at the end of this file.
+ * - A value with no text form on a refused name, on every route, see
+ *   `BlissSVGBuilder.name-refusal-values.test.js`; on the transient channel,
+ *   see `BlissSVGBuilder.transient-refusal-values.test.js`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -215,15 +215,5 @@ describe('BlissSVGBuilder name refusal scope', () => {
     ])('still refuses the name on the root when %s', (_where, build) => {
       expect(codes(build())).toEqual(['RESERVED_ATTRIBUTE_NAME']);
     });
-  });
-
-  // Acceptance criteria for an open 1.1.0 backlog row ("A value with no text
-  // form on a refused name is dropped in silence by the JavaScript channels"):
-  // today the options argument, the setters and the transient channel drop
-  // such a value before any pass can report the name, and an internal-only
-  // spelling carries it into the markup.
-  describe('when a refused name carries a value with no text form', () => {
-    it.todo('reports the name refusal through the builder options, setOptions and setTransientOptions, as a composition object does');
-    it.todo('keeps an internal-only spelling with no text value (autoVertical: null) out of the markup and the saved string');
   });
 });

@@ -522,8 +522,8 @@ export const INTERNAL_ONLY_SPELLINGS = new Map([
  * ONLY `\"`.
  */
 export const serializeOptionValue = (value) => {
-  // Guarded: a key the admission stage keeps whatever it holds (a switch, a key
-  // refused for its NAME) can hold a value `String()` throws on.
+  // Guarded: a key the admission stage keeps whatever it holds (a switch) can
+  // hold a value `String()` throws on.
   const str = textOfValue(value);
   return /[;\[\]|"']/.test(str) || /^\s|\s$/.test(str)
     ? `"${str.replace(/"/g, '\\"')}"`
@@ -703,6 +703,15 @@ export const TRANSIENT_REFUSED_OPTION_KEYS = new Set([
   'relative-kerning',
   'absolute-kerning'
 ]);
+
+/**
+ * The refusal of keys the transient channel cannot carry, in words shared by
+ * the two places that refuse them: the admission stage, one key per report,
+ * for a value with no text form, and the transient check, the keys of one
+ * bag joined, for text.
+ */
+export const transientRefusalMessage = (keys) =>
+  `"${keys.join('", "')}" cannot be a transient option: the value is read while the composition is built, not while it is drawn, so it would never reach the picture. Set it with setOptions() instead.`;
 
 /**
  * The complete warning-code vocabulary. Single source of truth: every warning
@@ -1122,9 +1131,9 @@ export const TEXT_OPTION_KEYS = new Set(
  * `INTERNAL_OPTIONS` is exactly the set of uncurated names where that premise is
  * FALSE: position and kerning reach an emitter as geometry and never as text,
  * and each already has a gate of its own (MALFORMED_COORDINATES,
- * MALFORMED_KERNING_VALUE). Without the exemption a text refusal lands on a
- * value the position gate has already read and honoured, so `{x: [5]}` both
- * positions the element and reports the option as dropped.
+ * MALFORMED_KERNING_VALUE). Without the exemption a value with no text form on
+ * one is refused as needing a text value, rather than in the words of the gate
+ * that reports the same key everywhere else.
  */
 export const isTextValuedOptionKey = (key) => (
   !INTERNAL_OPTIONS.has(key)
@@ -1287,46 +1296,56 @@ export const layerKeyNameRefusal = (key, level = 'global') => {
 };
 
 /**
- * A key that will never carry a value, whatever was written in it, because a
- * gate has already refused the NAME.
+ * The report a key earns for its NAME alone, or null when no pass refuses
+ * the name. One judge returns it, so every place that refuses a name words
+ * it the same way.
  *
- * The same rule `canonicalOptionKey` follows one pass earlier: a gate that
- * exists to make a value usable buys nothing on a name that can never carry
- * one. It also decides which of two reports an author gets when a key is
- * wrong twice, and the name is the one worth having: told that `null` is not
- * a text value, an author fixes the value and `nosuch--fill` is just as dead,
- * where the name refusal hands them the list of targets that exist.
- *
- * Each arm names a report raised elsewhere for the same key: the safety gate
- * and the reserved-name guard in the options pass and the root split, the
- * layer-key split loop, and the whole-option shorthands in the pass-through
- * loop.
+ * Two places report it, split by what the key holds. A value with no text
+ * form cannot be stored, so the admission stage reports the name and drops
+ * the key: left in the bag for a later pass to name, it was dropped first by
+ * the JavaScript channels, with nothing said, or kept by a composition object
+ * and saved as `[onclick=null]`. A text value is kept, and the pass that
+ * refuses the name (the safety gate and the reserved-name guard in the
+ * options pass and the root split, the layer-key split loop) reports it on
+ * every load. Either way the name is the report worth having: told only that
+ * `null` is not a text value, an author fixes the value and `nosuch--fill`
+ * is just as dead, where the name refusal hands them the targets that exist.
  *
  * `level` is where the key is written, because one name is refused at one
  * place only: the library's stamp, which the root alone reads, so it is
  * refused written bare at global scope and behind the root prefix, and is an
- * ordinary name anywhere else. Counting it refused everywhere let a value
- * with no text form past the value gate, onto the markup as
- * `data-generator="null"`. A caller that cannot know where the bag will act
- * (a definition's defaults, which act where the code is used, never on the
- * root) passes none.
+ * ordinary name anywhere else. A caller that cannot know where the bag will
+ * act (a definition's defaults, which act where the code is used, never on
+ * the root) passes none. A target-prefixed key is judged in the words of the
+ * global form, the only scope it reaches this judge from: written lower, the
+ * scope judge refuses it first, in that scope's words.
  *
- * Shared by the two places that must not disagree about it. At ingest it is why
- * such a key is ADMITTED whatever it holds: dropping the key would take the
- * name refusal down with it, since that refusal is raised by a later pass over
- * the bag and a dropped key is not in the bag. At render it is why the value
- * gate skips the key it is about to refuse for its name instead.
+ * The two internal names in `INTERNAL_ONLY_SPELLINGS` are not here. They
+ * name no option and refuse nothing: the pass-through emits a value written
+ * under one, with a hint naming the option that works, so a value with no
+ * text form on one is refused as on any name of your own.
  *
  * @param {string} key - the stored option name
  * @param {OptionScope['level']} [level] - where the key is written
+ * @returns {{code: string, message: string, source: string} | null}
  */
-export const optionNameIsAlreadyRefused = (key, level) => {
-  if (INTERNAL_ONLY_SPELLINGS.has(key)) return true;
-  if (isLayerAttributeKey(key)) return layerKeyNameRefusal(key) !== null;
-  return !isSafeAttributeName(key)
-    || isDocumentDefiningAttribute(key)
-    || (level === 'global' && isLibraryOwnedRootAttribute(key));
+export const optionNameRefusal = (key, level) => {
+  if (isLayerAttributeKey(key)) return layerKeyNameRefusal(key);
+  if (!isSafeAttributeName(key)) {
+    return { code: WARNING_CODES.UNSAFE_ATTRIBUTE_NAME, message: unsafeAttributeNameMessage(key), source: key };
+  }
+  if (isDocumentDefiningAttribute(key) || (level === 'global' && isLibraryOwnedRootAttribute(key))) {
+    return { code: WARNING_CODES.RESERVED_ATTRIBUTE_NAME, message: reservedAttributeMessage(key), source: key };
+  }
+  return null;
 };
+
+/**
+ * Whether a pass refuses the key's name. The render backstop asks it, to
+ * leave the value gate off a key whose name refusal that pass reports
+ * instead; answered by the stage's own judge, so the two cannot disagree.
+ */
+export const optionNameIsAlreadyRefused = (key, level) => optionNameRefusal(key, level) !== null;
 
 /**
  * The refusal that keeps one written value OUT of the composition, or null when
@@ -1341,18 +1360,28 @@ export const optionNameIsAlreadyRefused = (key, level) => {
  * (`crop=nope`), because the author can read it and fix it, so it is kept and
  * reported by the gate that knows what that option accepts.
  *
+ * Asked after the scope judge, it names the first thing wrong with a key whose
+ * value has no text form, in the words that thing is reported in everywhere
+ * else: the channel (a key the transient channel refuses), then the name (a
+ * name a later pass refuses), then the value. The value is dropped whichever
+ * is named, since it cannot be stored, so naming the one the author has to fix
+ * first costs nothing. A text value is not judged here at all: under a refused
+ * name it is kept, and the pass that refuses the name reports it on every load.
+ *
  * The judges are asked rather than the type test being reported directly, for
  * two reasons. They word the refusal for the option it landed on, so a number
- * option says it needs a number. And both returning null is what EXEMPTS
- * position and kerning: those reach an emitter as geometry rather than as text
- * and carry gates of their own, so `{x: [5]}` stays untouched here. Refusing it
- * would report a drop that did not happen, since the position gate reads and
- * honours that value.
+ * option says it needs a number and a position is refused in its own gate's
+ * words. And all of them returning null is what admits the two kinds of key
+ * no value can make wrong: a switch, which any value but `true` turns off, and
+ * the element key, which reaches neither the picture nor the saved text.
  */
-const admissionRefusal = (key, value, level) => {
+const admissionRefusal = (key, value, scope) => {
   if (hasAuthoredTextForm(value)) return null;
-  if (optionNameIsAlreadyRefused(key, level)) return null;
-  return judgeNumericOptionValue(key, value)
+  if (scope?.transient && TRANSIENT_REFUSED_OPTION_KEYS.has(key)) {
+    return { code: WARNING_CODES.MISPLACED_TRANSIENT_OPTION, message: transientRefusalMessage([key]), source: key };
+  }
+  return optionNameRefusal(key, scope?.level)
+    ?? judgeNumericOptionValue(key, value)
     ?? judgeTextOptionValue(key, value)
     ?? judgeGeometryOptionValue(key, value);
 };
@@ -1463,7 +1492,8 @@ const documentHome = (written, { notation, transient = false }) => {
  * the handle setters', and the `opts` of the adding and replacing methods).
  * Only the second sentence of a report depends on it. `transient` marks a
  * transient bag, where a key the transient channel refuses outright is left to
- * that refusal: it refuses kerning at every level, so telling the author to
+ * that refusal (the stage's own for a value with no text form, the transient
+ * check's for text): it refuses kerning at every level, so telling the author to
  * move a transient kerning value onto a character would only send them to the
  * second refusal.
  *
@@ -1546,8 +1576,12 @@ export const isScopeRefusal = (warning) =>
  * Given the `scope` the bag is being written at, the stage also refuses a key
  * that cannot act there (`scopeRefusal`), and it asks that FIRST: where a key
  * cannot act, fixing its value would achieve nothing, so `{marginTop: null}` on
- * a character is reported once, as misplaced. A key refused for its scope is
- * never noted as a spelling either, for the same reason a refused value is not.
+ * a character is reported once, as misplaced. Then, for a value with no text
+ * form, the channel and the name, so `{x: null}` in a transient bag is
+ * reported as a key that channel refuses and `{onclick: null}` as a name, each
+ * in the words the same key earns with a text value. A key refused for its
+ * scope is never noted as a spelling either, for the same reason a refused
+ * value is not.
  * Without a scope nothing is judged for scope. That is a definition's
  * `defaultOptions`, and only those: the defaults attach wherever the definition
  * is used, which the stage cannot know when they are declared, and no key bound
@@ -1566,7 +1600,7 @@ export const admitOptions = (writtenEntries, warn, scope) => {
   for (const [writtenKey, value] of writtenEntries) {
     const key = canonicalOptionKey(writtenKey);
     const refusal = (scope ? scopeRefusal(key, value, scope) : null)
-      ?? admissionRefusal(key, value, scope?.level);
+      ?? admissionRefusal(key, value, scope);
     if (refusal) {
       warn?.(refusal);
       continue;

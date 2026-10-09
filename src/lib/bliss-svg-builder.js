@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -935,9 +935,8 @@ class BlissSVGBuilder {
   // The two drops below are what is left for this channel to decide, and both
   // are silent because the stage has already reported everything it refused.
   // What reaches them is what the stage deliberately ADMITS whatever it holds:
-  // a switch, which is off for any value but `true`; the element key, which
-  // reaches neither the picture nor the saved text; and a key whose NAME a later
-  // pass refuses.
+  // a switch, which is off for any value but `true`, and the element key, which
+  // reaches neither the picture nor the saved text.
   //
   // `scope` is where the caller is writing, which only the caller knows: the
   // document for the options argument, the new or the addressed element for
@@ -1321,33 +1320,21 @@ class BlissSVGBuilder {
     }
   }
 
-  // Positioning family (GH #18): `x`, `y` and the two kerning values are the
-  // options a LAYOUT reads rather than an attribute the renderer copies, so
-  // they need the same promotion an options object gets when it arrives as
-  // DSL text: `x`/`y` onto the node as numbers, and any kerning spelling onto
-  // the single numeric key. The DSL surface gets that inside the parser; every
-  // other surface (constructor object input, `setOptions`, and the opts
-  // argument of the add/insert/replace family) arrives here, where an option
-  // set after construction lands on the authoring structure and never sees a
-  // parse. Without this the option was accepted, serialized, round-tripped,
-  // and changed nothing, with no warning.
-  //
-  // Runs on `#rawBlissObj` rather than the render clone, so the promotion also
-  // reaches what `toString()`/`toJSON()` emit: an option set through the API
-  // serializes exactly like the DSL spelling of the same value. It is
-  // idempotent, so a later rebuild re-normalizes nothing; the warnings ride
-  // `_parseWarnings`, the channel that survives a rebuild, so a conflict
-  // reported once is still reported after an unrelated mutation.
   // Gates the transient channel on the AUTHORING structure, so both surfaces
   // that can fill it (the setters and constructor object input) meet one rule
   // at one site, and so an offending key is dropped once rather than re-judged
-  // on every rebuild. Three refusals, each of which would otherwise be a silent
-  // no-op with a plausible-looking key sitting in the bag:
+  // on every rebuild. Three refusals, each of a plausible-looking key that
+  // would otherwise sit in the bag and change nothing:
   //
   //   - a key the library consumes before the render copy is taken, which a
   //     transient spelling could never reach (TRANSIENT_REFUSED_OPTION_KEYS);
-  //   - a name that is not a legal attribute name, including `on*` handlers,
-  //     which the render path already skips silently at every level;
+  //   - a bare name that is not a legal attribute name, including `on*`
+  //     handlers. The render path refuses one too, on every rebuild; this
+  //     check reports it once and drops it. A target-prefixed key is left to
+  //     the options pass and the root split, which judge its target before
+  //     its attribute, so `--x` reports UNKNOWN_LAYER here as it does in a
+  //     bracket. That report is re-derived on every rebuild, like any other
+  //     kept name refusal, and the key stays in a bag no save reads;
   //   - anything at all on a TSP/QSP space, which has no ink to decorate. That
   //     mirrors the space rule for ordinary options exactly, including its code.
   //
@@ -1371,10 +1358,9 @@ class BlissSVGBuilder {
         } else {
           const refused = keys.filter(k => TRANSIENT_REFUSED_OPTION_KEYS.has(k));
           if (refused.length > 0) {
-            drop(bag, refused, WARNING_CODES.MISPLACED_TRANSIENT_OPTION,
-              (k) => `"${k.join('", "')}" cannot be a transient option: the value is read while the composition is built, not while it is drawn, so it would never reach the picture. Set it with setOptions() instead.`);
+            drop(bag, refused, WARNING_CODES.MISPLACED_TRANSIENT_OPTION, transientRefusalMessage);
           }
-          const unsafe = Object.keys(bag).filter(k => !isSafeAttributeName(k));
+          const unsafe = Object.keys(bag).filter(k => !isLayerAttributeKey(k) && !isSafeAttributeName(k));
           if (unsafe.length > 0) {
             drop(bag, unsafe, WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
               (k) => unsafeAttributeNameMessage(k.join('", "')));
@@ -1396,6 +1382,23 @@ class BlissSVGBuilder {
     }
   }
 
+  // Positioning family (GH #18): `x`, `y` and the two kerning values are the
+  // options a LAYOUT reads rather than an attribute the renderer copies, so
+  // they need the same promotion an options object gets when it arrives as
+  // DSL text: `x`/`y` onto the node as numbers, and any kerning spelling onto
+  // the single numeric key. The DSL surface gets that inside the parser; every
+  // other surface (constructor object input, `setOptions`, and the opts
+  // argument of the add/insert/replace family) arrives here, where an option
+  // set after construction lands on the authoring structure and never sees a
+  // parse. Without this the option was accepted, serialized, round-tripped,
+  // and changed nothing, with no warning.
+  //
+  // Runs on `#rawBlissObj` rather than the render clone, so the promotion also
+  // reaches what `toString()`/`toJSON()` emit: an option set through the API
+  // serializes exactly like the DSL spelling of the same value. It is
+  // idempotent, so a later rebuild re-normalizes nothing; the warnings ride
+  // `_parseWarnings`, the channel that survives a rebuild, so a conflict
+  // reported once is still reported after an unrelated mutation.
   #normalizePositioningInvariant() {
     const raw = this.#rawBlissObj;
     const warnings = [];
