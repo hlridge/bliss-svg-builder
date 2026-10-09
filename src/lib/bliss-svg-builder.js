@@ -913,8 +913,13 @@ class BlissSVGBuilder {
   // Measured, resolving it costs nothing, because the kerning resolver reads
   // either spelling and the name is promoted back on the way out, so a round
   // trip is byte-identical and `toJSON()` deep-equal either way.
+  //
+  // The bag has no prototype, as a bracket's has none: a key can spell
+  // `__proto__` (`JSON.parse` writes one as readily as any other), and on a
+  // plain object that assignment is swallowed instead of stored, so the key
+  // would vanish without the report its name earns everywhere else.
   static #admitAuthoredBag(bag, warn, scope) {
-    const admitted = {};
+    const admitted = Object.create(null);
     for (const [key, value] of admitOptions(Object.entries(bag), warn, scope)) admitted[key] = value;
     return admitted;
   }
@@ -941,8 +946,10 @@ class BlissSVGBuilder {
   // `scope` is where the caller is writing, which only the caller knows: the
   // document for the options argument, the new or the addressed element for
   // the setters, and the transient channel for `setTransientOptions`.
+  //
+  // No prototype, for the reason `#admitAuthoredBag` gives.
   static #toRaw(obj, warn, scope) {
-    const raw = {};
+    const raw = Object.create(null);
     for (const [key, value] of admitOptions(Object.entries(obj), warn, scope)) {
       if (value === null || value === undefined) continue;
       if (typeof value === 'object') continue;

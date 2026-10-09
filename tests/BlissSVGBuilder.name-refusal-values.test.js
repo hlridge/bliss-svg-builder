@@ -108,6 +108,9 @@ const REFUSED_KEYS = [
   ['onClick', 'UNSAFE_ATTRIBUTE_NAME', 'everywhere'],
   ['a b', 'UNSAFE_ATTRIBUTE_NAME', 'everywhere'],
   ['xmlns:xlink', 'UNSAFE_ATTRIBUTE_NAME', 'everywhere'],
+  // pins the bags each route builds having no prototype: assigned on a plain
+  // object, `__proto__` holding text is swallowed and nothing reports it
+  ['__proto__', 'UNSAFE_ATTRIBUTE_NAME', 'everywhere'],
   ['xmlns', 'RESERVED_ATTRIBUTE_NAME', 'everywhere'],
   ['XMLNS', 'RESERVED_ATTRIBUTE_NAME', 'everywhere'],
   ['data-generator', 'RESERVED_ATTRIBUTE_NAME', 'at global scope'],
@@ -148,11 +151,11 @@ const xmlnsRefusal = (code) => ({
 describe('BlissSVGBuilder name refusal values', () => {
   describe('when a refused name carries a value with no text form', () => {
     it('derives one row for each route that refuses each key', () => {
-      // The 13 keys refused at every level through all 17 routes, the stamp's
+      // The 14 keys refused at every level through all 17 routes, the stamp's
       // 2 casings through the 5 at global scope, the 5 transient keys through
-      // the 3 transient bags: 13 x 17 + 2 x 5 + 5 x 3. Stops the derivation
+      // the 3 transient bags: 14 x 17 + 2 x 5 + 5 x 3. Stops the derivation
       // going vacuous in silence.
-      expect(PAIRS).toHaveLength(246);
+      expect(PAIRS).toHaveLength(263);
     });
 
     it.each(PAIRS)('reports %s written through %s for its name, as for a text value', (key, _route, code, kinds, build) => {

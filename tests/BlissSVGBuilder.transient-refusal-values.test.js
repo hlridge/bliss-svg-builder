@@ -15,7 +15,8 @@
  * - A refused key holding a value with no text form, through the builder, a
  *   character and a composition object's `transientOptions`: the misplacement
  *   in the channel's exact words, once per key, still there after an edit.
- * - The one report a bag of text values gets, its keys joined.
+ * - The one report a bag of text values gets, its keys joined, and that
+ *   report coming ahead of a name refused in the same bag.
  * - An ordinary key with no text form, and a position written outside the
  *   channel, each keeping its own report.
  * - A target-prefixed key whose whole key is not a usable name (`--x`,
@@ -103,6 +104,17 @@ describe('BlissSVGBuilder transient refusal values', () => {
       expect(reports(builder)).toEqual([
         { code: 'MISPLACED_TRANSIENT_OPTION', message: `"x", "y" ${CANNOT_BE_TRANSIENT}`, source: 'x' },
       ]);
+    });
+
+    it('reports a key it refuses ahead of a refused name in a bag holding text, whichever is written first', () => {
+      // pins the order the check refuses in: the channel before the name, the
+      // order the stage asks them in for one key
+      const channelFirst = afterMutating((b) => b.setTransientOptions({ x: 5, onclick: 'x' }));
+      const nameFirst = afterMutating((b) => b.setTransientOptions({ onclick: 'x', x: 5 }));
+      const inOrder = [['MISPLACED_TRANSIENT_OPTION', 'x'], ['UNSAFE_ATTRIBUTE_NAME', 'onclick']];
+
+      expect(codesAndSources(channelFirst)).toEqual(inOrder);
+      expect(codesAndSources(nameFirst)).toEqual(inOrder);
     });
 
     it('leaves an ordinary key holding null to the value refusal', () => {

@@ -14,6 +14,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   visible on plain objects).
  * - `[constructor=VALUE]` does not throw when used as a bracket
  *   option key.
+ * - A key named `__proto__` in object input or a setter, kept and reported
+ *   as a bracket keeps and reports it, rather than swallowed by the bag.
  * - An inherited name used as a glyph's `codeName` does not answer the
  *   preceding glyph's kerning table, which poisoned the layout with `NaN`.
  * - Invalid numeric option values for recognized keys: `NaN` and
@@ -89,6 +91,26 @@ describe('BlissSVGBuilder option hardening', () => {
       builder.glyph(1).setOptions({ constructor: 'x' });
 
       expect(builder.toString()).toContain('RK:3');
+    });
+  });
+
+  describe('when object input or a setter carries a key named __proto__', () => {
+    it('keeps the key and reports it, as a bracket does', () => {
+      // regression: the bags object input and the setters build were plain
+      // objects, where assigning `__proto__` is swallowed, so the key was lost
+      // with no report on every route but a bracket
+      const fromObject = new BlissSVGBuilder({
+        options: JSON.parse('{"__proto__": "x"}'),
+        groups: [{ glyphs: [{ codeName: 'B291', parts: [{ codeName: 'B291' }] }] }],
+      });
+      const fromOptions = new BlissSVGBuilder('B291', { ['__proto__']: 'x' });
+      const fromSetter = new BlissSVGBuilder('B291');
+      fromSetter.glyph(0).setOptions({ ['__proto__']: 'x' });
+
+      expect(fromObject.toString()).toBe('[__proto__=x]||B291');
+      expect(fromOptions.toString()).toBe('[__proto__=x]||B291');
+      expect(fromSetter.toString()).toBe('[__proto__=x]B291');
+      expect(fromOptions.warnings.map((w) => w.code)).toEqual(['UNSAFE_ATTRIBUTE_NAME']);
     });
   });
 
