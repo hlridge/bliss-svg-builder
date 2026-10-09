@@ -25,12 +25,13 @@
  *   `defaultOptions`.
  * - A value whose conversion to text THROWS (a non-callable `toString`, no
  *   prototype, a `toString` that throws) being refused rather than crashing
- *   the builder, on every route, and a key the library keeps whatever it holds
- *   still saving without a crash.
+ *   the builder, on every route, and under a name refused for itself too.
  * - Position and kerning following the same rule under their own codes
  *   (`MALFORMED_COORDINATES`, `MALFORMED_KERNING_VALUE`), on the options bag
  *   and on the promoted position field.
- * - The two deliberate exceptions, the switches and `key`, left alone.
+ * - A switch holding a value with no text form, dropped in silence and not
+ *   stored, so it displaces no other spelling of the switch; and the element
+ *   key, left alone whatever it holds (pinned as an open row's residue).
  *
  * Does NOT cover:
  * - Which values each half of the gate refuses and the wording of each
@@ -261,11 +262,12 @@ describe('BlissSVGBuilder refused value retention', () => {
       expect(b.toString()).toBe('B291');
     });
 
-    it('saves a key refused for its name without throwing', () => {
-      // A key whose NAME is refused keeps its value, so the name refusal can
-      // fire; the serializer then has to write that value down.
+    it('refuses one under a name refused as well, reporting the name, rather than throwing', () => {
+      // The name refusal is built from the key alone, so building it cannot
+      // throw, and the key goes with the value, so no save has to write it.
       const b = new BlissSVGBuilder(compositionWith({ onclick: { toString: 5 } }));
-      expect(() => b.toString()).not.toThrow();
+      expect(codes(b)).toEqual(['UNSAFE_ATTRIBUTE_NAME']);
+      expect(b.toString()).toBe('B291');
     });
   });
 
@@ -313,20 +315,75 @@ describe('BlissSVGBuilder refused value retention', () => {
   });
 
   describe('when a switch or an element key holds a value with no text form', () => {
-    // The two deliberate exceptions. A switch is on only when it is exactly
-    // `true`, so any other value already means off and reporting one would
-    // scold an ordinary way of turning it off. A key names the element and
-    // reaches neither the picture nor the saved text.
-    it('leaves a switch off and says nothing', () => {
+    // The two deliberate exceptions to reporting. A switch is on only when it
+    // is exactly `true`, so any other value already means off and reporting
+    // one would scold an ordinary way of turning it off; a value with no text
+    // form is still not stored, like any other. The element key names the
+    // element and is left alone whatever it holds.
+    it('turns a switch off in silence and stores nothing', () => {
       const b = new BlissSVGBuilder(compositionWith({ grid: null }));
       expect(codes(b)).toEqual([]);
+      expect(b.toString()).toBe('B291');
       expect(reloaded(b).svgCode).toBe(b.svgCode);
     });
 
-    it('saves a switch holding a value that cannot be converted without throwing', () => {
+    it('stores nothing for a switch holding a value that cannot be converted', () => {
       const b = new BlissSVGBuilder(compositionWith({ grid: { toString: 5 } }));
-      expect(() => b.toString()).not.toThrow();
+      expect(b.toString()).toBe('B291');
       expect(reloaded(b).svgCode).toBe(b.svgCode);
+    });
+
+    it('stores nothing for a switch given a function or a symbol through the builder options', () => {
+      const withFunction = new BlissSVGBuilder('B291', { grid: () => 1 });
+      const withSymbol = new BlissSVGBuilder('B291', { center: Symbol('s') });
+      expect(codes(withFunction)).toEqual([]);
+      expect(withFunction.toString()).toBe('B291');
+      expect(codes(withSymbol)).toEqual([]);
+      expect(withSymbol.toString()).toBe('B291');
+    });
+
+    it('stores nothing for a switch spelled as JavaScript spells it', () => {
+      const b = new BlissSVGBuilder(compositionWith({ errorPlaceholder: null }));
+      expect(codes(b)).toEqual([]);
+      expect(b.toString()).toBe('B291');
+    });
+
+    it('keeps a switch holding text or true', () => {
+      // pins that only a value with no text form is dropped from a switch
+      const on = new BlissSVGBuilder(compositionWith({ grid: true }));
+      expect(new BlissSVGBuilder(compositionWith({ grid: 'yes' })).toString()).toBe('[grid=yes]||B291');
+      expect(on.toString()).toBe('[grid]||B291');
+      expect(on.svgCode).toContain('bliss-grid');
+    });
+
+    it('leaves the other spelling of the switch in force and reports no collision', () => {
+      // pins the silent drop sitting before the spelling is noted: after it, the
+      // null written last would be named as displacing the `true`, which stays
+      const bag = { errorPlaceholder: true, 'error-placeholder': null };
+      const fromObject = new BlissSVGBuilder(compositionWith(bag));
+      const fromOptions = new BlissSVGBuilder('B291', bag);
+      expect(codes(fromObject)).toEqual([]);
+      expect(fromObject.toString()).toBe('[error-placeholder]||B291');
+      expect(codes(fromOptions)).toEqual([]);
+      expect(fromOptions.toString()).toBe('[error-placeholder]||B291');
+    });
+
+    it('still reports a switch written below global scope', () => {
+      // pins the silent drop sitting after the scope refusal: ahead of it, a
+      // switch written where no switch acts would go unreported
+      const b = new BlissSVGBuilder(bagAt('character', { grid: null }));
+      expect(codes(b)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+    });
+
+    it('leaves an element key alone whatever it holds', () => {
+      // Residue of an open backlog row ("The element `key` reaches
+      // `handle.key` (typed `string`) as whatever was written"), pinned as
+      // current behaviour; that row's own design re-pins it. Also pins the
+      // silent drop as the switches' alone: widened to every key, it would
+      // take this object away.
+      const b = new BlissSVGBuilder(bagAt('character', { key: { a: 1 } }));
+      expect(codes(b)).toEqual([]);
+      expect(b.glyph(0).key).toEqual({ a: 1 });
     });
 
     it('keeps an element key out of the saved text', () => {

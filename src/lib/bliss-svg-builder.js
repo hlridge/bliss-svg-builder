@@ -934,9 +934,9 @@ class BlissSVGBuilder {
   //
   // The two drops below are what is left for this channel to decide, and both
   // are silent because the stage has already reported everything it refused.
-  // What reaches them is what the stage deliberately ADMITS whatever it holds:
-  // a switch, which is off for any value but `true`, and the element key, which
-  // reaches neither the picture nor the saved text.
+  // Only the element key reaches them: it is the one key the stage deliberately
+  // ADMITS whatever it holds, and it reaches neither the picture nor the saved
+  // text.
   //
   // `scope` is where the caller is writing, which only the caller knows: the
   // document for the options argument, the new or the addressed element for

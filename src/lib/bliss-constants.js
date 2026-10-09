@@ -522,8 +522,9 @@ export const INTERNAL_ONLY_SPELLINGS = new Map([
  * ONLY `\"`.
  */
 export const serializeOptionValue = (value) => {
-  // Guarded: a key the admission stage keeps whatever it holds (a switch) can
-  // hold a value `String()` throws on.
+  // Guarded, as a defence for a value `String()` throws on, though nothing
+  // hands it one: the admission stage keeps a value with no text form on the
+  // element key alone, and nothing serializes that key.
   const str = textOfValue(value);
   return /[;\[\]|"']/.test(str) || /^\s|\s$/.test(str)
     ? `"${str.replace(/"/g, '\\"')}"`
@@ -1349,7 +1350,7 @@ export const optionNameIsAlreadyRefused = (key, level) => optionNameRefusal(key,
 
 /**
  * The refusal that keeps one written value OUT of the composition, or null when
- * it goes in.
+ * nothing is refused.
  *
  * One test decides it, and it is a test on the value's TYPE rather than on
  * which option it was written on, so it governs every option that exists and
@@ -1371,9 +1372,12 @@ export const optionNameIsAlreadyRefused = (key, level) => optionNameRefusal(key,
  * The judges are asked rather than the type test being reported directly, for
  * two reasons. They word the refusal for the option it landed on, so a number
  * option says it needs a number and a position is refused in its own gate's
- * words. And all of them returning null is what admits the two kinds of key
- * no value can make wrong: a switch, which any value but `true` turns off, and
- * the element key, which reaches neither the picture nor the saved text.
+ * words. And all of them returning null is what leaves unrefused the two kinds
+ * of key no value can make wrong: a switch, which any value but `true` turns
+ * off, and the element key, which reaches neither the picture nor the saved
+ * text. The element key then goes in whatever it holds; a switch holding no
+ * text does not, like any value with no text form (`admitOptions` drops it, in
+ * silence).
  */
 const admissionRefusal = (key, value, scope) => {
   if (hasAuthoredTextForm(value)) return null;
@@ -1568,6 +1572,9 @@ export const isScopeRefusal = (warning) =>
  * enters cannot be named as displacing another. `{strokeWidth: 5,
  * 'stroke-width': null}` is why: the null is dropped and the 5 survives, so a
  * collision report would say the 5 was ignored when it is the value in force.
+ * A switch holding a value with no text form never enters either, so it
+ * displaces nothing, and it is dropped in silence, since any value but `true`
+ * already turns a switch off.
  *
  * The drop does not depend on there being anywhere to report it: every route
  * passes a warnings channel, and a caller that passes none still has the
@@ -1605,6 +1612,11 @@ export const admitOptions = (writtenEntries, warn, scope) => {
       warn?.(refusal);
       continue;
     }
+    // A switch is on only when it is exactly `true`, so a value with no text
+    // form already means off. It is dropped like every value with no text form,
+    // so no save writes it, but without a report: reporting it would scold an
+    // ordinary way of turning a switch off.
+    if (BOOLEAN_OPTION_KEYS.has(key) && !hasAuthoredTextForm(value)) continue;
     noteSpelling(writtenKey, key, value);
     admitted.push([key, value]);
   }
