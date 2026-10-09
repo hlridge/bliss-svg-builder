@@ -1373,10 +1373,10 @@ export const optionNameIsAlreadyRefused = (key, level) => optionNameRefusal(key,
  * two reasons. They word the refusal for the option it landed on, so a number
  * option says it needs a number and a position is refused in its own gate's
  * words. And all of them returning null is what leaves unrefused the two kinds
- * of key no value can make wrong: a switch, which any value but `true` turns
- * off, and the element key, which reaches neither the picture nor the saved
- * text. The element key then goes in whatever it holds; a switch holding no
- * text does not, like any value with no text form (`admitOptions` drops it, in
+ * of key no value can make wrong: a switch, on only when it is exactly `true`,
+ * and the element key, which reaches neither the picture nor the saved text.
+ * The element key then goes in whatever it holds; a switch holding no text
+ * does not, like any value with no text form (`admitOptions` drops it, in
  * silence).
  */
 const admissionRefusal = (key, value, scope) => {
@@ -1573,8 +1573,10 @@ export const isScopeRefusal = (warning) =>
  * 'stroke-width': null}` is why: the null is dropped and the 5 survives, so a
  * collision report would say the 5 was ignored when it is the value in force.
  * A switch holding a value with no text form never enters either, so it
- * displaces nothing, and it is dropped in silence, since any value but `true`
- * already turns a switch off.
+ * displaces nothing: neither another spelling of the switch in the same bag
+ * nor a `true` written in a lower layer, such as the builder's `defaults`,
+ * which stays in force (`false` is what turns that off). It is dropped in
+ * silence, since on its own it leaves the switch off anyway.
  *
  * The drop does not depend on there being anywhere to report it: every route
  * passes a warnings channel, and a caller that passes none still has the
@@ -1612,10 +1614,10 @@ export const admitOptions = (writtenEntries, warn, scope) => {
       warn?.(refusal);
       continue;
     }
-    // A switch is on only when it is exactly `true`, so a value with no text
-    // form already means off. It is dropped like every value with no text form,
-    // so no save writes it, but without a report: reporting it would scold an
-    // ordinary way of turning a switch off.
+    // A switch is on only when it is exactly `true`, so on its own a value with
+    // no text form leaves it off. It is dropped like every value with no text
+    // form, so no save writes it and it displaces nothing, but without a report:
+    // reporting it would scold a common way of saying off.
     if (BOOLEAN_OPTION_KEYS.has(key) && !hasAuthoredTextForm(value)) continue;
     noteSpelling(writtenKey, key, value);
     admitted.push([key, value]);

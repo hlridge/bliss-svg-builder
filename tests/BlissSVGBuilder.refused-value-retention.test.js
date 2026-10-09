@@ -30,8 +30,9 @@
  *   (`MALFORMED_COORDINATES`, `MALFORMED_KERNING_VALUE`), on the options bag
  *   and on the promoted position field.
  * - A switch holding a value with no text form, dropped in silence and not
- *   stored, so it displaces no other spelling of the switch; and the element
- *   key, left alone whatever it holds (pinned as an open row's residue).
+ *   stored, so it displaces neither another spelling of the switch nor a
+ *   `true` written in a lower layer; and the element key, left alone whatever
+ *   it holds (pinned as an open row's residue).
  *
  * Does NOT cover:
  * - Which values each half of the gate refuses and the wording of each
@@ -316,10 +317,10 @@ describe('BlissSVGBuilder refused value retention', () => {
 
   describe('when a switch or an element key holds a value with no text form', () => {
     // The two deliberate exceptions to reporting. A switch is on only when it
-    // is exactly `true`, so any other value already means off and reporting
-    // one would scold an ordinary way of turning it off; a value with no text
-    // form is still not stored, like any other. The element key names the
-    // element and is left alone whatever it holds.
+    // is exactly `true`, so on its own any other value leaves it off, and
+    // reporting one would scold a common way of saying off; a value with no
+    // text form is still not stored, like any other, so it displaces nothing.
+    // The element key names the element and is left alone whatever it holds.
     it('turns a switch off in silence and stores nothing', () => {
       const b = new BlissSVGBuilder(compositionWith({ grid: null }));
       expect(codes(b)).toEqual([]);
@@ -366,6 +367,31 @@ describe('BlissSVGBuilder refused value retention', () => {
       expect(fromObject.toString()).toBe('[error-placeholder]||B291');
       expect(codes(fromOptions)).toEqual([]);
       expect(fromOptions.toString()).toBe('[error-placeholder]||B291');
+    });
+
+    it('leaves a switch a lower layer turned on in force', () => {
+      // pins the drop displacing nothing across layers too: stored, the null
+      // over `defaults`, the transient null and the function each turned the
+      // grid off
+      const overDefaults = new BlissSVGBuilder(compositionWith({ grid: null }), { defaults: { grid: true } });
+      const overOptions = new BlissSVGBuilder({ ...compositionWith({ grid: true }), transientOptions: { grid: null } });
+      const overString = new BlissSVGBuilder('[grid]||B291', { grid: () => 1 });
+      expect(codes(overDefaults)).toEqual([]);
+      expect(overDefaults.svgCode).toContain('bliss-grid');
+      expect(overDefaults.toString()).toBe('[grid]||B291');
+      expect(overOptions.svgCode).toContain('bliss-grid');
+      expect(overString.svgCode).toContain('bliss-grid');
+      expect(overString.toString()).toBe('[grid]||B291');
+    });
+
+    it('turns off a switch a lower layer turned on when it holds false', () => {
+      // the control for the row above: each upper layer can turn the switch off
+      const overDefaults = new BlissSVGBuilder(compositionWith({ grid: false }), { defaults: { grid: true } });
+      const overOptions = new BlissSVGBuilder({ ...compositionWith({ grid: true }), transientOptions: { grid: false } });
+      const overString = new BlissSVGBuilder('[grid]||B291', { grid: false });
+      expect(overDefaults.svgCode).not.toContain('bliss-grid');
+      expect(overOptions.svgCode).not.toContain('bliss-grid');
+      expect(overString.svgCode).not.toContain('bliss-grid');
     });
 
     it('still reports a switch written below global scope', () => {
