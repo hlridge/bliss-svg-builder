@@ -25,7 +25,11 @@
  * so it is absent from `toString()` and `toJSON()` and the picture is drawn as
  * if it had never been written. This holds wherever the value came from: a
  * composition object, the constructor's second argument, a mutation setter, or
- * a definition's `defaultOptions`.
+ * a definition's `defaultOptions`. If the name is refused as well (an event
+ * handler, `xmlns`, the library's own stamp on the root, a prefix that names no
+ * target), the name is reported instead, with `UNSAFE_ATTRIBUTE_NAME`,
+ * `RESERVED_ATTRIBUTE_NAME` or `UNKNOWN_LAYER`, and the key is not stored
+ * either.
  *
  * A value that IS text but wrong for the option (`{ crop: 'nope' }`) is kept
  * instead, because you can read it and correct it. It is reported, ignored when
@@ -33,10 +37,13 @@
  * composition is loaded.
  *
  * Position and kerning follow the same rule under their own codes,
- * `MALFORMED_COORDINATES` and `MALFORMED_KERNING_VALUE`. Two options are left
- * alone whatever they hold: a switch (`grid`, `center`, `errorPlaceholder`) is
- * on only when it is exactly `true`, so any other value already means off, and
- * `key` names the element and reaches neither the picture nor the saved text.
+ * `MALFORMED_COORDINATES` and `MALFORMED_KERNING_VALUE`. A switch (`grid`,
+ * `center`, `errorPlaceholder`) is never reported for what it holds, since it
+ * is on only when it is exactly `true`; a value with no text form is still not
+ * stored, so it does not turn off a switch turned on elsewhere, in the string
+ * or the builder's `defaults`, and `false` does. `key` names the element and is
+ * left alone whatever it holds: it reaches neither the picture nor the saved
+ * text.
  */
 export interface BlissOptions {
   // Stroke and spacing
@@ -806,11 +813,13 @@ export interface DefineResult {
   errors: string[];
   /**
    * Non-fatal reports about definitions that WERE registered, so this is never
-   * a reason to treat the call as failed; `errors` is. Currently carries
-   * `MULTIPLE_OPTION_SPELLINGS` when one `defaultOptions` bag writes one option
-   * under two spellings: the last value written wins and the displaced one is
-   * named here. Each message is prefixed with the code it came from, since one
-   * call can define many.
+   * a reason to treat the call as failed; `errors` is. Carries what a
+   * `defaultOptions` bag could not keep: a value with no text form, refused and
+   * left out of the definition as on every other route (see
+   * {@link BlissOptions}), and one option written under two spellings
+   * (`MULTIPLE_OPTION_SPELLINGS`), where the last value written wins and the
+   * displaced one is named. Each message is prefixed with the code it came
+   * from, since one call can define many.
    */
   warnings: Warning[];
 }

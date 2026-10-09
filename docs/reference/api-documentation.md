@@ -1400,7 +1400,7 @@ Pass `{ overwrite: true }` as the second argument to replace existing custom cod
 
 ### Warnings
 
-`define()` also returns a `warnings` array. It reports definitions that WERE registered, so it is never a reason to treat the call as failed; a refusal is an `errors` entry. Today it carries one code, `MULTIPLE_OPTION_SPELLINGS`: one `defaultOptions` bag writing a single option under both of its spellings. The last value written wins and the displaced one is named, with the code it came from, since one call can define many.
+`define()` also returns a `warnings` array. It reports definitions that WERE registered, so it is never a reason to treat the call as failed; a refusal is an `errors` entry. It carries what a `defaultOptions` bag could not keep: a value with no text form, refused and left out of the definition as it is [everywhere else](/handbook/syntax-options/options-system#values-from-javascript), and a single option written under both of its spellings (`MULTIPLE_OPTION_SPELLINGS`), where the last value written wins and the displaced one is named. Each report names the code it came from, since one call can define many.
 
 ```js
 const result = BlissSVGBuilder.define({

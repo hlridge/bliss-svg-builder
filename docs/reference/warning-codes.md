@@ -131,7 +131,7 @@ The last two are the cases worth knowing about: writing the key with no value at
 
 The second kind only reaches the library from JavaScript, since a value written in a bracket is always text. An object, an array, a `null` or an `undefined` handed to an option that writes text used to be put into the picture as whatever JavaScript made of it: `{ color: null }` painted `stroke="null"`, and an object given to `svg-title` or `aria-label` arrived as `[object Object]`. Those are refused now, and the option falls back the same way a refused number does.
 
-You get the same warning however the value reaches the option: in a composition object, as the builder's second argument, through `setOptions()`, or in a definition's own default options. It is reported once and is not stored, so it is absent from `toString()` and `toJSON()`, and a composition saved and reloaded draws the same picture.
+You get the same warning however the value reaches the option: in a composition object, as the builder's second argument, through `setOptions()`, or in a definition's own default options. It is reported once and is not stored, so it is absent from `toString()` and `toJSON()`, and a composition saved and reloaded draws the same picture. If the key's name is refused as well, you are told about the name instead, with [`UNSAFE_ATTRIBUTE_NAME`](#unsafe-attribute-name), [`RESERVED_ATTRIBUTE_NAME`](#reserved-attribute-name) or [`UNKNOWN_LAYER`](#unknown-layer), and the key is not stored either.
 
 A value that *is* text but wrong for the option is kept instead, because you can read it and correct it. `[crop=nope]` is reported, ignored when drawing, saved with the composition, and reported again each time that composition is loaded.
 
@@ -495,7 +495,7 @@ Splitting at the last `--` is what lets a target carry one of its own, so `grid-
 
 The test is a target this library **knows**, not one it happens to be drawing. `[grid--opacity=0.3]||` with the grid switched off is silent and emits nothing, exactly as the named `[grid-color=red]` is silent there, and a sub-element that this render leaves out is silent for the same reason.
 
-Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix.
+Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix. A value from JavaScript with no text form (`{ 'foo--x': null }`) is reported the same way but not kept, since it has nothing to save.
 
 Written below global scope (`[foo--x=1]B291`), the key is reported with this code too, but dropped rather than kept, because a prefixed key cannot act there whatever its target (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). The message then says that the attribute without a prefix goes on the element you wrote it on, not on the root.
 
@@ -580,7 +580,7 @@ builder.part(0).setTransientOptions({ 'on-click': 'x' });
 // warns, and nothing is emitted; other keys in the same call are kept
 ```
 
-Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. The one exception is a prefixed key written below global scope (`[content--onclick=x]B291`): it could not act there whatever its name, so it is dropped as [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option) describes, and reported with this code.
+Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. In two cases the key is dropped instead, though still reported with this code. A prefixed key written below global scope (`[content--onclick=x]B291`) could not act there whatever its name, so it is dropped as [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option) describes. And a value from JavaScript with no text form (`{ onclick: null }`) has nothing to save, so it is not stored at all.
 
 ## Misplaced Channel
 
@@ -610,7 +610,7 @@ new BlissSVGBuilder('B291', { autoVertical: true });   // warns; write { crop: '
 
 A curated option written in its camelCase spelling is **not** this warning. Every input resolves the name, so `[marginTop=3]`, `new BlissSVGBuilder('B291', { marginTop: 3 })` and `new BlissSVGBuilder({ options: { marginTop: 3 }, groups: [/* … */] })` all set the margin and say nothing. Writing the same name twice under two spellings is [`MULTIPLE_OPTION_SPELLINGS`](#multiple-option-spellings).
 
-The key is kept rather than dropped, so it round-trips through `toString()` and reports again on a reparse. It is reported once per place it was written, at every level, since each is a separate key that does nothing.
+The key is kept rather than dropped, so it round-trips through `toString()` and reports again on a reparse. It is reported once per place it was written, at every level, since each is a separate key that does nothing. A value from JavaScript with no text form (`{ autoVertical: null }`) gets [`INVALID_OPTION_VALUE`](#invalid-option-value) instead, as under any name of your own, and nothing is emitted or kept.
 
 An attribute name SVG or ARIA owns follows the same principle: casing and hyphenation carry no meaning in one of those, so `view-box`, `viewbox` and `viewBox` all reach `viewBox`, and the owner's spelling is what comes back. A name nobody owns is yours and is emitted exactly as you typed it.
 

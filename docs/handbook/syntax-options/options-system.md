@@ -75,6 +75,8 @@ One accepted limit: a value where a backslash sits directly next to a quote (the
 
 A bracket can only carry text, but a composition object, the builder's second argument, `setOptions()` and a definition's `defaultOptions` can carry anything JavaScript has. An option value has to be something with a text form, so a `null`, an `undefined`, or anything that is not a primitive (an object, an array, a function) is refused on the way in: it reports [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value) and is not stored, so it is absent from `toString()` and `toJSON()` and the picture is drawn as if you had never written it.
 
+If the name is refused as well, you are told about the name instead: an event handler such as `onclick` reports [`UNSAFE_ATTRIBUTE_NAME`](/reference/warning-codes#unsafe-attribute-name), `xmlns` anywhere or `data-generator` on the root reports [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name), and a prefixed key that names no target (`nosuch--fill`) reports [`UNKNOWN_LAYER`](/reference/warning-codes#unknown-layer). The key is not stored either, so `{ onclick: null }` leaves nothing behind in a save.
+
 A value that *is* text but wrong for the option is kept instead, because you can read it and correct it. It is reported, ignored when drawing, saved with the composition, and reported again each time that composition is loaded.
 
 ```js
@@ -86,7 +88,7 @@ builder.toString();        // '[crop=nope]||B313': the null is gone, the typo is
 
 Both draw the same picture as `B313` on its own, and reloading that saved string reports the typo again.
 
-A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). Two kinds of key are left alone whatever they hold. A switch (`grid`, `center`, `errorPlaceholder`) is on only when it is exactly `true`, so any other value already means off. And `key`, which names an element rather than describing it, reaches neither the picture nor the saved text.
+A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). A switch (`grid`, `center`, `errorPlaceholder`) is never reported for what it holds, since it is on only when it is exactly `true`. A value with no text form is still not stored, so it does not turn off a switch turned on elsewhere, in the string or the builder's `defaults`; `false` does. And `key`, which names an element rather than describing it, is left alone whatever it holds: it reaches neither the picture nor the saved text.
 
 ## What Counts as an Option
 
