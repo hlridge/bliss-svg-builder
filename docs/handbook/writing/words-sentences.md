@@ -81,7 +81,7 @@ Use `;;` to attach an indicator to the **head glyph** of the word:
 
 <Demo code="B313/B678;;B81" title="feeling + up + action indicator = to rejoice (head: feeling)" />
 
-The head glyph is determined automatically. You don't need to know which character is the head. The library figures it out using the rules below.
+The library picks the head glyph for you, using the rules below. The pick is a best-effort guess, so for some words you should name the head yourself with `^` (see [A Best-Effort Guess](#a-best-effort-guess)).
 
 `;;` is a reversible *overlay*, not a parse-time rewrite: the indicator is stored on the word and resolved onto the head only when the image is rendered. So `toString()` and `toJSON()` keep the `;;` form by default and round-trip it unchanged (`B313/B1103;;B81` stays `B313/B1103;;B81`). Pass `{ flattenIndicators: true }` to collapse it onto the head as character-level `;`. See the [serialization reference](/reference/api-documentation#word-level-indicators-in-the-output).
 
@@ -95,11 +95,19 @@ The head glyph is determined automatically. You don't need to know which charact
 
 When you use `;;`, the library determines which character is the head glyph. It uses three rules in order:
 
-1. **Explicit marker (`^`)**: Override for rare edge cases*: `B313^/B1103;;B81`
-2. **Exclusion heuristics**: Certain characters are never heads (see below)
-3. **Default**: The first non-excluded character is the head
+1. **Explicit marker (`^`)**: the marked character is the head: `B313^/B1103;;B81`
+2. **Exclusion heuristics**: characters on the exclusion list are skipped from the start of the word (see below), unless they carry an indicator of their own
+3. **Default**: the first character that is not skipped is the head
 
-*\* Could be useful in rare cases for [predefined words](/reference/api-documentation#define-definitions-options) if the heuristic would pick the wrong head glyph. For manually composed words, you can attach the indicator directly with `;` instead.*
+For a word you compose by hand, you can also attach the indicator directly with `;` instead.
+
+### A Best-Effort Guess
+
+The automatic pick is a best-effort guess. A Bliss character carries a concept, not a role, and the same character can act as a modifier in one word and as the classifier in another. Nothing in the code string says which role it has, so there is no way to decide it with certainty. A character that has so far been used only as a modifier, in its prepositional sense, can show up in a new word as the classifier, with a more or less corresponding noun sense.
+
+::: warning Mark the head yourself
+If you use word-level indicators, mark the head with `^` in every word that starts with a character that can act as a modifier: `B486/B378^;;B86`. The list of head glyph exclusions can change without prior warning; a marked head stays where you put it.
+:::
 
 ### The Head Marker (`^`)
 
@@ -134,6 +142,14 @@ See the [Head Glyph Exclusions reference](/reference/head-glyph-exclusions) for 
 <Demo code="B968/B313/B678;;B86" title="most + happiness + description indicator = happiest (head: feeling)" />
 
 In each case, the excluded character is skipped and the indicator appears on the head glyph.
+
+A character from the list that already carries an indicator of its own is not skipped: the indicator shows that this character is the head. BCI-AV writes "aboard" this way, with the description indicator on "inside", while "domestic" has it on "country":
+
+<Demo code="B398;B86/B688;;B81" title="aboard (inside + description indicator, vehicle) + action indicator (head: inside)" />
+
+<Demo code="B398/B243;B86;;B81" title="domestic (inside, country + description indicator) + action indicator (head: country)" />
+
+In both, the action indicator replaces the description indicator on the head glyph.
 
 ## Punctuation
 

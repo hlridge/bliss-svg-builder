@@ -10,7 +10,7 @@ Single separators work within a word (`/` between characters, `;` between the pa
 |-----------|-------|---------|---------|
 | `//` | Word separator | `B313//B431` | Two words |
 | `/` | Character separator | `B313/B1103` | Two characters in one word |
-| `;;` | Word-level indicator | `B313/B1103;;B81` | Indicator applied to the word's head glyph (picked for you) |
+| `;;` | Word-level indicator | `B313/B1103;;B81` | Indicator applied to the word's head glyph (picked for you, or marked with `^`) |
 | `;;!` | Word-level indicator, strip semantic | `B313/B1103;;!B81` | Same, but also strips the thing/abstract root |
 | `;` | Part composition (character level) | `B431;B81` | Superimposes a part onto a glyph, exactly as written |
 
@@ -30,7 +30,7 @@ A `;`-part must itself be a single part (a primitive or defined shape, or a defi
 
 A word has two indicator layers: each character's own parts (written with `;`) and the word's indicator (written with `;;`), which sits on top:
 
-- The builder picks the **head glyph** to display the indicator on; you don't name it. See [the head glyph algorithm](/handbook/writing/words-sentences#the-head-glyph-algorithm).
+- The builder picks the **head glyph** to display the indicator on, as a best-effort guess, unless you mark it with `^`. Marking it is advised in every word that starts with a character that can act as a modifier. See [the head glyph algorithm](/handbook/writing/words-sentences#the-head-glyph-algorithm).
 - While a `;;` indicator is active, it **hides the head glyph's own grammatical indicators**: the word's grammar wins over the character's. Removing the overlay un-hides them (the overlay is a layer, not a rewrite).
 - The word's semantic root (`B97` thing / `B6436` abstract) is preserved; `;;!` strips it too (see below).
 - The code after `;;` must be an indicator. A base character there is dropped with a `NON_INDICATOR_AS_WORD_INDICATOR` warning; an unknown code with `UNKNOWN_CODE`. The word renders either way. A custom code qualifies when it resolves to an indicator through single-code aliases (`define({ MYIND: { codeString: 'B81' } })` makes `WORD;;MYIND` work like `WORD;;B81`).
