@@ -113,11 +113,9 @@ export const blissHeadGlyphExclusions = [
   'B162', // between
   'B195', // by
   'B482', // on
-  'B491', // out of (forward)
   'B492', // out of (downward)
   'B977', // out of (upward)
   'B976', // out of (backward)
-  'B402', // into (forward)
   'B1124', // into (downward)
   'B1125', // into (upward)
   'B1123', // into (backward)
@@ -164,6 +162,18 @@ export const blissHeadGlyphExclusions = [
   'B16', // seven
   'B17', // eight
   'B18', // nine
+];
+
+/**
+ * Codes deliberately left off the exclusion list, so a word starting with one
+ * of them takes its word-level indicators there. Like the other "into" and
+ * "out of" characters, which stay on the list, each has a modifier sense, but
+ * BCI-AV uses these two mostly in their noun senses ("entrance", "exit").
+ * Where one is used as a modifier, mark the word's head with `^`.
+ */
+export const deliberatelyNotExcluded = [
+  'B402', // into, entrance
+  'B491', // out of, exit (forward)
 ];
 
 /**

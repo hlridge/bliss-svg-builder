@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
+import * as exclusions from '../src/lib/bliss-head-glyph-exclusions.js';
 
 /**
  * Pins one rule for which character heads a word (takes the word's `;;`
@@ -12,6 +13,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   and so does one fused with another base part; written bare, it is
  *   skipped. Each in the DSL and as a composition object whose character
  *   names the skip-list code and holds the second part.
+ * - B402 and B491 head a word (kept in the list of codes deliberately not
+ *   excluded); the six other "into" and "out of" characters are skipped.
  * - The parser's scan before a predefined word that marks its own head
  *   reads such a character as the drawing does, nested too; an unknown code
  *   in a `;` slot is the boundary. A lone skip-list character behind a
@@ -110,6 +113,26 @@ describe('BlissSVGBuilder head selection rule', () => {
       // before its part count, so the object put B99 on B451 while its save
       // reloaded with B99 on the first character (identical on v1.0.0)
       expectHeadEverywhere(new BlissSVGBuilder(objectNaming(code, second)), 0, saved, flattened);
+    });
+  });
+
+  describe('when a word starts with an "into" or "out of" character', () => {
+    it.each([
+      ['B402 ("into, entrance")', 'B402/B356;;B81', 'B402;B81/B356'],
+      ['B491 ("out of, exit")', 'B491/B356;;B81', 'B491;B81/B356'],
+    ])('heads the word with %s (%s)', (_label, input, flattened) => {
+      expectHeadEverywhere(new BlissSVGBuilder(input), 0, input, flattened);
+    });
+
+    it.each(['B492', 'B977', 'B976', 'B1124', 'B1125', 'B1123'])('skips %s and heads the next character', (code) => {
+      expectHeadEverywhere(new BlissSVGBuilder(`${code}/B356;;B81`), 1, `${code}/B356;;B81`, `${code}/B356;B81`);
+    });
+
+    it('keeps B402 and B491 in the list of codes deliberately not excluded, and out of the skip list', () => {
+      expect([...(exclusions.deliberatelyNotExcluded ?? [])].sort()).toEqual(['B402', 'B491']);
+      expect(exclusions.blissHeadGlyphExclusions).not.toContain('B402');
+      expect(exclusions.blissHeadGlyphExclusions).not.toContain('B491');
+      expect(exclusions.blissHeadGlyphExclusions).toEqual(expect.arrayContaining(['B492', 'B977', 'B976', 'B1124', 'B1125', 'B1123']));
     });
   });
 
