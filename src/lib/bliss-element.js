@@ -4,10 +4,10 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { blissElementDefinitions, isSpaceGlyph } from "./bliss-element-definitions.js";
+import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { INTERNAL_OPTIONS, PUBLICATION_MAP, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
-import { classifyIndicatorKind } from "./indicator-utils.js";
+import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Horizontal gap (in glyph units) between consecutive indicators in a stack.
@@ -47,6 +47,7 @@ export class BlissElement {
   #parentElement;
   #previousElement;
   #classifiedParts; // Cached result of #classifyParts (level 2 only)
+  #isFused = false; // Two or more base parts: no spacing data (level 2 only)
 
   /**
    * Stamps a non-inherited `vector-effect` onto bare <path> elements.
@@ -635,6 +636,19 @@ export class BlissElement {
           this.#children.push(child);
         }
 
+        // A character keeps the spacing data of the code it is made of (the
+        // external-letter flag, its letter and its kerning table) only while
+        // it draws that one code, moved, styled or carrying indicators. A
+        // second base part makes another character, spaced as a Bliss
+        // character. Judged on the parts as written, as the word space before
+        // a punctuation mark is judged where it is read (pullsInWordSpace), so
+        // a part that fails still counts.
+        this.#isFused = basePartCount(this.#children) > 1;
+        if (this.#isFused) {
+          this.#char = "";
+          this.#isExternalGlyph = false;
+        }
+
         // If any part failed (unknown code), replace the entire character
         const hasFailedParts = (this.#sharedOptions?.warnings?.length ?? 0) > warningCountBefore;
         if (hasFailedParts) {
@@ -713,14 +727,15 @@ export class BlissElement {
             this.#previousElement.#advanceX = this.#previousElement.width + this.#externalGlyphSpacing;
           }
 
+          const kerningKey = this.#kerningKeyAfter(this.#previousElement.kerningRules);
           if (!this.#isEmptyGlyph && !this.isExternalGlyph && !this.#previousElement.isExternalGlyph &&
-              this.#previousElement.kerningRules && this.codeName) {
+              this.#previousElement.kerningRules && kerningKey) {
             // Own-key test, not a plain lookup: a kerning table is an object
             // literal, so asking it for an inherited name (constructor,
             // toString) answers with the function, which is not nullish and
             // turns the advance below into NaN for the rest of the layout.
             const rules = this.#previousElement.kerningRules;
-            const kerningAdjustment = Object.hasOwn(rules, this.codeName) ? rules[this.codeName] : 0;
+            const kerningAdjustment = Object.hasOwn(rules, kerningKey) ? rules[kerningKey] : 0;
             if (kerningAdjustment !== 0) {
               this.#previousElement.#advanceX = this.#previousElement.width + this.#sharedOptions.charSpace + kerningAdjustment;
             }
@@ -1070,7 +1085,24 @@ export class BlissElement {
   }
 
   get kerningRules() {
-    return this.#blissObj.kerningRules || {};
+    return this.#isFused ? {} : (this.#blissObj.kerningRules || {});
+  }
+
+  // The code this character is looked up by in the previous character's
+  // kerning table: its own code where the table lists it, else the built-in
+  // code its base part is made of, read through a custom name that draws one
+  // code, so a digit kerns after a digit however it is written or named. A
+  // character fused from two base parts, here or inside the name that draws
+  // it, is another character and is kerned by nothing.
+  #kerningKeyAfter(rules) {
+    if (this.#isFused) return "";
+    if (this.codeName && Object.hasOwn(rules, this.codeName)) return this.codeName;
+    let part = this.#children[0];
+    while (part && !builtInCodes.has(part.codeName) && part.#children.length > 0) {
+      if (basePartCount(part.#children) > 1) return "";
+      part = part.#children[0];
+    }
+    return part?.codeName ?? "";
   }
 
   get isIndicator() {

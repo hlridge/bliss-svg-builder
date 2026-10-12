@@ -190,7 +190,7 @@ export class ElementHandle {
 
   get char() {
     this.#assertReachable();
-    return this.#nodeRef?.char ?? '';
+    return this.#findSnapshot().char;
   }
 
   get isIndicator() {

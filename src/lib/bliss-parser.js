@@ -9,7 +9,7 @@ import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js"
 import {
   resolveHeadIndex, headScanCode
 } from "./bliss-head-glyph-exclusions.js";
-import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
+import { basePartCount, resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
@@ -461,17 +461,41 @@ function onlyCodeOf(codeString) {
   return segments.length === 1 ? firstBaseCode(segments[0]) : null;
 }
 
+// How many base parts a code string draws: its `;` parts read as a part slot
+// reads them, each an indicator when its definition is one, counted as the
+// layout counts a character's parts (basePartCount).
+function basePartCountOf(codeString, definitions) {
+  return basePartCount(partSegmentsOf(codeString).map((segment) => {
+    const code = firstBaseCode(segment);
+    const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
+    return { isIndicator: resolveEffectiveDefinition(definition, definitions)?.isIndicator === true };
+  }));
+}
+
+// Whether a character pulls in the word space before it: a punctuation mark,
+// however it is decorated, while it draws one base part. A second base part
+// makes another character, which leaves the ordinary space. Read where the
+// space is decided and where the builder judges a stored one, so both agree.
+export function pullsInWordSpace(glyph) {
+  return glyph.shrinksPrecedingWordSpace === true && basePartCount(glyph.parts ?? []) <= 1;
+}
+
 // The layout data a code draws with, as its bare spelling gets it. Layout data
 // is what places a character among its neighbours: the external-letter
 // spacing, the letter it is (which pair kerning reads), its kerning table, and
-// whether it pulls in the word space before it. A coordinate, a `;` part or an
-// option bracket does not make a character a different one, so it keeps all
-// four; only a code of its own is lost. A built-in carries its own; a code
-// without an outline draws as its text-fallback glyph; a defined name that
-// stands for one character takes what it does not set itself from the
-// character its code string is made of, as its expansion does. Only as far as
-// a decorated use can read the name: a code string it fails on (a letter
-// without an outline) lends that failed character nothing.
+// whether it pulls in the word space before it. A decoration does not change
+// them; only a code of its own is lost. A coordinate, an indicator or an
+// option bracket leaves a character the one it is. A second base part makes
+// another character, yet the data stay with it: the layout, which sees the
+// parts, turns them off (basePartCount), and they apply again once that part
+// is removed. A built-in carries its own; a code without an outline draws as
+// its text-fallback glyph; a defined name that stands for one character takes
+// what it does not set itself from the character its code string is made of,
+// as its expansion does. A name whose code string fuses two base parts is
+// drawn inside one part, where the layout cannot see them, so it lends only
+// what it sets itself. Only as far as a decorated use can read the name: a
+// code string it fails on (a letter without an outline) lends that failed
+// character nothing.
 function layoutDefinitionOf(code, definitions, depth = 0) {
   if (code.startsWith('XTXT_')) return createTextFallbackGlyph(code.slice(5));
   const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
@@ -479,6 +503,7 @@ function layoutDefinitionOf(code, definitions, depth = 0) {
     return definition;
   }
   if (definition.codeString.includes('/')) return definition;
+  if (basePartCountOf(definition.codeString, definitions) > 1) return definition;
   const inner = layoutDefinitionOf(firstBaseCode(definition.codeString), definitions, depth + 1);
   if (!inner) return definition;
   return {
@@ -1681,6 +1706,17 @@ export class BlissParser {
             // instead, the identity a lone shape is saved by.
             if (!isBareAlias && !builtInCodes.has(potentialBaseCode) && expandedParts.length === 1) {
               const { partOptions, _aliasCodeName, ...character } = expandedParts[0];
+              // Drawn inside that one part, a code string fusing two base
+              // parts is out of the layout's sight: the name lends only the
+              // layout data it sets itself (layoutDefinitionOf).
+              if (basePartCountOf(drawnCodeString, definitions) > 1) {
+                delete character.isExternalGlyph;
+                delete character.char;
+                delete character.kerningRules;
+                delete character.shrinksPrecedingWordSpace;
+                if (definition.kerningRules) character.kerningRules = definition.kerningRules;
+                if (definition.shrinksPrecedingWordSpace === true) character.shrinksPrecedingWordSpace = true;
+              }
               return [{
                 ...character,
                 part: str.replace(/;$/, ''),
@@ -1766,7 +1802,9 @@ export class BlissParser {
           // character, a digit lost its kerning and a punctuation mark stopped
           // pulling in the word space, while the builder keeps all three when
           // it gives a character a part or a position, and every save writes
-          // this form. Its identity stays with the bare code.
+          // this form. A second base part makes another character: the
+          // layout, which sees the parts, turns the data off then
+          // (basePartCount). Its identity stays with the bare code.
           const layout = Object.hasOwn(definitions, codeForLookup)
             ? definition
             : (layoutDefinitionOf(potentialBaseCode, definitions) ?? definition);
@@ -2175,7 +2213,7 @@ export class BlissParser {
         const nextGroup = parsedGroups[i + 1];
         const isPunctuation = nextGroup && !nextGroup._isSpaceGroup &&
           (nextGroup.glyphs?.length > 0) &&
-          nextGroup.glyphs.every(g => g.shrinksPrecedingWordSpace === true);
+          nextGroup.glyphs.every(pullsInWordSpace);
         const defaultCode = isPunctuation ? 'QSP' : 'TSP';
 
         for (const glyph of group.glyphs) {

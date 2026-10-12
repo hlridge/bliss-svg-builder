@@ -12,9 +12,20 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - A typed glyph naming a digit (its kerning) and a typed glyph or bare alias
  *   naming a punctuation mark (the tighter word space before it), bare and
  *   decorated, each save reloading the same drawing.
- * - The digit read behind a part bracket, a coordinate or `;` parts in the
- *   code string of a decorated typed glyph.
- * - A kerning table the definition sets winning over the digit it is made of.
+ * - The digit read behind a part bracket or a coordinate in the code string
+ *   of a decorated typed glyph, and no digit spacing where that code string
+ *   fuses the digit with a shape.
+ * - A definition whose code string moves a digit keeping the kerning, and
+ *   one fusing a digit, a letter or a full stop with a second base part
+ *   spaced as a Bliss character, typed or bare, used bare, with a coordinate
+ *   or behind a part bracket, on either side of a digit pair, each save
+ *   reloading the same drawing; a typed glyph naming a digit kerned as that
+ *   digit after another digit.
+ * - A kerning table the definition sets winning over the digit it is made of,
+ *   and applying where its code string fuses two base parts, as a word-space
+ *   flag it sets does; a table listing a custom glyph kerns it by that name.
+ * - An indicator named through an alias inside a definition's code string,
+ *   read as the indicator it names, on either side of a digit pair.
  * - A typed glyph whose code string leads with a character bracket, read
  *   behind that bracket (the definition's own options) by a decorated use
  *   and by the layout lookup alike, each save reloading the same drawing.
@@ -106,13 +117,162 @@ describe('BlissSVGBuilder named character layout', () => {
     it.each([
       ['a part bracket', '[color=red]>B9'],
       ['a coordinate', 'B9:1'],
-      ['a `;` part', 'B9;C8'],
     ])('reads the digit behind %s in the code string of a decorated typed glyph (%s)', (_label, codeString) => {
       customCodes.push('DIGITLIKE');
       expect(BlissSVGBuilder.define({ DIGITLIKE: { type: 'glyph', codeString } }).defined).toEqual(['DIGITLIKE']);
       const builder = new BlissSVGBuilder('DIGITLIKE;B86/B10');
       expect(gapAfterFirst('DIGITLIKE;B86/B10')).toBe(1);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('spaces a decorated typed glyph whose code string fuses the digit with a shape as a Bliss character (B9;C8)', () => {
+      // a second base part makes another character (ruled 4A, H chunk)
+      customCodes.push('DIGITLIKE');
+      expect(BlissSVGBuilder.define({ DIGITLIKE: { type: 'glyph', codeString: 'B9;C8' } }).defined).toEqual(['DIGITLIKE']);
+      const builder = new BlissSVGBuilder('DIGITLIKE;B86/B10');
+      expect(gapAfterFirst('DIGITLIKE;B86/B10')).toBe(2);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+    });
+
+    it.each([
+      ['a bare alias of B9 with a coordinate', { codeString: 'B9:1' }, 'NAMED/B10', 1],
+      ['a bare alias of B9 fused with a second base part', { codeString: 'B9;B303' }, 'NAMED/B10', 2],
+      ['a typed glyph of B9 fused with a second base part', { type: 'glyph', codeString: 'B9;B303' }, 'NAMED/B10', 2],
+      ['a bare alias of the second digit with a coordinate', { codeString: 'B10:1' }, 'B9/NAMED', 1],
+      ['a bare alias of the second digit fused with a second base part', { codeString: 'B10;B303' }, 'B9/NAMED', 2],
+      ['a bare alias of a letter fused with a shape', { codeString: 'Xa;C8' }, 'NAMED/Xb', 2],
+      ['a typed glyph of the second digit fused with a second base part', { type: 'glyph', codeString: 'B10;B303' }, 'B9/NAMED', 2],
+      ['a typed glyph of B9 fused with a second base part, given a coordinate', { type: 'glyph', codeString: 'B9;B303' }, 'NAMED:1/B10', 2],
+      ['a bare alias of B9 fused with a second base part, given a coordinate', { codeString: 'B9;B303' }, 'NAMED:1/B10', 2],
+      ['a bare alias of B9 carrying an indicator, given a coordinate', { codeString: 'B9;B86' }, 'NAMED:1/B10', 1],
+      ['a bare alias of the second digit carrying an indicator, given a coordinate', { codeString: 'B10;B86' }, 'B9/NAMED:1', 1],
+    ])('spaces %s as the code string it stands for, and its save reloads the same drawing', (_label, definition, input, gap) => {
+      // a coordinate keeps a digit's kerning on either side, a second base
+      // part makes another character (ruled 4A, H chunk); a bare alias has no
+      // code of its own, so the second digit is kerned by the digit it draws.
+      // The rows of a typed glyph on the second digit and of an alias carrying
+      // an indicator pin how a name's base parts are counted, indicators left
+      // out, on either side (2026-10 hand mutants)
+      customCodes.push('NAMED');
+      expect(BlissSVGBuilder.define({ NAMED: definition }).defined).toEqual(['NAMED']);
+      const builder = new BlissSVGBuilder(input);
+      expect(gapAfterFirst(input)).toBeCloseTo(gap, 6);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('spaces a typed glyph fusing a letter without an outline with a shape as a Bliss character, reporting no letter, and both saves reload the same drawing', () => {
+      // pins the stop for a typed glyph clearing the letter and the
+      // external-letter flag its first part would lend (2026-10 hand mutants)
+      customCodes.push('FUSEDLETTER');
+      expect(BlissSVGBuilder.define({ FUSEDLETTER: { type: 'glyph', codeString: 'Xλ;C8' } }).defined).toEqual(['FUSEDLETTER']);
+      const builder = new BlissSVGBuilder('FUSEDLETTER/Xb');
+      expect(gapAfterFirst('FUSEDLETTER/Xb')).toBeCloseTo(2, 6);
+      expect(builder.glyph(0).char).toBe('');
+      expect(builder.glyph(0).isExternalGlyph).toBe(false);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('spaces a typed glyph of B9 fused with a second base part behind a part bracket as a Bliss character, and both saves reload with that gap', () => {
+      // the saves write the bracket on each part, which draws the same ink in
+      // two groups, so a reload is compared by its gap, not by its markup
+      customCodes.push('NAMED');
+      expect(BlissSVGBuilder.define({ NAMED: { type: 'glyph', codeString: 'B9;B303' } }).defined).toEqual(['NAMED']);
+      const builder = new BlissSVGBuilder('[color=red]>NAMED/B10');
+      expect(gapAfterFirst('[color=red]>NAMED/B10')).toBe(2);
+      expect(gapAfterFirst(builder.toString())).toBe(2);
+      expect(gapAfterFirst(builder.toJSON())).toBe(2);
+    });
+
+    it('kerns a typed glyph naming the second digit as that digit, and both saves reload the same drawing', () => {
+      // regression (H chunk F6, owner 2026-10-12: it acts as B10): the glyph
+      // was kerned by its own name, which B9's table does not list, while its
+      // default save wrote B10, which the reload kerned (identical on v1.0.0)
+      customCodes.push('NAMEDTEN');
+      expect(BlissSVGBuilder.define({ NAMEDTEN: { type: 'glyph', codeString: 'B10' } }).defined).toEqual(['NAMEDTEN']);
+      const builder = new BlissSVGBuilder('B9/NAMEDTEN');
+      expect(gapAfterFirst('B9/NAMEDTEN')).toBe(gapAfterFirst('B9/B10'));
+      expect(gapAfterFirst('B9/NAMEDTEN')).toBe(1);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('leaves the ordinary word space before a bare alias of a full stop fused with a shape', () => {
+      customCodes.push('NAMEDSTOP');
+      expect(BlissSVGBuilder.define({ NAMEDSTOP: { codeString: 'B4;C8' } }).defined).toEqual(['NAMEDSTOP']);
+      const builder = new BlissSVGBuilder('B291//NAMEDSTOP');
+      expect(secondWordX('B291//NAMEDSTOP')).toBe(16);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+    });
+
+    it.each([
+      ['B291//TYPEDSTOP'], ['B291//TYPEDSTOP:1'],
+    ])('leaves the ordinary word space before a typed glyph of a full stop fused with a shape in %s, and both saves reload the same drawing', (input) => {
+      customCodes.push('TYPEDSTOP');
+      expect(BlissSVGBuilder.define({ TYPEDSTOP: { type: 'glyph', codeString: 'B4;C8' } }).defined).toEqual(['TYPEDSTOP']);
+      const builder = new BlissSVGBuilder(input);
+      expect(secondWordX(input)).toBe(16);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it.each([
+      ['OWNFUSED/B313'], ['OWNFUSED:1/B313'],
+    ])('applies the kerning table a typed glyph fusing two base parts sets itself in %s, which preserve keeps and the default JSON leaves behind', (input) => {
+      // pins the stop for a name fusing two base parts keeping what the
+      // definition says of itself: it lends none of the digit's layout data,
+      // but its own kerning table stays (2026-10 hand mutants)
+      customCodes.push('OWNFUSED');
+      expect(BlissSVGBuilder.define({ OWNFUSED: { type: 'glyph', codeString: 'B9;B303', kerningRules: { B313: -1 } } }).defined).toEqual(['OWNFUSED']);
+      const builder = new BlissSVGBuilder(input);
+      expect(gapAfterFirst(input)).toBe(1);
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON({ preserve: true })).svgCode).toBe(builder.svgCode);
+      // the default JSON spells the glyph out as its two base parts, which
+      // leave the table the definition set behind, as the default string does
+      expect(gapAfterFirst(builder.toJSON())).toBe(2);
+    });
+
+    it.each([
+      ['B291//OWNSTOP'], ['B291//OWNSTOP:1'],
+    ])('pulls in the word space before a typed glyph fusing two base parts that says it does in %s, and its preserve string and default JSON reload so', (input) => {
+      // pins the same stop keeping a word-space flag the definition sets itself
+      customCodes.push('OWNSTOP');
+      expect(BlissSVGBuilder.define({ OWNSTOP: { type: 'glyph', codeString: 'B291;C8', shrinksPrecedingWordSpace: true } }).defined).toEqual(['OWNSTOP']);
+      const builder = new BlissSVGBuilder(input);
+      expect(secondWordX(input)).toBe(12);
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
+      expect(secondWordX(builder.toJSON())).toBe(12);
+    });
+
+    it.each([
+      ['CARRIESIND:1/B10'], ['B9/CARRIESIND10:1'],
+    ])('reads an indicator named through an alias in a code string as an indicator in %s, keeping the digit kerning', (input) => {
+      // pins the count of a name's base parts resolving each part through an
+      // alias chain, as the layout does (2026-10 hand mutants)
+      customCodes.push('INDNAME', 'CARRIESIND', 'CARRIESIND10');
+      expect(BlissSVGBuilder.define({
+        INDNAME: { codeString: 'B86' },
+        CARRIESIND: { codeString: 'B9;INDNAME' },
+        CARRIESIND10: { codeString: 'B10;INDNAME' },
+      }).defined).toEqual(['INDNAME', 'CARRIESIND', 'CARRIESIND10']);
+      const builder = new BlissSVGBuilder(input);
+      expect(gapAfterFirst(input)).toBe(1);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('kerns a typed glyph by its own name where the kerning table of the character before it lists that name', () => {
+      // pins the own-name lookup ahead of the code the name draws, which the
+      // table does not list here (2026-10 hand mutants)
+      customCodes.push('LISTED313', 'LISTSNAME');
+      expect(BlissSVGBuilder.define({
+        LISTED313: { type: 'glyph', codeString: 'B313' },
+        LISTSNAME: { type: 'glyph', codeString: 'B9', kerningRules: { LISTED313: -1 } },
+      }).defined).toEqual(['LISTED313', 'LISTSNAME']);
+      expect(gapAfterFirst('LISTSNAME/LISTED313')).toBe(1);
+      expect(gapAfterFirst('LISTSNAME/B313')).toBe(2);
     });
 
     it('lets a kerning table the definition sets win over the digit it is made of, as the bare name does', () => {

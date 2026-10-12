@@ -176,9 +176,10 @@ export interface ElementSnapshot {
   readonly codeName: string;
   /**
    * The rendered Unicode character for an external glyph (e.g. `'a'` for
-   * `Xa`, `'α'` for `Xα`), also when the letter carries a part, a position
-   * or an option (`Xa;B86`, `Xa:1`), which keep its spacing too. `''` for
-   * B-codes, other composites, shape primitives, multi-character text
+   * `Xa`, `'α'` for `Xα`), also when the letter carries an indicator, a
+   * position or an option (`Xa;B86`, `Xa:1`), which keep its spacing too.
+   * `''` once a second base part makes it another character (`Xa;C8`), and
+   * for B-codes, other composites, shape primitives, multi-character text
    * fallback, and non-glyph levels.
    */
   readonly char: string;
@@ -266,9 +267,10 @@ export declare class ElementHandle {
 
   /**
    * The rendered Unicode character for an external glyph (e.g. `'a'` for
-   * `Xa`, `'α'` for `Xα`), also when the letter carries a part, a position
-   * or an option (`Xa;B86`, `Xa:1`), which keep its spacing too. `''` for
-   * B-codes, other composites, shape primitives, multi-character text
+   * `Xa`, `'α'` for `Xα`), also when the letter carries an indicator, a
+   * position or an option (`Xa;B86`, `Xa:1`), which keep its spacing too.
+   * `''` once a second base part makes it another character (`Xa;C8`), and
+   * for B-codes, other composites, shape primitives, multi-character text
    * fallback, and non-glyph levels.
    */
   readonly char: string;

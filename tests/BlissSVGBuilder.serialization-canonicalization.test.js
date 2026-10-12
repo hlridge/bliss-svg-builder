@@ -16,7 +16,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Uniform space runs (all default, all non-default) emitting what they
  *   already did.
  * - The punctuation boundary, where QSP is the default and TSP is the
- *   divergence, so the two spellings swap roles.
+ *   divergence, so the two spellings swap roles; before a word that mixes
+ *   punctuation with another character, TSP stays the default.
  * - A run of single external letters collapsing back to `Xword`, including
  *   behind a kerning marker and under a word-level `;;` overlay.
  * - Every element that keeps a run explicit: a coordinate, an option bracket at
@@ -130,6 +131,15 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('H/QSP/QSP/B4')).toBe('H///B4');
       expect(roundTrip('H/QSP/TSP/B4')).toEqual(INTACT);
       expect(roundTrip('H/TSP/QSP/B4')).toEqual(INTACT);
+    });
+
+    it('keeps TSP the default before a word that mixes punctuation with another character', () => {
+      // pins the `every` where the builder judges a stored space (the parser's
+      // twin is pinned in BlissParser.space-resolution.test.js): with `some`
+      // the default space reads as diverging and is written out
+      expect(serialized('H//B4/H')).toBe('H//B4/H');
+      expect(serialized('H/QSP/B4/H')).toBe('H/QSP/B4/H');
+      expect(roundTrip('H//B4/H')).toEqual(INTACT);
     });
   });
 

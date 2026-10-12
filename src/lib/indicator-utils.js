@@ -345,6 +345,24 @@ export function resolveIndicatorCodes(existingIndicatorCodes, newCodes, { stripS
 }
 
 /**
+ * How many base parts a character draws, its parts read as the element's
+ * layout reads them: the base parts first, then the indicators. An indicator
+ * is left out of the count only there, where the layout places it as an
+ * indicator; written before a part, it is drawn where it stands, an ordinary
+ * part of a character composed on the fly, and then every part counts. Reads
+ * only each part's `isIndicator`, so it serves a parsed part and a laid-out
+ * element alike.
+ *
+ * @param {Array<{isIndicator?: boolean}>} parts
+ * @returns {number}
+ */
+export function basePartCount(parts) {
+  const firstIndicator = parts.findIndex((part) => part.isIndicator);
+  if (firstIndicator === -1) return parts.length;
+  return parts.slice(firstIndicator).every((part) => part.isIndicator) ? firstIndicator : parts.length;
+}
+
+/**
  * Classify an indicator code's kind for introspection: 'semantic' when its
  * definition carries a semanticIndicator flag (e.g. THING), 'grammatical'
  * otherwise, or null when the definition cannot be resolved. The caller gates
