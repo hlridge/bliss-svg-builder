@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
 import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import {
-  resolveHeadIndex
+  resolveHeadIndex, headScanCode
 } from "./bliss-head-glyph-exclusions.js";
 import { resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
 import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
@@ -448,10 +448,16 @@ function firstBaseCode(codeString) {
   return coordinate && coordinate.index > 0 ? first.slice(0, coordinate.index) : first;
 }
 
+// The `;` parts of a code string, read as a part slot reads it: behind its
+// option brackets, an empty segment (as after a trailing `;`) adding no part.
+function partSegmentsOf(codeString) {
+  return slotBodyOf(codeString).split(';').filter((segment) => segment !== '');
+}
+
 // The code a code string of one part is made of, read as firstBaseCode reads
 // it; null when it holds several parts.
 function onlyCodeOf(codeString) {
-  const segments = slotBodyOf(codeString).split(';').filter((segment) => segment !== '');
+  const segments = partSegmentsOf(codeString);
   return segments.length === 1 ? firstBaseCode(segments[0]) : null;
 }
 
@@ -901,15 +907,16 @@ export class BlissParser {
 
         // Rule-3 automatic scan: skip exclusions from the start, stop at the
         // first non-excluded character, or pick by priority tier when the
-        // whole word is exclusions. Custom glyph identity (glyphCode) governs
-        // first: a custom glyph wrapping an exclusion is its own character,
-        // not that exclusion. Without an identity, _scanCode (the character
-        // code stashed at part creation) keeps exclusion matching immune to
-        // decorations written onto part strings by outer expansion levels.
-        const findFallbackHeadIndex = (parts) => {
-          const getCode = (i) => parts[i].glyphCode ?? parts[i]._scanCode ?? parts[i].part.split(';')[0];
-          return resolveHeadIndex(parts.map((_, i) => getCode(i)));
-        };
+        // whole word is exclusions. Each character is read by headScanCode, as
+        // the render reads it: a token of several `;` parts is never skipped,
+        // whatever code it names. A token of one part is matched by its own
+        // code first (glyphCode: a custom glyph wrapping an exclusion is its
+        // own character, not that exclusion); without one, _scanCode (the
+        // character code stashed at part creation) keeps exclusion matching
+        // immune to decorations written onto part strings by outer expansion
+        // levels.
+        const findFallbackHeadIndex = (parts) => resolveHeadIndex(parts.map((p) =>
+          headScanCode(p.glyphCode, partSegmentsOf(p.part).length, p._scanCode ?? p.part.split(';')[0])));
 
         // A space carries neither a designation nor a word indicator: TSP/
         // QSP/ZSA groups serialize as bare word breaks ('//'), so a `^` or

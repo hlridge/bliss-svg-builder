@@ -168,12 +168,14 @@ export const blissHeadGlyphExclusions = [
 
 /**
  * Head-scan code for one glyph: the value fed per-glyph to resolveHeadIndex.
- * A head-exclusion code (e.g. B486 "opposite-to") excludes only when it stands
- * alone as a single glyph; a fused multi-part character is a character, not a
- * leading operator, so it is non-excludable (returns undefined). A named glyph
- * (custom code or single built-in) is classified by its own identity code.
- * Shared by the builder render path and the element snapshot so the two
- * head-resolution sites cannot drift apart.
+ * A character is compared with the skip list only when it is one part. An
+ * indicator written on a skip-list character overrules the list for it, and a
+ * character fused from several base parts is not the character on the list,
+ * so either way a character of more than one part is never skipped, whatever
+ * code it is named by (returns undefined). A one-part character is matched by
+ * its own code (a custom glyph's or a single built-in's), else by its part's.
+ * Shared by the parser's scan, the builder's render and the element snapshot,
+ * so the three places that pick a word's head cannot drift apart.
  *
  * @param {string|undefined} identityCode - the glyph's own code (glyphCode / codeName), if any
  * @param {number} partCount - number of parts composing the glyph
@@ -182,9 +184,9 @@ export const blissHeadGlyphExclusions = [
  */
 // `||` (not `??`) is deliberate: an identity-less snapshot glyph carries
 // codeName === '' (an empty string, not nullish), which must fall through to
-// the part-count branch. `??` would return that bogus '' identity.
+// its part's code. `??` would return that bogus '' identity.
 export const headScanCode = (identityCode, partCount, firstPartCode) =>
-  identityCode || (partCount > 1 ? undefined : firstPartCode);
+  partCount > 1 ? undefined : (identityCode || firstPartCode);
 
 /**
  * Resolve which glyph index of a word is the fallback head, given each

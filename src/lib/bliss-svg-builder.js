@@ -16,11 +16,11 @@ import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js
 // load so BlissElement can clone it without importing BlissParser itself.
 const ERROR_PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].glyphs[0].parts;
 
-// Head-scan code for a raw blissObj glyph: a custom glyph's own identity, else
-// its base part's codeName when single-part. A fused multi-part character is a
-// character (not a leading operator), so an exclusion code among its parts does
-// not exclude it: headScanCode is the single source shared with the element
-// snapshot so the two query-time head sites stay in lockstep.
+// Head-scan code for a raw blissObj glyph: a glyph of several parts is never
+// skipped, whatever code it names; a glyph of one part is matched by its own
+// identity, else by its part's codeName. headScanCode is the single source
+// shared with the element snapshot and the parser's scan, so the three places
+// that pick a word's head stay in lockstep.
 const getHeadCode = (glyph) =>
   headScanCode(glyph.glyphCode, glyph.parts?.length ?? 0, glyph.parts?.[0]?.codeName);
 
@@ -1558,6 +1558,11 @@ class BlissSVGBuilder {
         // nothing, exactly like the reparse of the serialized form.
         if (headIndex === -1) continue;
         const head = group.glyphs[headIndex];
+        // Marked so the snapshot crowns the character the codes are drawn on.
+        // Re-resolved from the merged parts it could move: the head gains
+        // parts, so a skip-list character picked by priority would no longer
+        // be skipped (`B1060/B578;;B99` would crown B1060, B99 drawn on B578).
+        head.isHeadGlyph = true;
         // The overlay stores code STRINGS (SIB-2); this render-merge parse is
         // where a definition-baked misplacement (e.g. a global-only option
         // key inside an indicator definition) first becomes observable, so

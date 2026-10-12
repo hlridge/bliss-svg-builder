@@ -130,14 +130,15 @@ describe('BlissSVGBuilder portable head marker', () => {
       expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
     });
 
-    it('marks the head in the string only where the JSON names the merged character by its own code', () => {
-      // pins the JSON's reload read with each character's published code: the
-      // merged character is published as B937, which the head scan skips,
-      // while the string writes it as B937;B86, which the scan does not
+    it('heads the merged character of two parts alike in the string and the JSON, with no marker', () => {
+      // pins the part count read before the character's own code: the merged
+      // character is published as B937, which the head scan skips alone, but
+      // it holds B937 and B86, so neither save skips it, and B81 stays on it
+      // as the absorbed builder drew it
       const other = changed('PH_MORE/B291;;B81', (b) => b.glyph(0).applyIndicators('B86'));
       const builder = new BlissSVGBuilder('B291');
       builder.merge(other);
-      expect(builder.toString()).toBe('B291//B937;B86/B291^;;B81');
+      expect(builder.toString()).toBe('B291//B937;B86/B291;;B81');
       expect(builder.toJSON().groups[2].glyphs.map((glyph) => glyph.isHeadGlyph === true)).toEqual([false, false]);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);

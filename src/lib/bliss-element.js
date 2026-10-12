@@ -1152,8 +1152,10 @@ export class BlissElement {
 
     // For group elements (level 1): resolve isHeadGlyph so every word has exactly one.
     // The parser stamps only an explicit `^`/designation; an unmarked word's head
-    // is resolved here at query time (R15 WS-4) via the shared exclusion scan, so
-    // it stays correct after a structural mutation reorders the glyphs.
+    // is resolved here at query time via the shared exclusion scan (headScanCode),
+    // so it stays correct after a structural mutation reorders the glyphs. A word
+    // drawn with `;;` codes arrives marked: the render marks the character it
+    // merged them onto, whose merged parts would read differently here.
     if (this.#level === 1 && childSnapshots.length > 0) {
       const marked = childSnapshots.findIndex(c => c.isHeadGlyph);
       if (marked === -1) {

@@ -313,14 +313,11 @@ describe('BlissParser head-marker matrix', () => {
     it('heads an options-prefixed composite character', () => {
       // B486;B303 is one fused character, not a lone B486 operator, so the
       // [color=red] prefix decorates the composite head at index 0 (an exclusion
-      // code excludes only when it stands alone as a glyph).
-      // TRIPWIRE (findings RR3-2-5): the parser's findFallbackHeadIndex
-      // (bliss-parser.js ~L325) is the un-migrated 3rd resolveHeadIndex feeder —
-      // it still scans a composite as its first part. Unobservable today (the
-      // parser stamps no fallback head, so markedIndexes is []). If a future
-      // change re-stamps a parser fallback head, this composite would wrongly
-      // stamp index 1 and markedIndexes would stop being [] — migrate that feeder
-      // to headScanCode then so all three feeders share the one rule.
+      // code excludes only when it stands alone as a glyph). The parser's scan
+      // reads it by its part count as well (headScanCode, shared with the
+      // render and the snapshot). It stamps no fallback head, so markedIndexes
+      // stays []; where its scan stops shows before a predefined word that
+      // marks its own head, see `BlissSVGBuilder.head-selection-rule.test.js`.
       expect(markedIndexes(BlissParser.parse('[color=red]B486;B303/B291'))).toEqual([]);
       expect(crownIndex('[color=red]B486;B303/B291')).toBe(0);
     });

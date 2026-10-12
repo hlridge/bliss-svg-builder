@@ -5,12 +5,14 @@ import { headScanCode } from '../src/lib/bliss-head-glyph-exclusions.js';
  * Pins headScanCode: the per-glyph head-scan code that feeds resolveHeadIndex,
  * encoding the rule that a head-exclusion (e.g. B486 "opposite-to") excludes
  * only when it stands alone as a single glyph, never when combined with other
- * parts into one fused character. The single source of truth shared by the
- * builder render path and the element snapshot so the two cannot drift.
+ * parts into one character. The single source of truth shared by the parser's
+ * scan, the builder render path and the element snapshot so the three cannot
+ * drift.
  *
  * Covers:
- * - A named identity (custom glyph code or single built-in code) is returned
- *   verbatim, so the scan classifies the glyph by its own code.
+ * - A named identity (custom glyph code or single built-in code) on a glyph of
+ *   one part is returned verbatim, so the scan classifies the glyph by its own
+ *   code; on a glyph of several parts it is not read (returns undefined).
  * - A multi-part glyph with no identity returns undefined (non-excludable): a
  *   fused character is a character, not a leading operator.
  * - A single-part glyph with no identity returns that part's code, so a lone
@@ -24,12 +26,23 @@ import { headScanCode } from '../src/lib/bliss-head-glyph-exclusions.js';
  */
 describe('bliss-head-glyph-exclusions.headScanCode', () => {
   describe('when the glyph has a named identity', () => {
-    it('returns the identity code so the scan classifies by the glyph code', () => {
-      expect(headScanCode('MYG', 2, 'B486')).toBe('MYG');
+    it('returns undefined when the named glyph holds two parts, the part count read before the name', () => {
+      expect(headScanCode('MYG', 2, 'B486')).toBeUndefined();
     });
 
     it('prefers the identity over the first part on a single-part glyph', () => {
       expect(headScanCode('B486', 1, 'B486')).toBe('B486');
+    });
+  });
+
+  describe('when the glyph names a skip-list code and holds more than one part', () => {
+    it.each([
+      ['B449', 'an indicator of its own (B449;B81)'],
+      ['B486', 'a second base part (B486;B303)'],
+    ])('returns undefined for %s carrying %s, so its own code does not skip it', (code) => {
+      // pins the part count read before the glyph's own code (H chunk P1): a
+      // composition object can name the code on a character of several parts
+      expect(headScanCode(code, 2, code)).toBeUndefined();
     });
   });
 
