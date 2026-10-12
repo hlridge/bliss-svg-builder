@@ -73,9 +73,10 @@ export function resolveEffectiveDefinition(definition, definitions) {
  * Look up a code's effective definition: registry lookup (own properties
  * only) followed by pure-rename resolution. The single predicate source for
  * "is this code an indicator" across the `;;` store, the render-merge, and
- * the semantic classification helpers.
+ * the semantic classification helpers; also the custom glyph a recorded name
+ * stands for when an object is read back.
  */
-function lookupEffectiveDefinition(bareCode, definitions) {
+export function lookupEffectiveDefinition(bareCode, definitions) {
   const definition = Object.prototype.hasOwnProperty.call(definitions, bareCode)
     ? definitions[bareCode]
     : undefined;

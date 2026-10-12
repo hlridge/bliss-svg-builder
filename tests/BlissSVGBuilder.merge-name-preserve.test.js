@@ -18,8 +18,12 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Divergence guardrail: a merged glyph that no longer matches its
  *   definition's anatomy is written as its typed delta (`MYGL1;B81`, the
  *   name on the one part the definition is) instead of a stale name.
+ * - The merged character keeping its name where no one code draws the glyph,
+ *   and getting no name back once an edit has re-made it.
  *
  * Does NOT cover:
+ * - Which character of a merged word takes its `;;` codes, see
+ *   `BlissSVGBuilder.portable-head-marker.test.js`.
  * - Alias-over-typed-target precedence through merge (ALGL stays ALGL) and
  *   typed SHAPES through merge (no glyphCode identity; the parser-side
  *   recording carries them), see `BlissSVGBuilder.typed-name-preserve.test.js`.
@@ -129,6 +133,48 @@ describe('BlissSVGBuilder merge name preserve', () => {
       expect(saved).toBe('B208//MYGL1;B81');
       expect(new BlissSVGBuilder(saved).svgCode).toBe(host.svgCode);
       expect(host.toString()).toBe('B208//C8;B81');
+    });
+  });
+
+  describe('when the merged character is read back by its name', () => {
+    it('keeps the name of a glyph no one code draws (MYGLYPH), as the absorbed builder holds it', () => {
+      // regression: the deep JSON writes such a glyph by no code at all, so the
+      // merged character came in nameless, reporting no code and publishing
+      // the internal isBlissGlyph flag
+      defineGlyphFixtures();
+      const other = new BlissSVGBuilder('MYGLYPH');
+      const host = new BlissSVGBuilder('B208');
+      host.merge(other);
+      expect(host.group(1).glyph(0).codeName).toBe('MYGLYPH');
+      expect(host.toJSON().groups.at(-1)).toEqual(other.toJSON().groups[0]);
+    });
+
+    it('keeps the name of a glyph given an indicator before the merge (MYGL1 with B81)', () => {
+      // pins the name read from the part the glyph is, its first: the
+      // indicator is appended after it, and the glyph keeps its name
+      defineGlyphFixtures();
+      const other = new BlissSVGBuilder('MYGL1');
+      other.glyph(0).applyIndicators('B81');
+      const host = new BlissSVGBuilder('B208');
+      host.merge(other);
+      expect(other.glyph(0).codeName).toBe('MYGL1');
+      expect(host.group(1).glyph(0).codeName).toBe('MYGL1');
+      expect(host.toJSON().groups.at(-1)).toEqual(other.toJSON().groups[0]);
+    });
+
+    it('gives no name back to a character re-made from the glyph its alias names (MYALIAS)', () => {
+      // pins the recorded name believed only while the character is published
+      // whole: replacing its part clears its name and code, while the deep
+      // JSON still records MYALIAS, the name it was written as
+      defineGlyphFixtures();
+      defineAndTrack({ MYALIAS: { codeString: 'MYGL1' } });
+      const other = new BlissSVGBuilder('MYALIAS');
+      other.glyph(0).replacePart(0, 'MYGL1');
+      const host = new BlissSVGBuilder('B208');
+      host.merge(other);
+      expect(other.glyph(0).codeName).toBe('');
+      expect(host.group(1).glyph(0).codeName).toBe('');
+      expect(host.toJSON().groups.at(-1)).toEqual(other.toJSON().groups[0]);
     });
   });
 });

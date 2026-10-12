@@ -9,7 +9,7 @@ import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
-import { filterToIndicators, getBareCode, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
+import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
@@ -2670,7 +2670,8 @@ class BlissSVGBuilder {
 
   /**
    * Reverse toJSON() normalization for object input:
-   *  - Glyph level: codeName → glyphCode rename.
+   *  - Glyph level: codeName → glyphCode rename, after a custom glyph that
+   *    deep output names by another code gets its own name back.
    *  - Glyphs and parts: surface text-fallback form 'X<chars>' → internal
    *    routing key 'XTXT_<chars>' so BlissElement / parser routing works.
    * @param {Object[]} groups - Array of raw group objects
@@ -2681,6 +2682,8 @@ class BlissSVGBuilder {
     for (const group of groups) {
       if (!group.glyphs) continue;
       for (const glyph of group.glyphs) {
+        const recorded = BlissSVGBuilder.#recordedGlyphCode(glyph);
+        if (recorded) glyph.codeName = recorded;
         if (glyph.codeName && !glyph.glyphCode) {
           glyph.glyphCode = BlissSVGBuilder.#textFallbackInternalForm(glyph.codeName);
           delete glyph.codeName;
@@ -2694,6 +2697,26 @@ class BlissSVGBuilder {
         BlissSVGBuilder.#buildNamedDefinition(glyph, readings);
       }
     }
+  }
+
+  // The custom glyph a deep JSON names by another code, read back from the name
+  // recorded beside it. Deep output writes such a glyph by the code it draws, or
+  // by none where no one code draws it, and a word's head is chosen by that
+  // code, so read back under it the glyph could stop heading the word it headed
+  // (merge() re-ingests deep output). The record is a name kept through edits,
+  // so it is believed only while it still describes the character: published
+  // whole (an edit that recomposes a character clears that with its code) and
+  // holding, first, the one part the named glyph is.
+  static #recordedGlyphCode(glyph) {
+    if (glyph.isBlissGlyph !== true) return undefined;
+    const code = lookupEffectiveDefinition(glyph._aliasCodeName, blissElementDefinitions)?.glyphCode;
+    return BlissSVGBuilder.#isPartNamed(glyph.parts?.[0], code) ? code : undefined;
+  }
+
+  // Whether `part` is the one part a glyph named `code` is: named by it, or
+  // holding the code it resolved to with the name recorded beside it.
+  static #isPartNamed(part, code) {
+    return part?.codeName === code || part?._aliasCodeName === code;
   }
 
   // A character an object names by a custom definition, built as the DSL
@@ -2739,7 +2762,7 @@ class BlissSVGBuilder {
     // become that part, so it answers to the key the first of them was given.
     const [own] = reading.parts;
     const contents = own.parts ?? [{ codeName: own.codeName }];
-    const named = parts[0]?.codeName === code || parts[0]?._aliasCodeName === code;
+    const named = BlissSVGBuilder.#isPartNamed(parts[0], code);
     if (!named && !BlissSVGBuilder.#startsWithParts(parts, contents)) return;
     if (!named) {
       const part = structuredClone(own);

@@ -16,12 +16,16 @@
  *   word with no `;;` codes, the custom glyph after the head, a head of two
  *   codes (also placing a code by its anchor); a designation already stored,
  *   written as before; `preserve`; the flattened save.
- * - A word that came in through `merge()`, whose character holds the custom
- *   glyph under the code it draws: the head the render reads, unmarked in the
- *   default saves, marked under `preserve`.
+ * - A word that came in through `merge()`, or a deep JSON the constructor
+ *   reloads: the custom glyph keeps its name, so the word's `;;` codes stay
+ *   where the absorbed builder drew them, marked in the default saves as the
+ *   absorbed builder's are; a name the deep JSON records for a character
+ *   since re-made from another code is not given back to it.
  *
  * Does NOT cover:
  * - How the head is chosen, see `BlissParser.head-glyph.test.js`.
+ * - The name a merged custom glyph keeps where no head is at stake, see
+ *   `BlissSVGBuilder.merge-name-preserve.test.js`.
  * - Re-emitting a stored designation, see
  *   `BlissSVGBuilder.head-marker-round-trip.test.js`.
  * - A `;;` code placed by an anchored head, see
@@ -34,6 +38,7 @@ const FIXTURES = {
   PH_MORE: { type: 'glyph', codeString: 'B937' },
   PH_MOREANC: { type: 'glyph', codeString: 'B937', anchorOffsetY: 2 },
   PH_ANC: { type: 'glyph', codeString: 'B291', anchorOffsetY: 2 },
+  PH_ALIAS: { codeString: 'PH_MORE' },
 };
 
 beforeAll(() => {
@@ -114,20 +119,62 @@ describe('BlissSVGBuilder portable head marker', () => {
   });
 
   describe('when the word came in through merge()', () => {
-    it('saves B291 merged with PH_MOREANC/B291;;B99 by the head the merged builder draws on', () => {
-      // pins the head read from the stored word, as the render reads it: the
-      // merged character's own code is B937 while its part stays PH_MOREANC,
-      // so B99 is drawn on B291 (backlog row "`merge()` moves a word's `;;`
-      // indicators off a custom glyph that heads it"). Read from the save's
-      // own copy, the head was PH_MOREANC, and the string placed B99 by its
-      // anchor. Under preserve the name ranks as a head, so B291 is marked.
+    it('keeps B81 on the custom glyph heading the merged word, as the merged builder drew it', () => {
+      // regression (row 237): the merge read the custom glyph by the code it
+      // draws, B937, which the head scan skips, so B81 moved to B291
+      // (identical on v1.0.0)
       const builder = new BlissSVGBuilder('B291');
-      builder.merge(new BlissSVGBuilder('PH_MOREANC/B291;;B99'));
-      expect(builder.toString()).toBe('B291//B937/B291;;B99');
-      expect(builder.toString({ preserve: true })).toBe('B291//PH_MOREANC/B291^;;B99');
+      builder.merge(new BlissSVGBuilder('PH_MORE/B291;;B81'));
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291//PH_MORE/B291;;B81').svgCode);
+      expect(builder.toString()).toBe('B291//B937^/B291;;B81');
+      expect(builder.toString({ omitOptions: true })).toBe('B291//B937^/B291;;B81');
+      expect(builder.toString({ preserve: true })).toBe('B291//PH_MORE/B291;;B81');
+      expect(builder.toString({ flattenIndicators: true })).toBe('B291//B937;B81/B291');
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toString({ flattenIndicators: true })).svgCode).toBe(builder.svgCode);
+    });
+
+    it('saves B291 merged with PH_MOREANC/B291;;B99 by the head the merged builder draws on', () => {
+      // pins the head read from the stored word, as the render reads it: the
+      // merged character keeps PH_MOREANC, so B99 is drawn on it and placed by
+      // its anchor, as the absorbed builder drew it
+      const builder = new BlissSVGBuilder('B291');
+      builder.merge(new BlissSVGBuilder('PH_MOREANC/B291;;B99'));
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291//PH_MOREANC/B291;;B99').svgCode);
+      expect(builder.toString()).toBe('B291//B937^/B291;;B99:,2');
+      expect(builder.toString({ preserve: true })).toBe('B291//PH_MOREANC/B291;;B99');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
+    });
+
+    it('keeps B81 on the custom glyph PH_ALIAS names, merged as PH_ALIAS/B291;;B81', () => {
+      // pins the recorded name read through the alias it was written as: the
+      // deep JSON records PH_ALIAS, which names PH_MORE
+      const builder = new BlissSVGBuilder('B291');
+      builder.merge(new BlissSVGBuilder('PH_ALIAS/B291;;B81'));
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291//PH_ALIAS/B291;;B81').svgCode);
+      expect(builder.toString()).toBe('B291//B937^/B291;;B81');
+      expect(builder.toString({ preserve: true })).toBe('B291//PH_ALIAS/B291;;B81');
+    });
+
+    it('keeps B81 where the absorbed builder drew it after PH_ALIAS/B291;;B81 had its first character re-made from B937', () => {
+      // pins the recorded name believed only while the character still holds
+      // the part the named glyph is: the character no longer draws PH_MORE but
+      // B937, which the head scan skips, yet the deep JSON still records
+      // PH_ALIAS, the name it was written as
+      const other = changed('PH_ALIAS/B291;;B81', (b) => {
+        b.glyph(0).replacePart(0, 'B937');
+        b.glyph(0).clearIndicators();
+      });
+      const builder = new BlissSVGBuilder('B291');
+      builder.merge(other);
+      expect(other.svgCode).toBe(new BlissSVGBuilder('B937/B291;;B81').svgCode);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291//B937/B291;;B81').svgCode);
+      expect(builder.toJSON().groups.at(-1)).toEqual(other.toJSON().groups[0]);
+      expect(new BlissSVGBuilder(other.toJSON({ deep: true })).svgCode).toBe(other.svgCode);
     });
 
     it('heads the merged character of two parts alike in the string and the JSON, with no marker', () => {
@@ -142,6 +189,19 @@ describe('BlissSVGBuilder portable head marker', () => {
       expect(builder.toJSON().groups[2].glyphs.map((glyph) => glyph.isHeadGlyph === true)).toEqual([false, false]);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+  });
+
+  describe('when the constructor reloads the deep JSON merge() reads', () => {
+    it('keeps B81 on the custom glyph heading PH_MORE/B291;;B81, as drawn before', () => {
+      // the constructor reads a deep JSON with merge()'s own ingest, so it
+      // keeps the custom glyph the deep JSON names by the code it draws
+      const other = new BlissSVGBuilder('PH_MORE/B291;;B81');
+      const reloaded = new BlissSVGBuilder(other.toJSON({ deep: true }));
+      expect(reloaded.svgCode).toBe(other.svgCode);
+      expect(reloaded.toString()).toBe('B937^/B291;;B81');
+      expect(reloaded.toString({ preserve: true })).toBe('PH_MORE/B291;;B81');
+      expect(reloaded.toJSON()).toEqual(other.toJSON());
     });
   });
 
