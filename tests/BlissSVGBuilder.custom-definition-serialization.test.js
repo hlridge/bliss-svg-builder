@@ -97,7 +97,10 @@ describe('BlissSVGBuilder custom definition serialization', () => {
     it('bakes the preserved name onto the head under flattenIndicators', () => {
       defineMyind();
       const b = new BlissSVGBuilder('B291;;MYIND');
-      expect(b.toString()).toBe('B291;;MYIND');
+      // re-pinned (H chunk Task 5, 2026-10-12): the default string kept the
+      // name; a word-level list holds indicators only, so the circle is
+      // written on the head where it was drawn, as the flattened string does
+      expect(b.toString()).toBe('B291;C2:3');
       // re-pinned (C25 Task 4, 2026-10-08): the flattened string writes the
       // circle where it was drawn, since a reload reads `C2` as plain ink
       expect(b.toString({ flattenIndicators: true })).toBe('B291;C2:3');

@@ -137,12 +137,12 @@ describe('BlissSVGBuilder omit options edges', () => {
       expect(new BlissSVGBuilder(saved).svgCode).toBe(new BlissSVGBuilder('B291;;OE_OFFIND:2').svgCode);
     });
 
-    it('keeps a name whose definition has no spelling a word-level list accepts, colour and all', () => {
-      // control: passes before and after a definition's options became part
-      // of its code; written out, OE_RINGIND would be C2, which a ;; list
-      // refuses as not an indicator
+    it('writes a code a word-level list cannot hold spelled out on the head, colour and all', () => {
+      // re-pinned (H chunk Task 5, 2026-10-12): the save kept the name;
+      // written out, OE_RINGIND is C2, which a ;; list refuses as not an
+      // indicator, so the circle goes on the head with its definition's red
       const saved = withoutOptions('B291;;OE_RINGIND');
-      expect(saved).toBe('B291;;OE_RINGIND');
+      expect(saved).toBe('B291;[color=red]>C2:3');
       expect(new BlissSVGBuilder(saved).svgCode).toContain('stroke="red"');
     });
   });

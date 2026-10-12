@@ -3038,12 +3038,12 @@ class BlissSVGBuilder {
   toString(options = {}) {
     // toString always needs nested parts so serializeParts can decompose
     // custom codes. The string output itself stays flat (;-delimited).
-    const obj = this.toJSON({
+    const obj = this.#composition({
       preserve: options.preserve,
       deep: true,
       flattenIndicators: options.flattenIndicators,
       omitOptions: options.omitOptions,
-    });
+    }, true);
 
     const GLYPH_INTERNAL_KEYS = new Set(['relativeKerning', 'absoluteKerning']);
     // A code reads the same way throughout one save, so it is parsed once.
@@ -3377,6 +3377,14 @@ class BlissSVGBuilder {
    * @returns {Object} Plain object with groups/glyphs/options structure
    */
   toJSON(options = {}) {
+    return this.#composition(options, false);
+  }
+
+  // The composition toJSON() returns, or with `forString` the deep copy
+  // toString() writes from, in which a word is flattened where the default
+  // saves leave no code in its `;;` list, as in the public JSON. Other deep
+  // output, which merge() re-ingests, keeps the word as stored.
+  #composition(options, forString) {
     const obj = structuredClone(this.#rawBlissObj);
     // A custom name reads the same way throughout one save, so it is parsed once.
     const readings = new Map();
@@ -3516,9 +3524,13 @@ class BlissSVGBuilder {
         // R14: flattenIndicators bakes the word-level overlay onto the head as
         // character-level parts and drops the field, reproducing the pre-overlay
         // (primitive) serialization. Default keeps the overlay (resolved at
-        // render, re-emitted as `;;`).
+        // render, re-emitted as `;;`), except where the default saves would
+        // leave none of its codes in the list (#spellsOutOntoHeadAlone).
         // (An all-empty word keeps its unflattenable overlay: headIndex -1.)
-        const overlayHeadIndex = options.flattenIndicators && group.wordIndicators && group.glyphs?.length
+        const flattens = options.flattenIndicators
+          || (!options.preserve && (!options.deep || forString) && !!group.wordIndicators
+            && BlissSVGBuilder.#spellsOutOntoHeadAlone(group.wordIndicators.codes ?? [], readings));
+        const overlayHeadIndex = flattens && group.wordIndicators && group.glyphs?.length
           ? resolveOverlayHeadIndex(group.glyphs)
           : -1;
         if (overlayHeadIndex !== -1) {
@@ -4152,71 +4164,106 @@ class BlissSVGBuilder {
   // Returns `{ parts, codes }`: the parts as written, `codes` the overlay's
   // codes where they are written otherwise than stored, else null. Where
   // `spellsOutCodes`, the overlay's custom codes are spelled out
-  // (#spelledOutWordCodes) and kept as spelled where that places. One placement
-  // serves every character of the same structure in one save, which
-  // `readings` memoizes as it does the save's other readings: nothing that
-  // places a part can change during a save, and each save brings its own
-  // `readings` with its own `losesIndicator` and `spellsOutCodes`. The parts
-  // handed back are the caller's own, never the memo's.
+  // (#spelledOutWordCodes): the indicators they draw stay `;;` codes, and any
+  // plain part among them, which a `;;` list cannot hold, is written on the
+  // character after its base parts, so the codes left in the list still meet
+  // the character's own indicators as they did. One placement serves every
+  // character of the same structure in one save, which `readings` memoizes as
+  // it does the save's other readings: nothing that places a part can change
+  // during a save, and each save brings its own `readings` with its own
+  // `losesIndicator` and `spellsOutCodes`. The parts handed back are the
+  // caller's own, never the memo's.
   static #placedAsDrawn(original, spelled, sources, overlay, readings, losesIndicator, spellsOutCodes) {
     const memoKey = 'placement:' + JSON.stringify([original, overlay], (name, value) => (name === 'key' ? undefined : value));
     if (!readings.has(memoKey)) {
       const storedCodes = overlay?.codes ?? [];
       const wordCodes = spellsOutCodes ? BlissSVGBuilder.#spelledOutWordCodes(storedCodes, readings) : null;
-      const placed = BlissSVGBuilder.#placementOf(original, spelled, sources, overlay, losesIndicator, wordCodes);
+      const startCodes = wordCodes?.codes ?? storedCodes;
+      const origins = wordCodes?.origins ?? storedCodes.map((_, stored) => ({ stored, path: [0] }));
+      const toHead = wordCodes?.toHead ?? [];
+      const at = toHead.length > 0 ? BlissSVGBuilder.#indicatorsStartIn(spelled) : spelled.length;
+      const written = [
+        ...spelled.slice(0, at).map((part, index) => ({ part, source: sources[index] })),
+        ...toHead.map(({ part, stored, path }) => ({ part, origin: { stored, path } })),
+        ...spelled.slice(at).map((part, index) => ({ part, source: sources[at + index] })),
+      ];
+      const placed = BlissSVGBuilder.#placementOf(original, written, overlay, losesIndicator, startCodes, origins);
+      const parts = placed?.parts ?? written.map(({ part }) => part);
+      const codes = placed?.codes ?? startCodes;
       readings.set(memoKey, {
-        moves: placed?.parts.map((part, index) => {
+        moves: spelled.map((part, index) => {
+          const placedPart = parts[index < at ? index : index + toHead.length];
           const move = {};
-          if (part.x !== spelled[index].x) move.x = part.x;
-          if (part.y !== spelled[index].y) move.y = part.y;
+          if (placedPart.x !== part.x) move.x = placedPart.x;
+          if (placedPart.y !== part.y) move.y = placedPart.y;
           return Object.keys(move).length > 0 ? move : null;
         }),
-        codes: placed && placed.codes.some((code, index) => code !== storedCodes[index]) ? placed.codes : null,
+        inserted: { at, parts: parts.slice(at, at + toHead.length) },
+        codes: codes.length !== storedCodes.length || codes.some((code, index) => code !== storedCodes[index]) ? codes : null,
       });
     }
-    const { moves, codes } = readings.get(memoKey);
+    const { moves, inserted, codes } = readings.get(memoKey);
+    const movedParts = spelled.map((part, index) => (moves[index] ? { ...part, ...moves[index] } : part));
     return {
-      parts: moves ? spelled.map((part, index) => (moves[index] ? { ...part, ...moves[index] } : part)) : spelled,
+      parts: [...movedParts.slice(0, inserted.at), ...inserted.parts.map((part) => structuredClone(part)),
+        ...movedParts.slice(inserted.at)],
       codes,
     };
   }
 
-  // The placement, or null where none is found, and the character is then
-  // written as if none were needed. The builder's character is laid out once;
-  // the written parts are read back and compared in rounds, because a position
-  // written on a base part moves the centring of every indicator over it, so
-  // one write can move another part. A placement is kept only from a round in
-  // which every part and code it can match to the builder's drawing is drawn
-  // where the builder drew it. One still moving after the last round is no
-  // placement at all: the last guess is unverified, and where the rounds chase
-  // each other (a part left of the character's start re-origins every part)
-  // it has moved the base off its own position.
+  // Where a character's spelled-out parts start its indicators, as a reload
+  // reads them: the first part after the first (the base, whatever it is)
+  // whose code draws an indicator, or the end.
+  static #indicatorsStartIn(parts) {
+    const start = parts.findIndex((part, index) => index > 0
+      && blissElementDefinitions[part.codeName]?.isIndicator === true);
+    return start === -1 ? parts.length : start;
+  }
+
+  // Where a save writes a character's parts and its word's `;;` codes so a
+  // reload draws them as the builder did. The builder's character is laid
+  // out once; the written parts are read back and compared in rounds,
+  // because a position written on a base part moves the centring of every
+  // indicator over it, so one write can move another part. A placement is
+  // kept only from a round in which every part and code it can match to the
+  // builder's drawing is drawn where the builder drew it. One still moving
+  // after the last round is no placement at all: the last guess is
+  // unverified, and where the rounds chase each other (a part left of the
+  // character's start re-origins every part) it has moved the base off its
+  // own position.
   //
-  // A written part is matched to what it stands for in the builder's
-  // character: the stored node it was spelled out of (through `sources`), the
-  // `;;` code merged onto it, or the semantic root the merge keeps. Both are
-  // compared at their first leaf, the ink: a composite's frame moves as it
-  // re-origins its parts, its ink does not.
+  // `written` lists the parts in the order the save writes them, each with
+  // what it stands for in the builder's character: `source`, the path to the
+  // stored node it was spelled out of (see #spelledOutParts), or `origin`, the
+  // place inside one of the word's `;;` codes of a plain part taken off it
+  // (see #spelledOutWordCodes). `startCodes` are the overlay's codes as the
+  // save writes them, `origins[k]` the stored code written code k comes from
+  // and the path to it inside that code's node. A written part or code is
+  // compared with what it stands for, or with the semantic root the merge
+  // keeps, at their first leaf, the ink: a composite's frame moves as it
+  // re-origins its parts, its ink does not. A part the word's `;;` codes
+  // replaced is not drawn, so it is placed where the character draws it
+  // without them, as it shows once they are cleared.
   //
   // The comparison is made in the character's own frame, so it cannot see a
   // written part move the frame itself. A part `losesIndicator` names is read
   // back as plain ink, which the layout counts as base, so a placement is kept
   // only where each such part the builder drew lies inside the base it drew
-  // (#leavesBaseSpan). One the word's `;;` codes replaced is not drawn at all,
-  // so it is not judged: the reload draws it wherever it is written.
+  // (#leavesBaseSpan); else the character keeps the spelling it always had.
+  // One the codes replaced is not judged: the builder did not draw it, and a
+  // reload does wherever it is written. Nor is a part taken off a code, which
+  // has no other spelling: where the builder drew it is the nearest a reload
+  // can come.
   //
-  // `wordCodes`, the overlay's codes spelled out (#spelledOutWordCodes), are
-  // tried first, and kept only where the reload's merge also resolves the
-  // codes against the character as the builder's did (#resolutionOf): the
-  // merge meets a head part by its code, and the semantic root goes first or
-  // last by what the codes are, so a code spelled out can reuse a part the
-  // name replaced, or move the root. No position moves a part back into
-  // another role, so there the stored codes are written, names and all, as
-  // they always were.
-  static #placementOf(original, spelled, sources, overlay, losesIndicator, wordCodes = null) {
-    if (spelled.some((part) => !part.codeName || part.errorCode)) return null;
-    const storedCodes = overlay?.codes ?? [];
-    const drawnHead = BlissSVGBuilder.#headMergedWith(original, overlay, storedCodes);
+  // The codes are placed as written, whether or not a reload's merge meets
+  // the character's own parts with them as the builder's did (a code spelled
+  // out can reuse a part a name replaced, or move the semantic root): the
+  // default saves never write a custom name. Returns `{ parts, codes }`, or
+  // null where no placement is found, and the caller writes the parts and
+  // codes as spelled.
+  static #placementOf(original, written, overlay, losesIndicator, startCodes, origins) {
+    if (written.some(({ part }) => !part.codeName || part.errorCode)) return null;
+    const drawnHead = BlissSVGBuilder.#headMergedWith(original, overlay, overlay?.codes ?? []);
     const drawn = BlissSVGBuilder.#characterLayout(drawnHead.parts);
     if (!drawn) return null;
     const drawnParts = new Map();
@@ -4229,6 +4276,8 @@ class BlissSVGBuilder {
       if (role.code !== undefined) drawnCodes.set(role.code, child);
       if (role.root) drawnRoot = child;
     });
+    const replaced = new Set(drawnHead.replaced);
+    const undrawn = replaced.size > 0 ? BlissSVGBuilder.#characterLayout(original) : null;
     // The drawn node `steps` down from `node`. A `null` step leads into a
     // part that was never stored, where nothing can be found.
     const drawnBelow = (node, steps) => {
@@ -4237,72 +4286,65 @@ class BlissSVGBuilder {
       for (const step of steps) found = found?.children[step];
       return found;
     };
-    const drawnAt = (path) => drawnBelow(drawnParts.get(path[0]), path.slice(1));
     const drawnOfCode = ({ stored, path }) => drawnBelow(drawnCodes.get(stored), path.slice(1));
-    const differs = (value) => Math.abs(value) > 1e-9;
-    // The rounds for one way of writing the overlay's codes, `startCodes`:
-    // `origins[k]` is the stored code written code k comes from, and the path
-    // to it inside that code's node. Returns the settled parts and codes with
-    // the reload's merged character, or null.
-    const settle = (startCodes, origins) => {
-      let parts = spelled;
-      let codes = startCodes;
-      for (let round = 0; round < 5; round++) {
-        const read = BlissSVGBuilder.#writtenPartsReadBack(parts);
-        if (!read) return null;
-        const reloadHead = BlissSVGBuilder.#headMergedWith(read, overlay, codes);
-        const reload = BlissSVGBuilder.#characterLayout(reloadHead.parts);
-        if (!reload) return null;
-        const layoutPlacesIndicators = BlissSVGBuilder.#layoutPlacesIndicators(reload.children);
-        const nextParts = [...parts];
-        const nextCodes = [...codes];
-        let moved = false;
-        reloadHead.roles.forEach((role, index) => {
-          const child = reload.children[index];
-          const target = role.part !== undefined ? drawnAt(sources[role.part])
-            : role.code !== undefined ? drawnOfCode(origins[role.code])
-              : drawnRoot;
-          if (!target) return;
-          const want = BlissSVGBuilder.#firstLeafOf(target);
-          const have = BlissSVGBuilder.#firstLeafOf(child);
-          const delta = { x: want.x - have.x, y: want.y - have.y };
-          if (!differs(delta.x) && !differs(delta.y)) return;
-          // A coordinate on an indicator the layout places is absolute in the
-          // character, so the drawn position is where the layout put its frame
-          // plus the difference; any other part sits at its written position.
-          const partIndex = role.part ?? role.reused;
-          const writtenAt = partIndex !== undefined ? parts[partIndex]
-            : role.code !== undefined ? BlissSVGBuilder.#wordCodeReading(codes[role.code]) : undefined;
-          if (!writtenAt) return;
-          const move = {};
-          for (const [axis, offset] of [['x', child.offsetX], ['y', child.offsetY]]) {
-            if (differs(delta[axis])) {
-              move[axis] = (child.isIndicator && layoutPlacesIndicators ? offset : (writtenAt[axis] ?? 0)) + delta[axis];
-            }
-          }
-          if (partIndex !== undefined) {
-            nextParts[partIndex] = { ...parts[partIndex], ...move };
-          } else {
-            nextCodes[role.code] = BlissSVGBuilder.#wordCodeAt(codes[role.code], { x: writtenAt.x, y: writtenAt.y, ...move });
-          }
-          moved = true;
-        });
-        if (!moved) {
-          const plainInk = parts.flatMap((part, index) => (losesIndicator(part) ? [drawnAt(sources[index])] : []));
-          return BlissSVGBuilder.#leavesBaseSpan(drawn, plainInk.filter(Boolean)) ? null : { parts, codes, head: reloadHead };
-        }
-        parts = nextParts;
-        codes = nextCodes;
-      }
-      return null;
+    const replacedAt = (index) => written[index].source !== undefined && replaced.has(written[index].source[0]);
+    const drawnOfPart = (index) => {
+      const { source, origin } = written[index];
+      if (origin) return drawnOfCode(origin);
+      return drawnBelow(replacedAt(index) ? undrawn?.children[source[0]] : drawnParts.get(source[0]), source.slice(1));
     };
-    if (wordCodes) {
-      const placed = settle(wordCodes.codes, wordCodes.origins);
-      const resolution = placed && BlissSVGBuilder.#resolutionOf(placed.head,
-        (index) => sources[index][0], (index) => wordCodes.origins[index].stored);
-      if (resolution === BlissSVGBuilder.#resolutionOf(drawnHead)) return placed;
+    const differs = (value) => Math.abs(value) > 1e-9;
+    let parts = written.map(({ part }) => part);
+    let codes = startCodes;
+    for (let round = 0; round < 5; round++) {
+      const read = BlissSVGBuilder.#writtenPartsReadBack(parts);
+      if (!read) return null;
+      const reloadHead = BlissSVGBuilder.#headMergedWith(read, overlay, codes);
+      const reload = BlissSVGBuilder.#characterLayout(reloadHead.parts);
+      if (!reload) return null;
+      const layoutPlacesIndicators = BlissSVGBuilder.#layoutPlacesIndicators(reload.children);
+      const nextParts = [...parts];
+      const nextCodes = [...codes];
+      let moved = false;
+      reloadHead.roles.forEach((role, index) => {
+        const child = reload.children[index];
+        const target = role.part !== undefined ? drawnOfPart(role.part)
+          : role.code !== undefined ? drawnOfCode(origins[role.code])
+            : drawnRoot;
+        if (!target) return;
+        const want = BlissSVGBuilder.#firstLeafOf(target);
+        const have = BlissSVGBuilder.#firstLeafOf(child);
+        const delta = { x: want.x - have.x, y: want.y - have.y };
+        if (!differs(delta.x) && !differs(delta.y)) return;
+        // A coordinate on an indicator the layout places is absolute in the
+        // character, so the drawn position is where the layout put its frame
+        // plus the difference; any other part sits at its written position.
+        const partIndex = role.part ?? role.reused;
+        const writtenAt = partIndex !== undefined ? parts[partIndex]
+          : role.code !== undefined ? BlissSVGBuilder.#wordCodeReading(codes[role.code]) : undefined;
+        if (!writtenAt) return;
+        const move = {};
+        for (const [axis, offset] of [['x', child.offsetX], ['y', child.offsetY]]) {
+          if (differs(delta[axis])) {
+            move[axis] = (child.isIndicator && layoutPlacesIndicators ? offset : (writtenAt[axis] ?? 0)) + delta[axis];
+          }
+        }
+        if (partIndex !== undefined) {
+          nextParts[partIndex] = { ...parts[partIndex], ...move };
+        } else {
+          nextCodes[role.code] = BlissSVGBuilder.#wordCodeAt(codes[role.code], { x: writtenAt.x, y: writtenAt.y, ...move });
+        }
+        moved = true;
+      });
+      if (!moved) {
+        const plainInk = written.flatMap(({ part }, index) =>
+          (losesIndicator(part) && !replacedAt(index) ? [drawnOfPart(index)] : []));
+        return BlissSVGBuilder.#leavesBaseSpan(drawn, plainInk.filter(Boolean)) ? null : { parts, codes };
+      }
+      parts = nextParts;
+      codes = nextCodes;
     }
-    return settle(storedCodes, storedCodes.map((_, stored) => ({ stored, path: [0] })));
+    return null;
   }
 
   // Whether any of `nodes`, drawn in the character `drawn`, lies outside the
@@ -4349,23 +4391,6 @@ class BlissSVGBuilder {
     return { parts: merged, roles, replaced };
   }
 
-  // How a character merged with its word's `;;` codes resolves them, as text
-  // two merges compare by: each merged part named by what it stands for
-  // (`part i`, `code k`, `root`, with `on part i` where the merge reused that
-  // part for it), in order, then the parts the codes replaced. `partOf` and
-  // `codeOf` give the stored part or code a written one comes from, so a
-  // reload's merge reads in the builder's terms, and a stored part or code
-  // written as several reads as one.
-  static #resolutionOf(head, partOf = (index) => index, codeOf = (index) => index) {
-    const names = [];
-    for (const role of head.roles) {
-      const stands = role.part !== undefined ? `part ${partOf(role.part)}` : role.root ? 'root' : `code ${codeOf(role.code)}`;
-      const name = role.reused !== undefined ? `${stands} on part ${partOf(role.reused)}` : stands;
-      if (names.at(-1) !== name) names.push(name);
-    }
-    return JSON.stringify([names, [...new Set(head.replaced.map(partOf))]]);
-  }
-
   // A character of `parts` laid out as the renderer lays one out: its
   // snapshot, or null where a part cannot be drawn. The spacing between
   // characters cannot reach inside one, so its values do not matter here.
@@ -4410,41 +4435,73 @@ class BlissSVGBuilder {
   }
 
   // A word's stored `;;` codes as the default saves write them: a code named
-  // by a custom definition is spelled out as a part named by one is
-  // (#spelledOutParts), from the part the overlay draws for it, into the
-  // built-in indicator codes it draws, each with that part's options (less
-  // what its own code brings) and its position. A code that would spell out
-  // into anything else keeps its name, as it always did: a `;;` list holds
-  // indicators only, so a plain shape or a compound holding one has no
-  // spelling there, nor does an instance without the definition read a code
-  // drawn by its own function.
+  // by a custom definition is spelled out (#wordCodeSpelling), each indicator
+  // it draws written as a `;;` code with that part's options (less what its
+  // own code brings) and its position. A plain part among them is taken off
+  // the list, which holds indicators only, to be written on the word's head
+  // as a plain part (in the JSON too: there an indicator flag would let the
+  // codes left in the list replace it). A code with no built-in spelling
+  // keeps its name: no built-in code draws what its own function draws, and a
+  // definition removed since the build has nothing left to spell.
   //
-  // Returns `{ codes, origins }`, `origins[k]` naming where written code k
-  // comes from: `stored`, the stored code's index, and `path`, the way to it
-  // inside the part that code draws (`[0]` for that part itself; see
-  // #spelledOutParts). Null where no code is spelled out.
+  // Returns `{ codes, origins, toHead }`, `origins[k]` naming where written
+  // code k comes from: `stored`, the stored code's index, and `path`, the way
+  // to it inside the part that code draws (`[0]` for that part itself; see
+  // #spelledOutParts); `toHead` the parts taken off, each with its `stored`
+  // and `path`. Null where no code is spelled out.
   static #spelledOutWordCodes(codes, readings) {
     const written = [];
     const origins = [];
+    const toHead = [];
     let spelledOut = false;
     codes.forEach((code, stored) => {
-      const node = builtInCodes.has(getBareCode(code)) ? undefined : BlissSVGBuilder.#wordCodeReading(code);
-      const sources = [];
-      const parts = node ? BlissSVGBuilder.#spelledOutParts([node], () => false, readings, sources) : [];
-      const writable = parts.length > 0 && parts.every((part) => builtInCodes.has(part.codeName)
-        && blissElementDefinitions[part.codeName].isIndicator === true);
-      if (!writable) {
+      const spelling = BlissSVGBuilder.#wordCodeSpelling(code, readings);
+      if (!spelling) {
         written.push(code);
         origins.push({ stored, path: [0] });
         return;
       }
-      parts.forEach((part, index) => {
-        written.push(BlissSVGBuilder.#wordCodeText(part, readings));
-        origins.push({ stored, path: sources[index] });
+      spelling.parts.forEach((part, index) => {
+        const path = spelling.sources[index];
+        if (blissElementDefinitions[part.codeName].isIndicator === true) {
+          written.push(BlissSVGBuilder.#wordCodeText(part, readings));
+          origins.push({ stored, path });
+        } else {
+          const plain = { ...part };
+          delete plain.isIndicator;
+          toHead.push({ part: plain, stored, path });
+        }
       });
       spelledOut = true;
     });
-    return spelledOut ? { codes: written, origins } : null;
+    return spelledOut ? { codes: written, origins, toHead } : null;
+  }
+
+  // A stored `;;` code named by a custom definition, spelled out as a part
+  // named by one is (#spelledOutParts), from the part the overlay draws for
+  // it: `{ parts, sources }`, `sources[i]` the way to part i inside that part.
+  // Null for a built-in code, which is written as stored, and for a code that
+  // spells out into anything but built-in codes.
+  static #wordCodeSpelling(code, readings) {
+    if (builtInCodes.has(getBareCode(code))) return null;
+    const node = BlissSVGBuilder.#wordCodeReading(code);
+    if (!node) return null;
+    const sources = [];
+    const parts = BlissSVGBuilder.#spelledOutParts([node], () => false, readings, sources);
+    return parts.length > 0 && parts.every((part) => builtInCodes.has(part.codeName)) ? { parts, sources } : null;
+  }
+
+  // Whether the default saves take every one of a word's `;;` codes off its
+  // list, each spelling out into plain parts alone (#spelledOutWordCodes).
+  // Such a word is written as the flattened save writes it: with no code left
+  // in the list, nothing would replace the head's own indicators or drop its
+  // semantic root on reload as the codes did.
+  static #spellsOutOntoHeadAlone(codes, readings) {
+    return codes.length > 0 && codes.every((code) => {
+      const spelling = BlissSVGBuilder.#wordCodeSpelling(code, readings);
+      return spelling !== null
+        && spelling.parts.every((part) => blissElementDefinitions[part.codeName].isIndicator !== true);
+    });
   }
 
   // One spelled-out part written as a `;;` code: its options as a part

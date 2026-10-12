@@ -23,16 +23,18 @@
  *   after it: placed, yet the next character reloads elsewhere, since the
  *   plain shape changes how far the character advances (the same residue).
  * - A compound indicator after the shape, placed while the shape stays put.
- * - The shape on a word's head that the word's `;;` codes replace: the string
- *   written as before, its reload still drawn differently, the JSON reloading
- *   as drawn (backlog: "A word's `;;` overlay resolves against a head part a
- *   portable save spelled out", the residue its fourth case keeps).
+ * - The shape on a word's head that the word's `;;` codes replace: written
+ *   where it shows without them, its reload still drawn differently (as a
+ *   plain part the codes no longer replace it), the JSON reloading as drawn
+ *   (backlog: "A word's `;;` overlay resolves against a head part a portable
+ *   save spelled out", the residue its fourth case keeps); written where it
+ *   shows even where it overhangs its base.
  * - Controls: a position the author wrote, the shape written alone, and the
- *   `;;` form's default string, which keeps the name.
+ *   `;;` form's default string, the shape written on the head.
  *
  * Does NOT cover:
- * - The `;;` form's default saves keeping the name, a word-level list holding
- *   no plain shape, see `BlissSVGBuilder.portable-word-indicators.test.js`.
+ * - The `;;` form's other default saves, a word-level list holding no plain
+ *   shape, see `BlissSVGBuilder.portable-word-indicators.test.js`.
  * - `preserve` keeping the name, see
  *   `BlissSVGBuilder.custom-definition-serialization.test.js`.
  */
@@ -186,17 +188,24 @@ describe('BlissSVGBuilder portable shape indicators', () => {
     it.each([
       ['B291;PS_RING;;B81', 'B291;PS_RING;;B81', () => {}],
       ['B291;PS_RING given B81 by group(0).applyIndicators', 'B291;PS_RING', (b) => b.group(0).applyIndicators('B81')],
-    ])('saves %s as B291;C2;;B81, as before, its reload still drawn differently', (_label, input, change) => {
-      // control: passes before C25. Pins the residue of backlog row "A word's
-      // ;; overlay resolves against a head part a portable save spelled out"
-      // (its fourth case): the builder replaces the shape with B81, while a
-      // reload reads C2 as a plain part the overlay keeps.
-      // pins the string looking for the word's head where only such a shape
-      // is placed (else C2 is placed as if alone, B291;C2:3;;B81), and the
-      // span guard leaving a part the drawing does not hold unjudged
+    ])('saves %s as B291;C2:3;;B81, the shape where it shows, its reload still drawn differently', (_label, input, change) => {
+      // re-pinned (H chunk Task 5, 2026-10-12): the string wrote C2 with no
+      // position; it now writes it where the character draws it without the
+      // word's codes. Pins the residue of backlog row "A word's ;; overlay
+      // resolves against a head part a portable save spelled out" (its fourth
+      // case): the builder replaces the shape with B81, while a reload reads
+      // C2 as a plain part the overlay keeps
       const builder = changed(input, change);
-      expect(builder.toString()).toBe('B291;C2;;B81');
+      expect(builder.toString()).toBe('B291;C2:3;;B81');
       expect(new BlissSVGBuilder(builder.toString()).svgCode).not.toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('saves B1;PS_RING;;B81 as B1;C2:-1;;B81:-1, the shape where it shows though it overhangs the base', () => {
+      // pins a replaced shape left out of the span guard: the builder does not
+      // draw it, so it is written where it shows without the word's codes
+      const builder = new BlissSVGBuilder('B1;PS_RING;;B81');
+      expect(builder.toString()).toBe('B1;C2:-1;;B81:-1');
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
     });
   });
@@ -212,7 +221,7 @@ describe('BlissSVGBuilder portable shape indicators', () => {
     });
   });
 
-  describe('when the string already draws the shape where it was drawn, or keeps its name', () => {
+  describe('when the string already draws the shape where it was drawn, or writes a word-level shape on the head', () => {
     it.each([
       ['B291;PS_RING:1,0', 'B291;C2:1,0'],
       ['PS_RING', 'C2'],
@@ -223,10 +232,11 @@ describe('BlissSVGBuilder portable shape indicators', () => {
       expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
     });
 
-    it('keeps the name in the default string of B291;;PS_RING', () => {
-      // control: passes before C25; a word-level list holds no plain shape
+    it('writes the shape of B291;;PS_RING on the head where it was drawn, in the default string', () => {
+      // re-pinned (H chunk Task 5, 2026-10-12): the string kept the name; a
+      // word-level list holds no plain shape, so the shape goes to the head
       const builder = new BlissSVGBuilder('B291;;PS_RING');
-      expect(builder.toString()).toBe('B291;;PS_RING');
+      expect(builder.toString()).toBe('B291;C2:3');
       expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
     });
   });
