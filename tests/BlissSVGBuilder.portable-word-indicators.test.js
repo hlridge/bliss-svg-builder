@@ -23,10 +23,11 @@
  *   parts otherwise (the semantic root reordered, a head part reused, a part
  *   the head's own compound is written as reused), still written where it
  *   was drawn, and one whose definition was removed after the build.
- * - Today's behaviour where a head's own custom indicator meets the word's
- *   codes (backlog: "A word's `;;` overlay resolves against a head part a
- *   portable save spelled out"): `preserve` reloads as drawn, the default
- *   string does not.
+ * - Where a head's own custom indicator meets the word's codes (backlog: "A
+ *   word's `;;` overlay resolves against a head part a portable save spelled
+ *   out"): a name of one code is reused as that code, so the default string
+ *   reloads as drawn; a compound of several codes is replaced whole, and
+ *   only `preserve` reloads as drawn.
  *
  * Does NOT cover:
  * - A built-in `;;` code placed by an anchored glyph, see
@@ -242,15 +243,26 @@ describe('BlissSVGBuilder portable word indicators', () => {
   });
 
   describe('when a head\'s own custom indicator meets the word\'s codes', () => {
-    it.each(['B291;PW_BAKED', 'B291;PW_RED', 'PW_BAKED'])(
+    it.each(['B291;PW_BAKED', 'PW_BAKED'])(
       'reloads %s given B81 by group(0).applyIndicators as drawn from preserve, not from the default string', (input) => {
         // control: passes before C25. Pins backlog row "A word's `;;` overlay
         // resolves against a head part a portable save spelled out": the
-        // word's codes meet the head's parts by code, so the spelled-out parts
-        // resolve otherwise, which no written position changes
+        // word's codes replace a compound of several codes whole, while its
+        // spelled-out parts meet them one by one, which no written position
+        // changes
         const builder = changed(input, (b) => b.group(0).applyIndicators('B81'));
         expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
         expect(new BlissSVGBuilder(builder.toString()).svgCode).not.toBe(builder.svgCode);
       });
+
+    it('reloads B291;PW_RED given B81 by group(0).applyIndicators as drawn from preserve and from the default string', () => {
+      // re-pinned (H chunk Task 5, 2026-10-12): the word's B81 now reuses the
+      // head's red B81 written through a name, as it reuses [color=red]>B81,
+      // so the spelled-out string reloads as drawn
+      const builder = changed('B291;PW_RED', (b) => b.group(0).applyIndicators('B81'));
+      expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+      expect(builder.svgCode).toContain('stroke="red"');
+    });
   });
 });

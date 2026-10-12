@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
@@ -26,6 +26,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Fused-character head: a multi-part composite leading a word is the head
  *   (a head-exclusion code excludes only as a lone glyph), and both
  *   head-resolution copies (render merge and the isHeadGlyph flag) agree.
+ * - A head indicator written through a defined name meeting the same code at
+ *   word level: a name of one code is reused as that code, keeping its place
+ *   and colour (the semantic root the merge keeps, and a typed indicator
+ *   placed by an anchor of its own, included); a definition drawn from
+ *   several codes is replaced whole.
  *
  * Does NOT cover:
  * - Parser store shape and head targeting, see
@@ -186,6 +191,62 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
       const fresh = new BlissSVGBuilder('B303/B233/H^;;B97');
       expect(mutated.svgCode).toBe(fresh.svgCode);
       expect(mutated.toString()).toBe('B303/B233/H^;;B97');
+    });
+  });
+
+  describe('when the head carries an indicator through a defined name', () => {
+    const NAMES = {
+      WO_ACT: { codeString: 'B81' },
+      WO_TACT: { type: 'glyph', isIndicator: true, codeString: 'B81' },
+      WO_RED: { codeString: 'B81', defaultOptions: { color: 'red' } },
+      WO_BAKED: { type: 'glyph', isIndicator: true, codeString: 'B97;B99:3,0' },
+      WO_THING: { codeString: 'B97' },
+      WO_IANCX: { type: 'glyph', isIndicator: true, codeString: 'B86', anchorOffsetX: 0.5 },
+      WO_REDBRK: { codeString: '[color=red]B81' },
+    };
+    beforeAll(() => {
+      const { defined, errors } = BlissSVGBuilder.define(NAMES);
+      expect(errors).toEqual([]);
+      expect(defined).toEqual(Object.keys(NAMES));
+    });
+    afterAll(() => Object.keys(NAMES).forEach((code) => BlissSVGBuilder.removeDefinition(code)));
+
+    it.each([
+      ['a bare alias of B81 moved to x 1', 'B291;WO_ACT:1;;B81', 'B291;B81:1;;B81'],
+      ['a typed indicator drawing B81 moved to x 1', 'B291;WO_TACT:1;;B81', 'B291;B81:1;;B81'],
+      ['a bare alias of B81 in red', 'B291;WO_RED;;B81', 'B291;[color=red]>B81;;B81'],
+    ])('reuses %s as the one code it names (%s draws as %s)', (_label, input, writtenOut) => {
+      // regression (H chunk F3): the keep-or-replace step read a name through
+      // its definition, while the reuse step compared the written name, so
+      // the word's B81 replaced the head's own and lost its place or colour
+      // (identical on v1.0.0)
+      expect(new BlissSVGBuilder(writtenOut).svgCode).not.toBe(new BlissSVGBuilder('B291;;B81').svgCode);
+      expect(new BlissSVGBuilder(input).svgCode).toBe(new BlissSVGBuilder(writtenOut).svgCode);
+    });
+
+    it.each([
+      ['the semantic root through a bare alias of B97 moved to x 1', 'B291;WO_THING:1;;B81', 'B291;B97:1;;B81', 'B291;B97;;B81'],
+      ['a typed indicator drawing B86 by an anchor of its own', 'B291;WO_IANCX;;B86', 'B291;B86:2.5;;B86', 'B291;;B86'],
+      ['an alias of B81 given red by a character bracket', 'B291;WO_REDBRK;;B81', 'B291;[color=red]>B81;;B81', 'B291;;B81'],
+    ])('reuses %s as the code it names (%s draws as %s)', (_label, input, writtenOut, replaced) => {
+      // note: the semantic root the merge keeps is matched like any code, and
+      // a typed definition of one code keeps the place its anchor gave it
+      expect(new BlissSVGBuilder(writtenOut).svgCode).not.toBe(new BlissSVGBuilder(replaced).svgCode);
+      expect(new BlissSVGBuilder(input).svgCode).toBe(new BlissSVGBuilder(writtenOut).svgCode);
+    });
+
+    it('replaces a definition drawn from several codes whole, though its built-in twin B98 keeps its semantic root', () => {
+      // control (H chunk F3): a compound definition stays its own indicator,
+      // not the codes it is drawn from
+      const replacedWhole = new BlissSVGBuilder('B291;;B81').svgCode;
+      expect(new BlissSVGBuilder('B291;WO_BAKED;;B81').svgCode).toBe(replacedWhole);
+      expect(new BlissSVGBuilder('B291;B98;;B81').svgCode).not.toBe(replacedWhole);
+    });
+
+    it('replaces a definition drawn from several codes whole when the word-level code is its first code', () => {
+      // control: pins the reuse step never matching such a definition by its
+      // first code (B97 here), which would keep the compound's B99
+      expect(new BlissSVGBuilder('B291;WO_BAKED;;B97').svgCode).toBe(new BlissSVGBuilder('B291;;B97').svgCode);
     });
   });
 

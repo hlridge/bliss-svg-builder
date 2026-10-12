@@ -5,6 +5,7 @@
  */
 
 import { OPTION_BRACKET_CONTENT, SEMANTIC_INDICATOR_ROOTS, peelCharacterBrackets } from './bliss-constants.js';
+import { builtInCodes } from './bliss-element-definitions.js';
 
 // Quote-aware option-prefix matchers: overlay codes arrive RESTORED, so a
 // quoted value may carry ']'/';'/':' and a lazy `\[.*?\]` would cut inside
@@ -67,6 +68,33 @@ export function resolveEffectiveDefinition(definition, definitions) {
     current = definitions[target];
   }
   return current ?? definition;
+}
+
+/**
+ * The code a name stands for: followed through every definition whose code
+ * string is one clean code (a character bracket leading it is the
+ * definition's own options), a typed one included, to the first code that is
+ * built-in, undefined, or defined as anything else. Unlike
+ * resolveEffectiveDefinition, which stops at a definition's identity, this
+ * reads a typed definition drawing one code as that code.
+ *
+ * @param {string} name - a code name, possibly custom
+ * @param {Object} definitions - the live definitions registry
+ * @returns {string}
+ */
+function codeNameStandsFor(name, definitions) {
+  let code = name;
+  const seen = new Set();
+  while (!builtInCodes.has(code) && !seen.has(code)
+      && Object.prototype.hasOwnProperty.call(definitions, code)) {
+    seen.add(code);
+    const { codeString } = definitions[code];
+    if (typeof codeString !== 'string') return code;
+    const target = peelCharacterBrackets(codeString).body;
+    if (!SINGLE_CODE_TOKEN.test(target)) return code;
+    code = target;
+  }
+  return code;
 }
 
 /**
@@ -442,11 +470,16 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
   // getElementByKey round-trip it) and its true 'character' origin, instead of
   // re-parsing into a fresh keyless node tagged 'word'. A code with no existing
   // match is genuinely overlay-added, so it is parsed fresh and tagged 'word'.
+  // A part named by a definition of one code matches as that code, so the
+  // same indicator keeps its place and options whether it is written through
+  // a name or written out. A definition of several codes matches only by its
+  // own name.
   const reusable = existingIndicatorParts.map((part, index) => ({ part, headIndex: baseParts.length + index }));
   const indicatorParts = [];
   const indicatorTrace = [];
   for (const [finalIndex, code] of finalCodes.entries()) {
-    const reuseIndex = reusable.findIndex(r => r.part.codeName === code);
+    const reuseIndex = reusable.findIndex(r => r.part.codeName === code
+      || codeNameStandsFor(r.part.codeName, definitions) === code);
     if (reuseIndex !== -1) {
       const [reused] = reusable.splice(reuseIndex, 1);
       indicatorParts.push({ ...reused.part });
