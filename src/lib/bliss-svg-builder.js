@@ -3287,19 +3287,34 @@ class BlissSVGBuilder {
     // serialized spacing always matches rendered spacing; bare empty groups
     // contribute no units and never split a run.
     let spaceRun = null;
+    // A reload reads a run against the word written after it, so the run is
+    // spelled against that word: every group written before the next space
+    // group (groups with no space between them are one word to a reload), as
+    // the builder stores its characters, less those written as nothing. The
+    // run's segment holds its slot until that word is complete.
+    let pendingRun = null;
+    const spellRun = (run, word) => {
+      // Each space is spelled on its own: a bare separator where it matches
+      // the word's default, its explicit code where it diverges. N default
+      // spaces are therefore still N+1 slashes and an all-divergent run is
+      // still the full code list, while a MIXED run keeps its default members
+      // compact instead of writing the whole run out. The result is
+      // self-delimiting (`//`, `/QSP/`, `//QSP/`), which is what lets the join
+      // below place it without doubling a separator.
+      const defaultCode = BlissSVGBuilder.#defaultSpaceBefore(word);
+      return '/' + run.map((code) => (code === defaultCode ? '/' : `${code}/`)).join('');
+    };
+    const closePendingRun = () => {
+      if (pendingRun) segments[pendingRun.slot] = spellRun(pendingRun.run, pendingRun.word);
+      pendingRun = null;
+    };
     const flushSpaceRun = () => {
       if (!spaceRun) return;
       // Defensive: only space groups open a run, and a space group always
       // holds a glyph. Empties never open one (they only skip the flush).
       if (spaceRun.length > 0) {
-        // Each space is spelled on its own: a bare separator where it matches
-        // the position's default, its explicit code where it diverges. N
-        // default spaces are therefore still N+1 slashes and an all-divergent
-        // run is still the full code list, while a MIXED run keeps its default
-        // members compact instead of writing the whole run out. The result is
-        // self-delimiting (`//`, `/QSP/`, `//QSP/`), which is what lets the
-        // join below place it without doubling a separator.
-        segments.push('/' + spaceRun.map(s => s.differs ? `${s.code}/` : '/').join(''));
+        pendingRun = { run: spaceRun, slot: segments.length, word: [] };
+        segments.push('');
       }
       spaceRun = null;
     };
@@ -3317,11 +3332,9 @@ class BlissSVGBuilder {
       // #normalizeFailedWordInvariant drops it from #rawBlissObj at rebuild
       // (retention family, rows 31/80), so no errorSource replay survives here.
       if (isSpaceGroup(group)) {
+        closePendingRun();
         spaceRun ??= [];
-        spaceRun.push(...group.glyphs.map(g => ({
-          code: g.parts[0].codeName,
-          differs: g.parts[0]._differsFromDefault === true,
-        })));
+        spaceRun.push(...group.glyphs.map(g => g.parts[0].codeName));
         continue;
       }
       // The word's `;;` codes are merged onto its head, so they are placed
@@ -3374,9 +3387,15 @@ class BlissSVGBuilder {
       if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
       if (groupStr === '') continue; // bare content-empty: no segment, run stays open
       flushSpaceRun();
+      // A character's own token is its last, after its kerning markers; one
+      // written as markers alone hands them to the next character on reload.
+      pendingRun?.word.push(...this.#rawBlissObj.groups[groupIndex].glyphs
+        .filter((_, glyphIndex) => glyphArrays[glyphIndex].at(-1)));
       segments.push(groupStr);
     }
-    flushSpaceRun();
+    closePendingRun();
+    // A run with no word after it reads back as ordinary spaces.
+    if (spaceRun) segments.push(spellRun(spaceRun, []));
     // Join: slash-only segments already include separators, others need /
     let result = segments.reduce((acc, seg) => {
       if (acc === '') return seg;

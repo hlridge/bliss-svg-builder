@@ -11,9 +11,11 @@
  * - mixed runs hold their per-space spelling (each default space a bare
  *   separator, each divergent space its explicit code, GH #19) and stay
  *   byte-stable across serialize cycles
- * - the default judged against the characters the string writes after a
- *   space, so an empty character written as nothing leaves the word and one
- *   written as a bracket stays
+ * - the default judged as a reload judges it: the whole run against the word
+ *   written after it (a space added beside another, an empty word inside the
+ *   run, a written QSP whose next word was replaced), that word being the
+ *   characters written, so an empty character written as nothing (or as a
+ *   kerning marker alone) leaves the word and one written as a bracket stays
  * - bare empties never trigger a separator: trailing without a space, solo,
  *   and run-of-only-empties documents
  * - options-carrying empties emit their own [opts]| segment, split runs,
@@ -195,10 +197,42 @@ describe('BlissSVGBuilder empty-content serialization', () => {
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
+    it('spells the quarter space as `//` before a full stop given an empty character holding only kerning', () => {
+      // note: the kerning is written as a marker the full stop takes on reload
+      const b = new BlissSVGBuilder('B291//B4');
+      b.group(1).insertGlyph(0, '', { relativeKerning: 2 });
+      expect(b.toString()).toBe('B291//RK:2/B4');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
     it('writes out the quarter space before a full stop given an empty character with an option', () => {
       const b = new BlissSVGBuilder('B291//B4');
       b.group(1).addGlyph('', { color: 'red' });
       expect(b.toString()).toBe('B291/QSP/B4/[color=red]');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+  });
+
+  describe('when a run of spaces comes before a full stop', () => {
+    // note: a reload reads the whole run against the word after it, where a
+    // full stop (B4) makes the quarter space (QSP) the default, so a space of
+    // the run decided elsewhere is the one written out
+    it.each([
+      ['a space added after a trailing space', 'H/TSP//B4', () => new BlissSVGBuilder('H//').addGroup('B4')],
+      ['a space added after an empty word', 'B291/TSP//B4', () => new BlissSVGBuilder('B291').addGroup('').addGroup('B4')],
+      ['a word merged in with its leading space', 'B291/TSP//B4', () => new BlissSVGBuilder('B291').merge(new BlissSVGBuilder('//B4'))],
+      ['a written QSP whose next word was replaced', 'B291//B4', () => new BlissSVGBuilder('B291/QSP/B300').replaceGroup(1, 'B4')],
+    ])('spells %s against the word after the run and saves %s', (_, spelling, make) => {
+      const b = make();
+      expect(b.toString()).toBe(spelling);
+      expect(new BlissSVGBuilder(spelling).svgCode).toBe(b.svgCode);
+      expect(new BlissSVGBuilder(b.toJSON()).svgCode).toBe(b.svgCode);
+    });
+
+    it('spells a run split by a word a refused option emptied against the full stop', () => {
+      const b = new BlissSVGBuilder('B291//[grid]|//B4');
+      expect(b.toString()).toBe('B291/TSP//B4');
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
   });
