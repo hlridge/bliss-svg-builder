@@ -11,6 +11,9 @@
  * - mixed runs hold their per-space spelling (each default space a bare
  *   separator, each divergent space its explicit code, GH #19) and stay
  *   byte-stable across serialize cycles
+ * - the default judged against the characters the string writes after a
+ *   space, so an empty character written as nothing leaves the word and one
+ *   written as a bracket stays
  * - bare empties never trigger a separator: trailing without a space, solo,
  *   and run-of-only-empties documents
  * - options-carrying empties emit their own [opts]| segment, split runs,
@@ -169,6 +172,34 @@ describe('BlissSVGBuilder empty-content serialization', () => {
       expect(b.toString()).toBe('');
       expect(b.toJSON().groups[0].wordIndicators.codes).toEqual(['B81']);
       expect(reparsedWidth(b)).toBe(viewBoxWidth(b));
+    });
+  });
+
+  describe('when the word after a space holds an empty character', () => {
+    // note: a character the string writes as nothing is no part of the word
+    // a reload reads after the space; one written as a bracket is
+    it.each([
+      ['B291//[grid]/B4'],
+      ['B291//B4/[grid]'],
+    ])('writes out the ordinary space read in %s before a full stop beside a character a refused option emptied', (input) => {
+      const b = new BlissSVGBuilder(input);
+      expect(b.toString()).toBe('B291/TSP/B4');
+      expect(b.warnings.map(w => w.code)).toEqual(['MISPLACED_GLOBAL_OPTION']);
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('keeps a written TSP before a full stop given an empty character', () => {
+      const b = new BlissSVGBuilder('B291/TSP/B4');
+      b.group(1).addGlyph('');
+      expect(b.toString()).toBe('B291/TSP/B4');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
+    });
+
+    it('writes out the quarter space before a full stop given an empty character with an option', () => {
+      const b = new BlissSVGBuilder('B291//B4');
+      b.group(1).addGlyph('', { color: 'red' });
+      expect(b.toString()).toBe('B291/QSP/B4/[color=red]');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
   });
 });

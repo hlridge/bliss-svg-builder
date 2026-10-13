@@ -42,6 +42,14 @@ const designationIsUnwritten = (glyph) =>
   glyph.isHeadGlyph === true && !glyph.parts?.length
     && !glyph.glyphCode && !glyph.codeName && !glyphEmitsOptionsToken(glyph);
 
+// A glyph the serializer writes nothing for, so no reload reads it back: no
+// parts, no code, no position (which is written as an `[x=N]` bracket) and no
+// option that re-emits it as an options-only token. Kerning alone is written
+// as a marker the next glyph takes.
+const glyphIsUnwritten = (glyph) =>
+  !glyph.parts?.length && !glyph.glyphCode && !glyph.codeName
+    && glyph.x === undefined && glyph.y === undefined && !glyphEmitsOptionsToken(glyph);
+
 // The written `Xword` shorthand expands to one glyph per letter at parse time
 // (`Xab` -> `Xa/Xb`), so serializing each glyph faithfully spells a word out
 // letter by letter. This folds such a run back into the shorthand it came from.
@@ -1169,25 +1177,44 @@ class BlissSVGBuilder {
     // _differsFromDefault or its identity (and width) would be lost. Both a
     // Pass-3 split and the decoration strip above feed movedSpaceGlyphs; a bared
     // QSP whose coordinate suppressed its parse-time flag is re-flagged here.
+    // A space an API edit inserted (#makeSpaceGroup) is set to the default
+    // first, as the parser sets a `//` to it.
     // ZSA is content and never a moved space glyph, so it never reaches this path.
     if (movedSpaceGlyphs.length > 0) {
       const moved = new Set(movedSpaceGlyphs);
       for (let i = 0; i < groups.length; i++) {
         const group = groups[i];
         if (!group.glyphs?.some(g => moved.has(g))) continue;
-        const nextGroup = groups[i + 1];
-        const isPunctuation = !!nextGroup && !BlissSVGBuilder.#isRawSpaceGroup(nextGroup)
-          && nextGroup.glyphs?.length > 0
-          && nextGroup.glyphs.every(pullsInWordSpace);
-        const defaultCode = isPunctuation ? 'QSP' : 'TSP';
+        const defaultCode = BlissSVGBuilder.#defaultSpaceAt(groups, i);
         for (const glyph of group.glyphs) {
           if (!moved.has(glyph)) continue;
           const part = glyph.parts[0];
+          if (part._fromSP) part.codeName = defaultCode;
+          delete part._fromSP;
           if (part.codeName !== defaultCode) part._differsFromDefault = true;
           else delete part._differsFromDefault;
         }
       }
     }
+  }
+
+  // The space a `//` at groups[index] reads back as: the default before the
+  // word a reload reads after it, every group up to the next space group
+  // (the string writes groups with no space between them as one word), less
+  // the glyphs it writes as nothing.
+  static #defaultSpaceAt(groups, index) {
+    const word = [];
+    for (let i = index + 1; i < groups.length && !BlissSVGBuilder.#isRawSpaceGroup(groups[i]); i++) {
+      word.push(...(groups[i].glyphs ?? []).filter((glyph) => !glyphIsUnwritten(glyph)));
+    }
+    return BlissSVGBuilder.#defaultSpaceBefore(word);
+  }
+
+  // The default word space before a word, as the parser resolves `//`: the
+  // tighter QSP where every character of it pulls in the word space (a
+  // punctuation mark), else TSP.
+  static #defaultSpaceBefore(word) {
+    return word.length > 0 && word.every(pullsInWordSpace) ? 'QSP' : 'TSP';
   }
 
   // Space-as-part invariant (row 78, extended row 81): a space (TSP/QSP, and
@@ -2191,9 +2218,12 @@ class BlissSVGBuilder {
       groups.push(BlissSVGBuilder.#makeSpaceGroup());
       groups.push(newGroup);
     } else {
-      // Insert in middle: before the target raw index, add [space, newGroup]
-      const rawIndex = indices[index];
-      groups.splice(rawIndex, 0, newGroup, BlissSVGBuilder.#makeSpaceGroup());
+      // Insert in middle: [space, newGroup] right after the previous word, so
+      // every space already there keeps the word after it, the one its width
+      // was decided against. removeGroup takes the new word back out with the
+      // space before it.
+      const rawIndex = indices[index - 1] + 1;
+      groups.splice(rawIndex, 0, BlissSVGBuilder.#makeSpaceGroup(), newGroup);
     }
 
     this.#rebuild();
@@ -2997,9 +3027,14 @@ class BlissSVGBuilder {
     return '';
   }
 
-  /** Creates a default space group for insertion between words */
+  /**
+   * Creates the space an API edit puts between words. It is marked to take
+   * its position's default, the space a `//` there reads as, which the rebuild
+   * settles against the word after it (#normalizeSpaceInvariant), so it saves
+   * as `//`.
+   */
   static #makeSpaceGroup() {
-    return { glyphs: [{ parts: [{ codeName: 'TSP' }] }] };
+    return { glyphs: [{ parts: [{ codeName: 'TSP', _fromSP: true }] }] };
   }
 
   /** Internal: removes a glyph group and its adjacent space from groups array */
