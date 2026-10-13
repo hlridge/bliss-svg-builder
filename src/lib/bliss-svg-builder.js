@@ -2194,7 +2194,7 @@ class BlissSVGBuilder {
   /**
    * Inserts a new glyph group at the given semantic (non-space) index
    * with automatic space management.
-   * @param {number} index - Semantic non-space group index
+   * @param {number} index - Semantic non-space group index (supports negative: -1 = before last)
    * @param {string} [code] - DSL code string; empty, whitespace-only, or omitted inserts an empty group
    * @param {Object | { defaults?: Object, overrides?: Object }} [opts]
    * @returns {this}
@@ -2206,6 +2206,7 @@ class BlissSVGBuilder {
     const newGroup = this.#parseGroupWithOpts(code, opts);
     const groups = this.#rawBlissObj.groups;
     const indices = this.#getNonSpaceGroupIndices();
+    if (index < 0) index = indices.length + index;
 
     if (groups.length === 0 || indices.length === 0) {
       // Empty — just push, no spaces needed
