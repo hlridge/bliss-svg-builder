@@ -2862,12 +2862,13 @@ class BlissSVGBuilder {
   }
 
   // Re-derive glyph-classification metadata (isBlissGlyph / isExternalGlyph /
-  // char / kerningRules) from a glyph's resolved glyphCode. toJSON() omits these
-  // (they are pure derived data, not authored composition), so object input must
-  // restore them like the parser does on string input: a registered code copies
-  // them from its definition; a text-fallback 'XTXT_<chars>' derives them (a
-  // single char is that rendered glyph, multi-char is '' since it is text, not
-  // one glyph). A composite (no glyphCode) carries no glyph-level identity.
+  // char / kerningRules / shrinksPrecedingWordSpace) from a glyph's resolved
+  // glyphCode. toJSON() omits these (they are pure derived data, not authored
+  // composition), so object input must restore them like the parser does on
+  // string input: a registered code copies them from its definition; a
+  // text-fallback 'XTXT_<chars>' derives them (a single char is that rendered
+  // glyph, multi-char is '' since it is text, not one glyph). A composite (no
+  // glyphCode) carries no glyph-level identity.
   static #reapplyGlyphMetadata(glyph) {
     const code = glyph.glyphCode;
     if (!code) return;
@@ -2877,6 +2878,7 @@ class BlissSVGBuilder {
       if (def.isExternalGlyph) glyph.isExternalGlyph = true;
       if (typeof def.char === 'string') glyph.char = def.char;
       if (def.kerningRules) glyph.kerningRules = def.kerningRules;
+      if (def.shrinksPrecedingWordSpace === true) glyph.shrinksPrecedingWordSpace = true;
     } else if (code.startsWith('XTXT_')) {
       const chars = code.slice(5);
       glyph.isExternalGlyph = true;
@@ -3699,10 +3701,12 @@ class BlissSVGBuilder {
             }
             if (!options.deep) delete glyph._aliasCodeName;
 
-            // Default output omits glyph-classification metadata: it is fully
-            // derived from the code and re-derived on reconstruction (see
-            // #reapplyGlyphMetadata), so it is not user-authored composition data.
-            // deep output keeps it for toString()/merge(). (issue #28 toJSON audit)
+            // Default output omits glyph-classification metadata, layout data
+            // included (the letter, the kerning table, a punctuation mark's
+            // word space): it is fully derived from the code and re-derived on
+            // reconstruction (see #reapplyGlyphMetadata), so it is not
+            // user-authored composition data. deep output keeps it for
+            // toString()/merge(). (issue #28 toJSON audit)
             //
             // "Derived from the code" only holds where there IS a code. Two
             // glyphs have none: one wearing a part-scope option (`[opts]>Xm`,
