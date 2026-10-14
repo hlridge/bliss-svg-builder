@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
+import { BlissParser, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
@@ -1208,6 +1208,13 @@ class BlissSVGBuilder {
       word.push(...(groups[i].glyphs ?? []).filter((glyph) => !glyphIsUnwritten(glyph)));
     }
     return BlissSVGBuilder.#defaultSpaceBefore(word);
+  }
+
+  // The default word space before a word as a string writes it: the word read
+  // back through the parser, judged as the parser judges the word after a
+  // `//`.
+  static #defaultSpaceBeforeWritten(text) {
+    return BlissSVGBuilder.#defaultSpaceBefore(BlissParser.parse(text).groups[0].glyphs);
   }
 
   // The default word space before a word, as the parser resolves `//`: the
@@ -3291,12 +3298,25 @@ class BlissSVGBuilder {
     // contribute no units and never split a run.
     let spaceRun = null;
     // A reload reads a run against the word written after it, so the run is
-    // spelled against that word: every group written before the next space
-    // group (groups with no space between them are one word to a reload), as
-    // the builder stores its characters, less those written as nothing. The
-    // run's segment holds its slot until that word is complete.
+    // spelled against that word as the reload reads it: every group written
+    // before the next space group (groups with no space between them are one
+    // word to a reload), read back as written. The written word can read
+    // otherwise than the stored one: a definition that pulls in the word
+    // space on a drawing whose own code does not is written as that code, and
+    // a character the builder does not count as punctuation can be written as
+    // a code that is. A word longer than a reload reads is never read back,
+    // so it is judged as the builder stores its characters, less those written
+    // as nothing. The run's segment holds its slot until that word is
+    // complete, and each written word is read back once per save.
     let pendingRun = null;
-    const spellRun = (run, word) => {
+    const writtenDefaults = new Map();
+    const defaultSpaceBefore = ({ texts, word }) => {
+      const text = texts.join('/');
+      if (text.length > MAX_INPUT_LENGTH) return BlissSVGBuilder.#defaultSpaceBefore(word);
+      if (!writtenDefaults.has(text)) writtenDefaults.set(text, BlissSVGBuilder.#defaultSpaceBeforeWritten(text));
+      return writtenDefaults.get(text);
+    };
+    const spellRun = (run, defaultCode) => {
       // Each space is spelled on its own: a bare separator where it matches
       // the word's default, its explicit code where it diverges. N default
       // spaces are therefore still N+1 slashes and an all-divergent run is
@@ -3304,11 +3324,10 @@ class BlissSVGBuilder {
       // compact instead of writing the whole run out. The result is
       // self-delimiting (`//`, `/QSP/`, `//QSP/`), which is what lets the join
       // below place it without doubling a separator.
-      const defaultCode = BlissSVGBuilder.#defaultSpaceBefore(word);
       return '/' + run.map((code) => (code === defaultCode ? '/' : `${code}/`)).join('');
     };
     const closePendingRun = () => {
-      if (pendingRun) segments[pendingRun.slot] = spellRun(pendingRun.run, pendingRun.word);
+      if (pendingRun) segments[pendingRun.slot] = spellRun(pendingRun.run, defaultSpaceBefore(pendingRun));
       pendingRun = null;
     };
     const flushSpaceRun = () => {
@@ -3316,7 +3335,7 @@ class BlissSVGBuilder {
       // Defensive: only space groups open a run, and a space group always
       // holds a glyph. Empties never open one (they only skip the flush).
       if (spaceRun.length > 0) {
-        pendingRun = { run: spaceRun, slot: segments.length, word: [] };
+        pendingRun = { run: spaceRun, slot: segments.length, texts: [], word: [] };
         segments.push('');
       }
       spaceRun = null;
@@ -3390,6 +3409,7 @@ class BlissSVGBuilder {
       if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
       if (groupStr === '') continue; // bare content-empty: no segment, run stays open
       flushSpaceRun();
+      pendingRun?.texts.push(groupStr);
       // A character's own token is its last, after its kerning markers; one
       // written as markers alone hands them to the next character on reload.
       pendingRun?.word.push(...this.#rawBlissObj.groups[groupIndex].glyphs
@@ -3398,7 +3418,7 @@ class BlissSVGBuilder {
     }
     closePendingRun();
     // A run with no word after it reads back as ordinary spaces.
-    if (spaceRun) segments.push(spellRun(spaceRun, []));
+    if (spaceRun) segments.push(spellRun(spaceRun, 'TSP'));
     // Join: slash-only segments already include separators, others need /
     let result = segments.reduce((acc, seg) => {
       if (acc === '') return seg;

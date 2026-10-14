@@ -69,6 +69,10 @@ const stripReferenceDecoration = (s) => s
 // external text, so it could never be reached as a definition.
 export const X_RUN_LETTERS = 'a-zA-ZÀ-ſͰ-ϿЀ-ӿ';
 
+// The longest input string the parser reads. Exported so the string save
+// knows which of the words it writes a reload can read back at all.
+export const MAX_INPUT_LENGTH = 10_000;
+
 // A written X token runs from a glyph boundary to the next structural
 // character: another glyph boundary (`/`), a part boundary (`;`), a head
 // marker (`^`) or a coordinate suffix (`:`). Taking the token WHOLE is what
@@ -748,7 +752,7 @@ export class BlissParser {
     return part;
   }
   static fromString(inputString) {
-    if (typeof inputString === 'string' && inputString.length > 10_000) {
+    if (typeof inputString === 'string' && inputString.length > MAX_INPUT_LENGTH) {
       throw new Error('Input string exceeds maximum length of 10,000 characters');
     }
     inputString = inputString.trim();

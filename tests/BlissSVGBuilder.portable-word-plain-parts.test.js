@@ -15,8 +15,9 @@
  *   replace, which the JSON keeps flagged.
  * - The deep JSON merge() re-ingests, left as stored.
  * - A digit or a full stop as the head: the string's plain part makes it
- *   another character on reload, losing the digit's kerning or the tighter
- *   word space (best effort); the JSON keeps an indicator flag where it can.
+ *   another character on reload, losing the digit's kerning (best effort),
+ *   while a full stop's tighter word space is written out; the JSON keeps an
+ *   indicator flag where it can.
  *
  * Does NOT cover:
  * - A word whose one code is a plain shape, or a compound holding a plain
@@ -146,17 +147,24 @@ describe('BlissSVGBuilder portable word plain parts', () => {
   });
 
   describe('when the word\'s head is a digit or a full stop', () => {
-    it.each([
-      ['B9/B10;;PP_RING', 'B9/B10;C2'],
-      ['B291//B4;;PP_RING', 'B291//B4;C2'],
-    ])('writes %s as %s, whose reload loses the head\'s spacing, while the JSON reloads as drawn', (input, saved) => {
-      // note (best effort): written on a digit or a full stop, a plain part
-      // makes it another character on reload, so the digit is no longer
-      // kerned and the full stop no longer takes the tighter word space; the
-      // JSON keeps the part's indicator flag
-      const builder = new BlissSVGBuilder(input);
-      expect(builder.toString()).toBe(saved);
-      expect(new BlissSVGBuilder(saved).svgCode).not.toBe(builder.svgCode);
+    it('writes B9/B10;;PP_RING as B9/B10;C2, whose reload loses the digit kerning, while the JSON reloads as drawn', () => {
+      // note (best effort): written on a digit, a plain part makes it another
+      // character on reload, so the digit is no longer kerned; the JSON keeps
+      // the part's indicator flag
+      const builder = new BlissSVGBuilder('B9/B10;;PP_RING');
+      expect(builder.toString()).toBe('B9/B10;C2');
+      expect(new BlissSVGBuilder('B9/B10;C2').svgCode).not.toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('writes B291//B4;;PP_RING as B291/QSP/B4;C2, its tighter space written out though the ring moves on reload, while the JSON reloads as drawn', () => {
+      // note (best effort): written on a full stop, a plain part makes it
+      // another character on reload, which reads `//` as the ordinary space,
+      // so the save writes the quarter space out; the ring, a plain part,
+      // still sits elsewhere on reload. The JSON keeps the indicator flag
+      const builder = new BlissSVGBuilder('B291//B4;;PP_RING');
+      expect(builder.toString()).toBe('B291/QSP/B4;C2');
+      expect(new BlissSVGBuilder('B291/QSP/B4;C2').svgCode).not.toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
     });
 
