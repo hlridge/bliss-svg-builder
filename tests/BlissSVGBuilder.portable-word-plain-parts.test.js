@@ -10,9 +10,9 @@
  *   indicator the codes replaced, or a semantic root they dropped, stays off.
  * - A plain part beside the head's own indicators, beside another word-level
  *   code (plain in the JSON too), and on a head that is itself an indicator;
- *   each of two words alike given its own copy in the JSON; a plain part
- *   written before a custom indicator the codes replace, which the JSON keeps
- *   flagged.
+ *   each of two words alike given its own copy in the JSON; the plain parts
+ *   of two codes; a plain part written before a custom indicator the codes
+ *   replace, which the JSON keeps flagged.
  * - The deep JSON merge() re-ingests, left as stored.
  * - A digit or a full stop as the head: the string's plain part makes it
  *   another character on reload, losing the digit's kerning or the tighter
@@ -30,6 +30,7 @@ import { BlissSVGBuilder } from '../src/index.js';
 const FIXTURES = {
   PP_RING: { type: 'glyph', isIndicator: true, codeString: 'C2' },
   PP_MIXED: { type: 'glyph', isIndicator: true, codeString: 'B270;B86' },
+  PP_RINGPLURAL: { type: 'glyph', isIndicator: true, codeString: 'C2;B99:3,0' },
 };
 
 beforeAll(() => {
@@ -53,6 +54,8 @@ describe('BlissSVGBuilder portable word plain parts', () => {
       ['B291;B86;;PP_RING', 'B291;C2:3'],
       ['B291;B97;;!PP_RING', 'B291;C2:3'],
       ['B291;B97;;PP_RING', 'B291;B97:1.5;C2:4.5'],
+      // pins every code of the list judged, not a word of one code only
+      ['B291;B86;;PP_RING;PP_RING', 'B291;C2:1.5;C2:4.5'],
     ])('writes %s as the flattened save does, %s, both default saves reloading as drawn', (input, saved) => {
       // note: with no code left in the word-level list, nothing would replace
       // the head's own B86 or drop its semantic root B97 on reload
@@ -96,6 +99,15 @@ describe('BlissSVGBuilder portable word plain parts', () => {
       const builder = new BlissSVGBuilder('B291;;B86:1.5;PP_RING');
       expect(builder.toString()).toBe('B291;C2:4.5;;B86:1.5');
       expect(builder.toJSON().groups[0].wordIndicators.codes).toEqual(['B86:1.5']);
+      expect(inkOf(new BlissSVGBuilder(builder.toString()))).toEqual(inkOf(builder));
+      expect(inkOf(new BlissSVGBuilder(builder.toJSON()))).toEqual(inkOf(builder));
+    });
+
+    it('writes the plain parts of two word-level codes on the head (B291;;PP_MIXED;PP_RINGPLURAL), both saves reloading with the same ink', () => {
+      // pins every plain part taken off the list written, not the first only
+      const builder = new BlissSVGBuilder('B291;;PP_MIXED;PP_RINGPLURAL');
+      expect(builder.toString()).toBe('B291;B270;C2:3;;B86:0;B99:6,0');
+      expect(builder.toJSON().groups[0].glyphs[0].parts.map((part) => part.codeName)).toEqual(['B291', 'B270', 'C2']);
       expect(inkOf(new BlissSVGBuilder(builder.toString()))).toEqual(inkOf(builder));
       expect(inkOf(new BlissSVGBuilder(builder.toJSON()))).toEqual(inkOf(builder));
     });

@@ -203,6 +203,7 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
       WO_THING: { codeString: 'B97' },
       WO_IANCX: { type: 'glyph', isIndicator: true, codeString: 'B86', anchorOffsetX: 0.5 },
       WO_REDBRK: { codeString: '[color=red]B81' },
+      WO_ACTACT: { codeString: 'WO_ACT' },
     };
     beforeAll(() => {
       const { defined, errors } = BlissSVGBuilder.define(NAMES);
@@ -215,6 +216,8 @@ describe('BlissSVGBuilder word-indicator overlay', () => {
       ['a bare alias of B81 moved to x 1', 'B291;WO_ACT:1;;B81', 'B291;B81:1;;B81'],
       ['a typed indicator drawing B81 moved to x 1', 'B291;WO_TACT:1;;B81', 'B291;B81:1;;B81'],
       ['a bare alias of B81 in red', 'B291;WO_RED;;B81', 'B291;[color=red]>B81;;B81'],
+      // pins the name followed to the end of its chain, not one step
+      ['an alias of an alias of B81 moved to x 1', 'B291;WO_ACTACT:1;;B81', 'B291;B81:1;;B81'],
     ])('reuses %s as the one code it names (%s draws as %s)', (_label, input, writtenOut) => {
       // regression (H chunk F3): the keep-or-replace step read a name through
       // its definition, while the reuse step compared the written name, so

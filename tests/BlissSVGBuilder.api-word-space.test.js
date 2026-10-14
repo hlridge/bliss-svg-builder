@@ -118,11 +118,38 @@ describe('BlissSVGBuilder API word space', () => {
     it.each([
       ['[x=2]/B4', 'B291//[x=2]/B4'],
       ['[color=red]/B4', 'B291//[color=red]/B4'],
+      // pins the vertical position read as well as the horizontal one
+      ['[y=2]/B4', 'B291//[y=2]/B4'],
     ])('counts an empty character written as a bracket: insertGroup(0, B291) on %s saves %s', (start, spelling) => {
       const builder = new BlissSVGBuilder(start).insertGroup(0, 'B291');
       expect(drawsAs(builder, spelling)).toBe(true);
       expect(builder.toString()).toBe(spelling);
       expect(reloadsAsDrawn(builder)).toEqual({ string: true, json: true });
+    });
+  });
+
+  describe('when the word after the inserted space comes from a composition object', () => {
+    it('judges the full stop past an empty group before it, which the string writes as nothing', () => {
+      const builder = new BlissSVGBuilder({ groups: [{ glyphs: [] }, { glyphs: [{ codeName: 'B4', parts: [{ codeName: 'B4' }] }] }] });
+      builder.insertGroup(0, 'B291');
+      expect(drawsAs(builder, 'B291//B4')).toBe(true);
+      expect(builder.toString()).toBe('B291//B4');
+    });
+
+    it('counts a character holding a code and no parts, which the string writes, so the space stays the ordinary one', () => {
+      // note: such a character draws nothing yet the string writes its code
+      // (backlog: "A glyph authored with only codeName and no parts serializes
+      // to a code it never rendered"); the space follows what the string writes
+      const builder = new BlissSVGBuilder({ groups: [{ glyphs: [{ codeName: 'B300', parts: [] }, { codeName: 'B4', parts: [{ codeName: 'B4' }] }] }] });
+      builder.insertGroup(0, 'B291');
+      expect(builder.toJSON().groups[1].glyphs[0].parts[0].codeName).toBe('TSP');
+    });
+
+    it('puts insertGroup(1, B291) right after an empty first group', () => {
+      const builder = new BlissSVGBuilder({ groups: [{ glyphs: [] }, { glyphs: [{ codeName: 'B4', parts: [{ codeName: 'B4' }] }] }] });
+      builder.insertGroup(1, 'B291');
+      expect(builder.toJSON().groups.map((group) => group.glyphs.map((glyph) => glyph.codeName ?? glyph.parts?.[0]?.codeName)))
+        .toEqual([[], ['TSP'], ['B291'], ['B4']]);
     });
   });
 

@@ -28,7 +28,7 @@ import { BlissSVGBuilder } from '../src/index.js';
  * Does NOT cover:
  * - How a space run is GROUPED into composition.children, see
  *   `BlissSVGBuilder.space-grouping.test.js`.
- * - Which space code an implicit `/` resolves to, see
+ * - Which space code `//` resolves to, see
  *   `BlissParser.space-resolution.test.js`.
  * - Space-glyph advance widths, see `BlissSVGBuilder.space-glyphs.test.js`.
  * - X-run EXPANSION at parse time (the inverse of the collapse here), see
@@ -131,6 +131,13 @@ describe('BlissSVGBuilder serialization canonicalization', () => {
       expect(serialized('H/QSP/QSP/B4')).toBe('H///B4');
       expect(roundTrip('H/QSP/TSP/B4')).toEqual(INTACT);
       expect(roundTrip('H/TSP/QSP/B4')).toEqual(INTACT);
+    });
+
+    it('counts a ZSA before the full stop as part of the word, so the ordinary space stays `//`', () => {
+      // pins ZSA counted as content in the word after a run, as the parser
+      // counts it
+      expect(serialized('B291//ZSA/B4')).toBe('B291//ZSA/B4');
+      expect(roundTrip('B291//ZSA/B4')).toEqual(INTACT);
     });
 
     it('keeps TSP the default before a word that mixes punctuation with another character', () => {

@@ -31,6 +31,13 @@ describe('bliss-head-glyph-exclusions.headScanCode', () => {
     });
 
     it('prefers the identity over the first part on a single-part glyph', () => {
+      // pins the identity read before the part's code; the row that pinned it
+      // with two different codes flipped when the part count came to be read
+      // first
+      expect(headScanCode('MYG', 1, 'B486')).toBe('MYG');
+    });
+
+    it('returns a skip-list code that names a single-part glyph, so that glyph is still skipped', () => {
       expect(headScanCode('B486', 1, 'B486')).toBe('B486');
     });
   });
@@ -49,7 +56,7 @@ describe('bliss-head-glyph-exclusions.headScanCode', () => {
   describe('when the glyph is a fused multi-part character with no identity', () => {
     it('returns undefined so a leading exclusion part does not exclude the character', () => {
       // pins the rule that B486 excludes only as a lone glyph; the multi-part
-      // case must be non-excludable. Kills the partCount boundary (>1 -> >=1).
+      // case must be non-excludable
       expect(headScanCode(undefined, 2, 'B486')).toBeUndefined();
     });
 
@@ -60,6 +67,8 @@ describe('bliss-head-glyph-exclusions.headScanCode', () => {
 
   describe('when the glyph is a single part with no identity', () => {
     it('returns the part code so a lone exclusion part still excludes', () => {
+      // pins the part-count boundary: a glyph of one part is compared (> 1,
+      // not >= 1)
       expect(headScanCode(undefined, 1, 'B486')).toBe('B486');
     });
 

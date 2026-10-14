@@ -20,7 +20,8 @@
  *   and run-of-only-empties documents
  * - options-carrying empties emit their own [opts]| segment, split runs,
  *   and round-trip
- * - fail-flagged words re-emit their errorSource in place and split runs
+ * - a word the builder drops as failed (MALFORMED_WORD_INDICATOR) leaves its
+ *   spaces to merge into one run, which round-trips
  * - a word-indicator overlay on an empty group stays string-invisible while
  *   toJSON still carries it
  *
@@ -130,6 +131,14 @@ describe('BlissSVGBuilder empty-content serialization', () => {
       const b = new BlissSVGBuilder({ groups: [word('B291'), empty()] });
       expect(b.toString()).toBe('B291');
       expect(reparsedWidth(b)).toBe(viewBoxWidth(b));
+    });
+
+    it('keeps the quarter space before a full stop when an empty group is added after it', () => {
+      // pins the run before the full stop spelled once the composition ends,
+      // even where its last group writes nothing
+      const b = new BlissSVGBuilder('B291//B4').addElement('');
+      expect(b.toString()).toBe('B291//B4');
+      expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
     it('keeps the leading empty-and-space emission unchanged', () => {

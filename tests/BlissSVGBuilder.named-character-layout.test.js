@@ -198,6 +198,14 @@ describe('BlissSVGBuilder named character layout', () => {
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
     });
 
+    it('kerns a typed indicator drawing the second digit as that digit', () => {
+      // pins the key read from the character's first part, whatever it is: a
+      // character of one indicator has no base part to read it from
+      customCodes.push('INDTEN');
+      expect(BlissSVGBuilder.define({ INDTEN: { type: 'glyph', isIndicator: true, codeString: 'B10' } }).defined).toEqual(['INDTEN']);
+      expect(gapAfterFirst('B9/INDTEN')).toBe(1);
+    });
+
     it('leaves the ordinary word space before a bare alias of a full stop fused with a shape', () => {
       customCodes.push('NAMEDSTOP');
       expect(BlissSVGBuilder.define({ NAMEDSTOP: { codeString: 'B4;C8' } }).defined).toEqual(['NAMEDSTOP']);

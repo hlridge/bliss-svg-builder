@@ -72,6 +72,14 @@ describe('BlissSVGBuilder insertGroup index', () => {
       expect(fromEnd.toJSON()).toEqual(fromStart.toJSON());
     });
 
+    it('counts an empty group as a word: on an empty group beside B4, index -1 builds what index 1 builds', () => {
+      const composition = () => ({ groups: [{ glyphs: [] }, { glyphs: [{ codeName: 'B4', parts: [{ codeName: 'B4' }] }] }] });
+      const fromEnd = new BlissSVGBuilder(composition()).insertGroup(-1, 'B291');
+      const fromStart = new BlissSVGBuilder(composition()).insertGroup(1, 'B291');
+      expect(fromEnd.toString()).toBe(fromStart.toString());
+      expect(fromEnd.toJSON()).toEqual(fromStart.toJSON());
+    });
+
     it('is undone by removeGroup(-2), which names the word it inserted', () => {
       const original = new BlissSVGBuilder('B291//B300');
       const builder = new BlissSVGBuilder('B291//B300').insertGroup(-1, 'B4').removeGroup(-2);

@@ -19,7 +19,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   definition's anatomy is written as its typed delta (`MYGL1;B81`, the
  *   name on the one part the definition is) instead of a stale name.
  * - The merged character keeping its name where no one code draws the glyph,
- *   and getting no name back once an edit has re-made it.
+ *   and getting no name back once an edit has re-made it, or once its deep
+ *   JSON puts another part before the glyph's own.
  *
  * Does NOT cover:
  * - Which character of a merged word takes its `;;` codes, see
@@ -160,6 +161,19 @@ describe('BlissSVGBuilder merge name preserve', () => {
       expect(other.glyph(0).codeName).toBe('MYGL1');
       expect(host.group(1).glyph(0).codeName).toBe('MYGL1');
       expect(host.toJSON().groups.at(-1)).toEqual(other.toJSON().groups[0]);
+    });
+
+    it('gives no name back to a character whose deep JSON puts another part before the glyph\'s own (MYGL1)', () => {
+      // pins the recorded name believed only while the glyph's own part comes
+      // first: with B291 before it, the character is no longer the glyph
+      defineGlyphFixtures();
+      const deep = new BlissSVGBuilder('MYGL1').toJSON({ deep: true });
+      deep.groups[0].glyphs[0].parts.unshift({ codeName: 'B291' });
+      const other = new BlissSVGBuilder(deep);
+      const host = new BlissSVGBuilder('B208');
+      host.merge(other);
+      expect(other.glyph(0).codeName).toBe('C8');
+      expect(host.group(1).glyph(0).codeName).toBe('C8');
     });
 
     it('gives no name back to a character re-made from the glyph its alias names (MYALIAS)', () => {

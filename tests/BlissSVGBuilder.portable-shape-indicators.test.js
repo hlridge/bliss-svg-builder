@@ -28,7 +28,7 @@
  *   plain part the codes no longer replace it), the JSON reloading as drawn
  *   (backlog: "A word's `;;` overlay resolves against a head part a portable
  *   save spelled out", the residue its fourth case keeps); written where it
- *   shows even where it overhangs its base.
+ *   shows even where it overhangs its base; two such shapes, each placed.
  * - Controls: a position the author wrote, the shape written alone, and the
  *   `;;` form's default string, the shape written on the head.
  *
@@ -72,6 +72,11 @@ const codesOfString = (text) => [...text.replace(/\[[^\]]*\]>?/g, '').matchAll(/
 
 // The codes only an instance holding their definitions can draw.
 const notBuiltIn = (codes) => codes.filter((code) => BlissSVGBuilder.getDefinition(code)?.isBuiltIn !== true);
+
+// What a builder draws whatever the drawing order: its frame and every
+// subpath it strokes, sorted.
+const inkOf = (builder) => [builder.svgCode.match(/viewBox="[^"]*"/)[0],
+  ...[...builder.svgCode.matchAll(/ d="([^"]+)"/g)].flatMap(([, d]) => d.split(/(?=M)/)).sort()];
 
 // The parts of a JSON that carry a position.
 const positionedParts = (json) => json.groups.flatMap((group) => group.glyphs ?? [])
@@ -199,6 +204,18 @@ describe('BlissSVGBuilder portable shape indicators', () => {
       expect(builder.toString()).toBe('B291;C2:3;;B81');
       expect(new BlissSVGBuilder(builder.toString()).svgCode).not.toBe(builder.svgCode);
       expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('saves B291;PS_RING:1;PS_RING;;B81 as B291;C2:1;C2:4.5;;B81, each shape where it shows', () => {
+      // pins every replaced shape placed, not the first only: with the word's
+      // codes cleared, the reload draws both shapes where the builder does
+      const builder = new BlissSVGBuilder('B291;PS_RING:1;PS_RING;;B81');
+      expect(builder.toString()).toBe('B291;C2:1;C2:4.5;;B81');
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+      const reloaded = new BlissSVGBuilder(builder.toString());
+      reloaded.group(0).clearIndicators();
+      builder.group(0).clearIndicators();
+      expect(inkOf(reloaded)).toEqual(inkOf(builder));
     });
 
     it('saves B1;PS_RING;;B81 as B1;C2:-1;;B81:-1, the shape where it shows though it overhangs the base', () => {
