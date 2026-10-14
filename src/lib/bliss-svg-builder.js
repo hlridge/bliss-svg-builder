@@ -4270,12 +4270,14 @@ class BlissSVGBuilder {
     };
   }
 
-  // Where a character's spelled-out parts start its indicators, as a reload
-  // reads them: the first part after the first (the base, whatever it is)
-  // whose code draws an indicator, or the end.
+  // Where a character's spelled-out parts start its indicators: the first
+  // part after the first (the base, whatever it is) stored as an indicator,
+  // or the end. A custom indicator spelled out into a plain shape keeps that
+  // flag in the JSON, whose reload reads a part written before a base part as
+  // an ordinary one; the string writes it as plain ink, where the order of
+  // plain parts changes nothing.
   static #indicatorsStartIn(parts) {
-    const start = parts.findIndex((part, index) => index > 0
-      && blissElementDefinitions[part.codeName]?.isIndicator === true);
+    const start = parts.findIndex((part, index) => index > 0 && part.isIndicator === true);
     return start === -1 ? parts.length : start;
   }
 

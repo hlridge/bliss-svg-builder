@@ -10,7 +10,9 @@
  *   indicator the codes replaced, or a semantic root they dropped, stays off.
  * - A plain part beside the head's own indicators, beside another word-level
  *   code (plain in the JSON too), and on a head that is itself an indicator;
- *   each of two words alike given its own copy in the JSON.
+ *   each of two words alike given its own copy in the JSON; a plain part
+ *   written before a custom indicator the codes replace, which the JSON keeps
+ *   flagged.
  * - The deep JSON merge() re-ingests, left as stored.
  * - A digit or a full stop as the head: the string's plain part makes it
  *   another character on reload, losing the digit's kerning or the tighter
@@ -96,6 +98,18 @@ describe('BlissSVGBuilder portable word plain parts', () => {
       expect(builder.toJSON().groups[0].wordIndicators.codes).toEqual(['B86:1.5']);
       expect(inkOf(new BlissSVGBuilder(builder.toString()))).toEqual(inkOf(builder));
       expect(inkOf(new BlissSVGBuilder(builder.toJSON()))).toEqual(inkOf(builder));
+    });
+
+    it('writes the plain part before a custom indicator the word-level codes replace (B291;PP_RING;;PP_MIXED), so the JSON reloads as drawn', () => {
+      // regression: the plain part went after the spelled-out ring, which the
+      // JSON keeps flagged as an indicator; a reload then read the ring as an
+      // ordinary part and drew it
+      const builder = new BlissSVGBuilder('B291;PP_RING;;PP_MIXED');
+      expect(builder.toString()).toBe('B291;B270:3;C2:3;;B86');
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+      // note (best effort): the string writes the ring as plain ink, which
+      // no word-level code replaces on reload
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).not.toBe(builder.svgCode);
     });
 
     it('gives each of two words alike its own copy of the plain part in the JSON', () => {
