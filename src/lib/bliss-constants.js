@@ -1317,16 +1317,18 @@ export const layerKeyNameRefusal = (key, level = 'global') => {
  * the name. One judge returns it, so every place that refuses a name words
  * it the same way.
  *
- * Two places report it, split by what the key holds. A value with no text
- * form cannot be stored, so the admission stage reports the name and drops
+ * Two places report it, split by whether the key can be stored. A value with
+ * no text form cannot be, so the admission stage reports the name and drops
  * the key: left in the bag for a later pass to name, it was dropped first by
  * the JavaScript channels, with nothing said, or kept by a composition object
- * and saved as `[onclick=null]`. A text value is kept, and the pass that
- * refuses the name (the safety gate and the reserved-name guard in the
- * options pass and the root split, the layer-key split loop) reports it on
- * every load. Either way the name is the report worth having: told only that
- * `null` is not a text value, an author fixes the value and `nosuch--fill`
- * is just as dead, where the name refusal hands them the targets that exist.
+ * and saved as `[onclick=null]`. Nor can a name the text form cannot write
+ * back, which the stage drops whatever it holds. Any other key is kept, and
+ * the pass that refuses the name (the safety gate and the reserved-name guard
+ * in the options pass and the root split, the layer-key split loop) reports
+ * it on every load. Either way the name is the report worth having: told
+ * only that `null` is not a text value, an author fixes the value and
+ * `nosuch--fill` is just as dead, where the name refusal hands them the
+ * targets that exist.
  *
  * `level` is where the key is written, because one name is refused at one
  * place only: the library's stamp, which the root alone reads, so it is
@@ -1364,26 +1366,42 @@ export const optionNameRefusal = (key, level) => {
  */
 export const optionNameIsAlreadyRefused = (key, level) => optionNameRefusal(key, level) !== null;
 
+// Whether the text form can write this name back as itself. A bracket key ends
+// at its first `=`, an entry at a `;` and the bracket at a `]`, a quote can
+// open a span that runs on into the next key, and the reader trims a key's
+// ends, so a name holding any of these reads back as another name, which can
+// be a working one: stored, `' color'` would be saved as `[ color=red]` and
+// read back as `color`. A `[` is none of these: a bracket reads it as part of
+// the name.
+const hasTextSpelling = (key) => !/[=;\]"']|^\s|\s$/.test(key);
+
 /**
- * The refusal that keeps one written value OUT of the composition, or null when
+ * The refusal that keeps one written entry OUT of the composition, or null when
  * nothing is refused.
  *
- * One test decides it, and it is a test on the value's TYPE rather than on
- * which option it was written on, so it governs every option that exists and
- * every option added later with no list to maintain. A value with no text form
- * the author meant is not input: it cannot be saved, cannot be read back and
- * cannot be fixed by reading it, so it is reported once and does not enter.
- * A value that IS text is input even when it is wrong for the option
+ * For a value, one test decides it, and it is a test on the value's TYPE rather
+ * than on which option it was written on, so it governs every option that
+ * exists and every option added later with no list to maintain. A value with no
+ * text form the author meant is not input: it cannot be saved, cannot be read
+ * back and cannot be fixed by reading it, so it is reported once and does not
+ * enter. A value that IS text is input even when it is wrong for the option
  * (`crop=nope`), because the author can read it and fix it, so it is kept and
  * reported by the gate that knows what that option accepts.
+ *
+ * A name is held to the same rule. One the text form cannot write back as
+ * itself (`hasTextSpelling`) cannot be saved and read back either, so it does
+ * not enter, whatever it holds. Every such name is one the safety gate refuses,
+ * so it is reported under the refusal its name earns. The transient channel
+ * never saves, so a name there is left to that channel's own checks.
  *
  * Asked after the scope judge, it names the first thing wrong with a key whose
  * value has no text form, in the words that thing is reported in everywhere
  * else: the channel (a key the transient channel refuses), then the name (a
  * name a later pass refuses), then the value. The value is dropped whichever
  * is named, since it cannot be stored, so naming the one the author has to fix
- * first costs nothing. A text value is not judged here at all: under a refused
- * name it is kept, and the pass that refuses the name reports it on every load.
+ * first costs nothing. A text value is judged here only under a name the text
+ * form cannot write: under any other refused name it is kept, and the pass
+ * that refuses the name reports it on every load.
  *
  * The judges are asked rather than the type test being reported directly, for
  * two reasons. They word the refusal for the option it landed on, so a number
@@ -1396,6 +1414,7 @@ export const optionNameIsAlreadyRefused = (key, level) => optionNameRefusal(key,
  * silence).
  */
 const admissionRefusal = (key, value, scope) => {
+  if (!scope?.transient && !hasTextSpelling(key)) return optionNameRefusal(key, scope?.level);
   if (hasAuthoredTextForm(value)) return null;
   if (scope?.transient && TRANSIENT_REFUSED_OPTION_KEYS.has(key)) {
     return { code: WARNING_CODES.MISPLACED_TRANSIENT_OPTION, message: transientRefusalMessage([key]), source: key };
@@ -1601,10 +1620,12 @@ export const isScopeRefusal = (warning) =>
  * Given the `scope` the bag is being written at, the stage also refuses a key
  * that cannot act there (`scopeRefusal`), and it asks that FIRST: where a key
  * cannot act, fixing its value would achieve nothing, so `{marginTop: null}` on
- * a character is reported once, as misplaced. Then, for a value with no text
- * form, the channel and the name, so `{x: null}` in a transient bag is
- * reported as a key that channel refuses and `{onclick: null}` as a name, each
- * in the words the same key earns with a text value. A key refused for its
+ * a character is reported once, as misplaced. Then a name the text form cannot
+ * write back, whatever it holds, outside a transient bag, which is never saved.
+ * Then, for a value with no text form, the channel and the name, so `{x: null}`
+ * in a transient bag is reported as a key that channel refuses and
+ * `{onclick: null}` as a name, each in the words the same key earns with a
+ * text value. A key refused for its
  * scope is never noted as a spelling either, for the same reason a refused
  * value is not.
  * Without a scope nothing is judged for scope. That is a definition's
