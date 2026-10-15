@@ -17,7 +17,7 @@
               <th class="col-code">Code</th>
               <th class="col-svg">Symbol</th>
               <th class="col-name">Gloss</th>
-              <th class="col-why">Why Excluded</th>
+              <th class="col-why">{{ group.excluded === false ? 'Why Not Excluded' : 'Why Excluded' }}</th>
             </tr>
           </thead>
           <tbody>

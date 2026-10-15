@@ -19,6 +19,7 @@ export const exclusions = {
   B486: { name: 'opposite', why: 'Inverts the concept' },
 
   // Concept-transforming operators
+  'B1060/B578/B608/B292': { name: 'rhymes with', why: 'Compares concepts' },
   'B1060/B578/B303': { name: 'looks similar to', why: 'Compares concepts' },
   'B1060/B578/B608': { name: 'sounds similar to', why: 'Compares concepts' },
   'B1060/B578/B374': { name: 'feels similar to', why: 'Compares concepts' },
@@ -31,6 +32,7 @@ export const exclusions = {
   'B578/B473': { name: 'smells like', why: 'Compares concepts' },
   'B578/B642': { name: 'tastes like', why: 'Compares concepts' },
   B348: { name: 'generalization of', why: 'Abstracts the concept' },
+  B444: { name: 'metaphor for', why: 'Compares concepts' },
 
   // Relational operators
   B449: { name: 'without', why: 'Relates concepts' },
@@ -49,11 +51,9 @@ export const exclusions = {
   B162: { name: 'between', why: 'Relates concepts' },
   B195: { name: 'by', why: 'Relates concepts' },
   B482: { name: 'on', why: 'Relates concepts' },
-  B491: { name: 'out of (forward)', why: 'Relates concepts' },
   B492: { name: 'out of (downward)', why: 'Relates concepts' },
   B977: { name: 'out of (upward)', why: 'Relates concepts' },
   B976: { name: 'out of (backward)', why: 'Relates concepts' },
-  B402: { name: 'into (forward)', why: 'Relates concepts' },
   B1124: { name: 'into (downward)', why: 'Relates concepts' },
   B1125: { name: 'into (upward)', why: 'Relates concepts' },
   B1123: { name: 'into (backward)', why: 'Relates concepts' },
@@ -99,6 +99,10 @@ export const exclusions = {
   B16: { name: 'seven', why: 'Quantity modifier' },
   B17: { name: 'eight', why: 'Quantity modifier' },
   B18: { name: 'nine', why: 'Quantity modifier' },
+
+  // Deliberately not excluded
+  B402: { name: 'into, entrance', why: 'Used mostly as the noun "entrance"; mark the head with ^ where it modifies' },
+  B491: { name: 'out of, exit (forward)', why: 'Used mostly as the noun "exit"; mark the head with ^ where it modifies' },
 };
 
 // Exclusion groups with display order
@@ -124,10 +128,10 @@ export const exclusionGroups = [
   {
     name: 'Concept-Transforming Operators',
     codes: [
-      'B1060/B578/B303', 'B1060/B578/B608', 'B1060/B578/B374',
-      'B1060/B578/B473', 'B1060/B578/B642', 'B1060/B578',
-      'B578/B303', 'B578/B608', 'B578/B374', 'B578/B473',
-      'B578/B642', 'B348'
+      'B1060/B578/B608/B292', 'B1060/B578/B303', 'B1060/B578/B608',
+      'B1060/B578/B374', 'B1060/B578/B473', 'B1060/B578/B642',
+      'B1060/B578', 'B578/B303', 'B578/B608', 'B578/B374', 'B578/B473',
+      'B578/B642', 'B348', 'B444'
     ]
   },
   {
@@ -135,8 +139,8 @@ export const exclusionGroups = [
     codes: [
       'B449', 'B578', 'B502/B167', 'B502', 'B102', 'B104', 'B109',
       'B111', 'B120/B120', 'B162/B368', 'B134', 'B135', 'B158',
-      'B162', 'B195', 'B482', 'B491', 'B492', 'B977', 'B976',
-      'B402', 'B1124', 'B1125', 'B1123', 'B490', 'B398', 'B493',
+      'B162', 'B195', 'B482', 'B492', 'B977', 'B976',
+      'B1124', 'B1125', 'B1123', 'B490', 'B398', 'B493',
       'B676', 'B1102', 'B331', 'B332', 'B337', 'B657', 'B653',
       'B677', 'B160'
     ]
@@ -153,5 +157,11 @@ export const exclusionGroups = [
       'B951', 'B962', 'B1151', 'B1152', 'B1153', 'B559/B11',
       'B9', 'B10', 'B11', 'B12', 'B13', 'B14', 'B15', 'B16', 'B17', 'B18'
     ]
+  },
+  {
+    name: 'Not Excluded',
+    description: 'Deliberately left off the list',
+    excluded: false,
+    codes: ['B402', 'B491']
   }
 ];
