@@ -219,6 +219,18 @@ describe('BlissSVGBuilder transient options', () => {
       expect(b.svgCode).not.toContain('on-click');
       expect(b.svgCode).toContain('data-safe="yes"');
     });
+
+    it('reports several refused names in one warning, each in its own sentence', () => {
+      // pins that a hint names its own key: built over the names joined into
+      // one, the marker hint read "B291/RK:5", "a b/B313"
+      const b = new BlissSVGBuilder('B291');
+      b.part(0).setTransientOptions({ 'RK:5': 'x', 'a b': 'y' });
+      const refusals = b.warnings.filter(w => w.code === 'UNSAFE_ATTRIBUTE_NAME');
+
+      expect(refusals).toHaveLength(1);
+      expect(refusals[0].message).toContain('"a b" is not a usable attribute name');
+      expect(refusals[0].message).toContain('as in B291/RK:5/B313,');
+    });
   });
 
   describe('when a transient option names a key the library consumes before rendering', () => {

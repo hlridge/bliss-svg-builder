@@ -10,7 +10,7 @@ import {
   resolveHeadIndex, headScanCode
 } from "./bliss-head-glyph-exclusions.js";
 import { basePartCount, resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
+import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, QUOTED_SPAN, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
 // optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
@@ -45,6 +45,13 @@ const PART_SLOT_CHAR_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACK
 // quoted `]` truncates at one layer even when the other accepts it.
 const BRACKET_TOKEN_PATTERN = new RegExp(String.raw`\{(.*)\}|\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`, 'g');
 const BRACKET_EXTRACT_PATTERN = new RegExp(String.raw`\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`);
+// One entry of an option bracket: everything up to the next `;` outside a
+// quoted span, the same spans OPTION_BRACKET_CONTENT steps over to find where
+// the bracket ends. Each step commits through an atomic lookahead, so an
+// unclosed quote cannot make the scan backtrack.
+const BRACKET_ENTRY_PATTERN = new RegExp(String.raw`(?:(?=(?<atom>` + QUOTED_SPAN + String.raw`|[^;]))\k<atom>)+`, 'g');
+// Every quoted span of a bracket, stripped before its `[`s are counted.
+const QUOTED_SPANS_PATTERN = new RegExp(QUOTED_SPAN, 'g');
 // One leading part-scope option bracket on a definition's code string (raw
 // text, so quotes are read by the same grammar).
 const LEADING_PART_BRACKET_PATTERN = new RegExp(String.raw`^\[` + OPTION_BRACKET_CONTENT + String.raw`\]>`);
@@ -583,9 +590,8 @@ export class BlissParser {
   // [k="]["]-class inputs and the veto is belt-and-suspenders (kept; the
   // Phase 6 Stryker re-baseline adjudicates its reachability).
   static #hasMultipleOptionBrackets(tokenized, restored) {
-    const QUOTED_SPAN = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
     return (tokenized.match(/\[/g) || []).length > 1
-      && (restored.replace(QUOTED_SPAN, '').match(/\[/g) || []).length > 1;
+      && (restored.replace(QUOTED_SPANS_PATTERN, '').match(/\[/g) || []).length > 1;
   }
 
   // `warn` is optional because the entry points are not uniform: `parse` keeps
@@ -613,8 +619,8 @@ export class BlissParser {
     // refuses anything here. It runs anyway, because that is what makes the
     // routes unable to drift apart rather than merely agreeing today.
     //
-    // The bag has no prototype: a bracket key is `[\w-]+`, which can spell
-    // `__proto__`, and on a plain object that assignment would be swallowed
+    // The bag has no prototype: a bracket key can be any name, `__proto__`
+    // included, and on a plain object that assignment would be swallowed
     // instead of stored.
     const parsedObject = Object.create(null);
     for (const [key, value] of admitOptions(written, warn, scope)) parsedObject[key] = value;
@@ -636,30 +642,32 @@ export class BlissParser {
     if (!extractedContent) return null;
 
     const written = [];
-
-    const regex = /([\w-]+)(?:\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^;]*))?/g;
-    let match;
-
-    while ((match = regex.exec(extractedContent)) !== null) {
-      const writtenKey = match[1].trim();
-
-      if (match[2] === undefined) {
+    // A key is everything before its entry's first `=` and is never split: a
+    // character the name gate refuses is reported under the name the author
+    // wrote, as the same key in an object is, instead of silently starting a
+    // second key with whatever followed it.
+    for (const [entry] of extractedContent.matchAll(BRACKET_ENTRY_PATTERN)) {
+      if (entry.trim() === '') continue;
+      const equals = entry.indexOf('=');
+      if (equals === -1) {
         // Bare key (e.g., [grid]) — treat as boolean true
-        written.push([writtenKey, true]);
-      } else {
-        let value = match[2].trim();
-
-        // Remove quotes and handle escapes for both double and single quotes
-        if (value.startsWith('"') && value.endsWith('"')) {
-          value = value.slice(1, -1).replace(/\\"/g, '"');
-        } else if (value.startsWith("'") && value.endsWith("'")) {
-          value = value.slice(1, -1).replace(/\\'/g, "'");
-        }
-
-        written.push([writtenKey, value]);
+        written.push([entry.trim(), true]);
+        continue;
       }
-    }
+      let value = entry.slice(equals + 1).trim();
 
+      // Unquoted only when the value is wrapped in a pair of one quote and
+      // every quote of that kind inside it is escaped, the form a save writes,
+      // so a saved value reads back as itself. A value that merely starts with
+      // a quote, as `"x"y` and `"x" "y"` do, is read as written.
+      if (value.startsWith('"') && value.endsWith('"') && !/(?<!\\)"/.test(value.slice(1, -1))) {
+        value = value.slice(1, -1).replace(/\\"/g, '"');
+      } else if (value.startsWith("'") && value.endsWith("'") && !/(?<!\\)'/.test(value.slice(1, -1))) {
+        value = value.slice(1, -1).replace(/\\'/g, "'");
+      }
+
+      written.push([entry.slice(0, equals).trim(), value]);
+    }
     return written;
   }
 

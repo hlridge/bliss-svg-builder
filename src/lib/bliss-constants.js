@@ -532,6 +532,14 @@ export const serializeOptionValue = (value) => {
 };
 
 /**
+ * One quoted span inside an option bracket ("..." or '...', with \-escapes), a
+ * regex SOURCE fragment with no group. Both scans of a bracket step over it
+ * whole, the one that finds where the bracket ends and the one that finds where
+ * each of its entries ends, so a quoted `]` or `;` ends neither.
+ */
+export const QUOTED_SPAN = String.raw`"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'`;
+
+/**
  * Bracket-content grammar (a regex SOURCE fragment) shared by every site
  * that tokenizes or (re-)extracts one `[option]` bracket: a quoted span
  * ("..." or '...', with \-escapes) may carry `]` `;` `|` `[` — mirroring
@@ -547,7 +555,7 @@ export const serializeOptionValue = (value) => {
  * Embed at most once per composed regex (the group is named); the counterpart
  * of [[serializeOptionValue]] above.
  */
-export const OPTION_BRACKET_CONTENT = String.raw`(?:(?=(?<atom>"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\]]))\k<atom>)*`;
+export const OPTION_BRACKET_CONTENT = String.raw`(?:(?=(?<atom>` + QUOTED_SPAN + String.raw`|[^\]]))\k<atom>)*`;
 
 /**
  * One character-scope option bracket (no `>` after it) at the start of a
@@ -1232,9 +1240,17 @@ const RESERVED_ATTRIBUTE_REASONS = new Map([
 export const reservedAttributeMessage = (name) =>
   `"${name}" ${RESERVED_ATTRIBUTE_REASONS.get(String(name).toLowerCase())}, so the written value was refused.`;
 
+// The two names people reach for that the library spells another way: the
+// kerning marker, which goes between characters, and SVG 1.1's namespaced link.
+const unsafeNameHint = (key) => {
+  if (/^(?:RK|AK):/.test(key)) return ` A kerning marker goes between two characters, as in B291/${key}/B313, not inside a bracket.`;
+  if (key.toLowerCase() === 'xlink:href') return ' Write "href": SVG 2 dropped the xlink: prefix.';
+  return '';
+};
+
 /** The refusal of a name the safety gate rejects, in words shared by every place that rejects one. */
 export const unsafeAttributeNameMessage = (key) =>
-  `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.`;
+  `"${key}" is not a usable attribute name (event handlers and names outside letters, digits and dashes are refused), so it was dropped and will not be emitted.${unsafeNameHint(key)}`;
 
 // Why a target-prefixed key resolved to no target. All three shapes fail the
 // same way, so they share a code, but each fails for its own reason and a

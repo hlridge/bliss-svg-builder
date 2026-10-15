@@ -1402,9 +1402,10 @@ class BlissSVGBuilder {
             drop(bag, refused, WARNING_CODES.MISPLACED_TRANSIENT_OPTION, transientRefusalMessage);
           }
           const unsafe = Object.keys(bag).filter(k => !isLayerAttributeKey(k) && !isSafeAttributeName(k));
+          // One sentence per name, so a hint the refusal gives names its own key.
           if (unsafe.length > 0) {
             drop(bag, unsafe, WARNING_CODES.UNSAFE_ATTRIBUTE_NAME,
-              (k) => unsafeAttributeNameMessage(k.join('", "')));
+              (k) => k.map(unsafeAttributeNameMessage).join(' '));
           }
         }
         if (Object.keys(bag).length === 0) delete node.transientOptions;
