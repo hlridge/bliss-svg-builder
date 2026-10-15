@@ -335,7 +335,7 @@ describe('BlissParser X-codes', () => {
       const builder = new BlissSVGBuilder('Xpiǎ');
       expect(builder.toString()).toBe('');
       expect(builder.warnings).toContainEqual(
-        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Invalid format: Xpiǎ' })
+        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Xpiǎ' })
       );
     });
 

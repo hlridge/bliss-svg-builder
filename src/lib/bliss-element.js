@@ -839,6 +839,10 @@ export class BlissElement {
             throw new Error(`Unable to create Bliss element: ${failedCode}`);
           }
 
+          // What a warning below quotes as its source: the token as the parser
+          // read it, or, for a part built another way, its error.
+          const written = this.#blissObj.errorSource ?? this.#blissObj.error;
+
           if (this.#blissObj.errorCode === WARNING_CODES.WORD_AS_PART) {
             this.#sharedOptions.warnings.push({
               code: WARNING_CODES.WORD_AS_PART,
@@ -852,10 +856,10 @@ export class BlissElement {
             this.#sharedOptions.warnings.push({
               code: WARNING_CODES.MALFORMED_COORDINATES,
               message: this.#blissObj.error,
-              source: this.#blissObj.error,
+              source: written,
             });
           } else {
-            const failedCode = this.#blissObj.codeName || this.#blissObj.error || 'unknown';
+            const failedCode = this.#blissObj.codeName || written || 'unknown';
             this.#sharedOptions.warnings.push({
               code: WARNING_CODES.UNKNOWN_CODE,
               message: `Unknown or invalid code: "${failedCode}"`,

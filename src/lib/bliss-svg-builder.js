@@ -1508,11 +1508,14 @@ class BlissSVGBuilder {
         for (const p of errorParts) {
           // Mirror BlissElement's leaf-fail warning so the visibility survives
           // the drop: a code with a bad `:x,y` suffix names the coordinate
-          // error, any other malformed token is UNKNOWN_CODE.
+          // error, any other malformed token is UNKNOWN_CODE. The source is the
+          // token as the parser read it; a failed part handed over in a
+          // composition object carries only its error, which stands in.
+          const source = p.errorSource ?? p.error;
           if (p.errorCode === WARNING_CODES.MALFORMED_COORDINATES) {
-            this.#mutationWarnings.push({ code: WARNING_CODES.MALFORMED_COORDINATES, message: p.error, source: p.error });
+            this.#mutationWarnings.push({ code: WARNING_CODES.MALFORMED_COORDINATES, message: p.error, source });
           } else {
-            this.#mutationWarnings.push({ code: WARNING_CODES.UNKNOWN_CODE, message: `Unknown or invalid code: "${p.error}"`, source: p.error });
+            this.#mutationWarnings.push({ code: WARNING_CODES.UNKNOWN_CODE, message: `Unknown or invalid code: "${source}"`, source });
           }
         }
         doomed.push(gi);

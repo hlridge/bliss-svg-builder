@@ -251,7 +251,7 @@ describe('BlissSVGBuilder text fallback', () => {
       const builder = new BlissSVGBuilder(input);
       expect(builder.warnings).toContainEqual(expect.objectContaining({
         code: 'UNKNOWN_CODE',
-        source: `Invalid format: ${input}`,
+        source: input,
       }));
     });
 
@@ -264,7 +264,7 @@ describe('BlissSVGBuilder text fallback', () => {
       const builder = new BlissSVGBuilder('Xpiǎ');
       expect(builder.warnings).toContainEqual(expect.objectContaining({
         code: 'UNKNOWN_CODE',
-        source: 'Invalid format: Xpiǎ',
+        source: 'Xpiǎ',
       }));
     });
 
@@ -272,7 +272,7 @@ describe('BlissSVGBuilder text fallback', () => {
       const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
       expect(builder.warnings).toContainEqual(expect.objectContaining({
         code: 'UNKNOWN_CODE',
-        source: 'Invalid format: Xpiǎ',
+        source: 'Xpiǎ',
       }));
     });
 
