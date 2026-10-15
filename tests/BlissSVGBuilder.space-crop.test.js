@@ -72,6 +72,11 @@ describe('BlissSVGBuilder space crop', () => {
     it('crops past a leading space before a character', () => {
       expect(viewBox('[crop=auto]||//B291')).toBe('5.25 7.25 9.5 9.5');
     });
+
+    it('crops past a written QSP at either edge', () => {
+      expect(viewBox('[crop=auto]||QSP/B291')).toBe('1.25 7.25 9.5 9.5');
+      expect(viewBox('[crop=auto]||B291/QSP')).toBe(viewBox('[crop=auto]||B291'));
+    });
   });
 
   describe('when a single side or axis is cropped automatically', () => {
@@ -154,6 +159,16 @@ describe('BlissSVGBuilder space crop', () => {
       // is unknown), so its word reads as a space group by its first part,
       // yet the placeholder it draws must stay inside the crop.
       expect(viewBox('[crop=auto;error-placeholder]||TSP;ZZ9')).toBe('-0.75 7.25 9.5 9.5');
+    });
+
+    it('keeps that ink at the right edge of a saved composition', () => {
+      // pins the one-part test on the object route: the shape toJSON() writes
+      // for `B291//TSP;ZZ9`, whose placeholder is the last ink on the right.
+      const saved = {
+        options: { crop: 'auto', errorPlaceholder: true },
+        groups: [word('B291'), word('TSP'), { glyphs: [{ parts: [{ codeName: 'TSP' }, { codeName: 'ZZ9' }] }] }],
+      };
+      expect(viewBox(saved)).toBe('-0.75 7.25 25.5 9.5');
     });
   });
 });
