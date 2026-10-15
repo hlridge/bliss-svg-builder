@@ -8,11 +8,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * to a warning rather than silently parsing.
  *
  * Covers:
- * - Well-formed forms (CODE alone, CODE:x,y, CODE:x, CODE:,y, signed,
- *   leading-dot and trailing-dot decimal shorthand, omitted values, trailing
- *   comma).
+ * - Well-formed forms (CODE alone, CODE:x,y, CODE:x, CODE:,y, signed with a
+ *   minus or a plus, leading-dot and trailing-dot decimal shorthand, omitted
+ *   values, trailing comma).
  * - Malformed forms: a malformed coordinate suffix (`:.`, `:-`, `:-.`, `:3,.`,
- *   `:3,-`, `:5,5,5`, `:abc,5`, `:+5`) warns MALFORMED_COORDINATES and drops the
+ *   `:3,-`, `:5,5,5`, `:abc,5`) warns MALFORMED_COORDINATES and drops the
  *   token (invalid syntax is not carried into toString); a comma without a colon
  *   (`B291,`, `B291,4`) is a general UNKNOWN_CODE since the `:` is the coordinate
  *   trigger. A coordinate syntax error is reported before the unknown-code check
@@ -51,6 +51,7 @@ describe('BlissSVGBuilder coordinate syntax', () => {
       ['HL2:,0',      undefined, 0,         'zero y only'],
       ['HL2:0,0',     0,         0,         'both zero'],
       ['HL2:-1,-1',  -1,        -1,         'both negative integers'],
+      ['HL2:+5',      5,         undefined, 'plus-signed x'],
       ['HL2:',        undefined, undefined, 'colon with no values'],
       ['HL2:,',       undefined, undefined, 'colon and comma with no values'],
       ['HL2:3,',      3,         undefined, 'trailing comma'],
@@ -74,7 +75,6 @@ describe('BlissSVGBuilder coordinate syntax', () => {
       ['B291:3,-',   'bare minus in the y position'],
       ['B291:5,5,5', 'extra third coordinate component'],
       ['B291:abc,5', 'non-numeric x component'],
-      ['B291:+5',    'plus sign is not allowed in coordinates'],
     ])('warns MALFORMED_COORDINATES on %s (%s)', (input) => {
       expect(warnings(input).map(w => w.code)).toEqual(['MALFORMED_COORDINATES']);
     });

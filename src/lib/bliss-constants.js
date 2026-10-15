@@ -1037,21 +1037,49 @@ export const textOfValue = (value) => {
 };
 
 /**
+ * The one grammar a number written as text is read by: JavaScript's decimal
+ * notation, the form `String()` writes a number in, so every number a save
+ * writes reads back as itself and every spelling of a value (an option, a
+ * coordinate, a kerning marker) agrees. A sign, digits with an optional
+ * fraction or a fraction alone, an optional exponent; `Infinity` is a spelling
+ * too, and the finiteness checks refuse it where a length is needed. The hex,
+ * binary and octal forms `Number()` also reads are not numbers here: nothing
+ * documented them, and a coordinate or a marker never read them.
+ *
+ * A regex SOURCE fragment with no capturing group, so the coordinate suffix and
+ * the kerning marker can embed it without renumbering their own groups.
+ */
+export const NUMBER_TEXT = String.raw`[+-]?(?:Infinity|(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)`;
+const WHOLE_NUMBER_TEXT = new RegExp(`^${NUMBER_TEXT}$`);
+
+/** Text read as a number by that grammar, its padding ignored, or NaN. */
+const numberFromText = (text) => (WHOLE_NUMBER_TEXT.test(text.trim()) ? Number(text) : NaN);
+
+/**
+ * Finds a coordinate written on a code: a `:` followed by what can start a
+ * number in that grammar. `define()`'s word guard asks it, and so does the
+ * alias expansion, which appends an outer coordinate only to a first part
+ * carrying none: a spelling it missed would get a second coordinate, which no
+ * reader accepts, and the character would be dropped.
+ */
+export const WRITTEN_COORDINATE_PATTERN = /:[+-]?(?:[\d.]|Infinity)/;
+
+/**
  * A written value read as a number, or NaN when it cannot be one, with the TYPE
- * deciding first: only a number, a bigint, or text that is not blank, is read.
+ * deciding first: only a number, a bigint, or text the number grammar reads, is
+ * read.
  *
  * The same rule `judgeNumericOptionValue` applies to the numeric options, and
  * for the same reason. `Number()` reads `null`, `[]` and a blank string as 0 and
  * `[5]` as 5, so trusting it alone invents a value nobody wrote, and for a
- * position a 0 is not an absence: it moves the element to its own origin.
+ * position a 0 is not an absence: it moves the element to its own origin. Blank
+ * text is no number to the grammar, so it is refused with the rest.
  * Shared by the position and kerning readers so the two cannot drift.
  */
-export const writtenNumber = (value) => (
-  typeof value === 'number' || typeof value === 'bigint'
-    || (typeof value === 'string' && value.trim() !== '')
-    ? Number(value)
-    : NaN
-);
+export const writtenNumber = (value) => {
+  if (typeof value === 'number' || typeof value === 'bigint') return Number(value);
+  return typeof value === 'string' ? numberFromText(value) : NaN;
+};
 
 export const judgeNumericOptionValue = (key, rawValue) => {
   const policy = NUMERIC_OPTION_POLICY.get(key);
@@ -1076,11 +1104,11 @@ export const judgeNumericOptionValue = (key, rawValue) => {
   }
   // The TYPE decides, not what Number() makes of it. Number(false) is 0 and
   // Number([5]) is 5, so trusting the NaN check below would honour a value the
-  // author never wrote as a number. Only a number, or a string carrying one,
-  // can be honoured; a padded number such as ' 5 ' still is.
-  const written = typeof rawValue === 'number' || typeof rawValue === 'string'
-    ? Number(rawValue)
-    : NaN;
+  // author never wrote as a number. Only a number, or a string the number
+  // grammar reads, can be honoured; a padded number such as ' 5 ' still is.
+  const written = typeof rawValue === 'number'
+    ? rawValue
+    : typeof rawValue === 'string' ? numberFromText(rawValue) : NaN;
   if (Number.isNaN(written)) {
     return {
       code: WARNING_CODES.INVALID_OPTION_VALUE,

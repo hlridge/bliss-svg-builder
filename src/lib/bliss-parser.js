@@ -10,14 +10,21 @@ import {
   resolveHeadIndex, headScanCode
 } from "./bliss-head-glyph-exclusions.js";
 import { basePartCount, resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
-import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, OPTION_BRACKET_CONTENT, QUOTED_SPAN, WARNING_CODES, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
+import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, NUMBER_TEXT, OPTION_BRACKET_CONTENT, QUOTED_SPAN, WARNING_CODES, WRITTEN_COORDINATE_PATTERN, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
-// optional (:2 | :2, | :,2 | :2,3 | :). Every site that strips a coordinate
+// optional (:2 | :2, | :,2 | :2,3 | :), each axis a number as every number
+// written as text is read (NUMBER_TEXT). Every site that strips a coordinate
 // suffix before a definition lookup must strip this SAME grammar, or
 // equivalent spellings take different semantic paths (a y-only ':,2' used to
 // bypass the misplacement gates while ':0,2' met them).
-const COORD_SUFFIX_PATTERN = /:(?:-?(?:\d+(?:\.\d*)?|\.\d+))?(?:,(?:-?(?:\d+(?:\.\d*)?|\.\d+))?)?$/;
+const COORD_SUFFIX_PATTERN = new RegExp(String.raw`:(?:${NUMBER_TEXT})?(?:,(?:${NUMBER_TEXT})?)?$`);
+// A part as parsePartString reads it: a code, then that suffix with each axis
+// captured (groups: code, x, y).
+const PART_STRING_PATTERN = new RegExp(String.raw`^([a-zA-Z0-9À-ſͰ-ϿЀ-ӿ\-._]+)(?::(${NUMBER_TEXT})?(?:,(${NUMBER_TEXT})?)?)?$`);
+// A kerning marker, RK or AK, with its value read by the same grammar (groups:
+// type, value).
+const KERNING_MARKER_PATTERN = new RegExp(String.raw`^(RK|AK)(?::(${NUMBER_TEXT}))?$`);
 
 // A codeString beginning with a part option ([color=red]>B291) must nest-parse
 // like a multi-code string; treated as a plain codeName it becomes one unknown
@@ -270,7 +277,8 @@ const coordinateNumber = writtenNumber;
 
 // Reads the promoted `x`/`y` FIELD. That field is the one route to a position
 // object input has and the DSL does not: a DSL coordinate is grammar-gated to
-// digits, so the field is a number by construction there and this is a no-op.
+// the number grammar, so the field is a number by construction there, or the
+// text as written for an axis no position can be (B291:1e400), refused here.
 // An object literal can put anything in it, while `x?: number` is what the
 // published declaration states at every scope, so this is that declaration
 // enforced at run time.
@@ -730,13 +738,17 @@ export class BlissParser {
     }
 
     if (codeString) {
-      const matched = codeString.match(/^([a-zA-Z0-9\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\-._]+)(?::(\-?(?:\d+(?:\.\d*)?|\.\d+))?(?:,(\-?(?:\d+(?:\.\d*)?|\.\d+))?)?)?$/);
+      const matched = codeString.match(PART_STRING_PATTERN);
 
       if (matched) {
         let [, code, x, y] = matched;
         part.codeName = code;
-        x !== undefined && (part.x = Number(x));
-        y !== undefined && (part.y = Number(y));
+        // An axis the grammar reads but no position can be (B291:1e400) is
+        // handed over as written, so the position gate refuses it quoting what
+        // the author wrote, as it quotes [x=1e400], not the Infinity it reads as.
+        const axisValue = (text) => (Number.isFinite(Number(text)) ? Number(text) : text);
+        x !== undefined && (part.x = axisValue(x));
+        y !== undefined && (part.y = axisValue(y));
       } else {
         // Restore placeholders in what is reported (a tokenized bracket
         // otherwise leaks as a literal [PLACEHOLDER_n]); the format checks
@@ -1622,7 +1634,7 @@ export class BlissParser {
                 const firstReal = allParts.find(p => !p._wordBreak);
                 if (firstReal) {
                   const semiParts = firstReal.part.split(';');
-                  if (!/:-?[\d.]/.test(semiParts[0])) {
+                  if (!WRITTEN_COORDINATE_PATTERN.test(semiParts[0])) {
                     semiParts[0] += positionSuffix;
                   }
                   firstReal.part = semiParts.join(';');
@@ -1752,7 +1764,7 @@ export class BlissParser {
               const firstPart = expandedParts[0].part;
               const semiParts = firstPart.split(';');
               // Only add position if the first sub-part doesn't already have coordinates
-              if (!/:-?[\d.]/.test(semiParts[0])) {
+              if (!WRITTEN_COORDINATE_PATTERN.test(semiParts[0])) {
                 semiParts[0] += positionSuffix;
               }
               expandedParts[0].part = semiParts.join(';');
@@ -1968,8 +1980,10 @@ export class BlissParser {
           ...(isHeadGlyph === true && { isHeadGlyph })
         };
 
-        const kerningMatch = part.match(/^(RK|AK)(?::([+-]?(?:\d+(?:\.\d*)?|\.\d+)))?$/);
-        if (kerningMatch) {
+        const kerningMatch = part.match(KERNING_MARKER_PATTERN);
+        // A value the grammar reads but no gap can be (RK:1e400, RK:Infinity) is
+        // as malformed as one it cannot read, and falls through to that report.
+        if (kerningMatch && (kerningMatch[2] === undefined || Number.isFinite(Number(kerningMatch[2])))) {
           const [_, kerningType, kerningValue] = kerningMatch;
           // A bare marker (RK/AK with no `:value`) is absent: it applies no
           // kerning and is not persisted, so it never materializes a default
@@ -1995,7 +2009,7 @@ export class BlissParser {
         }
 
         // A kerning marker (RK:/AK:) whose value failed the grammar above is a
-        // malformed kerning value (RK:abc, RK:., RK:.5.5, RK:5e2, RK:). Warn and
+        // malformed kerning value (RK:abc, RK:., RK:.5.5, RK:1e400, RK:). Warn and
         // drop it — apply no kerning, leaving the next glyph unshifted — rather
         // than letting it fall through as a misleading UNKNOWN_CODE. The ^ anchor
         // keeps a real code that merely contains RK:/AK: (e.g. B86RK:abc) from

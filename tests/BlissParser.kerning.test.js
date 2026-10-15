@@ -9,7 +9,8 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * alongside glyph-level and part-level bracket options.
  *
  * Covers:
- * - Decimal forms accepted by both RK and AK (0.5, .5, 5., signed, zero).
+ * - Decimal forms accepted by both RK and AK (0.5, .5, 5., signed, zero,
+ *   exponent).
  * - Multi-digit RK values (RK:25; pins regex \d+ quantifier).
  * - Decimal-only multi-digit RK values (RK:.55; pins the \.\d+ alternative
  *   quantifier).
@@ -19,7 +20,7 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   (never falling through to UNKNOWN_CODE), both between glyphs and at the
  *   start of input.
  * - A malformed kerning value (RK:/AK: followed by a non-number: RK:., RK:abc,
- *   RK:.5.5, RK:5e2, RK:, AK:.) warns MALFORMED_KERNING_VALUE and applies no
+ *   RK:.5.5, RK:, AK:.) warns MALFORMED_KERNING_VALUE and applies no
  *   kerning (the marker is dropped, the next glyph unshifted), rather than the
  *   misleading UNKNOWN_CODE the general code parser would emit.
  * - Start-anchor on the kerning regex (`^(RK|AK)...$`): a glyph code that
@@ -34,11 +35,10 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  * Does NOT cover:
  * - Effect of kerning on rendered SVG positions, see
  *   `BlissSVGBuilder.spacing.test.js`.
- * - An options-API form for kerning. The DSL `RK:` / `AK:` markers are
- *   the only public surface; `relativeKerning` / `absoluteKerning` are
- *   internal field names on the parsed tree (visible in `toJSON()`),
- *   not advertised options. An options-API form would be a future
- *   feature, not a parity gap.
+ * - The option spelling of kerning (`relative-kerning`, `absolute-kerning`)
+ *   and how it meets a marker, see `BlissSVGBuilder.kerning-options.test.js`;
+ *   that a number reads the same in every spelling, see
+ *   `BlissParser.number-grammar.test.js`.
  *
  * @issue: #24
  * @contract: parser-kerning-grammar
@@ -66,6 +66,7 @@ describe('BlissParser kerning', () => {
       ['RK:+0.5', 0.5],
       ['RK:+.5',  0.5],
       ['RK:0',    0],
+      ['RK:5e2',  500],
     ])('parses %s as relativeKerning=%s on the next glyph', (dsl, expected) => {
       const glyphs = probe(dsl);
       expect(glyphs).toHaveLength(2);
@@ -161,7 +162,7 @@ describe('BlissParser kerning', () => {
     // with a MALFORMED_KERNING_VALUE warning; no kerning is applied (the next
     // glyph is unshifted). This is a FORMAT error (the value didn't parse),
     // distinct from a value/range error, so MALFORMED_ not INVALID_.
-    it.each(['RK:.', 'RK:abc', 'RK:.5.5', 'RK:5e2', 'RK:', 'AK:.', 'AK:abc'])(
+    it.each(['RK:.', 'RK:abc', 'RK:.5.5', 'RK:', 'AK:.', 'AK:abc'])(
       'warns MALFORMED_KERNING_VALUE and applies no kerning for %s', (dsl) => {
         const b = new BlissSVGBuilder(`B313/${dsl}/B1103`);
         const glyphs = b.toJSON().groups[0].glyphs;
