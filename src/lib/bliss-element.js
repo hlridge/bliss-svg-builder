@@ -40,6 +40,7 @@ export class BlissElement {
   #char
   #externalGlyphSpacing
   #isSpaceGroup
+  #holdsOnlySpaces
   #isEmptyGlyph
   #isEmptyGroup
   //#endregion
@@ -532,6 +533,13 @@ export class BlissElement {
         return code && isSpaceGlyph(code);
       });
       const isSpaceGroup = this.#isSpaceGroup;
+
+      // A group of nothing but spaces has no ink for an automatic crop to
+      // stop at (#calculateBounds skips it). Every glyph must be a space and
+      // nothing else: #isSpaceGroup reads only a glyph's first part, and a
+      // glyph that starts with a space but keeps another part (an unknown
+      // code drawn as an error placeholder) has that part's ink to keep.
+      this.#holdsOnlySpaces = isSpaceGroup && this.#blissObj.glyphs.every(g => g.parts.length === 1);
 
       if (this.#previousElement) {
         if (this.#blissObj.x === undefined) {
@@ -1290,11 +1298,15 @@ export class BlissElement {
     }
 
     // Content-empty groups and empty-parts glyphs are excluded from bounds
-    // like they are from the width getter; an element left with no layout
-    // children collapses to a point at its origin instead of Math.min/max
-    // over nothing (Infinity).
+    // like they are from the width getter. A group of nothing but spaces is
+    // excluded here too, though the width getter keeps it: it separates
+    // words and draws nothing, and the point at its own origin would hold an
+    // automatic crop open on whichever edge it sits. A ZSA draws nothing
+    // either, but it is content placed to hold a crop open, so it counts.
+    // An element left with no layout children collapses to a point at its
+    // origin instead of Math.min/max over nothing (Infinity).
     const layoutChildren = this.#level === 0
-      ? this.#children.filter(child => !child.#isEmptyGroup)
+      ? this.#children.filter(child => !child.#isEmptyGroup && !child.#holdsOnlySpaces)
       : this.#level === 1
         ? this.#children.filter(child => !child.#isEmptyGlyph)
         : this.#children;

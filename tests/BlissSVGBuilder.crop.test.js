@@ -44,6 +44,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The `effectiveBounds` getter independent of crop, see
  *   `BlissSVGBuilder.effective-bounds.test.js`.
  * - Margin without crop, see `BlissSVGBuilder.margin.test.js`.
+ * - A word space under the automatic crop modes, see
+ *   `BlissSVGBuilder.space-crop.test.js`.
  * - Visual regression of cropped SVG output, see
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`.
  */
@@ -563,10 +565,10 @@ describe('BlissSVGBuilder crop', () => {
       });
 
       it('crops based on combined bounds across words (B291//B138)', () => {
-        // Word separator extends to y=0 -> minY=0, topRoom=0
-        // cropTop=0, cropBottom=min(4, bottomRoom)
+        // regression: see issue #41, the word space no longer holds the top
+        // open. Combined bounds: minY=4 (from B138) -> topRoom=4, cropTop=4
         const { y, h } = getViewBox('[crop=compact]||B291//B138');
-        expect(y).toBeCloseTo(-0.75, 2);
+        expect(y).toBeCloseTo(3.25, 2);
         expect(h).toBeCloseTo(17.5, 2);
       });
     });
