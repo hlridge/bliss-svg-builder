@@ -1289,8 +1289,9 @@ export declare class BlissSVGBuilder {
    * anchor sits 2 lower than `B291`'s), and on the character that carries a
    * word's `;;` indicators where a reload would pick another head
    * (`B937^/B291;;B81`). A `;;` code named by a custom definition is written
-   * as the built-in indicator codes it draws, or by its name where no
-   * built-in code can stand in for it (an indicator drawn from a plain shape).
+   * as the built-in codes it draws; one that spells out into a plain shape,
+   * which a `;;` list cannot hold, is written as a part of the head where it
+   * was drawn (`B291;;MYIND` comes back as `B291;C2:3`).
    *
    * The output uses the compact shorthand wherever it means the same thing: a
    * space that matches the default for its position is written as a bare
@@ -1336,7 +1337,8 @@ export declare class BlissSVGBuilder {
    * as `toString()`. As there, a part or a `wordIndicators` code carries the
    * position it was drawn at, and a glyph `isHeadGlyph: true`, where needed to
    * keep an indicator where it was drawn, and a `;;` code named by a custom
-   * definition is written as built-in codes wherever they can stand in for it.
+   * definition is written as built-in codes, a plain shape among them as a
+   * part of the head that keeps `isIndicator`.
    *
    * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
    * omits the `wordIndicators` field (see `toString`).

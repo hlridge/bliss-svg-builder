@@ -156,7 +156,7 @@ new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // codeName: 'LOVE'
 
 Word-level indicator behavior:
 - A word-level indicator (`;;`) is carried as a reversible `wordIndicators: { codes, stripSemantic }` field on its group, not baked onto a glyph's parts. The round-trip keeps it.
-- A `;;` code named by a custom definition is written in `codes` as the built-in indicator codes it draws (`['B99']` for `{ codeString: 'B99' }`), or by its name where no built-in code can stand in for it; `preserve` keeps the name.
+- A `;;` code named by a custom definition is written in `codes` as the built-in indicator codes it draws (`['B99']` for `{ codeString: 'B99' }`); one that spells out into a plain shape, which a `;;` list cannot hold, becomes a part of the head glyph that keeps `isIndicator`. `preserve` keeps the name.
 - Pass `{ flattenIndicators: true }` to bake the overlay onto the head glyph's parts and omit the `wordIndicators` field (the decomposed primitive form). `flattenIndicators` is independent of `preserve` and composes with it.
 
 ```js
@@ -195,7 +195,7 @@ The options a code brings by its definition are part of the code, so they are no
 
 Custom code behavior: custom names are decomposed to built-in codes by default. `{ preserve: true }` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`. A name is kept only while reading it back draws what you have: a change you make where the name is used is written beside it (`[color=blue]>SMILEY`, `SMILEY:3,4`, `SMILEY;B81`), and the options its definition gives are not written again. A glyph the name no longer describes, such as a composition object holding other parts than the definition draws, is written out in full, so the string reloads to what you see.
 
-Where the built-in codes alone would draw an indicator elsewhere than it was drawn (a glyph with an anchor of its own, a compound indicator broken into its parts), the decomposed output writes the position it was drawn at, on that part and axis only; where a reload would put a word's `;;` indicators on another character, it marks the head with `^` (see [Head Marker Resolution](#head-marker-resolution)). A word-level (`;;`) code named by a custom definition is written as the built-in indicator codes it draws, keeping its name only where no built-in code can stand in for it. [Serializing Custom Indicators and Shapes](/handbook/writing/custom-codes#serializing-custom-indicators-and-shapes) has the cases.
+Where the built-in codes alone would draw an indicator elsewhere than it was drawn (a glyph with an anchor of its own, a compound indicator broken into its parts), the decomposed output writes the position it was drawn at, on that part and axis only; where a reload would put a word's `;;` indicators on another character, it marks the head with `^` (see [Head Marker Resolution](#head-marker-resolution)). A word-level (`;;`) code named by a custom definition is written as the built-in codes it draws; one that spells out into a plain shape, which a `;;` list cannot hold, is written as a part of the head where it was drawn (`B291;;MYIND` comes back as `B291;C2:3`). [Serializing Custom Indicators and Shapes](/handbook/writing/custom-codes#serializing-custom-indicators-and-shapes) has the cases.
 
 ```js
 BlissSVGBuilder.define({
@@ -215,7 +215,7 @@ new BlissSVGBuilder('ANC;B81').toString();
 
 Which mode to use:
 
-- **Default** for output that leaves your environment: files, APIs, other Bliss tools. It contains only built-in codes, so any receiver renders it without your definitions, except for the few names no built-in code can stand in for (a shape drawn by its own `getPath` function, for one).
+- **Default** for output that leaves your environment: files, APIs, other Bliss tools. It spells your definitions out in built-in codes as well as they allow, so any receiver renders it without your definitions, usually with the same ink. A shape drawn by its own `getPath` function has no built-in form and keeps its name.
 - **`{ preserve: true }`** for output that stays where your definitions live: app-local storage, a document you reload in the same app. You get your own names back on re-parse, including a name that aliases a single primitive (`MYIND` for `C2`).
 
 Definition *metadata* does not travel in the default **string**: decomposition keeps the ink, and where it was drawn, but the `toString()` form drops fields like `isIndicator`, so a custom indicator serializes to its plain anatomy, which re-parses as ordinary ink, not as an indicator: with `MYIND` defined `{ type: 'glyph', isIndicator: true, codeString: 'C2' }`, `B291;MYIND` comes back as `B291;C2:3`. (`toJSON()` is different: each part it decomposes into keeps `isIndicator` and `width`, so a rebuilt builder places a custom indicator as an indicator, though a compound one arrives as separate parts rather than one unit.) When the string form must stay an indicator, run the same `define()` calls in the receiving environment, or keep the string local and use `preserve`. See [Serializing Custom Indicators and Shapes](/handbook/writing/custom-codes#serializing-custom-indicators-and-shapes) for the full behavior table.
@@ -503,6 +503,10 @@ Inserts a group at the given position. Negative indices count from the end:
 const builder = new BlissSVGBuilder('B313//B431');
 builder.insertGroup(1, 'B291');
 // now equivalent to 'B313//B291//B431'
+
+const other = new BlissSVGBuilder('B313//B431');
+other.insertGroup(-1, 'B291');
+// before the last word: also 'B313//B291//B431'
 ```
 
 An omitted or empty `code` inserts an [empty group](#empty-slots-are-deliberate).
