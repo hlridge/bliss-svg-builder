@@ -27,7 +27,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Controls saving `//` as before: a definition drawing a full stop, one
  *   setting the flag false on a full stop, one drawing an evergreen tree
  *   without the flag, a built-in full stop.
- * - A word longer than a reload reads, saved without reading it back.
+ * - A word longer than a reload reads, saved without reading it back: judged
+ *   as the builder stores it, every group written side by side, less the
+ *   characters written as nothing of their own (an empty character, one
+ *   holding only kerning).
  *
  * Does NOT cover:
  * - The space an API edit inserts and where it goes, see
@@ -73,6 +76,7 @@ const drawsAs = (builder, spelling) => builder.svgCode === new BlissSVGBuilder(s
 // a space by its part alone.
 const word = (code) => ({ glyphs: [{ codeName: code, parts: [{ codeName: code }] }] });
 const space = (code) => ({ glyphs: [{ parts: [{ codeName: code }] }] });
+const fullStops = (count) => ({ glyphs: Array.from({ length: count }, () => ({ codeName: 'B4', parts: [{ codeName: 'B4' }] })) });
 
 describe('BlissSVGBuilder written word space', () => {
   describe('when a definition pulls in the word space on a drawing whose own code does not', () => {
@@ -193,6 +197,35 @@ describe('BlissSVGBuilder written word space', () => {
       const glyphs = Array.from({ length: 2100 }, () => ({ codeName: 'B291', parts: [{ codeName: 'B291' }] }));
       const builder = new BlissSVGBuilder({ groups: [word('B291'), space('TSP'), { glyphs }] });
       expect(builder.toString()).toBe(`B291//${Array(2100).fill('B291').join('/')}`);
+    });
+
+    it('judges every group written side by side: a stored TSP before full stops beside an evergreen tree saves as //', () => {
+      // pins the whole word judged; judging only its first group, all full
+      // stops, wrote the stored TSP out
+      const builder = new BlissSVGBuilder({ groups: [word('B291'), space('TSP'), fullStops(3400), word('B300')] });
+      const saved = builder.toString();
+      expect(saved).toBe(`B291//${Array(3400).fill('B4').join('/')}/B300`);
+      expect(() => new BlissSVGBuilder(saved)).toThrow(/maximum length/);
+    });
+
+    it('leaves out an empty character: a stored QSP before full stops saves as //', () => {
+      // pins the characters written as nothing left out; counting them wrote
+      // the stored QSP out
+      const builder = new BlissSVGBuilder({ groups: [word('B291'), space('QSP'), fullStops(3400)] });
+      builder.group(1).addGlyph('');
+      const saved = builder.toString();
+      expect(saved).toBe(`B291//${Array(3400).fill('B4').join('/')}`);
+      expect(() => new BlissSVGBuilder(saved)).toThrow(/maximum length/);
+    });
+
+    it('leaves out an empty character holding only kerning: a stored QSP before full stops saves as //', () => {
+      // pins a character's own token, its last, as the one that counts;
+      // reading its kerning marker, written first, counted it
+      const builder = new BlissSVGBuilder({ groups: [word('B291'), space('QSP'), fullStops(3400)] });
+      builder.group(1).insertGlyph(0, '', { relativeKerning: 2 });
+      const saved = builder.toString();
+      expect(saved).toBe(`B291//RK:2/${Array(3400).fill('B4').join('/')}`);
+      expect(() => new BlissSVGBuilder(saved)).toThrow(/maximum length/);
     });
   });
 });
