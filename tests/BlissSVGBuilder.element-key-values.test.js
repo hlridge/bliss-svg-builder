@@ -17,6 +17,8 @@
  *   across changes; set through a setter, it takes away a key set before.
  * - `getElementByKey()` finding an element keyed by a number under its text,
  *   and two keys that differ only by type reported as one (`DUPLICATE_KEY`).
+ * - `getElementByKey()` finding a part by a key set on it, written in a
+ *   bracket, through `setOptions()` and in a composition object.
  * - The key kept out of both saves, whatever it was written as.
  *
  * Does NOT cover:
@@ -169,6 +171,30 @@ describe('BlissSVGBuilder element key values', () => {
       // regression: the number 5 and the text '5' were two keys in silence
       const builder = new BlissSVGBuilder({ groups: [{ glyphs: [b291({ options: { key: 5 } }), { parts: [{ codeName: 'B303' }], options: { key: '5' } }] }] });
       expect(builder.warnings.map((w) => [w.code, w.source])).toEqual([['DUPLICATE_KEY', '5']]);
+    });
+  });
+
+  describe('when a part is looked up by a key set on it', () => {
+    it.each([
+      ['in a bracket', () => new BlissSVGBuilder('B291;[key=k]>B81'), 'B81'],
+      ['through setOptions()', () => changed('B291;B81', (b) => b.glyph(0).part(1).setOptions({ key: 'k' })), 'B81'],
+      ['in a composition object', () => new BlissSVGBuilder(oneGlyph({ parts: [{ codeName: 'B291', options: { key: 'k' } }] })), 'B291'],
+    ])('finds it, the key written %s', (_route, build, codeName) => {
+      // regression: getElementByKey() found a word or a character by a key set
+      // on it, but never a part
+      const found = build().getElementByKey('k');
+      expect(found?.codeName).toBe(codeName);
+      expect(found?.key).toBe('k');
+    });
+
+    it('reads it as its own snapshot where a word indicator reorders the parts', () => {
+      // pins a part handle matching its snapshot by the key it is drawn with:
+      // the `;;` code is drawn before `B97`, so `B97`'s place among the
+      // snapshot's parts is not its place among the character's
+      const builder = new BlissSVGBuilder('B313;[key=ind]>B97;;B81');
+      const drawn = builder.snapshot().children[0].children[0].children.find((part) => part.key === 'ind');
+      expect(builder.glyph(0).part(1).x).toBe(drawn.x);
+      expect(builder.getElementByKey('ind').x).toBe(drawn.x);
     });
   });
 

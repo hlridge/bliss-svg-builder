@@ -163,8 +163,9 @@ describe('ElementHandle indicator introspection', () => {
 
   describe('when the handle is a nested sub-part', () => {
     it('returns null without throwing for a non-indicator sub-part', () => {
-      // regression: part().part() yields a level-3 nested handle the snapshot
-      // index cannot resolve; the getters must read the raw node, not throw.
+      // regression: part().part() yielded a nested handle the snapshot index
+      // could not resolve; the getters must read the raw node, not throw. (Since
+      // C28 such a handle resolves its snapshot, and its level is its depth.)
       const sub = new BlissSVGBuilder('B303;B86').part(1).part(0);
       expect(sub.codeName).toBe('AA2S');
       expect(sub.isIndicator).toBe(false);

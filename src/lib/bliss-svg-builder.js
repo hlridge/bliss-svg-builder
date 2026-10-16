@@ -658,8 +658,7 @@ class BlissSVGBuilder {
       // names nothing, so the element keeps its own key, which survives a
       // rebuild where a key generated here would not.
       if (obj.options.key !== undefined) {
-        const name = textOfValue(obj.options.key);
-        if (name !== '') obj.key = name;
+        obj.key = BlissSVGBuilder.#drawnKey(obj);
         delete obj.options.key;
       }
       // Two guards judge a NAME, and an emitter that honours either one simply
@@ -864,6 +863,7 @@ class BlissSVGBuilder {
       addMutationWarning: (warning) => this.#mutationWarnings.push(warning),
       clearOwnOptions: (node, level, character) => BlissSVGBuilder.#clearOwnOptions(node, level, character),
       ownLookAt: (node, level, character) => BlissSVGBuilder.#ownLookAt(node, level, character),
+      drawnKey: (node) => BlissSVGBuilder.#drawnKey(node),
     };
   }
 
@@ -985,12 +985,18 @@ class BlissSVGBuilder {
     return raw;
   }
 
-  // Assigns stable keys to the three DSL-visible levels in #rawBlissObj:
-  // groups (//), glyphs (/), and immediate parts (;).
+  // Assigns stable keys in #rawBlissObj: to groups (//), glyphs (/), and parts
+  // (;) at every depth, a definition's own parts inside a part included, since
+  // a handle reaches those too (`part(0).part(0)`) and its key has to survive
+  // a rebuild like any other.
   // Called before structuredClone so keys persist across rebuilds.
-  // Deeper nested parts (definition expansions) are intentionally skipped —
-  // they are not user-addressable and receive ephemeral keys from BlissElement.
   static #assignKeys(rawObj) {
+    const keyParts = (parts) => {
+      for (const part of parts ?? []) {
+        if (!part.key) part.key = generateKey();
+        keyParts(part.parts);
+      }
+    };
     if (!rawObj.key) rawObj.key = generateKey();
     if (rawObj.groups) {
       for (const group of rawObj.groups) {
@@ -998,11 +1004,7 @@ class BlissSVGBuilder {
         if (group.glyphs) {
           for (const glyph of group.glyphs) {
             if (!glyph.key) glyph.key = generateKey();
-            if (glyph.parts) {
-              for (const part of glyph.parts) {
-                if (!part.key) part.key = generateKey();
-              }
-            }
+            keyParts(glyph.parts);
           }
         }
       }
@@ -2068,41 +2070,41 @@ class BlissSVGBuilder {
    * @returns {ElementHandle|null}
    */
   getElementByKey(key) {
-    const snap = this.snapshot();
-    const groups = snap.children;
-    const rawGroups = this.#rawBlissObj.groups;
-
-    // Walk snapshot tree in parallel with raw groups
-    for (let rawGi = 0; rawGi < groups.length; rawGi++) {
-      const groupSnap = groups[rawGi];
-      const rawGroup = rawGroups[rawGi];
-
-      if (groupSnap.key === key) {
-        return new ElementHandle(this.#mutationCtx, 1, rawGroup);
-      }
-
-      const glyphs = groupSnap.children.filter(c => c.isGlyph);
-      for (let gi = 0; gi < glyphs.length; gi++) {
-        const rawGlyph = rawGroup.glyphs[gi];
-        if (glyphs[gi].key === key) {
-          return new ElementHandle(this.#mutationCtx, 2, rawGlyph, rawGroup);
-        }
-        const parts = glyphs[gi].children;
-        for (let pi = 0; pi < parts.length; pi++) {
-          if (parts[pi].key === key) {
-            // Match the raw part by key, not snapshot position: a `;;` head's
-            // snapshot carries an extra overlay-injected indicator part with no
-            // raw node. Match-by-key keeps base parts addressable and returns
-            // null for the overlay part (it lives only in the resolved tree).
-            const rawPart = rawGlyph.parts.find(rp => rp.key === key);
-            return rawPart
-              ? new ElementHandle(this.#mutationCtx, 3, rawPart, { group: rawGroup, glyph: rawGlyph })
-              : null;
-          }
-        }
+    // The authoring tree is searched, each element by the key it is drawn
+    // with (`#drawnKey`, the rule that names its snapshot), so a part is found
+    // by a key set on it, which the authoring part holds in its options, and at
+    // any depth. An indicator a `;;` word overlay adds lives only in the
+    // resolved tree, so it has no node to hand out and is not found.
+    for (const group of this.#rawBlissObj.groups ?? []) {
+      if (BlissSVGBuilder.#drawnKey(group) === key) return new ElementHandle(this.#mutationCtx, 1, group);
+      for (const glyph of group.glyphs ?? []) {
+        if (BlissSVGBuilder.#drawnKey(glyph) === key) return new ElementHandle(this.#mutationCtx, 2, glyph, group);
+        const part = this.#partWithKey(glyph.parts, key, 3, { group, glyph });
+        if (part) return part;
       }
     }
     return null;
+  }
+
+  // A handle to the part drawn with `key` among `parts` or inside them, at
+  // `level`, their depth; null when there is none.
+  #partWithKey(parts, key, level, parentRef) {
+    for (const part of parts ?? []) {
+      if (BlissSVGBuilder.#drawnKey(part) === key) return new ElementHandle(this.#mutationCtx, level, part, parentRef);
+      const inner = this.#partWithKey(part.parts, key, level + 1, parentRef);
+      if (inner) return inner;
+    }
+    return null;
+  }
+
+  // The key an element is drawn with: the one written in its options, as its
+  // text, unless that text is empty; otherwise its own. The options pass names
+  // the element's snapshot by this rule, and a handle finds its snapshot by it.
+  static #drawnKey(node) {
+    const written = node.options?.key;
+    if (written === undefined) return node.key;
+    const name = textOfValue(written);
+    return name === '' ? node.key : name;
   }
 
   // --- Live Navigation ---

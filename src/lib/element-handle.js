@@ -45,6 +45,17 @@ export function assertKeyArgs(method, keys) {
   }
 }
 
+// The indices leading from `parts` down to `node`, a part at any depth inside
+// them, or null when it is not there.
+const pathTo = (parts, node) => {
+  for (const [index, part] of (parts ?? []).entries()) {
+    if (part === node) return [index];
+    const below = pathTo(part.parts, node);
+    if (below) return [index, ...below];
+  }
+  return null;
+};
+
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
  * Survives `#rebuild()` because it holds a direct reference to the raw node,
@@ -54,6 +65,10 @@ export function assertKeyArgs(method, keys) {
  * becomes invalid when its own node is removed from the tree. Relocated
  * nodes (e.g. glyphs absorbed by mergeWithNext) are found via a full
  * tree scan and the handle's parent reference is updated automatically.
+ *
+ * A part handle finds its part at any depth below its character, so a handle
+ * to a part inside a part (`part(0).part(0)`) survives and reads as one to a
+ * character's own part does. Its level is its depth: 4 for a part of a part.
  */
 export class ElementHandle {
   #ctx;
@@ -114,11 +129,10 @@ export class ElementHandle {
       return false;
     }
 
-    if (this.#level === 3) {
+    if (this.#level >= 3) {
       for (const group of groups) {
         for (const glyph of (group.glyphs || [])) {
-          const pi = (glyph.parts || []).indexOf(this.#nodeRef);
-          if (pi >= 0) {
+          if (pathTo(glyph.parts, this.#nodeRef)) {
             this.#parentRef = { group, glyph };
             return true;
           }
@@ -145,6 +159,12 @@ export class ElementHandle {
   // still a part.
   get #scopeLevel() {
     return this.#level === 1 ? 'group' : this.#level === 2 ? 'character' : 'part';
+  }
+
+  // This handle's level as the options helpers number an element: 1 a word, 2
+  // a character, 3 a part, a part inside a part included.
+  get #optionLevel() {
+    return Math.min(this.#level, 3);
   }
 
   get isGroup() {
@@ -195,7 +215,7 @@ export class ElementHandle {
 
   get isIndicator() {
     this.#assertReachable();
-    if (this.#level !== 3) return false;
+    if (this.#level < 3) return false;
     return this.#nodeRef?.isIndicator === true;
   }
 
@@ -212,7 +232,7 @@ export class ElementHandle {
    */
   get indicatorLevel() {
     this.#assertReachable();
-    if (this.#level !== 3 || this.#nodeRef?.isIndicator !== true) return null;
+    if (this.#level < 3 || this.#nodeRef?.isIndicator !== true) return null;
     return 'character';
   }
 
@@ -225,7 +245,7 @@ export class ElementHandle {
    */
   get indicatorKind() {
     this.#assertReachable();
-    if (this.#level !== 3 || this.#nodeRef?.isIndicator !== true) return null;
+    if (this.#level < 3 || this.#nodeRef?.isIndicator !== true) return null;
     return classifyIndicatorKind(this.#nodeRef.codeName, blissElementDefinitions);
   }
 
@@ -254,34 +274,38 @@ export class ElementHandle {
       return glyphSnap;
     }
 
-    if (this.#level === 3) {
+    if (this.#level >= 3) {
       const groupSnap = snap.children[idx.groupIndex];
       if (!groupSnap) throw new Error('Snapshot not found for group in part handle.');
       const glyphs = groupSnap.children.filter(c => c.isGlyph);
       const glyphSnap = glyphs[idx.glyphIndex];
       if (!glyphSnap) throw new Error('Snapshot not found for glyph in part handle.');
-      // Map to the snapshot part by identity, not raw position: a `;;` word
-      // overlay on a head injects and reorders the resolved indicator parts
-      // (semantic-root preservation), so the raw partIndex no longer aligns with
-      // the snapshot array. Both a base part and (since N14-2) a reordered
-      // character-level `;` indicator keep their object key through the merge, so
-      // match by key. The by-code match is a defensive fallback for a keyless
-      // node (e.g. a deep nested sub-part that #assignKeys does not key). Fall
-      // back to position when nothing matches (no overlay).
-      const node = this.#nodeRef;
-      const parts = glyphSnap.children;
-      if (node?.key != null) {
-        const byKey = parts.find(c => c.key === node.key);
-        if (byKey) return byKey;
+      // One step down the path at a time, from the character's own part to
+      // this one.
+      let node = this.#parentRef.glyph.parts[idx.path[0]];
+      let found = this.#partSnapshotIn(glyphSnap.children, node, idx.path[0]);
+      for (const index of idx.path.slice(1)) {
+        node = node.parts[index];
+        found = found && this.#partSnapshotIn(found.children, node, index);
       }
-      if (node?.isIndicator === true) {
-        const byCode = parts.find(c => c.isIndicator === true && c.codeName === node.codeName);
-        if (byCode) return byCode;
-      }
-      return parts[idx.partIndex];
+      if (!found) throw new Error('Snapshot not found for part handle.');
+      return found;
     }
 
     throw new Error(`Unsupported handle level: ${this.#level}`);
+  }
+
+  // The snapshot of the raw part `node`, the `index`th of its parent, among
+  // `parts`. Matched by the key the part is drawn with, not by raw position: a
+  // `;;` word overlay on a head injects and reorders the resolved indicator
+  // parts (semantic-root preservation), so a character's raw part index no
+  // longer aligns with the snapshot array. A base part and a reordered
+  // character-level `;` indicator keep their key through the merge, a key set
+  // on a part is the one the snapshot shows, and every part at every depth has
+  // one. Position is the fallback: nothing reorders the parts inside a part.
+  #partSnapshotIn(parts, node, index) {
+    const key = this.#ctx.drawnKey(node);
+    return parts.find(c => c.key === key) ?? parts[index];
   }
 
   get x() { return this.#findSnapshot().x; }
@@ -321,7 +345,9 @@ export class ElementHandle {
     });
   }
 
-  // Resolve the current index of this node within its parent array
+  // Resolve the current index of this node within its parent array; for a part,
+  // the path from its character's own parts down to it, `partIndex` its first
+  // step.
   #resolveIndex() {
     if (this.#level === 1) {
       const groups = this.#ctx.getRaw().groups;
@@ -334,15 +360,15 @@ export class ElementHandle {
       if (glyphIndex < 0) return null;
       return { groupIndex, glyphIndex };
     }
-    if (this.#level === 3) {
+    if (this.#level >= 3) {
       const raw = this.#ctx.getRaw();
       const groupIndex = raw.groups.indexOf(this.#parentRef.group);
       if (groupIndex < 0) return null;
       const glyphIndex = this.#parentRef.group.glyphs?.indexOf(this.#parentRef.glyph) ?? -1;
       if (glyphIndex < 0) return null;
-      const partIndex = this.#parentRef.glyph.parts?.indexOf(this.#nodeRef) ?? -1;
-      if (partIndex < 0) return null;
-      return { groupIndex, glyphIndex, partIndex };
+      const path = pathTo(this.#parentRef.glyph.parts, this.#nodeRef);
+      if (!path) return null;
+      return { groupIndex, glyphIndex, partIndex: path[0], path };
     }
     return null;
   }
@@ -528,12 +554,12 @@ export class ElementHandle {
         glyph
       });
     }
-    if (this.#level === 3) {
+    if (this.#level >= 3) {
       const part = this.#nodeRef;
       if (!part?.parts?.length) return null;
       if (index < 0) index = part.parts.length + index;
       if (!Number.isInteger(index) || index < 0 || index >= part.parts.length) return null;
-      return new ElementHandle(this.#ctx, 3, part.parts[index], this.#parentRef);
+      return new ElementHandle(this.#ctx, this.#level + 1, part.parts[index], this.#parentRef);
     }
     return null;
   }
@@ -553,14 +579,14 @@ export class ElementHandle {
   #inFailFlaggedGroup() {
     if (this.#level === 1) return this.#nodeRef?.errorCode !== undefined;
     if (this.#level === 2) return this.#parentRef?.errorCode !== undefined;
-    if (this.#level === 3) return this.#parentRef?.group?.errorCode !== undefined;
+    if (this.#level >= 3) return this.#parentRef?.group?.errorCode !== undefined;
     return false;
   }
 
   // The character a part handle's part belongs to, at any depth; undefined
   // for any other handle.
   #owningCharacter() {
-    return this.#level === 3 ? this.#parentRef?.glyph : undefined;
+    return this.#level >= 3 ? this.#parentRef?.glyph : undefined;
   }
 
   addGlyph(code, opts) {
@@ -702,6 +728,8 @@ export class ElementHandle {
     // removal of the unit is consistent with its frozen serialization.
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return undefined;
 
+    // A character's own part only: what a save would write for a part removed
+    // or replaced inside another is undecided, so a deeper handle does nothing.
     if (this.#level === 3) {
       const glyph = this.#parentRef.glyph;
       if (!glyph?.parts) return undefined;
@@ -761,6 +789,8 @@ export class ElementHandle {
     const raw = this.#ctx.getRaw();
     const groups = raw.groups;
 
+    // A character's own part only: what a save would write for a part removed
+    // or replaced inside another is undecided, so a deeper handle does nothing.
     if (this.#level === 3) {
       const idx = this.#resolveIndex();
       if (!idx) return undefined;
@@ -920,6 +950,8 @@ export class ElementHandle {
       return this;
     }
 
+    // A character's own part only: what a save would write for a part removed
+    // or replaced inside another is undecided, so a deeper handle does nothing.
     if (this.#level === 3) {
       assertCodeArg('replace', code);
       assertOptsArg('replace', opts);
@@ -1523,7 +1555,7 @@ export class ElementHandle {
     // the two agree, and no look is made that no save could write back. The
     // names are matched the way the deletion above matched them, on a copy of
     // the look.
-    const ownLook = this.#ctx.ownLookAt(node, this.#level, this.#owningCharacter());
+    const ownLook = this.#ctx.ownLookAt(node, this.#optionLevel, this.#owningCharacter());
     if (ownLook) {
       const unnamed = { ...ownLook };
       for (const key of keys) deleteOptionByName(unnamed, key);
@@ -1559,7 +1591,7 @@ export class ElementHandle {
     if (this.#level !== 1 && this.#inFailFlaggedGroup()) return this;
     const node = this.#nodeRef;
     if (!node) return this;
-    this.#ctx.clearOwnOptions(node, this.#level, this.#owningCharacter());
+    this.#ctx.clearOwnOptions(node, this.#optionLevel, this.#owningCharacter());
     this.#ctx.rebuild();
     this.#syncGeneration();
     return this;
