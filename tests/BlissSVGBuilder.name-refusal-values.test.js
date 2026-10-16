@@ -37,10 +37,9 @@
  *   it, see `BlissSVGBuilder.transient-refusal-values.test.js`.
  * - The switches and the element key, see
  *   `BlissSVGBuilder.refused-value-retention.test.js`.
- * - A composition object holding a function or a symbol, which throws before
- *   anything is judged: an open backlog row ("A composition object holding a
- *   function or a symbol anywhere throws the platform's `DataCloneError` out of
- *   the constructor").
+ * - A composition object holding a function or a symbol, which its copy hands
+ *   to the judge of the place it sits in, see
+ *   `BlissSVGBuilder.composition-object-copy.test.js`.
  */
 
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';

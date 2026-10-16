@@ -166,6 +166,104 @@ const resolveOverlayHeadIndex = (glyphs) => {
   return contentIndexes[resolveHeadIndex(contentIndexes.map(i => getHeadCode(glyphs[i])))];
 };
 
+// The places on an element a judge reads: its options bags (the admission
+// stage), a position (the position gate) and the key written beside it (the
+// key's judge). A value with no text form held there reaches that judge, which
+// reports it in its own words and stores nothing of it.
+const JUDGED_BAGS = new Set(['options', 'transientOptions']);
+const JUDGED_FIELDS = new Set(['x', 'y', 'key']);
+const ELEMENT_LISTS = new Set(['groups', 'glyphs', 'parts']);
+const LEFT_OUT = Symbol('left out');
+
+// An own property whatever its key spells: assigning `__proto__` on an object
+// literal sets its prototype instead of storing the key.
+const putOwn = (target, key, value) =>
+  Object.defineProperty(target, key, { value, writable: true, enumerable: true, configurable: true });
+
+// A plain object, a class instance or an object behind a Proxy, read key by
+// key; a Date, a Map and the like are not.
+const isRecord = (value) => Object.prototype.toString.call(value) === '[object Object]';
+
+/**
+ * The copy the constructor makes of a composition object, so nothing it does
+ * reaches the caller's object. `structuredClone` made it until it met a value
+ * no clone can carry (a function, a symbol, an object behind a Proxy) and threw
+ * the platform's `DataCloneError`, which names no call and no key, before
+ * anything had been judged. This reads the object as data instead, and is
+ * `structuredClone`'s copy wherever that copy exists:
+ * - a plain object or a list is copied, read through a getter or a Proxy as
+ *   JSON reads it, and a back-reference is kept as the clone kept it;
+ * - a function or a symbol is handed on where a judge reads it, to be refused
+ *   there, and anywhere else is left out as JSON leaves it out: gone from an
+ *   object, `null` in a list;
+ * - a bigint is read as the text it spells, since no JSON save can hold one;
+ * - any other object is `structuredClone`'s copy of it, or left out when it
+ *   holds a value no clone can carry.
+ */
+const readComposition = (input) => {
+  const copies = new Map();
+  const readData = (value) => {
+    if (typeof value === 'bigint') return String(value);
+    if (typeof value === 'function' || typeof value === 'symbol') return LEFT_OUT;
+    if (value === null || typeof value !== 'object') return value;
+    if (copies.has(value)) return copies.get(value);
+    if (Array.isArray(value)) {
+      const copy = [];
+      copies.set(value, copy);
+      for (const item of value) {
+        const read = readData(item);
+        copy.push(read === LEFT_OUT ? null : read);
+      }
+      return copy;
+    }
+    if (isRecord(value)) {
+      const copy = {};
+      copies.set(value, copy);
+      for (const key of Object.keys(value)) {
+        const read = readData(value[key]);
+        if (read !== LEFT_OUT) putOwn(copy, key, read);
+      }
+      return copy;
+    }
+    try {
+      const copy = structuredClone(value);
+      copies.set(value, copy);
+      return copy;
+    } catch {
+      return LEFT_OUT;
+    }
+  };
+  // Handed to its judge as written, a bigint as its text there too. Nothing is
+  // copied: a judge stores only a value with a text form.
+  const readJudged = (value) => (typeof value === 'bigint' ? String(value) : value);
+  const readElement = (element) => {
+    if (!isRecord(element)) return readData(element);
+    if (copies.has(element)) return copies.get(element);
+    const copy = {};
+    copies.set(element, copy);
+    for (const key of Object.keys(element)) {
+      const value = element[key];
+      let read;
+      if (JUDGED_BAGS.has(key) && isRecord(value)) {
+        read = {};
+        for (const name of Object.keys(value)) putOwn(read, name, readJudged(value[name]));
+      } else if (JUDGED_FIELDS.has(key)) {
+        read = readJudged(value);
+      } else if (ELEMENT_LISTS.has(key) && Array.isArray(value)) {
+        read = value.map((item) => {
+          const child = readElement(item);
+          return child === LEFT_OUT ? null : child;
+        });
+      } else {
+        read = readData(value);
+      }
+      if (read !== LEFT_OUT) putOwn(copy, key, read);
+    }
+    return copy;
+  };
+  return readElement(input);
+};
+
 // Note: BlissSVGBuilder.LIB_VERSION is attached at the public entry point
 // (src/index.js), not declared here. Code that imports the class directly
 // from this file (e.g. internal tests) will see LIB_VERSION as undefined.
@@ -739,10 +837,10 @@ class BlissSVGBuilder {
     // Accept both string (DSL) and object (from toJSON()) input
     const blissObj = (typeof input === 'string')
       ? BlissParser.parse(input)
-      : structuredClone(input);
+      : readComposition(input);
 
     // A composition object stores an options bag exactly as it was given, so
-    // this is where it meets the admission stage. Done HERE, on the clone and
+    // this is where it meets the admission stage. Done HERE, on the copy and
     // before anything else reads the tree, so every gate, emitter and
     // serializer downstream sees the one spelling a bracket and the options
     // argument already store, and holds only values that can be saved again.
@@ -838,8 +936,12 @@ class BlissSVGBuilder {
     // error so BlissElement emits a WORD_AS_PART warning instead of rendering.
     BlissSVGBuilder.#flagWordParts(blissObj);
 
-    // Store a clean copy after option merging but before processing mutates it
-    this.#rawBlissObj = structuredClone(blissObj);
+    // Stored as it stands: it is the builder's own already (a parse, or the copy
+    // made of a composition object), and nothing processes it after this, since
+    // every rebuild renders from a clone of its own. A second clone here would
+    // meet a function the copy kept for its judge before the judge runs: a
+    // position is judged at the first rebuild.
+    this.#rawBlissObj = blissObj;
 
     this.#rebuild();
 

@@ -409,10 +409,12 @@ describe('BlissSVGBuilder text option values', () => {
       expect(b.svgCode).not.toContain('stroke="null"');
     });
 
-    it('refuses the two kinds only this channel can deliver', () => {
-      // Neither reaches object input, which clones what it is given, and the
-      // DSL cannot spell either. Both used to be converted with everything
-      // else, so the source text of a function was painted onto the symbol.
+    it('refuses a function and a symbol, which the DSL cannot spell', () => {
+      // Both used to be converted with everything else, so the source text of
+      // a function was painted onto the symbol. Retitled at C28 (Task 4): was
+      // "refuses the two kinds only this channel can deliver"; a composition
+      // object now hands both to the same gate (see
+      // `BlissSVGBuilder.composition-object-copy.test.js`), where its clone threw.
       const b = new BlissSVGBuilder('B291', { color: () => 1, background: Symbol('x') });
       expect(codes(b)).toEqual(['INVALID_OPTION_VALUE', 'INVALID_OPTION_VALUE']);
       expect(b.svgCode).not.toContain('=&gt;');
