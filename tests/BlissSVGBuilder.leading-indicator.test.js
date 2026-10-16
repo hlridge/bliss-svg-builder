@@ -21,6 +21,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - A word-level `;;` indicator, `applyIndicators()` and `flattenIndicators`
  *   add to it and never replace it, on the reload of a save too;
  *   `clearIndicators()` leaves it and reports that nothing changed.
+ * - Kept after the character's first part, it leaves the word's head no
+ *   indicators at its end, so a word-level indicator is not applied and is
+ *   reported (`MISPLACED_WORD_INDICATOR`), from the DSL and from
+ *   `group.applyIndicators()` alike; both saves keep it, each reload reports
+ *   it again, and it is drawn once the kept indicator is removed.
  *
  * Does NOT cover:
  * - The drop rule, its warning text and the built-in indicator before each
@@ -28,15 +33,19 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   `BlissSVGBuilder.position-presence-serialization.test.js`.
  * - How such a character is spaced beside a digit or letter, see
  *   `BlissSVGBuilder.decorated-character-layout.test.js`.
- * - Where an indicator added after it is drawn. The layout reads the parts as
- *   an indicator pattern broken by a plain part and places none of them, so
- *   the added indicator sits at the character's origin, over the leading
- *   one. No placement is right there, since the leading indicator already
- *   fills the indicator band; left as it falls, and every save reloads it.
- * - A custom compound of several indicators written first, under a
- *   word-level indicator: spelled out, its second indicator meets the word's
- *   in the merge, so the default saves do not reload it as drawn, and no
- *   built-in spelling would. `preserve` does.
+ * - Where an indicator added after one written first is drawn. The layout
+ *   reads the parts as an indicator pattern broken by a plain part and places
+ *   none of them, so the added indicator sits at the character's origin, over
+ *   the leading one. No placement is right there, since the leading indicator
+ *   already fills the indicator band; left as it falls, and every save
+ *   reloads it.
+ * - A custom compound indicator of several parts under a word-level
+ *   indicator, written first or in its usual place: the default saves spell
+ *   it out, and its parts then read as separate ones (its second indicator
+ *   meets the word's in the merge, or a plain part in it leaves the head no
+ *   indicators at its end, which the reload reports), so those saves do not
+ *   reload it as drawn. `preserve` does. Accepted as best effort for the
+ *   default saves, with the archived "mixed-base compound indicator" row.
  */
 
 const DEFINITIONS = {
@@ -143,6 +152,57 @@ describe('BlissSVGBuilder leading indicator', () => {
       builder.glyph(0).clearIndicators();
       expect(builder.toString()).toBe('B86;B303:0,0');
       expect(builder.warnings.map((w) => [w.code, w.source])).toEqual([['NOOP_INDICATOR_MUTATION', 'B86']]);
+    });
+  });
+
+  describe('when a word-level indicator meets one kept after the first part', () => {
+    // note: kept after the first part, the indicator is followed by a part
+    // that is not one, so the word's head has no run of indicators at its end
+    // for the `;;` codes to join or replace
+    it.each([
+      ['an indicator between two parts', 'B291;B86;C8:0,0;;B97', 'B291;B86;C8:0,0'],
+      ['two indicators written first', 'B86;B81;B303:0,0/B291;;B97', 'B86;B81;B303:0,0/B291'],
+    ])('reports %s as not applied and draws %s as without it', (_, input, bare) => {
+      const builder = new BlissSVGBuilder(input);
+      expect(builder.warnings.map((w) => [w.code, w.source])).toEqual([['MISPLACED_WORD_INDICATOR', ';;B97']]);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder(bare).svgCode);
+    });
+
+    it.each([
+      ['two codes', 'B291;B86;C8:0,0;;B97;B99', ';;B97;B99'],
+      ['a strip', 'B291;B86;C8:0,0;;!', ';;!'],
+      ['an empty overlay', 'B291;B86;C8:0,0;;', ';;'],
+    ])('reports %s as not applied either: %s', (_, input, source) => {
+      expect(new BlissSVGBuilder(input).warnings.map((w) => [w.code, w.source]))
+        .toEqual([['MISPLACED_WORD_INDICATOR', source]]);
+    });
+
+    it('keeps it in both saves, and each reload reports it again', () => {
+      const builder = new BlissSVGBuilder('B291;B86;C8:0,0;;B97');
+      expect(builder.toString()).toBe('B291;B86;C8:0,0;;B97');
+      for (const save of [builder.toString(), builder.toJSON()]) {
+        expect(new BlissSVGBuilder(save).warnings.map((w) => w.code)).toEqual(['MISPLACED_WORD_INDICATOR']);
+      }
+    });
+
+    it('reports it the same through group(0).applyIndicators() and saves what the DSL saves', () => {
+      const builder = new BlissSVGBuilder('B291;B86;C8:0,0');
+      builder.group(0).applyIndicators('B97');
+      expect(builder.warnings.map((w) => [w.code, w.source])).toEqual([['MISPLACED_WORD_INDICATOR', ';;B97']]);
+      expect(builder.toString()).toBe('B291;B86;C8:0,0;;B97');
+    });
+
+    it('draws it, with no report, once the kept indicator is removed', () => {
+      const builder = new BlissSVGBuilder('B291;B86;C8:0,0;;B97');
+      builder.glyph(0).removePart(1);
+      expect(builder.warnings).toEqual([]);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder('B291;C8:0,0;;B97').svgCode);
+    });
+
+    it('reports nothing for an indicator written first, which the merge reads as the base', () => {
+      const builder = new BlissSVGBuilder('B86;B303:0,0;;B97');
+      expect(builder.warnings).toEqual([]);
+      expect(builder.svgCode).not.toBe(new BlissSVGBuilder('B86;B303:0,0').svgCode);
     });
   });
 });

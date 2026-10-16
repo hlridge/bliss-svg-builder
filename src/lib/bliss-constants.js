@@ -776,7 +776,9 @@ export const WARNING_CODES = Object.freeze({
   MISPLACED_HEAD_MARKER: 'MISPLACED_HEAD_MARKER',
   MISPLACED_CHARACTER_INDICATOR: 'MISPLACED_CHARACTER_INDICATOR',
   // a well-formed word-level indicator (`;;`) on a target that cannot carry
-  // one (a space word)
+  // one: a space word (the overlay is dropped), or a word whose head glyph
+  // holds a part after one of its indicators (the overlay is kept and saved,
+  // but not applied)
   MISPLACED_WORD_INDICATOR: 'MISPLACED_WORD_INDICATOR',
   MISPLACED_PART_OPTION: 'MISPLACED_PART_OPTION',
   MISPLACED_CHARACTER_OPTION: 'MISPLACED_CHARACTER_OPTION',

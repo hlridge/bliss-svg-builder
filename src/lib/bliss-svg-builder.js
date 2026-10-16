@@ -1606,13 +1606,29 @@ class BlissSVGBuilder {
         // key inside an indicator definition) first becomes observable, so
         // its parse warnings must reach builder.warnings. #warnings was reset
         // above, so they re-derive per rebuild instead of accumulating.
+        const trace = {};
         head.parts = mergeWordIndicatorsOntoHead(
           head, group.wordIndicators, blissElementDefinitions, (code) => {
             const parsed = BlissParser.parse(code);
             this.#warnings.push(...(parsed._parseWarnings ?? []));
             return parsed;
-          }
+          }, trace
         );
+        // A head with a part after one of its indicators, past its first part
+        // (an indicator kept before a part positioned by hand, or before an
+        // unknown code), has no indicator run at its end, so the merge leaves
+        // it as it is. The overlay stays stored and saved, so it is reported
+        // on every rebuild, as the reload of a save reports it, until a
+        // mutation gives the head a shape it can merge onto.
+        if (!trace.applied) {
+          const { codes = [], stripSemantic } = group.wordIndicators;
+          const overlay = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+          this.#warnings.push({
+            code: WARNING_CODES.MISPLACED_WORD_INDICATOR,
+            message: `Word-level indicator (${overlay}) not applied: the word's head glyph has a non-indicator part after an indicator part, so the word-level indicator has nowhere to attach.`,
+            source: overlay,
+          });
+        }
       }
     }
 
