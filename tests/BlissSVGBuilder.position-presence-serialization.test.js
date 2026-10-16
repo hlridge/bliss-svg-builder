@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
 
 /**
@@ -29,7 +29,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   serializer cannot compute the layout default it would have to add the
  *   offset to. Applied per axis. An axis written on the composite, a zero
  *   included, is written on every ordinary part it spells out into; an
- *   indicator part under a zero offset stays unwritten.
+ *   indicator part under a zero offset is left to the indicator layout.
+ * - A position written on a custom code of one indicator: the default save
+ *   writes the indicator where it was drawn, with a coordinate only on the
+ *   axis the drawing needs, a zero included, so the spelling draws the same
+ *   with built-in codes alone; `preserve` keeps the name and the position.
  * - An indicator before a custom character written at the origin: the
  *   character is spelled out with the position on its parts, so the reload
  *   keeps the indicator as the builder did.
@@ -222,6 +226,45 @@ describe('BlissSVGBuilder part position presence', () => {
       expect(b.toString()).toBe('B81;B86');
       expect(new BlissSVGBuilder('B81;B86').svgCode).toBe(b.svgCode);
     });
+  });
+
+  describe('when a position is written on a custom code of one indicator', () => {
+    // The position pins the indicator, so the spelled-out indicator has to
+    // land where it was drawn. Each axis the indicator layout would place
+    // somewhere else is written; one it would place there anyway is not:
+    // over B291 an indicator sits at y 0 by default, over B119 (anchor
+    // offset -2) 2 units higher.
+    const DEFINITIONS = {
+      PPACT: { codeString: 'B81' },
+      PPIND: { type: 'glyph', isIndicator: true, codeString: 'B81' },
+    };
+
+    beforeAll(() => {
+      expect(BlissSVGBuilder.define(DEFINITIONS).defined).toEqual(Object.keys(DEFINITIONS));
+    });
+
+    afterAll(() => {
+      for (const code of Object.keys(DEFINITIONS)) BlissSVGBuilder.removeDefinition(code);
+    });
+
+    it.each([
+      ['B291;PPACT:0,0', 'B291;B81:0'],
+      ['B119;PPACT:0,0', 'B119;B81:0,0'],
+      ['B291;PPIND:0,0', 'B291;B81:0'],
+      ['B119;PPIND:0,0', 'B119;B81:0,0'],
+      ['PPACT:0,3',      'B81:,3'],
+      ['PPIND:0,0',      'B81'],
+    ])('saves %s as %s, which draws the same', (dsl, expected) => {
+      const b = new BlissSVGBuilder(dsl);
+      expect(b.toString()).toBe(expected);
+      expect(new BlissSVGBuilder(expected).svgCode).toBe(b.svgCode);
+      expect(new BlissSVGBuilder(b.toJSON()).svgCode).toBe(b.svgCode);
+    });
+
+    it.each(['B291;PPACT:0,0', 'B119;PPIND:0,0', 'PPACT:0,3', 'PPIND:0,0'])(
+      'keeps the name and the written position of %s with preserve', (dsl) => {
+        expect(new BlissSVGBuilder(dsl).toString({ preserve: true })).toBe(dsl);
+      });
   });
 
   describe('when an indicator precedes a custom character written at the origin', () => {

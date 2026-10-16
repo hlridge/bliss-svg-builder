@@ -33,6 +33,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   nothing further and render identically.
  *
  * Does NOT cover:
+ * - The other kinds of indicator kept before a positioned part (a flagged
+ *   glyph, a compound, one between two parts), how the saves write a kept
+ *   one, and what an indicator added to its character does to it, see
+ *   BlissSVGBuilder.leading-indicator.test.js.
  * - `;;` overlay code validation, see BlissParser.word-indicator-validation.test.js.
  * - Compound-indicator atomic layout and application, see
  *   BlissSVGBuilder.compound-indicator-application.test.js.
