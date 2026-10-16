@@ -202,6 +202,12 @@ TSP;;B81               →  renders the space, indicator dropped
 
 Attach it to a word instead: `B313;;B81`.
 
+It is also reported for a word whose head glyph has a part after one of its indicators. That happens when an indicator is kept before a part you positioned (see `MISPLACED_INDICATOR_PART`) and is not the character's first part: the character then has no indicators at its end for the word's indicator to join, so it is not applied. It stays in the saved string and is reported again when read back.
+
+```
+B291;B86;C8:0,0;;B97   →  renders B291;B86;C8:0,0, B97 not applied
+```
+
 ### `MISPLACED_PART_OPTION`
 
 A part option (`[opts]>`) on a code that expands to a whole word. `>` binds an option to a single part.
