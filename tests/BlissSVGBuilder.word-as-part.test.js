@@ -14,6 +14,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.mutation-api.test.js`.
  * - Parser-only WORD_AS_PART tagging for text fallback, see
  *   `BlissParser.internal-mechanics.test.js`.
+ * - The string save of a character a word part failed through the API
+ *   (`addPart('B9/B10')`): it writes `B303;B9/B10`, which reloads as two
+ *   drawn characters. A `[post-1.1.0]` backlog row; tripwire below.
  */
 describe('BlissSVGBuilder word-as-part diagnostics', () => {
   describe('when object input contains a word definition as a part', () => {
@@ -33,5 +36,9 @@ describe('BlissSVGBuilder word-as-part diagnostics', () => {
         BlissSVGBuilder.removeDefinition(code);
       }
     });
+  });
+
+  describe('when a word is added as one part through the API', () => {
+    it.todo('saves the failed character so its reload fails too, not as B303;B9/B10, which draws two characters');
   });
 });
