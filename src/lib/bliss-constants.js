@@ -524,8 +524,7 @@ export const INTERNAL_ONLY_SPELLINGS = new Map([
  */
 export const serializeOptionValue = (value) => {
   // Guarded, as a defence for a value `String()` throws on, though nothing
-  // hands it one: the admission stage keeps a value with no text form on the
-  // element key alone, and nothing serializes that key.
+  // hands it one: the admission stage lets no value with no text form in.
   const str = textOfValue(value);
   return /[;\[\]|"']/.test(str) || /^\s|\s$/.test(str)
     ? `"${str.replace(/"/g, '\\"')}"`
@@ -1446,12 +1445,10 @@ const hasTextSpelling = (key) => !/[=;\]"']|^\s|\s$/.test(key);
  * The judges are asked rather than the type test being reported directly, for
  * two reasons. They word the refusal for the option it landed on, so a number
  * option says it needs a number and a position is refused in its own gate's
- * words. And all of them returning null is what leaves unrefused the two kinds
- * of key no value can make wrong: a switch, on only when it is exactly `true`,
- * and the element key, which reaches neither the picture nor the saved text.
- * The element key then goes in whatever it holds; a switch holding no text
- * does not, like any value with no text form (`admitOptions` drops it, in
- * silence).
+ * words. And all of them returning null is what leaves unrefused the one kind
+ * of key no value can make wrong: a switch, on only when it is exactly `true`.
+ * A switch holding no text does not enter either, like any value with no text
+ * form (`admitOptions` drops it, in silence).
  */
 const admissionRefusal = (key, value, scope) => {
   if (!scope?.transient && !hasTextSpelling(key)) return optionNameRefusal(key, scope?.level);
@@ -1462,7 +1459,27 @@ const admissionRefusal = (key, value, scope) => {
   return optionNameRefusal(key, scope?.level)
     ?? judgeNumericOptionValue(key, value)
     ?? judgeTextOptionValue(key, value)
-    ?? judgeGeometryOptionValue(key, value);
+    ?? judgeGeometryOptionValue(key, value)
+    ?? judgeElementKeyValue(key, value);
+};
+
+/**
+ * The element key under the rule every option is under, in words for what it
+ * does. It reaches neither the picture nor the saved text, but it names the
+ * element, and `handle.key` and `getElementByKey()` read that name as text: a
+ * value with no text form names nothing, so it is refused, and the element
+ * keeps the key it had. Any other value names the element by its text, which
+ * it becomes where the key is read off the options.
+ *
+ * Asked only for a value with no text form, as the judges before it are.
+ */
+const judgeElementKeyValue = (key, value) => {
+  if (key !== 'key') return null;
+  return {
+    code: WARNING_CODES.INVALID_OPTION_VALUE,
+    message: `"key" needs a text value and ${describeRefusedValue(value)} is not one, so it was ignored: the element keeps the key it would have had without it.`,
+    source: `key=${textOfValue(value)}`,
+  };
 };
 
 /**

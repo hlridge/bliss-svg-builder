@@ -285,9 +285,12 @@ describe('BlissSVGBuilder text option values', () => {
       expect(b.svgCode).not.toContain('class="bliss-grid');
     });
 
-    it('leaves an element key alone, because it is identity rather than markup', () => {
+    it('refuses an element key with no text form too, though it is identity rather than markup', () => {
+      // re-pinned at C28 (Task 2): was "leaves an element key alone, because it
+      // is identity rather than markup"; the key names the element, and
+      // `handle.key` reads that name as text, so it is judged like any option
       const b = build(atDocument({ key: undefined }));
-      expect(b.warnings).toEqual([]);
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
     });
 
     it('leaves a kerning value to its own gate where kerning applies', () => {
@@ -422,6 +425,17 @@ describe('BlissSVGBuilder text option values', () => {
       // the constructor and the caller gets no picture and no diagnosis.
       const b = new BlissSVGBuilder('B291/B291', { charSpace: Symbol('x') });
       expect(b.warnings[0].source).toBe('char-space=Symbol(x)');
+    });
+
+    it('stores a number as the text a bracket would carry, where a composition object keeps the number', () => {
+      // pins the channel's conversion to text, the one thing it still decides
+      // after the admission stage; killed hand mutant k11 (C28, the setters
+      // storing every value as written)
+      const set = new BlissSVGBuilder('B291');
+      set.glyph(0).setOptions({ strokeWidth: 2 });
+      const written = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }], options: { strokeWidth: 2 } }] }] });
+      expect(set.toJSON().groups[0].glyphs[0].options.strokeWidth).toBe('2');
+      expect(written.toJSON().groups[0].glyphs[0].options.strokeWidth).toBe(2);
     });
 
     it('leaves the DSL untouched, which cannot spell these values at all', () => {

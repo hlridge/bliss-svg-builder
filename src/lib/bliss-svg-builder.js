@@ -652,9 +652,14 @@ class BlissSVGBuilder {
       obj.options = { ...(obj.options ?? {}), ...obj.transientOptions };
     }
     if (obj.options) {
-      // Extract key from options (key is element identity, not an SVG option)
+      // Extract key from options (key is element identity, not an SVG option).
+      // It names the element by its text: a composition object stores the
+      // type it was written in, and `5` and `'5'` are one name. An empty text
+      // names nothing, so the element keeps its own key, which survives a
+      // rebuild where a key generated here would not.
       if (obj.options.key !== undefined) {
-        obj.key = obj.options.key;
+        const name = textOfValue(obj.options.key);
+        if (name !== '') obj.key = name;
         delete obj.options.key;
       }
       // Two guards judge a NAME, and an emitter that honours either one simply
@@ -902,11 +907,21 @@ class BlissSVGBuilder {
   // The level each bag is judged at comes from the array its node was found
   // in, the way a bracket's comes from where it was written. A part's own
   // `parts` are parts too, at any depth.
+  //
+  // A key written beside an element is the same name as the key in its
+  // options (that field is where an element's identity is kept), so it is
+  // judged the same way and kept as its text; refused, it is removed, and the
+  // element gets a key of its own.
   static #admitAuthoredBags(node, level, warn) {
     for (const [bag, transient] of [['options', false], ['transientOptions', true]]) {
       if (node[bag]) {
         node[bag] = BlissSVGBuilder.#admitAuthoredBag(node[bag], warn, { level, notation: 'object', transient });
       }
+    }
+    if (Object.hasOwn(node, 'key')) {
+      const admitted = BlissSVGBuilder.#admitAuthoredBag({ key: node.key }, warn, { level, notation: 'object' });
+      if (Object.hasOwn(admitted, 'key')) node.key = textOfValue(admitted.key);
+      else delete node.key;
     }
     for (const [children, childLevel] of [['groups', 'group'], ['glyphs', 'character'], ['parts', 'part']]) {
       for (const child of node[children] ?? []) BlissSVGBuilder.#admitAuthoredBags(child, childLevel, warn);
@@ -952,11 +967,10 @@ class BlissSVGBuilder {
   // survive a rebuild, which a refused value's report has to: it is dropped, so
   // nothing in the rebuilt composition records it.
   //
-  // The two drops below are what is left for this channel to decide, and both
-  // are silent because the stage has already reported everything it refused.
-  // Only the element key reaches them: it is the one key the stage deliberately
-  // ADMITS whatever it holds, and it reaches neither the picture nor the saved
-  // text.
+  // Every value the stage admits has a text form, since it refuses or drops
+  // every other, so what is left for this channel to decide is only what the
+  // bag stores: a boolean stays a boolean, which a switch reads by identity, and
+  // any other value becomes its text.
   //
   // `scope` is where the caller is writing, which only the caller knows: the
   // document for the options argument, the new or the addressed element for
@@ -966,13 +980,7 @@ class BlissSVGBuilder {
   static #toRaw(obj, warn, scope) {
     const raw = Object.create(null);
     for (const [key, value] of admitOptions(Object.entries(obj), warn, scope)) {
-      if (value === null || value === undefined) continue;
-      if (typeof value === 'object') continue;
-      if (typeof value === 'boolean') {
-        raw[key] = value;
-      } else {
-        raw[key] = textOfValue(value);
-      }
+      raw[key] = typeof value === 'boolean' ? value : textOfValue(value);
     }
     return raw;
   }

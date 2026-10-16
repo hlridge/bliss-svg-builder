@@ -31,8 +31,9 @@
  *   and on the promoted position field.
  * - A switch holding a value with no text form, dropped in silence and not
  *   stored, so it displaces neither another spelling of the switch nor a
- *   `true` written in a lower layer; and the element key, left alone whatever
- *   it holds (pinned as an open row's residue).
+ *   `true` written in a lower layer; and the element key under the same rule
+ *   as every option, refused and not stored (the key's own values, see
+ *   `BlissSVGBuilder.element-key-values.test.js`).
  *
  * Does NOT cover:
  * - Which values each half of the gate refuses and the wording of each
@@ -315,12 +316,11 @@ describe('BlissSVGBuilder refused value retention', () => {
     });
   });
 
-  describe('when a switch or an element key holds a value with no text form', () => {
-    // The two deliberate exceptions to reporting. A switch is on only when it
+  describe('when a switch holds a value with no text form', () => {
+    // The one deliberate exception to reporting. A switch is on only when it
     // is exactly `true`, so on its own any other value leaves it off, and
     // reporting one would scold a common way of saying off; a value with no
     // text form is still not stored, like any other, so it displaces nothing.
-    // The element key names the element and is left alone whatever it holds.
     it('turns a switch off in silence and stores nothing', () => {
       const b = new BlissSVGBuilder(compositionWith({ grid: null }));
       expect(codes(b)).toEqual([]);
@@ -401,21 +401,26 @@ describe('BlissSVGBuilder refused value retention', () => {
       expect(codes(b)).toEqual(['MISPLACED_GLOBAL_OPTION']);
     });
 
-    it('leaves an element key alone whatever it holds', () => {
-      // Residue of an open backlog row ("The element `key` reaches
-      // `handle.key` (typed `string`) as whatever was written"), pinned as
-      // current behaviour; that row's own design re-pins it. Also pins the
-      // silent drop as the switches' alone: widened to every key, it would
-      // take this object away.
+  });
+
+  describe('when the element key holds a value with no text form', () => {
+    it('refuses it and stores nothing, as for every option', () => {
+      // re-pinned at C28 (Task 2): was "leaves an element key alone whatever it
+      // holds", the residue of the row "The element `key` reaches `handle.key`
+      // (typed `string`) as whatever was written"; the key is judged like any
+      // option now. It no longer pins the silent drop as the switches' alone:
+      // the stage refuses every other value with no text form before that drop
       const b = new BlissSVGBuilder(bagAt('character', { key: { a: 1 } }));
-      expect(codes(b)).toEqual([]);
-      expect(b.glyph(0).key).toEqual({ a: 1 });
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
+      expect(typeof b.glyph(0).key).toBe('string');
     });
 
     it('keeps an element key out of the saved text', () => {
+      // re-pinned at C28 (Task 2): the null was dropped in silence; it is
+      // refused with a report now
       const b = new BlissSVGBuilder('B291');
       b.glyph(0).setOptions({ key: null });
-      expect(codes(b)).toEqual([]);
+      expect(codes(b)).toEqual(['INVALID_OPTION_VALUE']);
       expect(b.toString()).toBe('B291');
     });
   });
