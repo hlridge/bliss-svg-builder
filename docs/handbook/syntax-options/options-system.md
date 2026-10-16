@@ -69,7 +69,7 @@ builder.toString();
 // '[data-note="semi;colon"]B313'
 ```
 
-One accepted limit: a value where a backslash sits directly next to a quote (the `a\"b` class, or a trailing backslash) does not survive the round-trip, because only `\"` and `\'` are unescaped on parse.
+One accepted limit: a value that holds a `;` or a `]` and also has a backslash at its very end or just before a `"` (such as `a;b\`) may not survive the round-trip, because only `\"` and `\'` are unescaped on parse.
 
 ### Values from JavaScript
 

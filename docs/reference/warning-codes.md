@@ -16,7 +16,7 @@ builder.warnings;
 
 - `code` — a stable identifier from the list below (the `WarningCode` type in TypeScript)
 - `message` — a human-readable description, including how to fix the input
-- `source` — the part of your input the warning is about. Its shape follows the code rather than one rule, so match on `code` first and read `source` as scoped to what that code reports. For an attribute it is usually the **key on its own**, prefix included, where the attribute itself is what is wrong (a refused name, `content--xmlns`; a key whose value cannot take effect where it landed, `grid--stroke`; the losing half of a collision, `grid-sky-color`), and usually the **option as written** where the option is (a refused value, `stroke-width=-2`; a key at a scope that cannot use it, `grid--opacity=0.3`). Other codes point at the spelling they are about: several option names comma-separated (`margin, crop-top`), a coordinate suffix (`:1`), a whole bracket (`[color=red]`), or, where the input could not be parsed as a code at all, the parser's description of what it read (`Invalid format: B291[x=1]`) rather than a substring of your input. It is empty only where the report is about a computed result that no key you wrote produced, and the message stands on its own there
+- `source` — the part of your input the warning is about. Its shape follows the code rather than one rule, so match on `code` first and read `source` as scoped to what that code reports. For an attribute it is usually the **key on its own**, prefix included, where the attribute itself is what is wrong (a refused name, `content--xmlns`; a key whose value cannot take effect where it landed, `grid--stroke`; the losing half of a collision, `grid-sky-color`), and usually the **option as written** where the option is (a refused value, `stroke-width=-2`; a key at a scope that cannot use it, `grid--opacity=0.3`). Other codes point at the spelling they are about: several option names comma-separated (`margin, crop-top`), a coordinate suffix (`:1`), a whole bracket (`[color=red]`), or, where the input could not be read as a code at all, the token as written (`B291[x=1]`). It is empty only where the report is about a computed result that no key you wrote produced, and the message stands on its own there
 
 Match on `code` in application logic; `message` texts may be refined between releases. The list below can grow in minor releases (existing code meanings never change within a major version), so handle unrecognized codes gracefully.
 
@@ -83,6 +83,8 @@ B313:abc               →  not numbers
 
 Correct forms: `B313:2,4`, `B313:2`, `B313:,4`.
 
+A suffix holding a number too large for JavaScript to hold (`B313:1e400`) loses only that axis instead, as the position option below does, and the character renders.
+
 The same code covers a position **option** whose value is not a number, at any scope. There the option alone is ignored and the content still renders, because a broken decoration should not destroy valid content:
 
 ```
@@ -104,7 +106,7 @@ Only a number or text that spells one is read as a coordinate, the same rule the
 
 ### `MALFORMED_KERNING_VALUE`
 
-An `RK:`/`AK:` kerning marker carrying a value the marker cannot read as a number. A plain decimal, positive or negative, is fine; exponent notation (`RK:1e3`) is not, and the option spelling takes it where the marker does not. The marker is ignored; the characters render at normal spacing.
+An `RK:`/`AK:` kerning marker carrying a value that is not a finite number. The marker reads a number exactly as the option spelling does, so a decimal is fine, positive or negative, with or without an exponent (`RK:-1.5`, `RK:1e3`). The marker is ignored; the characters render at normal spacing.
 
 ```
 B313/RK:x/B431         →  renders both characters, default spacing
@@ -575,12 +577,20 @@ It is reported at every scope, and for a prefixed key the name after the last `-
 [__proto__=x]||B291              →  warns: the name must start with a letter
 ```
 
+A name holding a colon, a dot or a space is refused whole, under the name you wrote, and two of them also get a pointer to the spelling that works:
+
+```
+[foo.bar=1]||B291                     →  warns about "foo.bar", nothing emitted
+[xlink:href=https://example.com]B291  →  warns, and points to "href"
+[RK:5]B291                            →  warns, and points to B291/RK:5/B313
+```
+
 ```js
 builder.part(0).setTransientOptions({ 'on-click': 'x' });
 // warns, and nothing is emitted; other keys in the same call are kept
 ```
 
-Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. In two cases the key is dropped instead, though still reported with this code. A prefixed key written below global scope (`[content--onclick=x]B291`) could not act there whatever its name, so it is dropped as [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option) describes. And a value from JavaScript with no text form (`{ onclick: null }`) has nothing to save, so it is not stored at all.
+Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. A prefixed key written below global scope (`[content--onclick=x]B291`) is dropped instead, though still reported with this code, since it could not act there whatever its name (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). And a value from JavaScript with no text form (`{ onclick: null }`) has nothing to save, so it is not stored at all.
 
 ## Misplaced Channel
 
