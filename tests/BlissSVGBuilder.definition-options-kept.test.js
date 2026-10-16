@@ -23,7 +23,8 @@
  *   draws as the same definition in a `;` slot does; the name under
  *   `preserve`, spelled out by default.
  * - Controls: a `getPath` shape keeps its options when cleared, as it always
- *   has; a key set to `false` saves without the definition's value; clearing
+ *   has; a key set to `false` saves the `false` in place of the definition's
+ *   value; clearing
  *   or removing a key on the one part of a typed shape or an alias written
  *   alone changes nothing; clearing everything equals clearing each element
  *   through its handle, alone and in a slot.
@@ -66,12 +67,6 @@ const changed = (input, change) => {
   change(builder);
   return builder;
 };
-
-// Every path and transform in the content group, joined, so a part drawn as a
-// <path> of its own compares equal to the same part merged into its neighbour.
-const inkOf = (svg) => [...svg.slice(svg.indexOf('class="bliss-content"')).matchAll(/ (?:d|transform)="([^"]*)"/g)]
-  .map((match) => match[1])
-  .join('');
 
 describe('BlissSVGBuilder definition options kept', () => {
   describe('when a part named by a definition is cleared or has a key removed', () => {
@@ -155,17 +150,19 @@ describe('BlissSVGBuilder definition options kept', () => {
       expect(builder.toString({ preserve: true })).toBe(input);
     });
 
-    it('saves a colour set to false without the definition\'s colour', () => {
+    it('saves a colour set to false in place of the definition\'s colour', () => {
       // control: passes before C23
-      // note: no save writes `false`, so the name, which would bring the
-      // colour back, is spelled out instead
+      // re-pinned at C28 (Task 1): was `B291;[stroke-width=0.5]>C8` from both,
+      // when no save wrote `false`; the string now writes it like any override,
+      // so the default save spells the shape out with it and `preserve` keeps
+      // the name beside it
       const builder = changed('B291;KO_SHAPE', (b) => b.glyph(0).part(1).setOptions({ color: false }));
       expect(builder.svgCode).not.toContain('stroke="blue"');
-      expect(builder.toString()).toBe('B291;[stroke-width=0.5]>C8');
-      expect(builder.toString({ preserve: true })).toBe('B291;[stroke-width=0.5]>C8');
+      expect(builder.toString()).toBe('B291;[color=false;stroke-width=0.5]>C8');
+      expect(builder.toString({ preserve: true })).toBe('B291;[color=false]>KO_SHAPE');
       const reloaded = new BlissSVGBuilder(builder.toString()).svgCode;
       expect(reloaded).not.toContain('stroke="blue"');
-      expect(inkOf(reloaded)).toBe(inkOf(builder.svgCode));
+      expect(reloaded).toBe(builder.svgCode);
     });
   });
 

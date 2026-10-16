@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -24,14 +24,21 @@ const ERROR_PLACEHOLDER_PARTS = BlissParser.parse('REFSQUARE;B699:3').groups[0].
 const getHeadCode = (glyph) =>
   headScanCode(glyph.glyphCode, glyph.parts?.length ?? 0, glyph.parts?.[0]?.codeName);
 
+// Whether the string writes `value` under the option `key`: every value but a
+// switch's `false`. A switch is on only when it is exactly `true`, so leaving
+// its `false` out is what off already means. Anywhere else a `false` is drawn
+// as the text it spells (`stroke="false"`, `aria-hidden="false"`), so a string
+// that left it out would reload another picture.
+const writesOptionValue = (key, value) => value !== false || !BOOLEAN_OPTION_KEYS.has(key);
+
 // Mirrors toString()'s glyph emission for an empty-parts glyph: it re-emits
 // a token only when some option survives serialization. `key` is stripped by
 // toJSON, the kerning keys emit as RK/AK segments (which cannot carry a `^`),
-// and `false` values are filtered by serializeOptions.
+// and serializeOptions writes the rest by the same rule.
 const GLYPH_OPTION_KEYS_WITHOUT_TOKEN = new Set(['key', 'relativeKerning', 'absoluteKerning']);
 const glyphEmitsOptionsToken = (glyph) =>
   Object.entries(glyph.options ?? {}).some(([k, v]) =>
-    v !== false && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
+    writesOptionValue(k, v) && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
 
 // A head designation on a glyph the serializer omits has no written form: no
 // parts, no code, and no option that re-emits it as an options-only token. The
@@ -84,7 +91,7 @@ function serializeOptions(opts, skipKeys) {
   if (!opts) return '';
   const entries = Object.entries(opts);
   const filtered = entries.filter(([k, v]) =>
-    v !== false && !(skipKeys?.has(k))
+    writesOptionValue(k, v) && !(skipKeys?.has(k))
   );
   if (filtered.length === 0) return '';
   const parts = filtered.map(([k, v]) => v === true ? k : `${k}=${serializeOptionValue(v)}`);
@@ -3578,7 +3585,7 @@ class BlissSVGBuilder {
               ? BlissSVGBuilder.#withoutLook(part.options, BlissSVGBuilder.#loneLookOf(part._aliasCodeName, readings))
               : part.options;
             const writesOwnOptions = Object.entries(ownOptions ?? {})
-              .some(([key, value]) => key !== 'key' && value !== false);
+              .some(([key, value]) => key !== 'key' && writesOptionValue(key, value));
             const writtenAsCharacter = soleRecord && !writesOwnOptions;
             const keepsOptions = writtenAsCharacter
               ? BlissSVGBuilder.#keepsNamedOptions(glyph, part._aliasCodeName, 'glyph', readings)
@@ -4772,20 +4779,24 @@ class BlissSVGBuilder {
     return !!reading && BlissSVGBuilder.#carriesKeysOf(node, reading, levels);
   }
 
-  // Whether `node` holds a value the string writes (so not `false`) for every
-  // key `reading` holds, at its own level and then, `levels` deep, part by
-  // part below it. A part the element no longer has carries nothing. A part
-  // with no parts array is written by its name, which brings its inner parts
-  // back whatever this answers.
-  static #carriesKeysOf(node, reading, levels) {
+  // Whether `node` holds a value for every key `reading` holds, at its own
+  // level and then, `levels` deep, part by part below it. A part the element
+  // no longer has carries nothing. A part with no parts array is written by
+  // its name, which brings its inner parts back whatever this answers.
+  //
+  // At the element's own level a value is held when the string writes it,
+  // beside the name, so a `false` there is held like any override. Below it the
+  // string writes the name alone, so a key set to `false` there is a default
+  // left out that the name would bring back, and is not held.
+  static #carriesKeysOf(node, reading, levels, below = false) {
     const writtenKeys = (bag) => Object.entries(bag ?? {})
-      .filter(([, value]) => value !== false)
+      .filter(([key, value]) => (below ? value !== false : writesOptionValue(key, value)))
       .map(([key]) => programmaticOptionKey(key));
     const held = new Set(writtenKeys(node?.options));
     if (!writtenKeys(reading.options).every((key) => held.has(key))) return false;
     const parts = node ? node.parts : [];
     if (levels === 0 || !Array.isArray(parts)) return true;
-    return (reading.parts ?? []).every((part, i) => BlissSVGBuilder.#carriesKeysOf(parts[i], part, levels - 1));
+    return (reading.parts ?? []).every((part, i) => BlissSVGBuilder.#carriesKeysOf(parts[i], part, levels - 1, true));
   }
 
   // Whether `parts` begins with `named`, part for part, judged on the written

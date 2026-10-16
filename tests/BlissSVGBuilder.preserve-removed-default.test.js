@@ -8,14 +8,15 @@
  *   a part named by a definition: every save route reloads what the builder
  *   draws. A definition's options are part of what its code is, so
  *   `removeOptions` on a part named by one returns them; `false` is how a part
- *   leaves one out.
+ *   leaves one out, and the string writes it as it writes any value, so
+ *   `preserve` keeps the name with the `false` beside it.
  * - A default set to `false` inside a part saved by its own name, or inside a
- *   part of a glyph saved by its own name: the `preserve` string spells it out.
- * - A default set to `false`, which no save writes, counting as removed; the
- *   same key set to `false` on the character reaching no option of the
- *   definition's, so the name stays.
- * - A flattened word-level indicator's head that lost its default, saved as a
- *   save without `preserve` saves it.
+ *   part of a glyph saved by its own name: the `preserve` string spells that
+ *   part out, since the name would bring the default back.
+ * - The same key set to `false` on the character, reaching no option of the
+ *   definition's: the name stays, with the `false` on the character.
+ * - A flattened word-level indicator's head whose part left its default out:
+ *   the name kept with the `false` beside it.
  * - Names kept while the keys are there: a value of the key on the character,
  *   an overriding part value, an untouched element, and a removed default
  *   written back; and a changed value on a part still written out by the
@@ -93,53 +94,52 @@ const SAVE_ROUTES = [
   ['toJSON({ preserve: true })', (builder) => new BlissSVGBuilder(builder.toJSON({ preserve: true }))],
 ];
 
-// Every path and transform in the content group, joined, so a styled part drawn
-// as a <path> of its own compares equal to the same part merged into its neighbour.
-const inkOf = (svg) => [...svg.slice(svg.indexOf('class="bliss-content"')).matchAll(/ (?:d|transform)="([^"]*)"/g)]
-  .map((match) => match[1])
-  .join('');
-
 describe('BlissSVGBuilder preserve removed default', () => {
   describe('when a default the name supplies has been removed', () => {
     it.each(SAVE_ROUTES)('reloads a glyph without its removed default through %s', (_route, reload) => {
       // re-pinned at C23 (D2, D8): was `removeOptions('color')` on the
       // character, which removes nothing now: the default is on the one part
-      // the glyph is, where `false` is how it is left out, so the reload is
-      // compared as the part rows below compare theirs
+      // the glyph is, where `false` is how it is left out. Since C28 (Task 1)
+      // every save writes the `false`, so the reload is the builder's drawing
       const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
-      expect(inkOf(reload(builder).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(reload(builder).svgCode).toBe(builder.svgCode);
       expect(reload(builder).svgCode).not.toContain('stroke="red"');
     });
 
     it.each(SAVE_ROUTES)('reloads a part without a default set to false through %s', (_route, reload) => {
-      // note: the builder draws `false` as an attribute value no save writes
-      // (backlog row "A `false` option value: admitted in silence for a text
-      // option, and dropped by `toString()`"), so the reload is compared by its
-      // ink and the colour it must not bring back
+      // regression: the string left the `false` out, so it was compared by its
+      // ink only (backlog row "A `false` option value: admitted in silence for
+      // a text option, and dropped by `toString()`")
       const builder = changed('B291;PR_SHAPE', (g) => g.part(1).setOptions({ color: false }));
-      expect(inkOf(reload(builder).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(reload(builder).svgCode).toBe(builder.svgCode);
       expect(reload(builder).svgCode).not.toContain('stroke="blue"');
     });
 
-    it('spells the glyph out in the preserve string', () => {
+    it('keeps the glyph\'s name in the preserve string, with the false beside it', () => {
       // regression: the name reloaded red. Re-pinned at C23 (D2, D8): the
       // default is left out on the one part the glyph is, not removed from
-      // the character, which holds none of it
+      // the character, which holds none of it. Re-pinned at C28 (Task 1): was
+      // `B291`, spelled out while no save wrote `false`; it is written beside
+      // the name now, as any override is (`[color=green]>PR_REDB` below)
       const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
-      expect(builder.toString({ preserve: true })).toBe('B291');
+      expect(builder.toString({ preserve: true })).toBe('[color=false]>PR_REDB');
     });
 
-    it('spells the part out in the preserve string, keeping the default that is left', () => {
-      // regression: the name reloaded blue
+    it('keeps the part\'s name in the preserve string, with the false beside it', () => {
+      // regression: the name reloaded blue. Re-pinned at C28 (Task 1): was
+      // `B291;[stroke-width=0.5]>C8`, spelled out while no save wrote `false`;
+      // the name now brings the stroke width that is left
       const builder = changed('B291;PR_SHAPE', (g) => g.part(1).setOptions({ color: false }));
-      expect(builder.toString({ preserve: true })).toBe('B291;[stroke-width=0.5]>C8');
+      expect(builder.toString({ preserve: true })).toBe('B291;[color=false]>PR_SHAPE');
     });
 
     it('spells a part out when a default was set to false inside it', () => {
+      // re-pinned at C28 (Task 1): was `B291;C8;HL8:0,8`; the inner part keeps
+      // its own name now, the `false` beside it
       const builder = changed('B291;PR_MULTI', (g) => g.part(1).part(0).setOptions({ color: false }));
       const saved = builder.toString({ preserve: true });
-      expect(saved).toBe('B291;C8;HL8:0,8');
-      expect(inkOf(new BlissSVGBuilder(saved).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(saved).toBe('B291;[color=false]>PR_NESTED;HL8:0,8');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
     });
 
@@ -147,44 +147,52 @@ describe('BlissSVGBuilder preserve removed default', () => {
       // note: the string writes the glyph's name alone, and reading it back
       // restores every level the name reaches, its parts' own parts included.
       // Re-pinned at C23 (D2): the glyph's parts are inside the one part it
-      // is, so the part is reached one level further down
+      // is, so the part is reached one level further down. Re-pinned at C28
+      // (Task 1): was `B291;C8;HL8:0,8`; the inner part keeps its own name now
       const builder = changed('PR_GLMULTI', (g) => g.part(0).part(1).part(0).setOptions({ color: false }));
       const saved = builder.toString({ preserve: true });
-      expect(saved).toBe('B291;C8;HL8:0,8');
-      expect(inkOf(new BlissSVGBuilder(saved).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(saved).toBe('B291;[color=false]>PR_NESTED;HL8:0,8');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
     });
 
-    it('counts a default set to false on its part as removed, since no save writes false', () => {
+    it('holds a default set to false on its part like any override, so the name reloads the false', () => {
       // re-pinned at C23 (D2): was `false` on the character, which the default
-      // no longer sits on (that case is the row below)
+      // no longer sits on (that case is the row below). Re-pinned at C28
+      // (Task 1): was "counts a default set to false on its part as removed,
+      // since no save writes false" (saved `B291`); a save writes it now
       const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
-      const saved = builder.toString({ preserve: true });
-      expect(saved).toBe('B291');
-      expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
+      const reloaded = new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode;
+      expect(reloaded).toContain('stroke="false"');
+      expect(reloaded).not.toContain('stroke="red"');
     });
 
     it('keeps the name when the character sets the default\'s key to false, which reaches no option of the definition\'s', () => {
       // re-pinned at C23 (D2, D7): was "counts a default set to false as
       // removed" (saved `B291`). A character option does not restyle the
-      // definition's part, so the colour stays, and so does the name
+      // definition's part, so the colour stays, and so does the name.
+      // Re-pinned at C28 (Task 1): was `PR_REDB`; the character's `false` is
+      // written now
       const builder = changed('PR_REDB', (g) => g.setOptions({ color: false }));
       const saved = builder.toString({ preserve: true });
-      expect(saved).toBe('PR_REDB');
+      expect(saved).toBe('[color=false]PR_REDB');
       expect(builder.svgCode).toContain('stroke="red"');
-      expect(inkOf(new BlissSVGBuilder(saved).svgCode)).toBe(inkOf(builder.svgCode));
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
       expect(new BlissSVGBuilder(saved).svgCode).toContain('stroke="red"');
     });
 
-    it('saves a flattened head that lost its default as a save without preserve does', () => {
+    it('keeps a flattened head\'s name with the false beside it', () => {
       // re-pinned at C23 (D2, D8): was `removeOptions('color')` on the
       // character, and the JSON equal to the save without preserve. The
       // default is left out on the head's named part now, so the JSON keeps
       // the name beside the part it writes out, as the row on the JSON below
-      // says, and reloads what the builder draws
+      // says, and reloads what the builder draws. Re-pinned at C28 (Task 1):
+      // was "saves a flattened head that lost its default as a save without
+      // preserve does" (both `B291;B81`); the `false` is written, beside the
+      // name under `preserve` and on the spelled-out part without it
       const builder = changed('PR_REDB;;B81', (g) => g.part(0).setOptions({ color: false }));
-      expect(builder.toString({ preserve: true, flattenIndicators: true })).toBe('B291;B81');
-      expect(builder.toString({ preserve: true, flattenIndicators: true })).toBe(builder.toString({ flattenIndicators: true }));
+      expect(builder.toString({ preserve: true, flattenIndicators: true })).toBe('[color=false]>PR_REDB;B81');
+      expect(builder.toString({ flattenIndicators: true })).toBe('[color=false]>B291;B81');
       expect(new BlissSVGBuilder(builder.toJSON({ preserve: true, flattenIndicators: true })).svgCode).toBe(builder.svgCode);
     });
   });
@@ -219,15 +227,17 @@ describe('BlissSVGBuilder preserve removed default', () => {
   describe('when the JSON writes the parts out beside the name', () => {
     it('keeps the name when only a part lost a default the name supplies', () => {
       // note: the parts are written out, so the name brings back only the
-      // character's own options; the string spells this glyph out instead.
-      // Re-pinned at C23 (D2): was `part(1).removeOptions('color')` on a lone
-      // PR_TWO, whose bracketed parts sit inside the one part it is now, where
-      // a change is backlog row "A part saved by its name forgets a change
-      // made inside it"; the part a lone PR_REDB is leaves its default out
+      // character's own options. Re-pinned at C23 (D2): was
+      // `part(1).removeOptions('color')` on a lone PR_TWO, whose bracketed
+      // parts sit inside the one part it is now, where a change is backlog row
+      // "A part saved by its name forgets a change made inside it"; the part a
+      // lone PR_REDB is leaves its default out. Re-pinned at C28 (Task 1): the
+      // string spelled this glyph out (`B291`) while no save wrote `false`; it
+      // keeps the name too now, the `false` beside it
       const builder = changed('PR_REDB', (g) => g.part(0).setOptions({ color: false }));
       const json = builder.toJSON({ preserve: true });
       expect(json.groups[0].glyphs[0].codeName).toBe('PR_REDB');
-      expect(builder.toString({ preserve: true })).toBe('B291');
+      expect(builder.toString({ preserve: true })).toBe('[color=false]>PR_REDB');
       expect(new BlissSVGBuilder(json).svgCode).toBe(builder.svgCode);
     });
   });
