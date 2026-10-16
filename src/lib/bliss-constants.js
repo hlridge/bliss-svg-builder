@@ -517,9 +517,10 @@ export const INTERNAL_ONLY_SPELLINGS = new Map([
  * parser strips and unescapes on the way back in. Everything else emits
  * byte-unchanged. Lives here because both the builder (toString) and the
  * parser (`;;`-overlay rebuild) emit option values, and the builder already
- * imports the parser. Known residue: a backslash abutting the escaping
- * (`a\"b` class, trailing `\`) cannot round-trip — the parser unescapes
- * ONLY `\"`.
+ * imports the parser. Known residue: the parser unescapes only `\"`, so a
+ * backslash before a quote in the quoted form can end the span early, and a
+ * value that needs quotes and ends in `\` (`a;b\`) or holds `\"` before a
+ * `;` can fail to read back.
  */
 export const serializeOptionValue = (value) => {
   // Guarded, as a defence for a value `String()` throws on, though nothing
@@ -1270,8 +1271,17 @@ export const reservedAttributeMessage = (name) =>
 
 // The two names people reach for that the library spells another way: the
 // kerning marker, which goes between characters, and SVG 1.1's namespaced link.
+// The marker example repeats the key only when the reader would take it for a
+// marker (a finite value in the number grammar, as written). Any other key
+// (`RK:`, `RK:abc`, `RK: 5`) copied from the message would be refused in its
+// turn, so the example shows the form instead.
 const unsafeNameHint = (key) => {
-  if (/^(?:RK|AK):/.test(key)) return ` A kerning marker goes between two characters, as in B291/${key}/B313, not inside a bracket.`;
+  const marker = /^(RK|AK):/.exec(key);
+  if (marker) {
+    const value = key.slice(marker[0].length);
+    const example = WHOLE_NUMBER_TEXT.test(value) && Number.isFinite(Number(value)) ? key : `${marker[1]}:5`;
+    return ` A kerning marker goes between two characters, as in B291/${example}/B313, not inside a bracket.`;
+  }
   if (key.toLowerCase() === 'xlink:href') return ' Write "href": SVG 2 dropped the xlink: prefix.';
   return '';
 };

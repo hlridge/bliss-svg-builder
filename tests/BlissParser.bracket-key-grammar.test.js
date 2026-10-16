@@ -15,7 +15,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Parity with the same key written in a composition object, whose save now
  *   reloads as the same key.
  * - The two hints the refusal gives: a kerning marker written inside a
- *   bracket, and `xlink:href`.
+ *   bracket, whose example repeats the key only when the reader takes it
+ *   for a marker, and `xlink:href`.
  * - Nameless entries (`[=5]`, `[=]`) and empty ones (`[;;]`, `[ ]`).
  * - A quoted value followed by text, a value of two quoted spans, a `;`
  *   inside quotes, the first `=` splitting an entry, and the padding around
@@ -23,8 +24,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - `define()` reading a definition's own bracket the same way.
  *
  * Does NOT cover:
- * - Names a save could not write back (holding `=`, `;`, a square bracket, a
- *   quote, or edge whitespace), which are not stored at all, see
+ * - Names a save could not write back (holding `=`, `;`, a closing square
+ *   bracket, a quote, or edge whitespace), which are not stored at all, see
  *   `BlissSVGBuilder.unspellable-option-names.test.js`.
  * - The refusal's base wording and the event-handler names, see
  *   `BlissSVGBuilder.unsafe-attribute-names.test.js`.
@@ -100,13 +101,33 @@ describe('BlissParser bracket key grammar', () => {
   });
 
   describe('when the key is a kerning marker written in a bracket', () => {
-    it.each(['RK:5', 'AK:-1.5'])('reports [%s] as one name, says where a marker goes and does not kern', (key) => {
+    it.each(['RK:5', 'AK:-1.5', 'RK:1e3'])('reports [%s] as one name, says where a marker goes and does not kern', (key) => {
       const { warnings, svgCode } = new BlissSVGBuilder(`B291/[${key}]B313`);
 
       expect(warnings).toHaveLength(1);
       expect(`${warnings[0].code} ${warnings[0].source}`).toBe(`UNSAFE_ATTRIBUTE_NAME ${key}`);
       expect(warnings[0].message).toContain(`B291/${key}/B313`);
+      expect(new BlissSVGBuilder(`B291/${key}/B313`).warnings).toEqual([]);
       expect(svgCode).toBe(new BlissSVGBuilder('B291/B313').svgCode);
+    });
+
+    it.each([
+      ['RK:', 'RK:5'],
+      ['AK:', 'AK:5'],
+      ['RK:abc', 'RK:5'],
+      ['RK:1e400', 'RK:5'],
+      ['RK:Infinity', 'RK:5'],
+      ['RK: 5', 'RK:5'],
+      ['AK:0x10', 'AK:5'],
+    ])('answers [%s], which is no marker either, with the example %s', (key, marker) => {
+      // pins the example repeating the key only when the reader would take it
+      // for a marker: copied from the message, B291/RK:abc/B313 is refused too
+      const { warnings } = new BlissSVGBuilder(`B291/[${key}]B313`);
+
+      expect(warnings).toHaveLength(1);
+      expect(`${warnings[0].code} ${warnings[0].source}`).toBe(`UNSAFE_ATTRIBUTE_NAME ${key}`);
+      expect(warnings[0].message).toContain(`B291/${marker}/B313`);
+      expect(warnings[0].message).not.toContain(`B291/${key}/B313`);
     });
 
     it.each(['XRK:5', 'rk:5'])('reports [%s] without the marker sentence', (key) => {
