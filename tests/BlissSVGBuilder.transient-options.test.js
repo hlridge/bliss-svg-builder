@@ -221,13 +221,16 @@ describe('BlissSVGBuilder transient options', () => {
     });
 
     it('reports several refused names in one warning, each in its own sentence', () => {
-      // pins that a hint names its own key: built over the names joined into
-      // one, the marker hint read "B291/RK:5", "a b/B313"
+      // pins one sentence per name: built over the names joined into one,
+      // the message opened "RK:5", "a b" is not a usable attribute name (the
+      // marker hint alone cannot tell, since a key that is not a working
+      // marker is shown the plain RK:5 example)
       const b = new BlissSVGBuilder('B291');
       b.part(0).setTransientOptions({ 'RK:5': 'x', 'a b': 'y' });
       const refusals = b.warnings.filter(w => w.code === 'UNSAFE_ATTRIBUTE_NAME');
 
       expect(refusals).toHaveLength(1);
+      expect(refusals[0].message).toContain('"RK:5" is not a usable attribute name');
       expect(refusals[0].message).toContain('"a b" is not a usable attribute name');
       expect(refusals[0].message).toContain('as in B291/RK:5/B313,');
     });
