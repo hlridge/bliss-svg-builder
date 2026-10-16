@@ -88,7 +88,7 @@ builder.toString();        // '[crop=nope]||B313': the null is gone, the typo is
 
 Both draw the same picture as `B313` on its own, and reloading that saved string reports the typo again.
 
-A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). A switch (`grid`, `center`, `errorPlaceholder`) is never reported for what it holds, since it is on only when it is exactly `true`. A value with no text form is still not stored, so it does not turn off a switch turned on elsewhere, in the string or the builder's `defaults`; `false` does. And `key`, which names an element rather than describing it, is left alone whatever it holds: it reaches neither the picture nor the saved text.
+A position (`x`, `y`) and a kerning value follow the same rule and report under their own codes, [`MALFORMED_COORDINATES`](/reference/warning-codes#malformed-coordinates) and [`MALFORMED_KERNING_VALUE`](/reference/warning-codes#malformed-kerning-value). A switch (`grid`, `center`, `errorPlaceholder`) is never reported for what it holds, since it is on only when it is exactly `true`. A value with no text form is still not stored, so it does not turn off a switch turned on elsewhere, in the string or the builder's `defaults`; `false` does. And `key`, which names an element rather than describing it, follows the same rule: a value with no text form is refused and the element keeps its own key, and any other value names the element by its text, so `{ key: 5 }` finds it as `getElementByKey('5')`.
 
 ## What Counts as an Option
 

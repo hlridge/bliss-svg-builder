@@ -41,9 +41,9 @@
  * `center`, `errorPlaceholder`) is never reported for what it holds, since it
  * is on only when it is exactly `true`; a value with no text form is still not
  * stored, so it does not turn off a switch turned on elsewhere, in the string
- * or the builder's `defaults`, and `false` does. `key` names the element and is
- * left alone whatever it holds: it reaches neither the picture nor the saved
- * text.
+ * or the builder's `defaults`, and `false` does. `key` follows the same rule:
+ * it names the element, so a value with no text form is refused and the element
+ * keeps its own key, and any other value names it by its text (`5` as `'5'`).
  */
 export interface BlissOptions {
   // Stroke and spacing
@@ -118,7 +118,9 @@ export interface BlissOptions {
   // on a handle (`setOptions({ key: 'subject' })`), in a composition object, or
   // in a DSL bracket at element scope. It is identity rather than appearance, so
   // it changes nothing about the picture and is not published by either
-  // serializer; written at document scope it names nothing and is dropped.
+  // serializer. A number or a boolean names the element by its text, and an
+  // empty key names nothing; written at document scope it names no element
+  // `getElementByKey()` can find.
   key?: string;
 
   // SVG pass-through attributes: any key not in the known set. A name an SVG or
