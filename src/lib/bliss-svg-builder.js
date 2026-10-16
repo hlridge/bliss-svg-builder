@@ -3707,6 +3707,12 @@ class BlissSVGBuilder {
                 && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))
                 && keepsOptions) {
               part.codeName = part._aliasCodeName;
+            } else if (!keepsOptions && part.codeName === part._aliasCodeName) {
+              // A part that already carries the name (a typed shape written
+              // alone, which nothing renamed) would read to the string as one
+              // whose name was kept here, so the recording goes with the
+              // verdict and the string asks for itself.
+              delete part._aliasCodeName;
             }
           }
           if (!options.deep) delete part._aliasCodeName;

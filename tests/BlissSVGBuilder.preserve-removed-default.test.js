@@ -143,6 +143,20 @@ describe('BlissSVGBuilder preserve removed default', () => {
       expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
     });
 
+    it.each([
+      ['alone', 'PR_MULTI'],
+      ['in a word of two characters', 'PR_MULTI/B303'],
+    ])('spells a shape written %s out when a default was set to false inside it', (_where, code) => {
+      // regression (C28 review F1): a typed shape written alone carries its own
+      // name, and the string kept it without asking whether the name still
+      // brings what its parts hold, so the reload brought the red back
+      const builder = changed(code, (g) => g.part(0).part(0).setOptions({ color: false }));
+      const saved = builder.toString({ preserve: true });
+      expect(saved.startsWith('PR_MULTI')).toBe(false);
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(saved).svgCode).not.toContain('stroke="red"');
+    });
+
     it('spells a glyph out when a default was set to false inside one of its parts', () => {
       // note: the string writes the glyph's name alone, and reading it back
       // restores every level the name reaches, its parts' own parts included.
