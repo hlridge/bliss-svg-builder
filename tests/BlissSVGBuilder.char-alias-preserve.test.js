@@ -11,8 +11,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * Covers:
  * - Standalone, in-word, option-prefixed, coordinate-suffixed, and
  *   head-designated character-level alias forms under preserve.
- * - Alias chains: outermost written name wins; multi-part and
- *   coordinate-decorated shorthand dissolves; unknown targets stay resolved.
+ * - Alias chains: outermost written name wins, through a link that places
+ *   its code too; multi-part shorthand dissolves; unknown targets stay
+ *   resolved.
  * - Divergence safety: a glyph that no longer equals the pure rename
  *   (applyIndicators, addPart, object input with extra parts, flattened
  *   overlays) decomposes its base instead of emitting an unreparseable
@@ -158,11 +159,14 @@ describe('BlissSVGBuilder character-level alias preserve', () => {
       expect(new BlissSVGBuilder('SHORT').toString()).toBe('B1103;B81');
     });
 
-    it('dissolves a name whose chain ends in coordinate-decorated shorthand', () => {
+    it('keeps a name whose chain ends in a code with a position', () => {
+      // re-pinned by the owner's ruling folded into C29 (2026-10-17): such a
+      // name dissolved into `B1103:2,3`; it now reads through the link that
+      // places the code, as in a part slot, and keeps the name written
       defineAndTrack({ POSAL: { codeString: 'B1103:2,3' } });
       defineAndTrack({ SHORT2: { codeString: 'POSAL' } });
-      expect(new BlissSVGBuilder('POSAL').toString({ preserve: true })).toBe('B1103:2,3');
-      expect(new BlissSVGBuilder('SHORT2').toString({ preserve: true })).toBe('B1103:2,3');
+      expect(new BlissSVGBuilder('POSAL').toString({ preserve: true })).toBe('POSAL');
+      expect(new BlissSVGBuilder('SHORT2').toString({ preserve: true })).toBe('SHORT2');
     });
 
     it('leaves a forward-referenced unknown target resolved', () => {

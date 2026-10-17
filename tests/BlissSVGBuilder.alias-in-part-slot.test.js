@@ -15,13 +15,12 @@
  * - An alias of a typed indicator drawing with its own colour, still an
  *   indicator.
  * - The part handle naming the code drawn and holding what that code holds,
- *   as for the alias written alone.
- * - Where the reading stops: an alias of an alias of a positioned code keeps
- *   the name written; an alias of an alias of several codes is refused as a
- *   part, as those codes are, in a use and in `define()`; a rename of a word
- *   fails as the word does.
+ *   as for the alias written alone, through a link that places that code too.
+ * - Where the reading stops: an alias of an alias of several codes is refused
+ *   as a part, as those codes are, in a use and in `define()`; a rename of a
+ *   word fails as the word does.
  * - A misplaced indicator or space written through a name, reported by the
- *   name written.
+ *   name and the position written where it is used.
  * - A second bracket leading the code string of an alias in a slot, or of a
  *   link it is read through, reported once.
  *
@@ -62,6 +61,8 @@ const ALIASES = {
   SL_ACT: { codeString: 'B81' },
   SL_ALIND: { codeString: 'SL_MYIND' },
   SL_SP: { codeString: 'TSP' },
+  SL_PIND: { codeString: 'B81:1,0' },
+  SL_PSP: { codeString: 'TSP:1,0' },
   SL_ALPOS: { codeString: 'SL_POS', defaultOptions: { color: 'blue' } },
   SL_ALMULTI: { codeString: 'SL_MULTI' },
   SL_ALWORD: { codeString: 'SL_WORD' },
@@ -155,6 +156,15 @@ describe('BlissSVGBuilder alias in a part slot', () => {
       expect(new BlissSVGBuilder('SL_A2').glyph(0).part(0).codeName).toBe('B291');
     });
 
+    it('names the code an alias of an alias of a positioned code draws, as written alone', () => {
+      // re-pinned by C29's review fix F2: the part kept the name written and
+      // held what it draws below it, where the colour the inner link's code
+      // brings beat the alias's; it is now that code, read through the link
+      // that places it
+      expect(new BlissSVGBuilder('B313;SL_ALPOS').glyph(0).part(1).codeName).toBe('B291');
+      expect(new BlissSVGBuilder('SL_ALPOS').glyph(0).part(0).codeName).toBe('B291');
+    });
+
     it('holds what that code holds written in the slot, with no part per link', () => {
       const inner = new BlissSVGBuilder('B313;SL_A2').glyph(0).part(1).part(0);
       expect(inner.codeName).toBe(new BlissSVGBuilder('B313;B291').glyph(0).part(1).part(0).codeName);
@@ -162,12 +172,6 @@ describe('BlissSVGBuilder alias in a part slot', () => {
   });
 
   describe('when the alias names an alias of something other than one code', () => {
-    it('keeps the name of an alias of a positioned code, holding what that draws', () => {
-      // note: an alias of shorthand is shorthand for the same thing, so the
-      // part keeps the name written rather than the inner alias's
-      expect(new BlissSVGBuilder('B313;SL_ALPOS').glyph(0).part(1).codeName).toBe('SL_ALPOS');
-    });
-
     it('refuses an alias of an alias of several codes as a part, as those codes are refused', () => {
       expect(warningsOf('B313;SL_ALMULTI')).toEqual([{ code: 'COMPOSITE_AS_PART', source: 'SL_ALMULTI' }]);
       expect(svgOf('B313;SL_ALMULTI')).toBe(svgOf('B313;SL_MULTI'));
@@ -196,6 +200,17 @@ describe('BlissSVGBuilder alias in a part slot', () => {
     ])('reports %s as %s with the name written, %s', (input, code, source) => {
       // regression: the report named the code the name draws (C2, TSP), not
       // the text written
+      expect(warningsOf(input)).toEqual([{ code, source }]);
+    });
+
+    it.each([
+      [';SL_PIND;B313', 'MISPLACED_INDICATOR_PART', 'SL_PIND'],
+      [';SL_PIND:2;B313', 'MISPLACED_INDICATOR_PART', 'SL_PIND:2'],
+      [';SL_PIND:2,3;B313', 'MISPLACED_INDICATOR_PART', 'SL_PIND:2,3'],
+      ['B291;SL_PSP;B313', 'MISPLACED_SPACE', 'SL_PSP'],
+    ])('reports %s as %s with the name and the position written where it is used, %s', (input, code, source) => {
+      // note: the name places its code (`B81:1,0`), so the part is drawn at
+      // that position plus the one written; only the one written is reported
       expect(warningsOf(input)).toEqual([{ code, source }]);
     });
   });

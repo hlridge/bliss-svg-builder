@@ -256,13 +256,14 @@ describe('BlissParser definition expansion', () => {
 
   describe('when expandParts expands a part referencing a definition with a nested codeString', () => {
     it('expands nested part definitions inside composite codeStrings', () => {
+      // re-pinned by C29's review fix F2: a nested name that places one code
+      // (`C8:0,8`) was a part holding that code; it is now the code, placed
+      // where the name places it, as the name written alone draws
       const part = { codeName: '_C9_OUTER_NESTED' };
       BlissParser.expandParts({ groups: [{ glyphs: [{ parts: [part] }] }] });
 
-      expect(part.parts[0].codeName).toBe('_C9_NESTED');
-      expect(part.parts[0].parts).toEqual([
-        expect.objectContaining({ codeName: 'C8', x: 0, y: 8 })
-      ]);
+      expect(part.parts[0]).toEqual(expect.objectContaining({ codeName: 'C8', x: 0, y: 8 }));
+      expect(part.parts[0].parts).toBeUndefined();
       expect(part.parts[1].codeName).toBe('H');
     });
 

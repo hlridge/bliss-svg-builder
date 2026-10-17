@@ -9,7 +9,7 @@ import { hasPathData, createTextFallbackGlyph } from "./bliss-shape-creators.js"
 import {
   resolveHeadIndex, headScanCode
 } from "./bliss-head-glyph-exclusions.js";
-import { basePartCount, resolveEffectiveDefinition, resolveWordIndicatorOverlay } from "./indicator-utils.js";
+import { basePartCount, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN } from "./indicator-utils.js";
 import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, NUMBER_TEXT, OPTION_BRACKET_CONTENT, QUOTED_SPAN, WARNING_CODES, WRITTEN_COORDINATE_PATTERN, admitOptions, isScopeRefusal, peelCharacterBrackets, serializeOptionValue, textOfValue, withoutEmptyRegion, writtenNumber } from "./bliss-constants.js";
 
 // The coordinate-suffix grammar parsePartString accepts: ':' with EACH axis
@@ -18,7 +18,7 @@ import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, NUMBER_TEXT, OPTION_BRACKET_C
 // suffix before a definition lookup must strip this SAME grammar, or
 // equivalent spellings take different semantic paths (a y-only ':,2' used to
 // bypass the misplacement gates while ':0,2' met them).
-const COORD_SUFFIX_PATTERN = new RegExp(String.raw`:(?:${NUMBER_TEXT})?(?:,(?:${NUMBER_TEXT})?)?$`);
+export const COORD_SUFFIX_PATTERN = new RegExp(String.raw`:(?:${NUMBER_TEXT})?(?:,(?:${NUMBER_TEXT})?)?$`);
 // A part as parsePartString reads it: a code, then that suffix with each axis
 // captured (groups: code, x, y).
 const PART_STRING_PATTERN = new RegExp(String.raw`^([a-zA-Z0-9À-ſͰ-ϿЀ-ӿ\-._]+)(?::(${NUMBER_TEXT})?(?:,(${NUMBER_TEXT})?)?)?$`);
@@ -154,6 +154,26 @@ const readTextFallbackKey = (code) => {
   if (typeof code !== 'string' || !code.startsWith(X_TEXT_FALLBACK_PREFIX)) return null;
   const asWritten = `X${code.slice(X_TEXT_FALLBACK_PREFIX.length)}`;
   return classifyXCode(asWritten) === 'letters' ? asWritten : null;
+};
+
+// The code a `;` part slot reads a code as. The glyph-boundary pass never sees
+// a slot, so a letter with no outline is made its text-fallback glyph here,
+// as that pass makes one written alone, and a routing key is read as the
+// letters it names when they all have outlines (readTextFallbackKey). Asked
+// of the code written in a slot and of the code an alias there names, so the
+// alias draws what the code written in its place draws.
+const slotCodeOf = (code) => {
+  const keyAsLetters = readTextFallbackKey(code);
+  if (keyAsLetters !== null) return keyAsLetters;
+  return classifyXCode(code) === 'glyph' ? `${X_TEXT_FALLBACK_PREFIX}${code.slice(1)}` : code;
+};
+
+// The definition a text-fallback glyph is read by in a part slot: one made for
+// its letters, drawn as a shape.
+const textFallbackDefinitionOf = (code) => {
+  const glyph = createTextFallbackGlyph(code.slice(X_TEXT_FALLBACK_PREFIX.length));
+  glyph.isShape = true;
+  return glyph;
 };
 
 // Rewrites the X shorthand in a code string into the codes the renderer knows:
@@ -1562,7 +1582,7 @@ export class BlissParser {
           const definition = useBaseCodeLookup
             ? (definitions[potentialBaseCode] || {})
             : codeForLookup.startsWith('XTXT_')
-              ? (() => { const g = createTextFallbackGlyph(codeForLookup.slice(5)); g.isShape = true; return g; })()
+              ? textFallbackDefinitionOf(codeForLookup)
               : (definitions[codeForLookup] || {});
 
           // If we have a codeString, recursively expand it
@@ -1707,6 +1727,7 @@ export class BlissParser {
                   ...(expandedSubPart._frag !== undefined && { _frag: expandedSubPart._frag }),
                   ...(expandedSubPart._scanCode !== undefined && { _scanCode: expandedSubPart._scanCode }),
                   ...(expandedSubPart._aliasCodeName !== undefined && { _aliasCodeName: expandedSubPart._aliasCodeName }),
+                  ...(expandedSubPart._aliasPosition !== undefined && { _aliasPosition: expandedSubPart._aliasPosition }),
                   ...(expandedSubPart.partOptions && { partOptions: expandedSubPart.partOptions })
                 };
               });
@@ -1733,7 +1754,7 @@ export class BlissParser {
             // has no glyphCode, so the name it was written as is recorded
             // instead, the identity a lone shape is saved by.
             if (!isBareAlias && !builtInCodes.has(potentialBaseCode) && expandedParts.length === 1) {
-              const { partOptions, _aliasCodeName, ...character } = expandedParts[0];
+              const { partOptions, _aliasCodeName, _aliasPosition, ...character } = expandedParts[0];
               // Drawn inside that one part, a code string fusing two base
               // parts is out of the layout's sight: the name lends only the
               // layout data it sets itself (layoutDefinitionOf).
@@ -1817,6 +1838,18 @@ export class BlissParser {
                   || effective.isExternalGlyph || effective.glyphCode
                   || typeof effective.getPath === 'function')) {
                 expandedParts[0]._aliasCodeName = potentialBaseCode;
+              } else {
+                // A chain with a link that places the code it names
+                // (`RED:1,0`) is read as a part slot reads it: where it
+                // reaches a code with an identity, the name is recorded with
+                // the position its links add, which the saves take off the
+                // part's own, so the name is written with what was written
+                // where it was used.
+                const { position } = BlissParser.#readThroughRenames({ codeName: potentialBaseCode }, definition);
+                if (position !== undefined) {
+                  expandedParts[0]._aliasCodeName = potentialBaseCode;
+                  expandedParts[0]._aliasPosition = position;
+                }
               }
             }
 
@@ -1925,7 +1958,7 @@ export class BlissParser {
       // silent tie-break at layout time.
       let pendingKerning;
 
-      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, partOptions, _aliasCodeName, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
+      for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, partOptions, _aliasCodeName, _aliasPosition, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
         // Lift a word-level fail-render flag onto its enclosing group (mirrors
         // the _wordIndicators lift below). A malformed `;;` makes the whole word
         // invalid; the element reads group.errorCode and collapses it to one
@@ -2161,15 +2194,10 @@ export class BlissParser {
             // the two disagree about what one code means. A multi-letter one is
             // then a word here and fails below exactly as `B291;Xhello` does,
             // instead of rendering silently and reloading as that failure.
-            const keyAsLetters = readTextFallbackKey(part.codeName);
-            if (keyAsLetters !== null) {
-              part.codeName = keyAsLetters;
-            } else if (classifyXCode(part.codeName) === 'glyph') {
-              part.codeName = `XTXT_${part.codeName.slice(1)}`;
-            }
+            if (part.codeName !== undefined) part.codeName = slotCodeOf(part.codeName);
 
-            const definition = part.codeName?.startsWith('XTXT_')
-              ? (() => { const g = createTextFallbackGlyph(part.codeName.slice(5)); g.isShape = true; return g; })()
+            const { definition, position } = part.codeName?.startsWith('XTXT_')
+              ? { definition: textFallbackDefinitionOf(part.codeName) }
               : BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
             // The code the definition draws, behind the bracket that leads its
             // code string, which is the definition's own options and so this
@@ -2202,6 +2230,7 @@ export class BlissParser {
             partIndex++;
 
             extractPositionFromOptions(part, parseWarnings);
+            BlissParser.#placeByLinks(part, position, warn);
             parts.push(part);
           }
           return parts;
@@ -2221,6 +2250,7 @@ export class BlissParser {
           if (glyphObj.parts.length === 1
               && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode))) {
             glyphObj.parts[0]._aliasCodeName = _aliasCodeName;
+            if (_aliasPosition !== undefined) glyphObj.parts[0]._aliasPosition = _aliasPosition;
           }
           glyphObj._aliasCodeName = _aliasCodeName;
         }
@@ -2403,48 +2433,111 @@ export class BlissParser {
 
   /**
    * Read a part named by a bare alias as the alias written alone expands:
-   * through every link of a chain that renames one code, each link's options
+   * through every link of a chain that names one code, each link's options
    * under the ones further out and the part's own bracket over them all, so
    * the outer link wins a key two links set, and a part bracket where the
-   * alias is used restyles what it draws. Where the chain reaches a code with
-   * an identity of its own (a built-in, a typed definition, a shape drawn by
-   * its own function, a letter), the part is that code, recording the name
-   * written for the saves that keep it, as the alias written alone does.
-   * Where it ends at an alias of something other than one code (a code with a
-   * position, several codes), the name written is shorthand for the same, so
-   * the part keeps it and holds what that alias draws. A word is no part, so
-   * a rename of one is left as written, to fail as the word does. Returns the
-   * definition the part is then read by.
+   * alias is used restyles what it draws. A link may place the code it names
+   * (`RED:1,0`). Where the chain reaches a code with an identity of its own
+   * (a built-in, a typed definition, a shape drawn by its own function, a
+   * letter), the part is that code, placed where the links place it beside
+   * the position written where the alias is used, recording the name written
+   * and the position the links add for the saves that keep the name, as the
+   * alias written alone does. Where it ends at an alias of several codes, the
+   * name written is shorthand for the same, so the part keeps it and holds
+   * what that alias draws; a link that places its code is then not read
+   * through, so the code stays placed where the link holds it. A word is no
+   * part, so a rename of one is left as written, to fail as the word does.
+   * Returns the definition the part is then read by, and the position the
+   * links add, which the caller adds once the part's own position is read.
    */
   static #readThroughRenames(part, definition, warn) {
     const written = part.codeName;
     if (!BlissParser.#isShorthand(definition)
         || processXCodes(finalCodeStringOf(written, blissElementDefinitions) ?? '').includes('/')) {
-      return definition;
+      return { definition };
     }
+    // Walked before any link is read, since where the chain ends decides how
+    // far it is read. A link is looked at without a report: it reports where
+    // it is read, here or, where the chain stops at it, where the part is
+    // read by it.
+    const links = [];
     const seen = new Set([written]);
     let code = written;
     let current = definition;
     while (BlissParser.#isShorthand(current)) {
-      // Looked at without a report first: a link the chain stops at is read,
-      // and reports, where the part is read by it.
-      const { codeString: body } = BlissParser.#readDefinition(code, current);
-      if (seen.has(body) || !Object.hasOwn(blissElementDefinitions, body)) break;
-      seen.add(body);
-      const { options } = BlissParser.#readDefinition(code, current, warn);
+      const link = BlissParser.#linkOf(BlissParser.#readDefinition(code, current).codeString);
+      const next = link === null ? undefined : BlissParser.#oneCodeDefinitionOf(link.code);
+      if (next === undefined || seen.has(link.code)) break;
+      seen.add(link.code);
+      links.push({ name: code, definition: current, x: link.x, y: link.y });
+      code = link.code;
+      current = next;
+    }
+    if (BlissParser.#isShorthand(current)) {
+      const placing = links.findIndex(({ x, y }) => x !== undefined || y !== undefined);
+      if (placing !== -1) {
+        ({ name: code, definition: current } = links[placing]);
+        links.length = placing;
+      }
+    }
+    const position = {};
+    for (const { name, definition: link, x, y } of links) {
+      const { options } = BlissParser.#readDefinition(name, link, warn);
       if (options) part.options = { ...options, ...part.options };
       // An anchor a link sets itself stays where the code it names sets none,
       // as #applyEffectiveMetadata leaves one.
       for (const axis of ['anchorOffsetX', 'anchorOffsetY']) {
-        if (current[axis] !== undefined) part[axis] ??= current[axis];
+        if (link[axis] !== undefined) part[axis] ??= link[axis];
       }
-      code = body;
-      current = blissElementDefinitions[body];
+      if (x !== undefined) position.x = (position.x ?? 0) + x;
+      if (y !== undefined) position.y = (position.y ?? 0) + y;
     }
-    if (BlissParser.#isShorthand(current)) return current;
+    if (BlissParser.#isShorthand(current)) return { definition: current };
     part.codeName = code;
     part._aliasCodeName = written;
-    return current;
+    if (Object.keys(position).length === 0) return { definition: current };
+    part._aliasPosition = position;
+    return { definition: current, position };
+  }
+
+  // A link's code string read as one code and the position it places that
+  // code at, or null where an axis is no position (`:1e400`). Whether the code
+  // is one code is #oneCodeDefinitionOf's to say.
+  static #linkOf(codeString) {
+    const coordinate = codeString.match(COORD_SUFFIX_PATTERN);
+    if (coordinate === null || coordinate.index === 0) return { code: slotCodeOf(codeString) };
+    const [x, y] = coordinate[0].slice(1).split(',')
+      .map((axis) => (axis === '' ? undefined : writtenNumber(axis)));
+    if (![x, y].every((axis) => axis === undefined || Number.isFinite(axis))) return null;
+    return { code: slotCodeOf(codeString.slice(0, coordinate.index)), x, y };
+  }
+
+  // Place a part read through links that place its code where they place it,
+  // beside the position written where the alias is used, axis by axis: an axis
+  // neither writes stays unset, so an indicator is still placed for you on it.
+  // The part's own position is read first, from both its channels as every
+  // route reads them (a bracket's `x` is the position written there, not one
+  // displacing the links'); a value no position can be is left for that read
+  // to refuse.
+  static #placeByLinks(part, position, warn) {
+    if (position === undefined) return;
+    const reports = [];
+    normalizePositionFields(part, reports);
+    extractPositionFromOptions(part, reports);
+    for (const report of reports) warn?.(report);
+    for (const axis of ['x', 'y']) {
+      if (position[axis] !== undefined) part[axis] = (part[axis] ?? 0) + position[axis];
+    }
+  }
+
+  // The definition one code is read by in a part slot, or undefined when the
+  // code is not one (it holds a character the DSL reads as structure, which
+  // the parser splits on before it looks a name up) or names nothing. A
+  // text-fallback glyph has one made for its letters.
+  static #oneCodeDefinitionOf(code) {
+    if (!SINGLE_CODE_TOKEN.test(code)) return undefined;
+    if (code.startsWith(X_TEXT_FALLBACK_PREFIX)) return textFallbackDefinitionOf(code);
+    return Object.hasOwn(blissElementDefinitions, code) ? blissElementDefinitions[code] : undefined;
   }
 
   // A bare alias with a code string: shorthand a part naming it is read
@@ -2515,7 +2608,7 @@ export class BlissParser {
     if (!part.codeName || part.parts?.length > 0) return;
 
     if (!blissElementDefinitions[part.codeName]) return;
-    const definition = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName], warn);
+    const { definition, position } = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName], warn);
 
     // Read as parseParts reads it: behind the definition's own bracket.
     const { codeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
@@ -2534,6 +2627,7 @@ export class BlissParser {
 
     BlissParser.#applyDefinitionMetadata(part, definition, options);
     BlissParser.#applyEffectiveMetadata(part, definition);
+    BlissParser.#placeByLinks(part, position, warn);
   }
 
   /**
@@ -2555,7 +2649,7 @@ export class BlissParser {
       // A bracket the stage emptied stores no `{}`, as in parseParts.
       if (part.options && Object.keys(part.options).length === 0) delete part.options;
 
-      const definition = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
+      const { definition, position } = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
       const { codeString: innerCodeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
 
       if (innerCodeString) {
@@ -2572,6 +2666,7 @@ export class BlissParser {
 
       BlissParser.#applyDefinitionMetadata(part, definition, options);
       BlissParser.#applyEffectiveMetadata(part, definition);
+      BlissParser.#placeByLinks(part, position, warn);
       parts.push(part);
     }
 

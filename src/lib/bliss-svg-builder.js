@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
+import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
@@ -1405,8 +1405,7 @@ class BlissSVGBuilder {
         if (remainderCount > 0 && !knownRemainder) continue;
         for (const i of misplaced) {
           const p = parts[i];
-          // A part read through a name is reported by the name written.
-          const source = `${p._aliasCodeName ?? p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
+          const source = BlissSVGBuilder.#writtenTextOf(p);
           this.#mutationWarnings.push({
             code: WARNING_CODES.MISPLACED_SPACE,
             message: `A space is a word separator, not a character part, so "${source}" was dropped.`,
@@ -1467,8 +1466,7 @@ class BlissSVGBuilder {
         }
         for (const i of misplaced) {
           const p = parts[i];
-          // A part read through a name is reported by the name written.
-          const source = `${p._aliasCodeName ?? p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
+          const source = BlissSVGBuilder.#writtenTextOf(p);
           this.#mutationWarnings.push({
             code: WARNING_CODES.MISPLACED_INDICATOR_PART,
             message: `An indicator can only follow its base parts at the end of a character (BASE;INDICATOR), so "${source}" was dropped.`,
@@ -3178,6 +3176,14 @@ class BlissSVGBuilder {
     return '';
   }
 
+  // A part as it was written, for the source of a report about it: a part
+  // read through a name is written as that name, with the position written
+  // where it was used rather than the one its links add (#positionAtUse).
+  static #writtenTextOf(part) {
+    const at = BlissSVGBuilder.#positionAtUse(part) ?? part;
+    return `${part._aliasCodeName ?? part.codeName}${BlissSVGBuilder.#positionSuffix(at.x, at.y)}`;
+  }
+
   /**
    * Creates the space an API edit puts between words. It is marked to take
    * its position's default, the space a `//` there reads as, which the rebuild
@@ -3675,14 +3681,18 @@ class BlissSVGBuilder {
           // separation), so a bare-alias name stays decomposed there, while
           // a typed name dumb-appends and round-trips. Deep output keeps the
           // field for the toString()/merge() pipelines; public output drops it.
-          if (options.preserve && part._aliasCodeName) {
+          // Where the name places the code it renames, the position written
+          // where it was used is what the name is written with.
+          const used = options.preserve && part._aliasCodeName
+            ? BlissSVGBuilder.#positionAtUse(part) : null;
+          if (used) {
             const namedDef = blissElementDefinitions[part._aliasCodeName];
             // A decorated part (coordinates or options) restores only a PURE
             // rename chain: a decorated custom anatomy dissolved its own
             // state into this part, and the written name would re-emit it as
             // instance decoration (preserve-completeness chunk; the glyph-
             // level consult keeps such a name at the clean-glyph level).
-            const decorated = (part.x ?? 0) !== 0 || (part.y ?? 0) !== 0 || part.options;
+            const decorated = (used.x ?? 0) !== 0 || (used.y ?? 0) !== 0 || part.options;
             // The name also has to leave nothing to bring back. A sole part
             // carrying the character's own recording, with no options of its
             // own to write, is written as the whole character, so the
@@ -3708,6 +3718,11 @@ class BlissSVGBuilder {
                 && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))
                 && keepsOptions) {
               part.codeName = part._aliasCodeName;
+              for (const axis of ['x', 'y']) {
+                if (used[axis] === undefined) delete part[axis];
+                else part[axis] = used[axis];
+              }
+              delete part._aliasPosition;
             } else if (!keepsOptions && part.codeName === part._aliasCodeName) {
               // A part that already carries the name (a typed shape written
               // alone, which nothing renamed) would read to the string as one
@@ -3716,7 +3731,10 @@ class BlissSVGBuilder {
               delete part._aliasCodeName;
             }
           }
-          if (!options.deep) delete part._aliasCodeName;
+          if (!options.deep) {
+            delete part._aliasCodeName;
+            delete part._aliasPosition;
+          }
           if (part.options) delete part.options.key;
           publishOptionSpellings(part);
           // Surface text-fallback routing key 'XTXT_<chars>' as 'X<chars>'.
@@ -4977,6 +4995,8 @@ class BlissSVGBuilder {
   // (coordinates, options, or several parts) dissolves its state INTO the
   // parsed part, so restoring the written name onto a decorated part would
   // re-emit that state as instance decoration and shift the reparse.
+  // A link that places the code it renames (`RED:1,0`) is pure too: the part
+  // records the position such links add (#positionAtUse).
   static #renameChainIsPure(name) {
     let code = name;
     const seen = new Set();
@@ -4986,11 +5006,42 @@ class BlissSVGBuilder {
       const def = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
         ? blissElementDefinitions[code] : undefined;
       if (!def || typeof def.codeString !== 'string') return true;
-      const renamed = BlissSVGBuilder.#renamedCode(def.codeString);
+      const renamed = BlissSVGBuilder.#renamedCode(def.codeString).replace(COORD_SUFFIX_PATTERN, '');
       if (!SINGLE_CODE_TOKEN.test(renamed)) return false;
       code = renamed;
     }
     return true;
+  }
+
+  // The position written where a name was used, for a part the name places
+  // (`_aliasPosition`, the position its links add): the part's own, less
+  // theirs, an axis they place left unset where nothing is left on it, as the
+  // name sets that axis wherever it is used. Null where the part has lost an
+  // axis the name places, since no use of the name leaves it unset.
+  static #positionAtUse(part) {
+    const placed = part._aliasPosition ?? {};
+    const used = { x: part.x, y: part.y };
+    for (const axis of ['x', 'y']) {
+      if (placed[axis] === undefined) continue;
+      if (part[axis] === undefined) return null;
+      const rest = BlissSVGBuilder.#addendOf(part[axis], placed[axis]);
+      used[axis] = rest === 0 ? undefined : rest;
+    }
+    return used;
+  }
+
+  // The shortest number that, added to `placed`, gives `total` again: the
+  // position written beside one a name's links add, without the binary
+  // rounding their sum carries (0.2 written beside a link's 0.1 is placed at
+  // 0.30000000000000004, and that less 0.1 is 0.20000000000000004). Seventeen
+  // significant digits give back any double, so the search ends there.
+  static #addendOf(total, placed) {
+    const rest = total - placed;
+    for (let digits = 1; digits <= 17; digits++) {
+      const candidate = Number(rest.toPrecision(digits));
+      if (candidate + placed === total) return candidate;
+    }
+    return rest;
   }
 
   // The code a definition's code string renames, read behind the character

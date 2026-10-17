@@ -18,12 +18,14 @@ const CHAR_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT 
 // (mirrors the DSL gate's `(.+)` requirement, round-3 review F3).
 const CHAR_OPTION_STRIP = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.+)$`);
 
-// A codeString that is one clean code token (no separators, coordinates,
-// options, or markers): the only form a pure-rename alias can hold.
-// \w+ rather than letter-first: define() accepts digit-leading names (the
+// A codeString that is one code as the DSL reads it: no character the DSL
+// reads as structure (a separator, a coordinate, an option bracket, a head
+// marker, a text block, white space), the only form a pure-rename alias can
+// hold. Any other character is part of a name: define() accepts names spelled
+// with a hyphen, a dot or a letter outside ASCII, and digit-leading ones (the
 // Blissary-ID pattern, e.g. '1219'), and an alias to one must resolve like
-// any other single-code rename (review MINOR-4).
-export const SINGLE_CODE_TOKEN = /^\w+$/;
+// any other single-code rename.
+export const SINGLE_CODE_TOKEN = /^[^/;:|^[\]>{}\s]+$/;
 
 /**
  * Resolve a definition to its EFFECTIVE definition by following pure-rename
