@@ -25,7 +25,11 @@
  *   character's one part, with a position or behind a part bracket: deferred
  *   past 1.1.0 (backlog row "An alias of several codes, as a character's only
  *   part, with a position or behind a part bracket, leaves a part whose own
- *   code brings an option in that option"), the `it.todo` rows below.
+ *   code brings an option in that option"), the `it.todo` rows below. With
+ *   it, an alias of a link that writes a part bracket on its code
+ *   (`[x=1]>HD_RED`), in a slot, with a position, behind a part bracket where
+ *   it is used, through `addPart()`, an object or its part handle, which
+ *   leaves that code's own option in force the same way.
  * - An alias of one code in a slot, see
  *   `BlissSVGBuilder.alias-in-part-slot.test.js`.
  * - Links named outside ASCII letters, digits and `_`, see
@@ -52,6 +56,9 @@ const HOLDERS = {
   HD_PY: { codeString: 'HD_RED:,1' },
   HD_M2: { codeString: 'HD_RED;C8', defaultOptions: { color: 'blue' } },
   HD_M3: { codeString: 'HD_A1;C8', defaultOptions: { color: 'blue' } },
+  // links writing a part bracket on their code, which the reader stops at
+  HD_PXR: { codeString: '[x=1]>HD_RED' },
+  HD_POR: { codeString: '[opacity=0.5]>HD_RED' },
 };
 
 const ALIASES = {
@@ -62,6 +69,8 @@ const ALIASES = {
   HD_ALPX: { codeString: 'HD_PX', defaultOptions: { color: 'blue' } },
   HD_ALPY: { codeString: 'HD_PY', defaultOptions: { color: 'blue' } },
   HD_P2: { codeString: 'HD_POS:2,0', defaultOptions: { color: 'blue' } },
+  HD_ALPXR: { codeString: 'HD_PXR', defaultOptions: { color: 'blue' } },
+  HD_ALPOR: { codeString: 'HD_POR', defaultOptions: { color: 'blue' } },
 };
 
 beforeAll(() => {
@@ -274,5 +283,17 @@ describe('BlissSVGBuilder alias over held defaults', () => {
     it.todo('reloads ;HD_M2 and ;[color=green]>HD_M2 as drawn from both saves');
     it.todo('draws an option set through the part holding the alias on a key it did not set when read, and its preserve save reloads as drawn');
     it.todo('keeps both names under preserve for a part bracket on a key the alias does not set over a typed part that brings it');
+  });
+
+  describe('when an alias names a link that writes a part bracket on its code', () => {
+    // scenario: deferred past 1.1.0 with the rows above (the same backlog
+    // row): the reader stops at such a link, so the part holds the link's
+    // body, and the red its code brings stays over the options above it
+    it.todo('draws B313;HD_ALPXR as B313;[color=blue]>HD_RED:1, the alias\'s blue over the red HD_RED brings');
+    it.todo('draws ;HD_ALPXR, HD_ALPXR:2 and B313;HD_ALPXR:2 in the alias\'s blue, as HD_ALPXR alone');
+    it.todo('draws [color=green]>HD_PXR, B313;[color=green]>HD_PXR and B313;[color=green]>HD_ALPXR green, as B313;[color=green]>HD_RED:1');
+    it.todo('draws HD_ALPXR added through addPart() or a composition object in the alias\'s blue');
+    it.todo('reaches the ink with an option set through the part handle of B313;HD_ALPXR');
+    it.todo('draws B313;HD_ALPOR as B313;[opacity=0.5;color=blue]>HD_RED');
   });
 });

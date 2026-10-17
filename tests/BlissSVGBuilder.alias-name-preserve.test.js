@@ -18,7 +18,10 @@
  *   below it, in a slot and written alone.
  * - A composition object naming a part by such a name with parts below it
  *   (as 1.0.0's deep `preserve` save wrote it, or written by hand): drawn as
- *   the name draws, in a slot, placed, written alone; the parts below a typed
+ *   the name draws, in a slot, placed, written alone, three levels down,
+ *   held by a part of no name or of a name nothing defines; the parts below
+ *   it left out of every save where the code drawn is drawn by its own
+ *   function (a primitive, a letter drawn as text); the parts below a typed
  *   definition's name or an alias of several codes taken as they stand.
  * - `preserve` keeping the name of an alias of a typed shape or glyph of
  *   several codes that brings options or a position: alone, in a slot,
@@ -31,6 +34,10 @@
  *   `it.todo` row below; deferred).
  * - The default saves of such an alias, which spell its codes out as parts
  *   of the character: the same ink, grouped otherwise on reload.
+ * - A part held below another with nothing below it, which is not read from
+ *   its definition, and the saves of a part of no name or of a name nothing
+ *   defines holding parts; backlog rows "A glyph authored with only
+ *   `codeName`" and "A composition-object part holding parts under no name".
  * - What an alias in a slot draws, see
  *   `BlissSVGBuilder.alias-in-part-slot.test.js`; its other saves, see
  *   `BlissSVGBuilder.alias-in-part-slot-routes.test.js`.
@@ -68,6 +75,10 @@ const ALIASES = {
   NP_A2: { codeString: 'NP_A1', defaultOptions: { color: 'blue' } },
   NP_ARED: { codeString: 'NP_RED', defaultOptions: { color: 'blue' } },
   NP_MANY: { codeString: 'B291;C8' },
+  // aliases of codes drawn by their own function, which no code string
+  // rebuilds a part from
+  NP_C8: { codeString: 'C8', defaultOptions: { color: 'blue' } },
+  NP_LL: { codeString: 'Xλ', defaultOptions: { color: 'blue' } },
 };
 
 const OF_ALIASES = {
@@ -78,8 +89,14 @@ const OF_ALIASES = {
   NP_MA2: { codeString: 'C8;NP_A2' },
 };
 
+// an alias of several codes holding one of those, so the name read through
+// sits three levels down
+const OF_HOLDERS = {
+  NP_MM: { codeString: 'NP_MPOS;C8' },
+};
+
 beforeAll(() => {
-  for (const fixtures of [TARGETS, ALIASES, OF_ALIASES]) {
+  for (const fixtures of [TARGETS, ALIASES, OF_ALIASES, OF_HOLDERS]) {
     const { defined, errors } = BlissSVGBuilder.define(fixtures);
     expect(errors).toEqual([]);
     expect(defined).toEqual(Object.keys(fixtures));
@@ -87,7 +104,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  for (const code of [...Object.keys(OF_ALIASES), ...Object.keys(ALIASES), ...Object.keys(TARGETS)]) {
+  for (const code of [...Object.keys(OF_HOLDERS), ...Object.keys(OF_ALIASES), ...Object.keys(ALIASES), ...Object.keys(TARGETS)]) {
     BlissSVGBuilder.removeDefinition(code);
   }
 });
@@ -148,6 +165,10 @@ describe('BlissSVGBuilder alias name preserve', () => {
       // character's one part: its parts are taken as they stand, the name
       // among them read again
       ';NP_MPOS', ';NP_MAPOS', ';NP_MA2',
+      // the same, held by such an alias held by another: the parts taken as
+      // they stand are walked at every depth, not only below a name that is
+      // itself read through
+      ';NP_MM',
     ])('reloads %s as drawn, with the same reports', (input) => {
       // regression: the save kept the parts below the name, which a reload
       // takes as they stand: the position the name's links add was lost, and
@@ -215,6 +236,35 @@ describe('BlissSVGBuilder alias name preserve', () => {
       // not what the name draws
       const builder = new BlissSVGBuilder(object);
       expect(builder.svgCode).toBe(new BlissSVGBuilder(input).svgCode);
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it.each([
+      ['a code drawn by its own function', characterOf({ codeName: 'B313' }, { codeName: 'NP_C8', parts: [{ codeName: 'HL8' }] }), 'B313;NP_C8'],
+      ['a letter drawn as text', characterOf({ codeName: 'B313' }, { codeName: 'NP_LL', parts: [{ codeName: 'HL8' }] }), 'B313;NP_LL'],
+    ])('leaves the parts below a name read through to %s out of every save', (_label, object, input) => {
+      // the code drawn has no code string to read the part again from, so
+      // nothing replaces the parts below the name: drawn by the code's own
+      // function either way, they would show only in what a save writes
+      const builder = new BlissSVGBuilder(object);
+      const named = new BlissSVGBuilder(input);
+      expect(builder.svgCode).toBe(named.svgCode);
+      expect(builder.toString()).toBe(named.toString());
+      expect(builder.toString({ preserve: true })).toBe(named.toString({ preserve: true }));
+      const savedPartOf = (b) => deepPreserveOf(b).groups[0].glyphs[0].parts[1];
+      expect(savedPartOf(builder)).toEqual(savedPartOf(named));
+    });
+
+    it.each([
+      ['no name', (held) => characterOf({ codeName: 'B313' }, { parts: [held] })],
+      ['a name nothing defines', (held) => characterOf({ codeName: 'B313' }, { codeName: 'NP_NONE', parts: [held] })],
+      ['no name, as the character\'s one part', (held) => characterOf({ parts: [{ codeName: 'C8' }, held] })],
+    ])('reads a name read through by the name where a part of %s holds it', (_label, holderOf) => {
+      // the parts below such a holder are taken as they stand, as below a
+      // name it is not read through, and walked the same way
+      const builder = new BlissSVGBuilder(holderOf({ codeName: 'NP_A2', parts: [{ codeName: 'C8' }] }));
+      const drawn = new BlissSVGBuilder(holderOf({ codeName: 'B291', options: { color: 'blue' }, parts: B291_TREE }));
+      expect(builder.svgCode).toBe(drawn.svgCode);
       expect(builder.warnings).toEqual([]);
     });
 
