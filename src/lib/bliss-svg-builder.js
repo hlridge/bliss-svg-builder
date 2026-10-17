@@ -3721,6 +3721,13 @@ class BlissSVGBuilder {
                 || (namedDef && !BlissSVGBuilder.#isBareAliasDefinition(namedDef)))
                 && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))
                 && keepsOptions) {
+              // A name read through to another code is what a reload reads,
+              // so public output writes it with nothing below it: the parts
+              // below are that code's own, already placed where the name's
+              // links put it, and a reload takes parts as they stand. A name
+              // that is the part's own code keeps its parts, which are its
+              // own. The copy toString() writes from keeps the whole tree.
+              if (!forString && part.codeName !== part._aliasCodeName) delete part.parts;
               part.codeName = part._aliasCodeName;
               for (const axis of ['x', 'y']) {
                 if (used[axis] === undefined) delete part[axis];
@@ -4995,10 +5002,12 @@ class BlissSVGBuilder {
   }
 
   // A rename chain is pure when every link is a single bare token down to a
-  // built-in, primitive, or unknown end. A decorated custom anatomy
-  // (coordinates, options, or several parts) dissolves its state INTO the
-  // parsed part, so restoring the written name onto a decorated part would
-  // re-emit that state as instance decoration and shift the reparse.
+  // built-in, primitive, or unknown end, or to a definition with an identity
+  // of its own (a typed glyph, shape or indicator), which holds its anatomy
+  // as the part's parts, however many codes it has. A decorated custom
+  // anatomy (coordinates, options, or several parts) dissolves its state INTO
+  // the parsed part, so restoring the written name onto a decorated part
+  // would re-emit that state as instance decoration and shift the reparse.
   // A link that places the code it renames (`RED:1,0`) is pure too: the part
   // records the position such links add (#positionAtUse).
   static #renameChainIsPure(name) {
@@ -5010,6 +5019,7 @@ class BlissSVGBuilder {
       const def = Object.prototype.hasOwnProperty.call(blissElementDefinitions, code)
         ? blissElementDefinitions[code] : undefined;
       if (!def || typeof def.codeString !== 'string') return true;
+      if (!BlissSVGBuilder.#isBareAliasDefinition(def)) return true;
       const renamed = BlissSVGBuilder.#renamedCode(def.codeString).replace(COORD_SUFFIX_PATTERN, '');
       if (!SINGLE_CODE_TOKEN.test(renamed)) return false;
       code = renamed;
