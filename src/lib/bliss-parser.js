@@ -329,9 +329,8 @@ export function normalizePositionFields(obj, parseWarnings) {
     // `axis=value`. The options channel has a second spelling to account for (a
     // bare `[x]`, stored as `true`) and reports that one as the axis alone.
     const source = `${axis}=${textOfValue(written)}`;
-    // Not optional, unlike its neighbour: this runs from one call site, which
-    // always has somewhere to report to. A guard here would be a branch no test
-    // can reach.
+    // Not optional, unlike its neighbour: every call site has somewhere to
+    // report to. A guard here would be a branch no test can reach.
     parseWarnings.push({
       code: WARNING_CODES.MALFORMED_COORDINATES,
       message: `Malformed position "${source}"; the position is ignored.`,
@@ -1839,16 +1838,18 @@ export class BlissParser {
                   || typeof effective.getPath === 'function')) {
                 expandedParts[0]._aliasCodeName = potentialBaseCode;
               } else {
-                // A chain with a link that places the code it names
-                // (`RED:1,0`) is read as a part slot reads it: where it
-                // reaches a code with an identity, the name is recorded with
+                // Any other chain is read as a part slot reads it, through a
+                // link that writes a position for the code it names
+                // (`RED:1,0`, `RED:`) or names a letter drawn as text: where it
+                // reaches a code with an identity, the name is recorded, with
                 // the position its links add, which the saves take off the
                 // part's own, so the name is written with what was written
                 // where it was used.
-                const { position } = BlissParser.#readThroughRenames({ codeName: potentialBaseCode }, definition);
-                if (position !== undefined) {
+                const read = { codeName: potentialBaseCode };
+                const { position } = BlissParser.#readThroughRenames(read, definition);
+                if (read._aliasCodeName !== undefined) {
                   expandedParts[0]._aliasCodeName = potentialBaseCode;
-                  expandedParts[0]._aliasPosition = position;
+                  if (position !== undefined) expandedParts[0]._aliasPosition = position;
                 }
               }
             }
@@ -2244,11 +2245,14 @@ export class BlissParser {
         // also rides the glyph itself: a multi-part anatomy or a custom
         // typed-glyph identity (glyphCode) has no part-level carrier, and
         // the serializer consult (preserve-completeness chunk) restores the
-        // written name only for a clean instance of the definition.
+        // written name only for a clean instance of the definition. A letter
+        // drawn as text has a glyph code too, but it names the one part
+        // itself, so that part carries the recording.
         if (_aliasCodeName
             && !(glyphObj.parts.length === 1 && isSpaceGlyph(glyphObj.parts[0].codeName))) {
           if (glyphObj.parts.length === 1
-              && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode))) {
+              && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode)
+                || glyphObj.glyphCode.startsWith(X_TEXT_FALLBACK_PREFIX))) {
             glyphObj.parts[0]._aliasCodeName = _aliasCodeName;
             if (_aliasPosition !== undefined) glyphObj.parts[0]._aliasPosition = _aliasPosition;
           }
@@ -2362,22 +2366,13 @@ export class BlissParser {
    * superimposing it as a part would bury its internal structure (e.g. a baked
    * indicator), so it is rejected. The predicate:
    * - index > 0: a leading operand is the base (and the promotion path), not a part;
-   * - part.parts.length > 1: a composition (a primitive or single-code rename
-   *   alias expands to <= 1 part and stays legal);
-   * - part.isIndicator !== true: a flagged indicator is a legal part (excludes a
-   *   built-in compound indicator such as B85 = B270;B86 or B98 = B97;B99);
-   * - the definition is not a flagged glyph/shape: isBlissGlyph / isShape are
-   *   carried by the DEFINITION, not stamped onto the part, so they are read from
-   *   the registry (this exempts the ~1000 built-in composite characters and
-   *   custom type:'glyph'/'shape' definitions, which are legal parts).
+   * - the part draws several parts (#isComposition).
    * Must run AFTER #applyDefinitionMetadata stamps part.isIndicator. The element
    * layer then fails the whole character to render with a COMPOSITE_AS_PART
    * warning. Shared by parseParts (DSL input) and expandParts (object input).
    */
   static #flagCompositePart(part, index) {
-    const def = blissElementDefinitions[part.codeName];
-    if (index > 0 && part.parts?.length > 1 && part.isIndicator !== true &&
-        def?.isBlissGlyph !== true && def?.isShape !== true) {
+    if (index > 0 && BlissParser.#isComposition(part)) {
       part.error = `"${part.codeName}" is a composition and cannot be a part; a ; part must be a primitive or a flagged glyph`;
       part.errorCode = 'COMPOSITE_AS_PART';
     } else if (part.errorCode === 'COMPOSITE_AS_PART') {
@@ -2388,6 +2383,31 @@ export class BlissParser {
       delete part.errorCode;
       delete part.error;
     }
+  }
+
+  /**
+   * Whether a part draws several parts that nothing with an identity holds:
+   * - more than one part of its own: a composition (a primitive or single-code
+   *   rename alias holds at most one and stays legal);
+   * - a flagged indicator is a part whatever it holds (a built-in compound
+   *   indicator such as B85 = B270;B86 or B98 = B97;B99);
+   * - so is a flagged glyph or shape: isBlissGlyph / isShape are carried by the
+   *   DEFINITION, not stamped onto the part, so they are read from the registry
+   *   (this exempts the ~1000 built-in composite characters and custom
+   *   type:'glyph'/'shape' definitions);
+   * - a part holding exactly one part (a link that places or restyles the code
+   *   it names, `MULTI:1,0` or `[color=red]>MULTI`) draws what that part draws,
+   *   so it is read through to it.
+   */
+  static #isComposition(part) {
+    let held = part;
+    while (held.isIndicator !== true) {
+      const def = blissElementDefinitions[held.codeName];
+      if (def?.isBlissGlyph === true || def?.isShape === true) return false;
+      if (held.parts?.length !== 1) return held.parts?.length > 1;
+      [held] = held.parts;
+    }
+    return false;
   }
 
   /**
@@ -2466,7 +2486,7 @@ export class BlissParser {
     let current = definition;
     while (BlissParser.#isShorthand(current)) {
       const link = BlissParser.#linkOf(BlissParser.#readDefinition(code, current).codeString);
-      const next = link === null ? undefined : BlissParser.#oneCodeDefinitionOf(link.code);
+      const next = BlissParser.#oneCodeDefinitionOf(link.code);
       if (next === undefined || seen.has(link.code)) break;
       seen.add(link.code);
       links.push({ name: code, definition: current, x: link.x, y: link.y });
@@ -2489,8 +2509,15 @@ export class BlissParser {
       for (const axis of ['anchorOffsetX', 'anchorOffsetY']) {
         if (link[axis] !== undefined) part[axis] ??= link[axis];
       }
-      if (x !== undefined) position.x = (position.x ?? 0) + x;
-      if (y !== undefined) position.y = (position.y ?? 0) + y;
+      // Read as a part's own position is read: an axis no position can be is
+      // refused and reported here, where the link is read, and the rest of the
+      // link still places the code.
+      const at = { x, y };
+      const reports = [];
+      normalizePositionFields(at, reports);
+      for (const report of reports) warn?.(report);
+      if (at.x !== undefined) position.x = (position.x ?? 0) + at.x;
+      if (at.y !== undefined) position.y = (position.y ?? 0) + at.y;
     }
     if (BlissParser.#isShorthand(current)) return { definition: current };
     part.codeName = code;
@@ -2501,14 +2528,14 @@ export class BlissParser {
   }
 
   // A link's code string read as one code and the position it places that
-  // code at, or null where an axis is no position (`:1e400`). Whether the code
-  // is one code is #oneCodeDefinitionOf's to say.
+  // code at, each axis as written: the link is read where the chain is read
+  // through it, which refuses an axis no position can be (`:1e400`) quoting
+  // what was written, as parsePartString hands such an axis over. Whether the
+  // code is one code is #oneCodeDefinitionOf's to say.
   static #linkOf(codeString) {
     const coordinate = codeString.match(COORD_SUFFIX_PATTERN);
     if (coordinate === null || coordinate.index === 0) return { code: slotCodeOf(codeString) };
-    const [x, y] = coordinate[0].slice(1).split(',')
-      .map((axis) => (axis === '' ? undefined : writtenNumber(axis)));
-    if (![x, y].every((axis) => axis === undefined || Number.isFinite(axis))) return null;
+    const [x, y] = coordinate[0].slice(1).split(',').map((axis) => (axis === '' ? undefined : axis));
     return { code: slotCodeOf(codeString.slice(0, coordinate.index)), x, y };
   }
 

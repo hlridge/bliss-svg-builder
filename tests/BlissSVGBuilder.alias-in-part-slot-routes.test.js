@@ -10,6 +10,8 @@
  * - A composition object naming an alias as a part, with and without options
  *   of its own, or naming an alias of several codes that holds one, drawing
  *   as the string does.
+ * - An alias placing several codes, refused as a part through `addPart()` and
+ *   a composition object as the string refuses it.
  * - Both saves of a slot holding an alias: the default spells it out in the
  *   code it draws with the merged options, `preserve` keeps the name; each
  *   string and each JSON reloading byte-identical.
@@ -32,9 +34,11 @@ const TARGETS = {
   SR_SHAPE: { type: 'shape', codeString: 'C8', defaultOptions: { color: 'red' } },
   SR_A1: { codeString: 'B291', defaultOptions: { color: 'red' } },
   SR_POS: { codeString: 'B291:1,0', defaultOptions: { color: 'red' } },
+  SR_MULTI: { codeString: 'B291;C8' },
 };
 
 const ALIASES = {
+  SR_PM: { codeString: 'SR_MULTI:1,0' },
   SR_AL: { codeString: 'SR_RED' },
   SR_SHB: { codeString: 'SR_SHAPE', defaultOptions: { color: 'blue' } },
   SR_A2: { codeString: 'SR_A1', defaultOptions: { color: 'blue' } },
@@ -99,6 +103,19 @@ describe('BlissSVGBuilder alias in a part slot routes', () => {
       // its own, so the alias inside it is read through there too
       const object = { groups: [{ glyphs: [{ parts: [{ codeName: 'SR_MC' }] }] }] };
       expect(new BlissSVGBuilder(object).svgCode).toBe(svgOf('B313;[color=blue]>B291'));
+    });
+  });
+
+  describe('when a part method or a composition object names a positioned alias of several codes', () => {
+    it.each([
+      ['addPart()', () => changed('B313', (b) => b.glyph(0).addPart('SR_PM'))],
+      ['a composition object', () => new BlissSVGBuilder(objectWithPart({ codeName: 'SR_PM' }))],
+    ])('refuses it as a part through %s, as the string refuses it', (_label, build) => {
+      // regression: the link placing the codes held them under a part of its
+      // own, so the part was not counted as several
+      const builder = build();
+      expect(builder.warnings.map(({ code, source }) => ({ code, source }))).toEqual([{ code: 'COMPOSITE_AS_PART', source: 'SR_PM' }]);
+      expect(builder.svgCode).toBe(svgOf('B313;SR_PM'));
     });
   });
 

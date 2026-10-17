@@ -13,6 +13,9 @@
  * - Its saves: `preserve` keeps the name, writing only the position written
  *   where it is used, written alone and in a slot; the default string
  *   reloading as drawn.
+ * - A link placing its code at an axis no position can be (`:1e400,0`): the
+ *   alias drawn as written alone, on every route, the axis reported once; the
+ *   name kept under `preserve`, reported again on reload.
  *
  * Does NOT cover:
  * - An alias of several codes, one of which brings its own option, as a
@@ -39,12 +42,18 @@ const TARGETS = {
 const HOLDERS = {
   HD_POS: { codeString: 'HD_RED:1,0' },
   HD_FPOS: { codeString: 'HD_RED:0.1,0.7' },
+  HD_INF: { codeString: 'HD_RED:1e400,0' },
+  HD_INFX: { codeString: 'HD_RED:1e400' },
+  HD_NONE: { codeString: 'HD_RED:' },
   HD_M2: { codeString: 'HD_RED;C8', defaultOptions: { color: 'blue' } },
   HD_M3: { codeString: 'HD_A1;C8', defaultOptions: { color: 'blue' } },
 };
 
 const ALIASES = {
   HD_ALPOS: { codeString: 'HD_POS', defaultOptions: { color: 'blue' } },
+  HD_ALINF: { codeString: 'HD_INF', defaultOptions: { color: 'blue' } },
+  HD_ALINFX: { codeString: 'HD_INFX', defaultOptions: { color: 'blue' } },
+  HD_ALNONE: { codeString: 'HD_NONE', defaultOptions: { color: 'blue' } },
 };
 
 beforeAll(() => {
@@ -64,6 +73,8 @@ afterAll(() => {
 const svgOf = (input) => new BlissSVGBuilder(input).svgCode;
 
 const preserveOf = (input) => new BlissSVGBuilder(input).toString({ preserve: true });
+
+const reportsOf = (builder) => builder.warnings.map(({ code, source }) => [code, source]);
 
 describe('BlissSVGBuilder alias over held defaults', () => {
   describe('when an alias of a positioned code is used as a part', () => {
@@ -140,6 +151,68 @@ describe('BlissSVGBuilder alias over held defaults', () => {
         const builder = new BlissSVGBuilder(input);
         expect(svgOf(builder.toString())).toBe(builder.svgCode);
       });
+
+    it.each(['HD_NONE', 'HD_ALNONE', 'B313;HD_ALNONE'])(
+      'keeps the name of %s, whose link writes a position with no axis, under preserve, each save reloading as drawn', (input) => {
+        // regression: written alone, the name was kept only where the links
+        // add a position, so a link writing a bare `:` lost it
+        const builder = new BlissSVGBuilder(input);
+        expect(builder.toString({ preserve: true })).toBe(input);
+        expect(new BlissSVGBuilder(builder.toJSON({ preserve: true })).svgCode).toBe(builder.svgCode);
+      });
+  });
+
+  describe('when an alias names a link placing its code at an axis no position can be', () => {
+    // note: the number grammar reads 1e400, but as Infinity, which no position
+    // can be, so the axis is refused where the link is read and the rest of
+    // the link still places the code
+    it.each([
+      ['B313;HD_ALINF', 'B313;[color=blue]>HD_RED:1e400,0'],
+      [';HD_ALINF', '[color=blue]>HD_RED:1e400,0'],
+      ['B313;[color=green]>HD_ALINF', 'B313;[color=green]>HD_RED:1e400,0'],
+      ['B313;HD_ALINF:2,3', 'B313;[color=blue]>HD_RED:2,3'],
+      ['HD_ALINF:2,3', '[color=blue]>HD_RED:2,3'],
+    ])('draws %s as %s, reporting the axis once as written', (input, expansion) => {
+      // regression: the link was not read through, so the slot held the
+      // positioned code as a part below the alias's, whose own red beat the blue
+      const builder = new BlissSVGBuilder(input);
+      expect(builder.svgCode).toBe(svgOf(expansion));
+      expect(reportsOf(builder)).toEqual([['MALFORMED_COORDINATES', 'x=1e400']]);
+    });
+
+    it('draws HD_ALINF added by addPart() as written in the slot, reporting the axis once', () => {
+      const builder = new BlissSVGBuilder('B313');
+      builder.glyph(0).addPart('HD_ALINF');
+      expect(builder.svgCode).toBe(svgOf('B313;[color=blue]>HD_RED:1e400,0'));
+      expect(reportsOf(builder)).toEqual([['MALFORMED_COORDINATES', 'x=1e400']]);
+    });
+
+    it('draws HD_ALINF named by a composition object as written in the slot, reporting the axis once', () => {
+      const builder = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B313' }, { codeName: 'HD_ALINF' }] }] }] });
+      expect(builder.svgCode).toBe(svgOf('B313;[color=blue]>HD_RED:1e400,0'));
+      expect(reportsOf(builder)).toEqual([['MALFORMED_COORDINATES', 'x=1e400']]);
+    });
+
+    it.each([
+      ['B313;HD_ALINF', 'B313;HD_ALINF'],
+      ['B313;HD_ALINF:2,3', 'B313;HD_ALINF:2,3'],
+      ['HD_ALINF', 'HD_ALINF'],
+      ['HD_ALINF:2,3', 'HD_ALINF:2,3'],
+      ['HD_INF', 'HD_INF'],
+      ['HD_ALINFX', 'HD_ALINFX'],
+    ])('saves %s as %s under preserve, reloading as drawn and reporting the axis again', (input, saved) => {
+      // note: the axis is text a position is written as, so it is kept, and
+      // reported again wherever the name is read
+      const reloaded = new BlissSVGBuilder(preserveOf(input));
+      expect(preserveOf(input)).toBe(saved);
+      expect(reloaded.svgCode).toBe(svgOf(input));
+      expect(reportsOf(reloaded)).toEqual([['MALFORMED_COORDINATES', 'x=1e400']]);
+    });
+
+    it.each(['B313;HD_ALINF', 'HD_ALINF'])('reloads %s as drawn from its default string', (input) => {
+      const builder = new BlissSVGBuilder(input);
+      expect(svgOf(builder.toString())).toBe(builder.svgCode);
+    });
   });
 
   describe('when an alias of several codes is a character\'s one part or takes a part bracket', () => {

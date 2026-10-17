@@ -17,7 +17,7 @@
  *   the word brings the same code.
  * - An alias of a letter drawn as text, in a slot, alone in one, through
  *   `addPart()` and a composition object, drawing as the letter written there
- *   and reloading as drawn.
+ *   and reloading as drawn; its name kept under `preserve` written alone too.
  *
  * Does NOT cover:
  * - An alias of a code with a position, or of several codes, whose codes
@@ -178,6 +178,14 @@ describe('BlissSVGBuilder alias chain names', () => {
     it.each([{}, { preserve: true }])('reloads B313;CN_LL2 as drawn from the string saved with %o', (saveOptions) => {
       const builder = new BlissSVGBuilder('B313;CN_LL2');
       expect(svgOf(builder.toString(saveOptions))).toBe(builder.svgCode);
+    });
+
+    it.each(['CN_LL', 'CN_LL2', 'B313;CN_LL2'])('keeps the name of %s under preserve, each save reloading as drawn', (input) => {
+      // regression: written alone, the save wrote the letter, since the
+      // character's code for the letter kept the name off its one part
+      const builder = new BlissSVGBuilder(input);
+      expect(builder.toString({ preserve: true })).toBe(input);
+      expect(new BlissSVGBuilder(builder.toJSON({ preserve: true })).svgCode).toBe(builder.svgCode);
     });
   });
 });

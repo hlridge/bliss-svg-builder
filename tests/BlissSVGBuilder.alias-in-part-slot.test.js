@@ -17,8 +17,10 @@
  * - The part handle naming the code drawn and holding what that code holds,
  *   as for the alias written alone, through a link that places that code too.
  * - Where the reading stops: an alias of an alias of several codes is refused
- *   as a part, as those codes are, in a use and in `define()`; a rename of a
- *   word fails as the word does.
+ *   as a part, as those codes are, in a use and in `define()`, and so is an
+ *   alias that places or restyles them, or a link to one; a rename of a word
+ *   fails as the word does. A positioned typed glyph of several codes stays a
+ *   part, and any of these may be the one part of a character.
  * - A misplaced indicator or space written through a name, reported by the
  *   name and the position written where it is used.
  * - A second bracket leading the code string of an alias in a slot, or of a
@@ -45,6 +47,7 @@ const TARGETS = {
   SL_A1: { codeString: 'B291', defaultOptions: { color: 'red' } },
   SL_POS: { codeString: 'B291:1,0', defaultOptions: { color: 'red' } },
   SL_MULTI: { codeString: 'B291;C8' },
+  SL_TG: { type: 'glyph', codeString: 'B291;C8' },
   SL_WORD: { codeString: 'B291/C8' },
   SL_DBL: { codeString: '[color=red][color=blue]B291' },
   SL_DBLPOS: { codeString: '[color=red][color=blue]B291:1,0' },
@@ -65,13 +68,23 @@ const ALIASES = {
   SL_PSP: { codeString: 'TSP:1,0' },
   SL_ALPOS: { codeString: 'SL_POS', defaultOptions: { color: 'blue' } },
   SL_ALMULTI: { codeString: 'SL_MULTI' },
+  SL_PM: { codeString: 'SL_MULTI:1,0' },
+  SL_PMY: { codeString: 'SL_MULTI:,1' },
+  SL_PXM: { codeString: '[color=red]>SL_MULTI' },
+  SL_PTG: { codeString: 'SL_TG:1,0' },
   SL_ALWORD: { codeString: 'SL_WORD' },
   SL_ALDBL: { codeString: 'SL_DBL' },
   SL_ALDBLPOS: { codeString: 'SL_DBLPOS' },
 };
 
+// Links to SL_PM, defined once it exists.
+const PLACED = {
+  SL_ALPM: { codeString: 'SL_PM', defaultOptions: { color: 'blue' } },
+  SL_PPM: { codeString: 'SL_PM:0,2' },
+};
+
 beforeAll(() => {
-  for (const fixtures of [TARGETS, ALIASES]) {
+  for (const fixtures of [TARGETS, ALIASES, PLACED]) {
     const { defined, errors } = BlissSVGBuilder.define(fixtures);
     expect(errors).toEqual([]);
     expect(defined).toEqual(Object.keys(fixtures));
@@ -79,7 +92,8 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  for (const code of [...Object.keys(ALIASES), ...Object.keys(TARGETS), 'SL_HOLDS_ALMULTI']) {
+  const holders = ['SL_HOLDS_ALMULTI', 'SL_HOLDS_PM', 'SL_HOLDS_ALPM'];
+  for (const code of [...holders, ...Object.keys(PLACED), ...Object.keys(ALIASES), ...Object.keys(TARGETS)]) {
     BlissSVGBuilder.removeDefinition(code);
   }
 });
@@ -182,6 +196,42 @@ describe('BlissSVGBuilder alias in a part slot', () => {
       expect(defined).toEqual([]);
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('a ; part cannot be a composition ("B313;SL_ALMULTI")');
+    });
+
+    it.each([
+      ['B313;SL_MULTI:1,0', 'SL_MULTI'],
+      ['B313;SL_PM', 'SL_PM'],
+      ['B313;SL_PMY', 'SL_PMY'],
+      ['B313;SL_PXM', 'SL_PXM'],
+      ['B313;SL_ALPM', 'SL_ALPM'],
+      ['B313;SL_PPM', 'SL_PPM'],
+    ])('refuses %s as a part, as the codes it places or restyles are refused', (input, source) => {
+      // regression: a link that places or restyles the codes held them under a
+      // part of its own, and only a part's own parts were counted
+      expect(warningsOf(input)).toEqual([{ code: 'COMPOSITE_AS_PART', source }]);
+      expect(svgOf(input)).toBe(svgOf('B313;SL_MULTI'));
+    });
+
+    it.each([
+      ['SL_HOLDS_PM', 'B313;SL_PM'],
+      ['SL_HOLDS_ALPM', 'B313;SL_ALPM'],
+    ])('refuses %s, a definition holding %s, as one holding those codes', (code, codeString) => {
+      const { defined, errors } = BlissSVGBuilder.define({ [code]: { codeString } });
+      expect(defined).toEqual([]);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain(`a ; part cannot be a composition ("${codeString}")`);
+    });
+
+    it('draws a positioned alias of several codes as the one part of its character', () => {
+      // note: the first part is the character's base, so it may be a composition
+      expect(warningsOf(';SL_PM')).toEqual([]);
+      expect(svgOf(';SL_PM')).toBe(svgOf('SL_PM'));
+    });
+
+    it('draws a positioned typed glyph of several codes as a part', () => {
+      // note: a typed glyph is a part whatever it holds
+      expect(warningsOf('B313;SL_PTG')).toEqual([]);
+      expect(svgOf('B313;SL_PTG')).toBe(svgOf('B313;SL_TG:1,0'));
     });
 
     it('fails a rename of a word as a part, under the name written', () => {
