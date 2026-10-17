@@ -1405,7 +1405,8 @@ class BlissSVGBuilder {
         if (remainderCount > 0 && !knownRemainder) continue;
         for (const i of misplaced) {
           const p = parts[i];
-          const source = `${p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
+          // A part read through a name is reported by the name written.
+          const source = `${p._aliasCodeName ?? p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
           this.#mutationWarnings.push({
             code: WARNING_CODES.MISPLACED_SPACE,
             message: `A space is a word separator, not a character part, so "${source}" was dropped.`,
@@ -1466,7 +1467,8 @@ class BlissSVGBuilder {
         }
         for (const i of misplaced) {
           const p = parts[i];
-          const source = `${p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
+          // A part read through a name is reported by the name written.
+          const source = `${p._aliasCodeName ?? p.codeName}${BlissSVGBuilder.#positionSuffix(p.x, p.y)}`;
           this.#mutationWarnings.push({
             code: WARNING_CODES.MISPLACED_INDICATOR_PART,
             message: `An indicator can only follow its base parts at the end of a character (BASE;INDICATOR), so "${source}" was dropped.`,
@@ -3253,8 +3255,8 @@ class BlissSVGBuilder {
     // repeat. A character's one part written by the name it records brings
     // what the name gives the part of a character written alone: read back
     // alone, the name brings it to the part directly; behind a part bracket,
-    // read in a slot, through the links it nests. Any other part is read in a
-    // `;` slot.
+    // read in a slot, the same, through every link it renames. Any other part
+    // is read in a `;` slot.
     const lookOf = (part, parts) => (parts.length === 1 && part.codeName === part._aliasCodeName
       ? BlissSVGBuilder.#loneLookOf(part.codeName, readings)
       : BlissSVGBuilder.#ownLookOf(part.codeName, readings));
@@ -3401,10 +3403,9 @@ class BlissSVGBuilder {
 
       // A character whose one part is a name read in a `;` slot, written as
       // that name and nothing more, reads back as the name standing alone.
-      // Where the name is shorthand that expands alone but nests in a slot (an
-      // alias of an alias, of a code with options of its own, of several
-      // codes), the two draw differently, so the empty base keeps the part in
-      // its slot.
+      // Where the name is shorthand for several codes, the character's parts
+      // where it stands alone but one part holding them in a slot, the two
+      // can draw differently, so the empty base keeps the part in its slot.
       if (options.preserve && glyph.parts?.length === 1) {
         const [part] = glyph.parts;
         const inSlot = part._aliasCodeName === undefined || part._aliasCodeName !== glyph._aliasCodeName;
@@ -4097,10 +4098,10 @@ class BlissSVGBuilder {
 
   // The options the parser gives the part of a character written as `code`
   // alone, or undefined: #ownLookOf's question asked where the name stands
-  // alone rather than in a `;` slot. The answers differ where a single link
-  // renames a code that is a composition itself: alone, the rename dissolves
-  // into one part holding the options of every link; in a slot, each link
-  // nests as a part of its own. Every definition's own options sit on that
+  // alone rather than in a `;` slot. A slot reads a name as it reads standing
+  // alone, through every link it renames, so the answers differ only for a
+  // name standing for several codes: alone they are the character's parts,
+  // in a slot one part holds them. Every definition's own options sit on that
   // part, never on the character. Only a name that reads as one part records
   // itself on that part, so the first is the one.
   static #loneLookOf(code, readings = new Map()) {
@@ -4834,9 +4835,9 @@ class BlissSVGBuilder {
   // cannot matter (`[x=2]>S8`, `S8:2` and `S8:2,` are one part). At 'glyph'
   // level it is the one character the code reads as; at 'part' level the part
   // it reads as in a `;` slot, through the scaffold the part methods parse a
-  // new part with. The two differ where a name expands alone and nests in a
-  // slot: an alias of several codes draws several parts, and an alias chain
-  // can resolve a key two links set differently.
+  // new part with. The two differ where a name stands for several codes,
+  // which alone are several parts of the character and in a slot one part
+  // holding them.
   // Null when the code does not read as one character or one part, which a
   // name holding a separator can do: define() accepts one, and the parser
   // splits on the separator before it looks the name up. `readings` memoizes
@@ -4858,11 +4859,12 @@ class BlissSVGBuilder {
   }
 
   // Whether `name` written alone draws what it draws as the one part of a
-  // character, read in a `;` slot. A typed definition, and an alias of one
-  // code drawn by no code string, read alike; an alias otherwise expands where
-  // it stands alone and nests where it sits in a slot, which can resolve a key
-  // two links set differently or group the parts differently. Drawn, not
-  // derived, so no rule about which links nest can drift from the renderer.
+  // character, read in a `;` slot. A typed definition and an alias of one
+  // code read alike, a slot reading an alias through every link it renames as
+  // the name standing alone does; an alias of several codes is the
+  // character's parts alone but one part holding them in a slot, which can
+  // group them differently. Drawn, not derived, so no rule about which names
+  // read alike can drift from the renderer.
   static #readsAloneAsInSlot(name, readings) {
     const memoKey = `alone:${name}`;
     if (!readings.has(memoKey)) {

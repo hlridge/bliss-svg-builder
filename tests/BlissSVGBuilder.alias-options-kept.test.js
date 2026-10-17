@@ -3,7 +3,7 @@
  * part of what the code is where the alias is written alone, so a clear and a
  * `preserve` save treat them as the definition's; ordinary part options where
  * it spells several parts; and a name read in a part slot saved so that it
- * reloads in its slot.
+ * reloads as drawn.
  *
  * Covers:
  * - A clear (of the part, or of everything) or a key removal on the part of an
@@ -15,7 +15,8 @@
  *   and for an alias of `REFSQUARE`, an option of the part's own beside it in
  *   a part bracket; the `preserve` JSON of a chain reloading as drawn.
  * - A name read in a part slot that is the one part of its character, saved
- *   under `preserve` in its slot where the name alone draws otherwise.
+ *   under `preserve` by its name alone, and in its slot where the name alone
+ *   draws otherwise (an alias of several codes).
  * - A key two links set: the alias's own over the code it renames, a part
  *   bracket in the alias's code string over the alias's own.
  * - A composition object naming an alias as its character: the parts it
@@ -27,9 +28,8 @@
  *   `BlissSVGBuilder.alias-options-on-parts.test.js`.
  * - A part named by a definition in a `;` slot, see
  *   `BlissSVGBuilder.definition-options-kept.test.js`.
- * - An alias used in a `;` slot, where a chain nests one part per link and the
- *   inner link's key wins (backlog row "An alias written alone and the same
- *   alias in a part slot resolve a key two links set differently").
+ * - An alias used in a `;` slot beside other parts, see
+ *   `BlissSVGBuilder.alias-in-part-slot.test.js`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
@@ -82,7 +82,7 @@ describe('BlissSVGBuilder alias options kept', () => {
     ])('keeps what %s gives its part after %s', (input, _label, change) => {
       // note: what the name gives the part where it stands alone is part of
       // what the code is: the alias's own options, every link's, and the look
-      // of the code it renames, which a part slot would nest one part per link
+      // of the code it renames
       const builder = changed(input, change);
       const untouched = new BlissSVGBuilder(input);
       expect(builder.svgCode).toBe(untouched.svgCode);
@@ -129,27 +129,42 @@ describe('BlissSVGBuilder alias options kept', () => {
     });
 
     it('reloads a chain from its preserve JSON as the builder draws it', () => {
-      // note: the JSON writes every part in a slot, where the chain nests a
-      // part per link, so it names the code the part draws instead
+      // note: the JSON writes every part in a slot, which reads the chain as
+      // the name written alone reads it
       const builder = new BlissSVGBuilder('AK_A2');
       expect(new BlissSVGBuilder(builder.toJSON({ preserve: true })).svgCode).toBe(builder.svgCode);
     });
   });
 
   describe('when an alias read in a part slot is the one part of its character', () => {
-    it.each([';AK_BLUE', ';AK_RSD', ';AK_ALIAS2'])('keeps %s in its slot under preserve', (input) => {
+    it('keeps ;AK_ALIAS2 in its slot under preserve', () => {
       // regression: the save wrote the name alone, which reads as the alias
-      // written alone; expanded there, a chain resolves a key its links both
-      // set the other way, and several parts are styled one by one
-      const builder = new BlissSVGBuilder(input);
-      expect(builder.toString({ preserve: true })).toBe(input);
-      expect(new BlissSVGBuilder(input).svgCode).toBe(builder.svgCode);
+      // written alone; expanded there, several parts are styled one by one
+      const builder = new BlissSVGBuilder(';AK_ALIAS2');
+      const saved = builder.toString({ preserve: true });
+      expect(saved).toBe(';AK_ALIAS2');
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
     });
 
-    it('keeps AK_BLUE in its slot after an override on it is cleared', () => {
+    it.each([
+      [';AK_BLUE', 'AK_BLUE'],
+      [';AK_RSD', 'AK_RSD'],
+    ])('writes %s by its name alone under preserve, as %s, which draws the same', (input, name) => {
+      // re-pinned: a part slot now reads an alias as the name written alone
+      // reads it, so the name alone reloads the drawing; the slot was kept
+      // while a chain, or the look of the code an alias renames, resolved a
+      // key the other way there
+      const builder = new BlissSVGBuilder(input);
+      const saved = builder.toString({ preserve: true });
+      expect(saved).toBe(name);
+      expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
+    });
+
+    it('writes AK_BLUE by its name alone after an override on it is cleared', () => {
+      // re-pinned with the rows above: the cleared part reads as AK_BLUE alone
       const builder = changed('[color=green]>AK_BLUE', (b) => b.glyph(0).part(0).clearOptions());
       const saved = builder.toString({ preserve: true });
-      expect(saved).toBe(';AK_BLUE');
+      expect(saved).toBe('AK_BLUE');
       expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
     });
 

@@ -2170,7 +2170,7 @@ export class BlissParser {
 
             const definition = part.codeName?.startsWith('XTXT_')
               ? (() => { const g = createTextFallbackGlyph(part.codeName.slice(5)); g.isShape = true; return g; })()
-              : (blissElementDefinitions[part.codeName] || {});
+              : BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
             // The code the definition draws, behind the bracket that leads its
             // code string, which is the definition's own options and so this
             // part's.
@@ -2391,12 +2391,66 @@ export class BlissParser {
    * code's options under the alias's own.
    */
   static #renameToDrawnCode(part, code, definition) {
-    part._aliasCodeName = part.codeName;
+    // A name recorded further out (a bare alias read through to this
+    // definition) is the one written, and stays.
+    part._aliasCodeName ??= part.codeName;
     part.codeName = code;
     if (BlissParser.#isBareAlias(definition)) return;
     const drawn = blissElementDefinitions[code];
     const drawnOptions = drawn && BlissParser.#readDefinition(code, drawn).options;
     if (drawnOptions) part.options = { ...drawnOptions, ...part.options };
+  }
+
+  /**
+   * Read a part named by a bare alias as the alias written alone expands:
+   * through every link of a chain that renames one code, each link's options
+   * under the ones further out and the part's own bracket over them all, so
+   * the outer link wins a key two links set, and a part bracket where the
+   * alias is used restyles what it draws. Where the chain reaches a code with
+   * an identity of its own (a built-in, a typed definition, a shape drawn by
+   * its own function, a letter), the part is that code, recording the name
+   * written for the saves that keep it, as the alias written alone does.
+   * Where it ends at an alias of something other than one code (a code with a
+   * position, several codes), the name written is shorthand for the same, so
+   * the part keeps it and holds what that alias draws. A word is no part, so
+   * a rename of one is left as written, to fail as the word does. Returns the
+   * definition the part is then read by.
+   */
+  static #readThroughRenames(part, definition, warn) {
+    const written = part.codeName;
+    if (!BlissParser.#isShorthand(definition)
+        || processXCodes(finalCodeStringOf(written, blissElementDefinitions) ?? '').includes('/')) {
+      return definition;
+    }
+    const seen = new Set([written]);
+    let code = written;
+    let current = definition;
+    while (BlissParser.#isShorthand(current)) {
+      // Looked at without a report first: a link the chain stops at is read,
+      // and reports, where the part is read by it.
+      const { codeString: body } = BlissParser.#readDefinition(code, current);
+      if (seen.has(body) || !Object.hasOwn(blissElementDefinitions, body)) break;
+      seen.add(body);
+      const { options } = BlissParser.#readDefinition(code, current, warn);
+      if (options) part.options = { ...options, ...part.options };
+      // An anchor a link sets itself stays where the code it names sets none,
+      // as #applyEffectiveMetadata leaves one.
+      for (const axis of ['anchorOffsetX', 'anchorOffsetY']) {
+        if (current[axis] !== undefined) part[axis] ??= current[axis];
+      }
+      code = body;
+      current = blissElementDefinitions[body];
+    }
+    if (BlissParser.#isShorthand(current)) return current;
+    part.codeName = code;
+    part._aliasCodeName = written;
+    return current;
+  }
+
+  // A bare alias with a code string: shorthand a part naming it is read
+  // through.
+  static #isShorthand(definition) {
+    return typeof definition.codeString === 'string' && BlissParser.#isBareAlias(definition);
   }
 
   // A definition with a code string and no identity of its own (no glyph,
@@ -2460,8 +2514,8 @@ export class BlissParser {
   static #expandPartRecursive(part, warn) {
     if (!part.codeName || part.parts?.length > 0) return;
 
-    const definition = blissElementDefinitions[part.codeName];
-    if (!definition) return;
+    if (!blissElementDefinitions[part.codeName]) return;
+    const definition = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName], warn);
 
     // Read as parseParts reads it: behind the definition's own bracket.
     const { codeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
@@ -2501,7 +2555,7 @@ export class BlissParser {
       // A bracket the stage emptied stores no `{}`, as in parseParts.
       if (part.options && Object.keys(part.options).length === 0) delete part.options;
 
-      const definition = blissElementDefinitions[part.codeName] || {};
+      const definition = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
       const { codeString: innerCodeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
 
       if (innerCodeString) {

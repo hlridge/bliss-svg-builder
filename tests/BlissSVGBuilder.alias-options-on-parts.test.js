@@ -23,8 +23,8 @@
  *   builder draws it.
  *
  * Does NOT cover:
- * - An alias used in a `;` slot, where a chain nests one part per link and the
- *   inner link's key wins, unchanged.
+ * - An alias used in a `;` slot, read there as it is written alone, see
+ *   `BlissSVGBuilder.alias-in-part-slot.test.js`.
  * - The clears and the `preserve` saves of an alias once its options sit on
  *   its parts, see `BlissSVGBuilder.alias-options-kept.test.js`.
  * - Typed definitions written alone, see

@@ -233,7 +233,9 @@ describe('BlissSVGBuilder part position presence', () => {
     // land where it was drawn. Each axis the indicator layout would place
     // somewhere else is written; one it would place there anyway is not:
     // over B291 an indicator sits at y 0 by default, over B119 (anchor
-    // offset -2) 2 units higher.
+    // offset -2) 2 units higher. An alias of one code is not spelled out: it
+    // is read as the code it names, so it saves as that code written with the
+    // same position does, each axis as written.
     const DEFINITIONS = {
       PPACT: { codeString: 'B81' },
       PPIND: { type: 'glyph', isIndicator: true, codeString: 'B81' },
@@ -248,11 +250,13 @@ describe('BlissSVGBuilder part position presence', () => {
     });
 
     it.each([
-      ['B291;PPACT:0,0', 'B291;B81:0'],
+      // re-pinned: the alias was spelled out with only the axes the layout
+      // needs (`B291;B81:0`, `B81:,3`); read as `B81` it keeps the axes written
+      ['B291;PPACT:0,0', 'B291;B81:0,0'],
       ['B119;PPACT:0,0', 'B119;B81:0,0'],
       ['B291;PPIND:0,0', 'B291;B81:0'],
       ['B119;PPIND:0,0', 'B119;B81:0,0'],
-      ['PPACT:0,3',      'B81:,3'],
+      ['PPACT:0,3',      'B81:0,3'],
       ['PPIND:0,0',      'B81'],
     ])('saves %s as %s, which draws the same', (dsl, expected) => {
       const b = new BlissSVGBuilder(dsl);
