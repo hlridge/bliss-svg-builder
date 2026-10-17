@@ -2308,8 +2308,10 @@ export class BlissParser {
 
   /**
    * Walk a blissObj structure and expand any PARTs that have a codeName
-   * but no sub-parts. This supports toJSON round-trips where nested
-   * parts were stripped.
+   * but no sub-parts, reading again a name the DSL reads through wherever
+   * parts are kept (see #expandPartRecursive). This supports toJSON
+   * round-trips where nested parts were stripped, and deep saves, which keep
+   * them.
    *
    * A definition's code string is DSL text, so its brackets are read here as
    * the DSL reads them when a string names the definition: at part scope, with
@@ -2527,6 +2529,17 @@ export class BlissParser {
     return { definition: current, position };
   }
 
+  // Whether a part named `name` is read through to a code with an identity of
+  // its own, as #readThroughRenames reads one: asked of a scratch part, so the
+  // links are looked at without a report and nothing is changed.
+  static #readsThrough(name) {
+    const definition = blissElementDefinitions[name];
+    if (!definition) return false;
+    const scratch = { codeName: name };
+    BlissParser.#readThroughRenames(scratch, definition);
+    return scratch._aliasCodeName !== undefined;
+  }
+
   // A link's code string read as one code and the position it places that
   // code at, each axis as written: the link is read where the chain is read
   // through it, which refuses an axis no position can be (`:1e400`) quoting
@@ -2626,15 +2639,28 @@ export class BlissParser {
 
   /**
    * Recursively expand a single part from its definition's codeString, and
-   * give it the definition's metadata as parseParts does. Only runs if the
-   * part has a codeName, a matching definition, and no existing sub-parts. A
-   * definition drawn by its own function (`getPath`) has no codeString to
-   * expand, but its defaults still land on the part, where the DSL puts them.
+   * give it the definition's metadata as parseParts does, when the part has a
+   * codeName and a matching definition. Parts already below a part are taken
+   * as they stand, except below a name the DSL reads through to a code with
+   * an identity of its own: that name is read again, as a string naming it
+   * is, and what sits below it is left aside. A deep save writes there what
+   * the name drew, which 1.0.0 wrote as one part per link of its chain. Such
+   * a name is read again at any depth among parts taken as they stand, since
+   * an alias of several codes can hold one. A definition drawn by its own
+   * function (`getPath`) has no codeString to expand, but its defaults still
+   * land on the part, where the DSL puts them.
    */
   static #expandPartRecursive(part, warn) {
-    if (!part.codeName || part.parts?.length > 0) return;
-
-    if (!blissElementDefinitions[part.codeName]) return;
+    if (part.parts?.length > 0) {
+      if (!BlissParser.#readsThrough(part.codeName)) {
+        for (const held of part.parts) {
+          if (held.parts?.length > 0) BlissParser.#expandPartRecursive(held, warn);
+        }
+        return;
+      }
+      delete part.parts;
+    }
+    if (!part.codeName || !blissElementDefinitions[part.codeName]) return;
     const { definition, position } = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName], warn);
 
     // Read as parseParts reads it: behind the definition's own bracket.

@@ -3721,13 +3721,6 @@ class BlissSVGBuilder {
                 || (namedDef && !BlissSVGBuilder.#isBareAliasDefinition(namedDef)))
                 && (!decorated || BlissSVGBuilder.#renameChainIsPure(part._aliasCodeName))
                 && keepsOptions) {
-              // A name read through to another code is what a reload reads,
-              // so public output writes it with nothing below it: the parts
-              // below are that code's own, already placed where the name's
-              // links put it, and a reload takes parts as they stand. A name
-              // that is the part's own code keeps its parts, which are its
-              // own. The copy toString() writes from keeps the whole tree.
-              if (!forString && part.codeName !== part._aliasCodeName) delete part.parts;
               part.codeName = part._aliasCodeName;
               for (const axis of ['x', 'y']) {
                 if (used[axis] === undefined) delete part[axis];

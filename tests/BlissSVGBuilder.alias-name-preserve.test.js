@@ -1,8 +1,9 @@
 /**
  * Pins `preserve` keeping the name a part was read through in every save,
- * each save reloading as drawn: the deep JSON writes that name with nothing
- * below it, and an alias of a typed shape or glyph of several codes keeps its
- * name when it brings options or a position.
+ * each save reloading as drawn: the deep JSON writes that name with the tree
+ * below it, a composition object naming it is read by the name, and an alias
+ * of a typed shape or glyph of several codes keeps its name when it brings
+ * options or a position.
  *
  * Covers:
  * - `toJSON({ deep: true, preserve: true })` of a part read through a name
@@ -12,15 +13,22 @@
  *   or a part bracket where it is used, through `addPart()`, a composition
  *   object and `merge()`. Its reload draws byte-identical with the same
  *   reports, and every save of that reload is the original's.
- * - The part that save writes: the name and its options, with nothing below
- *   it; a typed definition's own name keeps the parts below it, in a slot and
- *   written alone.
+ * - The part that save writes: the name and its options, with the parts the
+ *   code drawn holds below it; a typed definition's own name keeps the parts
+ *   below it, in a slot and written alone.
+ * - A composition object naming a part by such a name with parts below it
+ *   (as 1.0.0's deep `preserve` save wrote it, or written by hand): drawn as
+ *   the name draws, in a slot, placed, written alone; the parts below a typed
+ *   definition's name or an alias of several codes taken as they stand.
  * - `preserve` keeping the name of an alias of a typed shape or glyph of
  *   several codes that brings options or a position: alone, in a slot,
  *   through an alias of it, with a position or a part bracket where it is
  *   used; each `preserve` save reloading byte-identical.
  *
  * Does NOT cover:
+ * - A change made inside a part read through a name, which the deep
+ *   `preserve` reload leaves aside with the other parts below the name (an
+ *   `it.todo` row below; deferred).
  * - The default saves of such an alias, which spell its codes out as parts
  *   of the character: the same ink, grouped otherwise on reload.
  * - What an alias in a slot draws, see
@@ -59,10 +67,15 @@ const ALIASES = {
   NP_APOS: { codeString: 'NP_POS', defaultOptions: { color: 'blue' } },
   NP_A2: { codeString: 'NP_A1', defaultOptions: { color: 'blue' } },
   NP_ARED: { codeString: 'NP_RED', defaultOptions: { color: 'blue' } },
+  NP_MANY: { codeString: 'B291;C8' },
 };
 
 const OF_ALIASES = {
   NP_ALPSB: { codeString: 'NP_PSB' },
+  // aliases of several codes, each holding a name read through as its second
+  NP_MPOS: { codeString: 'C8;NP_POS' },
+  NP_MAPOS: { codeString: 'C8;NP_APOS:0,2' },
+  NP_MA2: { codeString: 'C8;NP_A2' },
 };
 
 beforeAll(() => {
@@ -103,6 +116,24 @@ const savesOf = (builder) => ({
 // The part at `index` of the first character a deep preserve save writes.
 const deepPreservePartOf = (input, index) => deepPreserveOf(new BlissSVGBuilder(input)).groups[0].glyphs[0].parts[index];
 
+const namesBelow = (part) => part.parts.map(({ codeName }) => codeName);
+
+// A composition object of one character holding `parts`.
+const characterOf = (...parts) => ({ groups: [{ glyphs: [{ parts }] }] });
+
+// B291 as its definition draws it, the parts a save writes below it.
+const B291_TREE = [{
+  codeName: 'S8', x: 0, y: 8,
+  parts: [{ codeName: 'HL8' }, { codeName: 'HL8', x: 0, y: 8 }, { codeName: 'VL8' }, { codeName: 'VL8', x: 8, y: 0 }],
+}];
+
+// The second part 1.0.0's `toJSON({ deep: true, preserve: true })` wrote for
+// `B313;NP_A2`: the name holding one part per link, each with its options.
+const NP_A2_AS_100_SAVED_IT = {
+  codeName: 'NP_A2', options: { color: 'blue' },
+  parts: [{ codeName: 'NP_A1', options: { color: 'red' }, parts: [{ codeName: 'B291', parts: B291_TREE }] }],
+};
+
 describe('BlissSVGBuilder alias name preserve', () => {
   describe('when a part read through a name is reloaded from its deep preserve JSON', () => {
     it.each([
@@ -113,6 +144,10 @@ describe('BlissSVGBuilder alias name preserve', () => {
       // several codes written with nothing below it: with those codes below
       // the name, the reload refused them as several
       'B313;NP_ASB', 'NP_PSB', 'B313;NP_PSB:2,3', 'B313;[color=green]>NP_AS',
+      // a name read through, held by an alias of several codes that is the
+      // character's one part: its parts are taken as they stand, the name
+      // among them read again
+      ';NP_MPOS', ';NP_MAPOS', ';NP_MA2',
     ])('reloads %s as drawn, with the same reports', (input) => {
       // regression: the save kept the parts below the name, which a reload
       // takes as they stand: the position the name's links add was lost, and
@@ -142,24 +177,52 @@ describe('BlissSVGBuilder alias name preserve', () => {
   });
 
   describe('when a deep preserve save writes a part kept by a name it was read through', () => {
-    it('writes the name with its options and position and nothing below it', () => {
+    it('writes the name with its options and position and the tree below it', () => {
+      // re-pinned by C29's review fix F1, reworked: deep output holds every
+      // part down to the primitives, as the API reference says, and a reload
+      // reads the name again instead of the parts below it
       const named = deepPreservePartOf('B313;NP_A2', 1);
       expect(named.codeName).toBe('NP_A2');
       expect(named.options).toEqual({ color: 'blue' });
-      expect(named).not.toHaveProperty('parts');
+      expect(named.parts).toEqual(B291_TREE);
       const placed = deepPreservePartOf('B313;NP_POS:2,3', 1);
       expect([placed.codeName, placed.x, placed.y]).toEqual(['NP_POS', 2, 3]);
-      expect(placed).not.toHaveProperty('parts');
+      expect(placed.parts).toEqual(B291_TREE);
     });
 
     it.each([
       ['B313;NP_RED', 1, ['B291']],
-      // pins the parts left out only below a name read through to another
-      // code: a typed shape written alone carries its own name as its record,
-      // and the parts below it are its own
+      // a typed shape written alone carries its own name as its record
       ['NP_SHAPE', 0, ['HL8', 'VL8']],
     ])('keeps the parts below the typed definition %s names', (input, index, below) => {
-      expect(deepPreservePartOf(input, index).parts.map(({ codeName }) => codeName)).toEqual(below);
+      expect(namesBelow(deepPreservePartOf(input, index))).toEqual(below);
+    });
+
+    it.todo('keeps a change made inside a part read through a name (deferred: what a save writes for a part changed inside)');
+  });
+
+  describe('when a composition object names a part by a name read through, with parts below it', () => {
+    it.each([
+      ['in a slot', characterOf({ codeName: 'B313' }, { codeName: 'NP_A2', parts: [{ codeName: 'C8' }] }), 'B313;NP_A2'],
+      ['placed', characterOf({ codeName: 'B313' }, { codeName: 'NP_POS', x: 2, parts: [{ codeName: 'C8' }] }), 'B313;NP_POS:2'],
+      ['read through to a typed shape of several codes', characterOf({ codeName: 'B313' }, { codeName: 'NP_AS', parts: [{ codeName: 'C8' }] }), 'B313;NP_AS'],
+      ['written alone', characterOf({ codeName: 'NP_A2', parts: [{ codeName: 'C8' }] }), 'NP_A2'],
+      ['as 1.0.0 saved it', characterOf({ codeName: 'B313' }, NP_A2_AS_100_SAVED_IT), 'B313;NP_A2'],
+      ['held by an alias of several codes', characterOf({ codeName: 'NP_MA2', parts: [{ codeName: 'C8' }, { codeName: 'NP_A2', parts: [{ codeName: 'C8' }] }] }), ';NP_MA2'],
+    ])('draws it %s as the name draws', (_label, object, input) => {
+      // regression: the parts below the name were taken as they stand, so a
+      // deep save that kept them reloaded what they held where they held it,
+      // not what the name draws
+      const builder = new BlissSVGBuilder(object);
+      expect(builder.svgCode).toBe(new BlissSVGBuilder(input).svgCode);
+      expect(builder.warnings).toEqual([]);
+    });
+
+    it.each([
+      ['a typed shape', characterOf({ codeName: 'B313' }, { codeName: 'NP_SHAPE', parts: [{ codeName: 'C8' }] }), 'B313;C8'],
+      ['an alias of several codes', characterOf({ codeName: 'NP_MANY', parts: [{ codeName: 'C8' }] }), 'C8'],
+    ])('takes the parts below %s as they stand', (_label, object, drawn) => {
+      expect(new BlissSVGBuilder(object).svgCode).toBe(new BlissSVGBuilder(drawn).svgCode);
     });
   });
 
