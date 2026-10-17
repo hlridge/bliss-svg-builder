@@ -7,12 +7,15 @@
  * - An alias of a positioned code whose code brings its own colour, in a
  *   slot, as a character's one part, with a position of its own, behind a
  *   part bracket, through `addPart()` and a composition object; the
- *   positioned code itself behind a part bracket.
+ *   positioned code itself behind a part bracket; a link placing one axis,
+ *   and two placing links adding up; a position written where it is used
+ *   that no position can be.
  * - Its part handle naming the code drawn, and an edit through the handle
  *   reaching the ink.
  * - Its saves: `preserve` keeps the name, writing only the position written
- *   where it is used, written alone and in a slot; the default string
- *   reloading as drawn.
+ *   where it is used, written alone and in a slot, and writes the code drawn
+ *   once an edit took off an axis the name places; the default string
+ *   reloading as drawn; neither JSON recording the links' position.
  * - A link placing its code at an axis no position can be (`:1e400,0`): the
  *   alias drawn as written alone, on every route, the axis reported once; the
  *   name kept under `preserve`, reported again on reload.
@@ -45,6 +48,8 @@ const HOLDERS = {
   HD_INF: { codeString: 'HD_RED:1e400,0' },
   HD_INFX: { codeString: 'HD_RED:1e400' },
   HD_NONE: { codeString: 'HD_RED:' },
+  HD_PX: { codeString: 'HD_RED:1' },
+  HD_PY: { codeString: 'HD_RED:,1' },
   HD_M2: { codeString: 'HD_RED;C8', defaultOptions: { color: 'blue' } },
   HD_M3: { codeString: 'HD_A1;C8', defaultOptions: { color: 'blue' } },
 };
@@ -54,6 +59,9 @@ const ALIASES = {
   HD_ALINF: { codeString: 'HD_INF', defaultOptions: { color: 'blue' } },
   HD_ALINFX: { codeString: 'HD_INFX', defaultOptions: { color: 'blue' } },
   HD_ALNONE: { codeString: 'HD_NONE', defaultOptions: { color: 'blue' } },
+  HD_ALPX: { codeString: 'HD_PX', defaultOptions: { color: 'blue' } },
+  HD_ALPY: { codeString: 'HD_PY', defaultOptions: { color: 'blue' } },
+  HD_P2: { codeString: 'HD_POS:2,0', defaultOptions: { color: 'blue' } },
 };
 
 beforeAll(() => {
@@ -85,10 +93,31 @@ describe('BlissSVGBuilder alias over held defaults', () => {
       ['B313;[color=green]>HD_ALPOS', 'B313;[color=green]>HD_RED:1,0'],
       ['B313;[color=green]>HD_POS', 'B313;[color=green]>HD_RED:1,0'],
       ['B313;HD_POS', 'B313;HD_RED:1,0'],
+      ['B313;HD_ALPX', 'B313;[color=blue]>HD_RED:1'],
+      ['B313;HD_ALPY', 'B313;[color=blue]>HD_RED:,1'],
+      // pins two placing links adding up: only the last one placing survived
+      // the 2026-10-17 hand mutants
+      ['B313;HD_P2', 'B313;[color=blue]>HD_RED:3,0'],
     ])('draws %s as %s', (input, expansion) => {
       // regression: the slot held the positioned code as a part below the
       // alias's, whose own red beat the options above it
       expect(svgOf(input)).toBe(svgOf(expansion));
+    });
+
+    it('reads a link placing only y with no report, its default string writing only y', () => {
+      // pins an empty axis read as no axis: handed over as written, it was
+      // refused as a malformed position
+      const builder = new BlissSVGBuilder('B313;HD_ALPY');
+      expect(builder.warnings).toEqual([]);
+      expect(builder.toString()).toBe('B313;[color=blue]>B291:,1');
+    });
+
+    it('draws B313;HD_ALPOS:1e400 at the links\' position, reporting the axis written there once', () => {
+      // pins the position written where the alias is used read before the
+      // links' is added: added as text, it read as 1e4001
+      const builder = new BlissSVGBuilder('B313;HD_ALPOS:1e400');
+      expect(builder.svgCode).toBe(svgOf('B313;[color=blue]>HD_RED:1,0'));
+      expect(reportsOf(builder)).toEqual([['MALFORMED_COORDINATES', 'x=1e400']]);
     });
 
     it('draws HD_ALPOS added by addPart() as written in the slot', () => {
@@ -138,13 +167,30 @@ describe('BlissSVGBuilder alias over held defaults', () => {
       expect(svgOf(saved)).toBe(svgOf(input));
     });
 
-    it.each(['HD_FPOS:0.2,0.1', 'B313;HD_FPOS:0.2,0.1'])(
+    it.each(['HD_FPOS:0.2,0.1', 'B313;HD_FPOS:0.2,0.1', 'HD_FPOS:0.25,0.15'])(
       'saves %s as written under preserve, a decimal position with no binary residue', (input) => {
         // regression: 0.2 beside the name's 0.1 is placed at 0.30000000000000004,
-        // and taking 0.1 back off that left 0.20000000000000004 in the save
+        // and taking 0.1 back off that left 0.20000000000000004 in the save.
+        // 0.25 and 0.15 need two digits: pins the search past one
         expect(preserveOf(input)).toBe(input);
         expect(svgOf(preserveOf(input))).toBe(svgOf(input));
       });
+
+    it.each([{}, { preserve: true }])('writes no record of the links\' position in the JSON saved with %o', (saveOptions) => {
+      const part = new BlissSVGBuilder('B313;HD_ALPOS').toJSON(saveOptions).groups[0].glyphs[0].parts[1];
+      expect(part).not.toHaveProperty('_aliasPosition');
+    });
+
+    it('saves a part an edit took off the x its name places as the code drawn under preserve, reloading as drawn', () => {
+      // pins the name kept only where it can be written: no use of HD_P2
+      // leaves x unset, so the part is written as what it draws
+      const builder = new BlissSVGBuilder('B313;HD_P2:2');
+      builder.glyph(0).part(1).removeOptions('x');
+      expect(builder.toString({ preserve: true })).toBe('B313;[color=blue]>HD_RED:,0');
+      expect(svgOf(builder.toString({ preserve: true }))).toBe(builder.svgCode);
+      // pins the record dropped from public JSON where the name is not kept
+      expect(builder.toJSON({ preserve: true }).groups[0].glyphs[0].parts[1]).not.toHaveProperty('_aliasPosition');
+    });
 
     it.each(['B313;HD_ALPOS', 'B313;HD_ALPOS:2,3', 'HD_ALPOS:2,3'])(
       'reloads %s as drawn from its default string', (input) => {

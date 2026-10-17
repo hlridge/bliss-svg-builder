@@ -9,7 +9,8 @@
  *   byte-identical to the expansion written in the string.
  * - A composition object naming an alias as a part, with and without options
  *   of its own, or naming an alias of several codes that holds one, drawing
- *   as the string does.
+ *   as the string does; an alias that places its code given an x of its own
+ *   as text, in its options, or as text no position can be.
  * - An alias placing several codes, refused as a part through `addPart()` and
  *   a composition object as the string refuses it.
  * - Both saves of a slot holding an alias: the default spells it out in the
@@ -96,6 +97,23 @@ describe('BlissSVGBuilder alias in a part slot routes', () => {
       ['over a typed glyph, with a colour of its own', { codeName: 'SR_AL', options: { color: 'green' } }, 'B313;[color=green]>SR_RED'],
     ])('draws the part %s as the string %s', (_label, part, expansion) => {
       expect(new BlissSVGBuilder(objectWithPart(part)).svgCode).toBe(svgOf(expansion));
+    });
+
+    it.each([
+      ['written as text', { codeName: 'SR_ALPOS', x: '2' }],
+      ['in its options', { codeName: 'SR_ALPOS', options: { x: 2 } }],
+    ])('places an alias that places its code at its own x %s beside the links\' position', (_label, part) => {
+      // pins the part's own position read, from both its channels, before the
+      // links' is added: added as text, x 2 drew at 21
+      const builder = new BlissSVGBuilder(objectWithPart(part));
+      expect(builder.warnings).toEqual([]);
+      expect(builder.svgCode).toBe(svgOf('B313;[color=blue]>B291:3,0'));
+    });
+
+    it('reports an x of its own that no position can be, drawing the part at the links\' position', () => {
+      const builder = new BlissSVGBuilder(objectWithPart({ codeName: 'SR_ALPOS', x: 'abc' }));
+      expect(builder.warnings.map(({ code, source }) => ({ code, source }))).toEqual([{ code: 'MALFORMED_COORDINATES', source: 'x=abc' }]);
+      expect(builder.svgCode).toBe(svgOf('B313;[color=blue]>B291:1,0'));
     });
 
     it('draws an alias of several codes holding an alias as the string does', () => {

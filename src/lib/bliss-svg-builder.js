@@ -3179,9 +3179,13 @@ class BlissSVGBuilder {
   // A part as it was written, for the source of a report about it: a part
   // read through a name is written as that name, with the position written
   // where it was used rather than the one its links add (#positionAtUse).
+  // Where an edit took off an axis the name places, no use of the name draws
+  // the part, so it is written as the code drawn, where it is drawn, as the
+  // save writes it.
   static #writtenTextOf(part) {
-    const at = BlissSVGBuilder.#positionAtUse(part) ?? part;
-    return `${part._aliasCodeName ?? part.codeName}${BlissSVGBuilder.#positionSuffix(at.x, at.y)}`;
+    const used = BlissSVGBuilder.#positionAtUse(part);
+    if (used === null) return `${part.codeName}${BlissSVGBuilder.#positionSuffix(part.x, part.y)}`;
+    return `${part._aliasCodeName ?? part.codeName}${BlissSVGBuilder.#positionSuffix(used.x, used.y)}`;
   }
 
   /**

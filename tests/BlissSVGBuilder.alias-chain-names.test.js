@@ -9,15 +9,17 @@
  *   alone, in a slot, as a character's one part, behind a part bracket and
  *   with a position, each save reloading as drawn.
  * - A link whose name holds a character the DSL reads as structure (`;`, `:`,
- *   `[`, `^`, `/`): a slot does not read through it, failing as before the
- *   slot read aliases through.
+ *   `[`, `]`, `^`, `/`, `|`, `>`, `{`, `}`, a space): a slot does not read
+ *   through it, failing as before the slot read aliases through.
  * - A word indicator written through such a link attaching as the code it
  *   names.
  * - An indicator a typed definition names through such a link, reused when
  *   the word brings the same code.
  * - An alias of a letter drawn as text, in a slot, alone in one, through
  *   `addPart()` and a composition object, drawing as the letter written there
- *   and reloading as drawn; its name kept under `preserve` written alone too.
+ *   and reloading as drawn; its name kept under `preserve` written alone too,
+ *   where its link places the letter as well; its part handle naming the
+ *   letter. A typed glyph named with an X is no such letter.
  *
  * Does NOT cover:
  * - An alias of a code with a position, or of several codes, whose codes
@@ -47,9 +49,17 @@ const LINKS = {
   'CN_S[N': { codeString: 'B291', defaultOptions: RED },
   'CN_S^N': { codeString: 'B291', defaultOptions: RED },
   'CN_S/N': { codeString: 'B291', defaultOptions: RED },
+  'CN_S|N': { codeString: 'B291', defaultOptions: RED },
+  'CN_S]N': { codeString: 'B291', defaultOptions: RED },
+  'CN_S>N': { codeString: 'B291', defaultOptions: RED },
+  'CN_S{N': { codeString: 'B291', defaultOptions: RED },
+  'CN_S}N': { codeString: 'B291', defaultOptions: RED },
+  'CN_S N': { codeString: 'B291', defaultOptions: RED },
   'CN_IN-D': { codeString: 'B81' },
   'CN_TI-D': { type: 'glyph', isIndicator: true, codeString: 'B81' },
   CN_LL: { codeString: 'Xλ', defaultOptions: RED },
+  CN_LLP: { codeString: 'Xλ:1,0' },
+  XCN_TG: { type: 'glyph', codeString: 'B291', defaultOptions: RED },
 };
 
 const ALIASES = {
@@ -64,9 +74,17 @@ const ALIASES = {
   CN_OBRACKET: { codeString: 'CN_S[N', defaultOptions: BLUE },
   CN_OCARET: { codeString: 'CN_S^N', defaultOptions: BLUE },
   CN_OSLASH: { codeString: 'CN_S/N', defaultOptions: BLUE },
+  CN_OBAR: { codeString: 'CN_S|N', defaultOptions: BLUE },
+  CN_OCLOSE: { codeString: 'CN_S]N', defaultOptions: BLUE },
+  CN_OANGLE: { codeString: 'CN_S>N', defaultOptions: BLUE },
+  CN_OBRACEL: { codeString: 'CN_S{N', defaultOptions: BLUE },
+  CN_OBRACER: { codeString: 'CN_S}N', defaultOptions: BLUE },
+  CN_OSPACE: { codeString: 'CN_S N', defaultOptions: BLUE },
   CN_IND2: { codeString: 'CN_IN-D' },
   CN_TIND2: { type: 'glyph', isIndicator: true, codeString: 'CN_TI-D', defaultOptions: RED },
   CN_LL2: { codeString: 'CN_LL', defaultOptions: BLUE },
+  CN_LLP2: { codeString: 'CN_LLP', defaultOptions: BLUE },
+  CN_AXTG: { codeString: 'XCN_TG', defaultOptions: BLUE },
 };
 
 const SPELLED = ['CN_OHYPHEN', 'CN_ODOT', 'CN_ORING', 'CN_OCOMMA', 'CN_OHASH', 'CN_OPAREN'];
@@ -120,10 +138,18 @@ describe('BlissSVGBuilder alias chain names', () => {
       ['CN_OBRACKET', 'UNKNOWN_CODE'],
       ['CN_OCARET', 'UNKNOWN_CODE'],
       ['CN_OSLASH', 'WORD_AS_PART'],
+      ['CN_OBAR', 'UNKNOWN_CODE'],
+      ['CN_OCLOSE', 'UNKNOWN_CODE'],
+      ['CN_OANGLE', 'UNKNOWN_CODE'],
+      ['CN_OBRACEL', 'UNKNOWN_CODE'],
+      ['CN_OBRACER', 'UNKNOWN_CODE'],
+      ['CN_OSPACE', 'UNKNOWN_CODE'],
     ])('does not read B313;%s through that link, reporting %s', (alias, code) => {
       // note: no DSL string reaches such a name in a slot (the parser splits
       // it before it looks it up), so a slot does not reach it through an
-      // alias either
+      // alias either. Pins each character the one-code test refuses: a name
+      // read whole across `|`, `]`, `>`, a brace or a space survived the
+      // 2026-10-17 hand mutants
       const builder = new BlissSVGBuilder(`B313;${alias}`);
       expect(builder.warnings.map((warning) => warning.code)).toEqual([code]);
       expect(builder.svgCode).not.toContain('stroke="blue"');
@@ -180,12 +206,30 @@ describe('BlissSVGBuilder alias chain names', () => {
       expect(svgOf(builder.toString(saveOptions))).toBe(builder.svgCode);
     });
 
-    it.each(['CN_LL', 'CN_LL2', 'B313;CN_LL2'])('keeps the name of %s under preserve, each save reloading as drawn', (input) => {
+    it.each(['CN_LL', 'CN_LL2', 'B313;CN_LL2', 'CN_LLP2', 'B313;CN_LLP2'])('keeps the name of %s under preserve, each save reloading as drawn', (input) => {
       // regression: written alone, the save wrote the letter, since the
-      // character's code for the letter kept the name off its one part
+      // character's code for the letter kept the name off its one part.
+      // CN_LLP2's link places the letter (`Xλ:1,0`): pins that link's code
+      // read as a slot reads a letter, which the 2026-10-17 hand mutants left
+      // unread
       const builder = new BlissSVGBuilder(input);
       expect(builder.toString({ preserve: true })).toBe(input);
       expect(new BlissSVGBuilder(builder.toJSON({ preserve: true })).svgCode).toBe(builder.svgCode);
+    });
+
+    it('names the letter on the part handle of an alias whose link places it', () => {
+      const part = new BlissSVGBuilder('B313;CN_LLP2').glyph(0).part(1);
+      expect(part.codeName).toBe('Xλ');
+      expect([part.x, part.y]).toEqual([1, 0]);
+    });
+
+    it('keeps the name of an alias of a typed glyph named with an X on the character, as for any typed glyph', () => {
+      // pins the letter test reading the text fallback's own prefix: a glyph
+      // whose name starts with an X is no letter, so its one part keeps the
+      // glyph's name
+      const glyph = new BlissSVGBuilder('CN_AXTG').toJSON({ preserve: true }).groups[0].glyphs[0];
+      expect(glyph.codeName).toBe('CN_AXTG');
+      expect(glyph.parts[0].codeName).toBe('XCN_TG');
     });
   });
 });

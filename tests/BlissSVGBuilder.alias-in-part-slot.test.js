@@ -20,9 +20,11 @@
  *   as a part, as those codes are, in a use and in `define()`, and so is an
  *   alias that places or restyles them, or a link to one; a rename of a word
  *   fails as the word does. A positioned typed glyph of several codes stays a
- *   part, and any of these may be the one part of a character.
+ *   part, so does a part bracket on a typed glyph or shape of several codes,
+ *   and any of these may be the one part of a character.
  * - A misplaced indicator or space written through a name, reported by the
- *   name and the position written where it is used.
+ *   name and the position written where it is used, or by the code drawn
+ *   once an edit took off a position the name places.
  * - A second bracket leading the code string of an alias in a slot, or of a
  *   link it is read through, reported once.
  *
@@ -48,6 +50,7 @@ const TARGETS = {
   SL_POS: { codeString: 'B291:1,0', defaultOptions: { color: 'red' } },
   SL_MULTI: { codeString: 'B291;C8' },
   SL_TG: { type: 'glyph', codeString: 'B291;C8' },
+  SL_SH2: { type: 'shape', codeString: 'HL8;VL8' },
   SL_WORD: { codeString: 'B291/C8' },
   SL_DBL: { codeString: '[color=red][color=blue]B291' },
   SL_DBLPOS: { codeString: '[color=red][color=blue]B291:1,0' },
@@ -72,9 +75,12 @@ const ALIASES = {
   SL_PMY: { codeString: 'SL_MULTI:,1' },
   SL_PXM: { codeString: '[color=red]>SL_MULTI' },
   SL_PTG: { codeString: 'SL_TG:1,0' },
+  SL_PXTG: { codeString: '[color=green]>SL_TG' },
+  SL_PXSH: { codeString: '[color=green]>SL_SH2' },
   SL_ALWORD: { codeString: 'SL_WORD' },
   SL_ALDBL: { codeString: 'SL_DBL' },
   SL_ALDBLPOS: { codeString: 'SL_DBLPOS' },
+  SL_DBLPM: { codeString: '[color=red][color=blue]SL_MULTI:1,0' },
 };
 
 // Links to SL_PM, defined once it exists.
@@ -228,10 +234,27 @@ describe('BlissSVGBuilder alias in a part slot', () => {
       expect(svgOf(';SL_PM')).toBe(svgOf('SL_PM'));
     });
 
+    it.each(['SL_PMY', 'SL_PPM', 'SL_ALPM'])('draws ;%s, which places several codes, as it draws alone', (alias) => {
+      // pins where the slot stops reading such a chain: at its first link
+      // that places the codes, on one axis or both, however many follow
+      expect(warningsOf(`;${alias}`)).toEqual([]);
+      expect(svgOf(`;${alias}`)).toBe(svgOf(alias));
+    });
+
     it('draws a positioned typed glyph of several codes as a part', () => {
       // note: a typed glyph is a part whatever it holds
       expect(warningsOf('B313;SL_PTG')).toEqual([]);
       expect(svgOf('B313;SL_PTG')).toBe(svgOf('B313;SL_TG:1,0'));
+    });
+
+    it.each([
+      ['B313;SL_PXTG', 'B313;[color=green]>SL_TG'],
+      ['B313;SL_PXSH', 'B313;[color=green]>SL_SH2'],
+    ])('draws %s, a part bracket on a typed definition of several codes, as a part, as %s', (input, expansion) => {
+      // pins the read through a part holding one part stopping at a typed
+      // glyph or shape, as it does where that is the part itself
+      expect(warningsOf(input)).toEqual([]);
+      expect(svgOf(input)).toBe(svgOf(expansion));
     });
 
     it('fails a rename of a word as a part, under the name written', () => {
@@ -263,10 +286,22 @@ describe('BlissSVGBuilder alias in a part slot', () => {
       // that position plus the one written; only the one written is reported
       expect(warningsOf(input)).toEqual([{ code, source }]);
     });
+
+    it('reports an indicator an edit took off a position its name places by the code drawn, where it is drawn', () => {
+      // regression: the report wrote the name with the position drawn
+      // (`SL_PIND:1`), which places the indicator one unit further right;
+      // no use of the name leaves y unset, so the part is written as the save
+      // writes it
+      const builder = new BlissSVGBuilder('B313;SL_PIND');
+      builder.glyph(0).part(1).removeOptions('y');
+      builder.glyph(0).addPart('B313');
+      expect(builder.warnings.map(({ code, source }) => ({ code, source })))
+        .toEqual([{ code: 'MISPLACED_INDICATOR_PART', source: 'B81:1' }]);
+    });
   });
 
   describe('when the code string of an alias in a part slot leads with two brackets', () => {
-    it.each(['B313;SL_DBL', 'B313;SL_DBLPOS', 'B313;SL_ALDBL', 'B313;SL_ALDBLPOS'])(
+    it.each(['B313;SL_DBL', 'B313;SL_DBLPOS', 'B313;SL_ALDBL', 'B313;SL_ALDBLPOS', ';SL_DBLPM'])(
       'reports the second bracket of %s once', (input) => {
         // pins one report per code string read: a link read through to the
         // code it names is read once, and the one the part is left with once
