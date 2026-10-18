@@ -238,6 +238,18 @@ export const isImageAttribute = (name) =>
   IMAGE_ATTRIBUTES.has(name) || name.startsWith('aria-') || name.startsWith('data-');
 
 /**
+ * The link attributes. A bare key with one of these names goes on the `<a>`
+ * its `href` builds: the element's own at element scope, the one around the
+ * content group at global scope. Never on a group, where `href` does nothing
+ * and an `href` the safety check refused would come back as written. Without a
+ * usable `href` there is no `<a>`, and the whole family is dropped. Behind a
+ * target prefix they are ordinary attributes, written where the prefix says.
+ */
+export const ANCHOR_ATTRIBUTE_NAMES = Object.freeze(
+  ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy']
+);
+
+/**
  * The written options whose whole job is to compute the root's `viewBox`. When
  * an author writes the `viewBox` directly, the value these produced is replaced,
  * so they are reported as displaced rather than left to look effective.

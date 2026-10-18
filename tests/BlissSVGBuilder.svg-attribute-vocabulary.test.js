@@ -48,8 +48,8 @@
  */
 
 import { describe, it, expect, afterAll } from 'vitest';
-import { BlissSVGBuilder, ANCHOR_ATTRIBUTE_NAMES } from '../src/lib/bliss-svg-builder.js';
-import { canonicalOptionKey } from '../src/lib/bliss-constants.js';
+import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
+import { ANCHOR_ATTRIBUTE_NAMES, canonicalOptionKey } from '../src/lib/bliss-constants.js';
 import {
   SVG_ATTRIBUTE_NAMES,
   SVG_ELEMENT_BASIS,

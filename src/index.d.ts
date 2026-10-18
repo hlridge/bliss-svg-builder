@@ -1075,7 +1075,11 @@ export declare class BlissSVGBuilder {
 
   // --- SVG output (getters) ---
 
-  /** SVG content (path elements and groups) without the outer `<svg>` wrapper. */
+  /**
+   * The composition's markup (path elements and groups) on its own: no outer
+   * `<svg>`, and nothing a global option adds, the global link included.
+   * `svgCode` places it inside the content group.
+   */
   readonly svgContent: string;
 
   /** Parsed SVG as a DOM element. Requires a DOM environment. */

@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -70,6 +70,21 @@ export class BlissElement {
   }
 
   /**
+   * Whether an `href` may build a link: a web, mail or phone address, a path,
+   * or a fragment. Anything else (`javascript:`, `data:`) builds none. Judged
+   * with control characters removed and the ends trimmed; the value written
+   * into the link is the one the author gave. Shared by every level's link and
+   * the global one the builder draws, so the two cannot disagree.
+   *
+   * @param {*} value - the href as stored (already escaped)
+   * @returns {boolean}
+   */
+  static isSafeHref(value) {
+    const cleaned = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim();
+    return /^(https?:|mailto:|tel:|\/|#)/i.test(cleaned);
+  }
+
+  /**
    * Wraps content with <a> and/or <g> tags based on options.
    * Ensures consistent wrapping behavior across all element levels.
    *
@@ -113,26 +128,11 @@ export class BlissElement {
     const computed = processed && typeof processed === 'object' ? processed : {};
     const written = authored && typeof authored === 'object' ? authored : {};
 
-    const anchorAttrNames = new Set([
-      'href',
-      'target',
-      'rel',
-      'download',
-      'hreflang',
-      'type',
-      'referrerpolicy'
-    ]);
-
     const anchorAttrs = [];
     const groupAttrs = new Map(); // attrName -> value; deduped, explicit name beats alias
     let hasHref = false;
     let hasPointerEvents = false;
     let vectorEffect = null;
-
-    const isSafeHref = (value) => {
-      const cleaned = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim();
-      return /^(https?:|mailto:|tel:|\/|#)/i.test(cleaned);
-    };
 
     // The two computed values the library publishes first, then everything the
     // author wrote. Two bags have no order between them, so the order is stated
@@ -161,9 +161,9 @@ export class BlissElement {
     for (const [key, value, isAlias] of emitted) {
       if (INTERNAL_OPTIONS.has(key) || !isSafeAttributeName(key)) continue;
 
-      if (anchorAttrNames.has(key)) {
+      if (ANCHOR_ATTRIBUTE_NAMES.includes(key)) {
         if (key === 'href') {
-          if (!isSafeHref(value)) continue;
+          if (!BlissElement.isSafeHref(value)) continue;
           hasHref = true;
         }
         anchorAttrs.push(`${key}="${value}"`);
@@ -481,23 +481,11 @@ export class BlissElement {
         const hasTaggedContent = childContents.some(c => c.startsWith('<'));
         const hasRawContent = childContents.some(c => !c.startsWith('<'));
 
-        const content = hasTaggedContent && hasRawContent
+        // Nothing is wrapped here: every global option, the link included,
+        // is written by the builder around the content group.
+        return hasTaggedContent && hasRawContent
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
-
-        // At level 0 (sentence/global), only pass anchor attributes to #wrapWithAnchorAndGroup
-        // SVG-level attributes (stroke-width, color, etc.) are handled by the SVG builder,
-        // so no computed value is offered here at all: the whole anchor family
-        // is uncurated, and therefore lives in the author's bag.
-        const anchorAttrNames = new Set(['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy']);
-        const filteredOptions = {};
-        for (const [key, value] of Object.entries(this.#blissObj.authoredOptions ?? {})) {
-          if (anchorAttrNames.has(key)) {
-            filteredOptions[key] = value;
-          }
-        }
-
-        return BlissElement.#wrapWithAnchorAndGroup(content, null, filteredOptions);
       };
     } else if (this.#level === 1) {
       // Group level

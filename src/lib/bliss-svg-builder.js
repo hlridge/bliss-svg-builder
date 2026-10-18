@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -117,20 +117,24 @@ function serializeOptionsWithPosition(node, skipKeys) {
   return serializeOptions({ ...position, ...node.options }, skipKeys);
 }
 
-// The anchor-attribute family, mirroring the two anchorAttrNames sets inside
-// BlissElement (keep all three in sync: a name added there but not here would
-// leak onto the content <g>). At global scope these travel through the level-0 <a> wrap
-// (with its href safety allowlist), so they must never double-emit as plain
-// content-<g> attributes: href is not a valid <g> attribute, and an
-// allowlist-rejected href would resurface verbatim.
-// Exported so the attribute-vocabulary test can assert the vocabulary still covers
-// every routed name. A restated copy there would only ever catch itself moving.
-export const ANCHOR_ATTRIBUTE_NAMES = ['href', 'target', 'rel', 'download', 'hreflang', 'type', 'referrerpolicy'];
-
 // Renders one layer's attribute map as markup. An empty map yields an empty
 // string, so a tag built from it closes without a stray space.
 const formatAttributes = (attrs) =>
   Object.entries(attrs).map(([name, value]) => `${name}="${value}"`).join(' ');
+
+// A written viewBox as four numbers, or undefined when it does not read as
+// one: four values separated by whitespace or commas, each finite, and a size
+// that is not negative (a negative one voids the attribute in SVG). Nothing
+// written (undefined) reads as no viewBox, like any other non-number. Lenient
+// beyond that on purpose. Reading a value a renderer then refuses costs
+// nothing, since the renderer ignores the viewBox and the placement with it;
+// refusing one a renderer reads leaves the paper short of the picture.
+const parseViewBox = (written) => {
+  const numbers = String(written).trim().split(/[\s,]+/).map(Number);
+  if (numbers.length !== 4 || !numbers.every(Number.isFinite)) return undefined;
+  const [x, y, width, height] = numbers;
+  return width >= 0 && height >= 0 ? { x, y, width, height } : undefined;
+};
 
 // A layer's structural classes are the library's identifier for that element,
 // so an authored class is APPENDED to them and never replaces them: replacing
@@ -273,11 +277,13 @@ class BlissSVGBuilder {
   // Where the global walk puts each global key, rebuilt together on every pass:
   // the root <svg>'s attributes, the content group's, the `<target>--<attribute>`
   // values for every other target (grouped by target and applied at that
-  // target's emission point), and a bare vector-effect for the content's paths.
+  // target's emission point), a bare vector-effect for the content's paths,
+  // and the link attributes for the <a> around the content group.
   #rootAttributes = {};
   #contentAttributes = {};
   #layerAttributes = {};
   #globalVectorEffect;
+  #globalAnchorAttributes = {};
   #sharedOptions;
   #mutationCtx;
   #warnings = [];
@@ -1852,6 +1858,7 @@ class BlissSVGBuilder {
     this.#contentAttributes = {};
     this.#layerAttributes = {};
     this.#globalVectorEffect = undefined;
+    this.#globalAnchorAttributes = {};
     // One setter per element a key can land on, so a collision is judged where
     // two values would meet and nowhere else: `root--stroke` beside `color`
     // reaches two elements and collides with nothing, while `content--stroke`
@@ -2011,9 +2018,13 @@ class BlissSVGBuilder {
         });
         continue;
       }
-      // The level-0 element builds the global <a> from these, reading them from
-      // the options bag, so no element here carries them.
-      if (ANCHOR_ATTRIBUTE_NAMES.includes(attrName)) continue;
+      // The link attributes go on the <a> the emitter draws around the content
+      // group, and only when the href is one a link may carry; no element here
+      // carries them.
+      if (ANCHOR_ATTRIBUTE_NAMES.includes(attrName)) {
+        this.#globalAnchorAttributes[attrName] = value;
+        continue;
+      }
       // vector-effect is not inherited, so on a group it would be a dead
       // attribute; it is relocated onto the content's paths, where it takes
       // effect. That repairs the library's OWN default destination, so it
@@ -6207,6 +6218,13 @@ class BlissSVGBuilder {
 
     const round = (num) => parseFloat(num.toFixed(4));
 
+    // The viewBox the root carries: the author's when it reads as one, else
+    // the computed one. What covers the whole picture (the paper, the zones,
+    // the global link's rect) is placed from it, so a written viewBox leaves
+    // no strip of the picture uncovered.
+    const viewBox = parseViewBox(this.#rootAttributes.viewBox)
+      ?? { x: viewBoxX, y: viewBoxY, width: viewBoxWidth, height: viewBoxHeight };
+
     const svgTitle = this.#processedOptions.svgTitle ?? "";
     const svgDesc = this.#processedOptions.svgDesc ?? "";
     const background = this.#processedOptions.background ?? "";
@@ -6246,14 +6264,14 @@ class BlissSVGBuilder {
       const topColor = backgroundTop || bulkBg;
       const midColor = backgroundMid || bulkBg;
       const bottomColor = backgroundBottom || bulkBg;
-      const zoneX = round(viewBoxX);
-      const zoneWidth = round(viewBoxWidth);
-      const topY = round(viewBoxY);
-      // Zone heights floor at 0 like the outer viewBox dimensions above: an
-      // ordinary vertical crop can push the viewBox past the sky (y=8) or
-      // earth (y=16) boundary, and a negative height is invalid SVG on <rect>.
-      const topHeight = round(Math.max(0, 8 - viewBoxY));
-      const bottomHeight = round(Math.max(0, viewBoxY + viewBoxHeight - 16));
+      const zoneX = round(viewBox.x);
+      const zoneWidth = round(viewBox.width);
+      const topY = round(viewBox.y);
+      // Zone heights floor at 0 like the outer viewBox dimensions: an ordinary
+      // vertical crop can push the viewBox past the sky (y=8) or earth (y=16)
+      // boundary, and a negative height is invalid SVG on <rect>.
+      const topHeight = round(Math.max(0, 8 - viewBox.y));
+      const bottomHeight = round(Math.max(0, viewBox.y + viewBox.height - 16));
 
       const zoneRect = (classes, y, height, fill) =>
         `    <rect ${formatAttributes(layerAttributes(classes,
@@ -6269,7 +6287,7 @@ class BlissSVGBuilder {
       backgroundContent = `${backgroundWrapper}\n${zoneRects}\n  </g>`;
     } else if (background !== "") {
       const paper = `    <rect ${formatAttributes(layerAttributes(ELEMENT_CLASSES.backgroundZone,
-        { x: viewBoxX, y: viewBoxY, width: '100%', height: '100%', stroke: 'none', fill: background },
+        { x: viewBox.x, y: viewBox.y, width: '100%', height: '100%', stroke: 'none', fill: background },
         authoredFor(ELEMENT_CLASSES.backgroundZone)))}/>`;
       backgroundContent = `${backgroundWrapper}\n${paper}\n  </g>`;
     }
@@ -6393,6 +6411,25 @@ class BlissSVGBuilder {
     const contentInner = this.#globalVectorEffect
       ? BlissElement.applyVectorEffectToPaths(content, this.#globalVectorEffect)
       : content;
+    const contentGroup = [
+      `  <g ${formatAttributes(contentAttrs)}>`,
+      `    ${contentInner}`,
+      '  </g>',
+    ];
+
+    // A global link wraps the content group from outside, so the whole symbol
+    // is one link, and its first child is a transparent rect over the viewBox:
+    // a link is hit only where something paints, and the rect paints every
+    // point without showing (`transparent` is a paint, `none` is not). An href
+    // that is missing or refused builds no link, and its attributes go with it.
+    const anchor = this.#globalAnchorAttributes;
+    const symbol = BlissElement.isSafeHref(anchor.href) ? [
+      `  <a ${formatAttributes(anchor)} style="cursor: pointer;">`,
+      `    <rect ${formatAttributes({ x: round(viewBox.x), y: round(viewBox.y), width: '100%',
+        height: '100%', fill: 'transparent', stroke: 'none' })}/>`,
+      ...contentGroup.map((line) => `  ${line}`),
+      '  </a>',
+    ] : contentGroup;
 
     let svgStr = [
       `<svg ${formatAttributes(rootAttrs)}>`,
@@ -6400,9 +6437,7 @@ class BlissSVGBuilder {
       desc,
       backgroundContent,
       gridPath,
-      `  <g ${formatAttributes(contentAttrs)}>`,
-      `    ${contentInner}`,
-      '  </g>',
+      ...symbol,
       svgText,
       '</svg>',
     ].filter(Boolean).join('\n');
