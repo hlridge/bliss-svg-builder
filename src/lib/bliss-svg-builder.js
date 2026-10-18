@@ -3222,8 +3222,8 @@ class BlissSVGBuilder {
    * Returns a portable DSL string. Custom codes are decomposed to built-in
    * codes by default. `preserve` keeps a custom name that stands for a
    * single glyph, indicator, or shape: every typed definition (whatever its
-   * anatomy) and every bare alias renaming one existing code; multi-code
-   * shorthand always serializes expanded.
+   * anatomy) and every bare alias of one existing code, with or without a
+   * position; multi-code shorthand always serializes expanded.
    *
    * @param {Object} [options]
    * @param {boolean} [options.preserve=false] - Keep custom glyph/shape code names

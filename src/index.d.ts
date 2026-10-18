@@ -167,13 +167,15 @@ export interface ElementSnapshot {
   /**
    * The input code that produces this element (e.g. `'B431'`, `'Xa'`, `'H'`).
    * At part level, the structural lookup key the user would write (`'B81'`,
-   * `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`). At glyph level, the input
-   * code only when the glyph is actually a glyph: B-codes (`'B431'`), single
-   * X-codes (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases
-   * (`'LOVE'`); `''` for composites, bare shape primitives, and
-   * multi-character text fallback. Always `''` at group level. Note: this is
-   * the live identity; what serialized output emits for a custom name is
-   * governed by `toString()`/`toJSON()` and their `preserve` option.
+   * `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`); a part written through a bare
+   * alias of one code gives the code the alias resolves to (`'B431'` for
+   * `MYCODE`, an alias of `B431`). At glyph level, the input code only when
+   * the glyph is actually a glyph: B-codes (`'B431'`), single X-codes
+   * (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases (`'LOVE'`); `''`
+   * for composites, bare shape primitives, and multi-character text
+   * fallback. Always `''` at group level. Note: this is the live identity;
+   * what serialized output emits for a custom name is governed by
+   * `toString()`/`toJSON()` and their `preserve` option.
    */
   readonly codeName: string;
   /**
@@ -257,13 +259,15 @@ export declare class ElementHandle {
   /**
    * The input code that produces this element (e.g. `'B431'`, `'Xa'`, `'H'`).
    * At part level, the structural lookup key the user would write (`'B81'`,
-   * `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`). At glyph level, the input
-   * code only when the glyph is actually a glyph: B-codes (`'B431'`), single
-   * X-codes (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases
-   * (`'LOVE'`); `''` for composites, bare shape primitives, and
-   * multi-character text fallback. Always `''` at group level. Note: this is
-   * the live identity; what serialized output emits for a custom name is
-   * governed by `toString()`/`toJSON()` and their `preserve` option.
+   * `'H'`, `'Xa'`, `'TSP'`, `'Xα'`, `'Xhαllo'`); a part written through a bare
+   * alias of one code gives the code the alias resolves to (`'B431'` for
+   * `MYCODE`, an alias of `B431`). At glyph level, the input code only when
+   * the glyph is actually a glyph: B-codes (`'B431'`), single X-codes
+   * (`'Xa'`, `'Xα'`), or `define()`d `type:'glyph'` aliases (`'LOVE'`); `''`
+   * for composites, bare shape primitives, and multi-character text
+   * fallback. Always `''` at group level. Note: this is the live identity;
+   * what serialized output emits for a custom name is governed by
+   * `toString()`/`toJSON()` and their `preserve` option.
    */
   readonly codeName: string;
 
@@ -793,9 +797,10 @@ export interface BareDefinition {
    * Options for every part the alias draws, in every character of every word
    * it spells, never for the character itself. Where the alias names one code
    * they stay with that code as a glyph's own options do (see
-   * {@link GlyphDefinition.defaultOptions}); where it spells several codes
-   * they are ordinary options of the parts, which a clear removes. The keys a
-   * glyph definition refuses are refused here too.
+   * {@link GlyphDefinition.defaultOptions}) wherever the alias is used, a part
+   * included, and win over the options that code brings; where it spells
+   * several codes they are ordinary options of the parts, which a clear
+   * removes. The keys a glyph definition refuses are refused here too.
    */
   defaultOptions?: BlissOptions;
 }
@@ -1276,13 +1281,13 @@ export declare class BlissSVGBuilder {
    * function, or an external glyph, has no built-in form and keeps its name.
    * `{ preserve: true }` keeps a custom name that stands for a single glyph,
    * indicator, or shape: every `type`d definition (whatever its anatomy) and
-   * every bare alias renaming one existing code; multi-code shorthand always
-   * serializes expanded. A name is kept only where reading it back draws what
-   * you have: a change made where the name is used is written beside it
-   * (`[color=blue]>MYGLYPH`, `MYGLYPH:3,4`, `MYGLYPH;B81`), the options its
-   * definition gives are not repeated, and a glyph the name no longer
-   * describes (such as a composition object whose parts are not the ones the
-   * definition draws) is written out in full.
+   * every bare alias of one existing code, with or without a position;
+   * multi-code shorthand always serializes expanded. A name is kept only
+   * where reading it back draws what you have: a change made where the name
+   * is used is written beside it (`[color=blue]>MYGLYPH`, `MYGLYPH:3,4`,
+   * `MYGLYPH;B81`), the options its definition gives are not repeated, and a
+   * glyph the name no longer describes (such as a composition object whose
+   * parts are not the ones the definition draws) is written out in full.
    *
    * A position or a head marker appears where needed to keep an indicator
    * where it was drawn: on an indicator the built-in codes alone would draw

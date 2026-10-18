@@ -78,7 +78,7 @@ new BlissSVGBuilder('B2661').toJSON();
 
 For output like this the receiver doesn't need your definitions: it is built-in codes all the way down, wherever a custom code was used, a part of another character included. Where those codes alone would draw an indicator somewhere else than your code did, the output also says where it goes: a position on the indicator, or a head marker (`^`) on the character that carries a word's `;;` indicators. Not every name can decompose, though: a `getPath` primitive has no built-in form, so it keeps its name even in default output and needs its `define()` wherever the output is read; see [Serializing Custom Indicators and Shapes](#serializing-custom-indicators-and-shapes).
 
-If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. `preserve` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias that renames one existing code. A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`:
+If you're serializing for your own use (where the custom codes are defined), `{ preserve: true }` keeps custom names in the output. `preserve` keeps a custom name when the name stands for a single glyph, indicator, or shape. That covers every code defined with a `type` (such a definition is itself a glyph, indicator, or shape, whatever its anatomy) and every bare alias of one existing code, with or without a position (a `codeString` of `B431` or `B431:1,0`). A `codeString` that combines several codes is shorthand for the composition it spells out; shorthand always serializes expanded, with or without `preserve`:
 
 ```js
 new BlissSVGBuilder('LOVE').toString({ preserve: true });
@@ -279,7 +279,7 @@ builder.toString();                    // '[color=blue][color=red]>B291;B81'
 builder.toString({ preserve: true });  // '[color=blue]REDGLYPH;B81'
 ```
 
-An alias's options work the same way on every part it draws, in every character of every word it spells: `{ codeString: 'B291/C8', defaultOptions: { color: 'red' } }` comes back as `[color=red]>B291/[color=red]>C8`. Where an alias stands for one code, its options stay with that code as a glyph's do. Where it spells several codes, it is shorthand, so once spelled out its options are ordinary options of those parts, and a clear removes them.
+An alias's options work the same way on every part it draws, in every character of every word it spells: `{ codeString: 'B291/C8', defaultOptions: { color: 'red' } }` comes back as `[color=red]>B291/[color=red]>C8`. Where an alias stands for one code, its options stay with that code as a glyph's do, and they win over the options that code brings. The alias is that code wherever you write it: with `BLUEGLYPH` defined `{ codeString: 'REDGLYPH', defaultOptions: { color: 'blue' } }`, the glyph draws blue in `BLUEGLYPH`, in `B313;BLUEGLYPH`, at `BLUEGLYPH:1,0` and added with `addPart('BLUEGLYPH')`, and a part bracket where you use it wins over both definitions (`[color=green]>BLUEGLYPH` draws green). Where it spells several codes, it is shorthand, so once spelled out its options are ordinary options of those parts, and a clear removes them.
 
 ## Serializing Custom Indicators and Shapes
 
