@@ -24,8 +24,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   an unsafe name), see `BlissSVGBuilder.layer-attribute-refusals.test.js`,
  *   and what such a key reports below global scope, see
  *   `BlissSVGBuilder.name-refusal-scope.test.js`.
- * - Bare global attributes, which target the root, see
- *   `BlissSVGBuilder.svg-structure.test.js`.
+ * - Bare global attributes, which land on the content group or, for the
+ *   attributes that describe the image, on the root, see
+ *   `BlissSVGBuilder.global-placement.test.js`.
  * - Verbatim attribute-name emission, see
  *   `BlissSVGBuilder.attribute-name-fidelity.test.js`.
  */
@@ -77,8 +78,8 @@ describe('BlissSVGBuilder layer attributes', () => {
       const named = new BlissSVGBuilder('[color=red]||B291').svgCode;
 
       expect(contentTag(raw)).toContain('color="red"');
-      expect(contentTag(raw)).not.toContain('stroke=');
-      expect(rootTag(named)).toContain('stroke="red"');
+      expect(contentTag(raw)).not.toContain('stroke="red"');
+      expect(contentTag(named)).toContain('stroke="red"');
       expect(named).not.toContain('color="red"');
     });
 

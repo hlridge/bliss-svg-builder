@@ -101,6 +101,14 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
  * container carries it too and an authored value MERGES there, so reporting it
  * would report a live feature.
  *
+ * The root is a container by the same rule: its emitter stamps the five paint
+ * defaults on the content group, so a `root--stroke` is beaten there by the
+ * content group's own `stroke`, and `content--` is what reaches it. The grid
+ * lines and the paper set their own paint too, so nothing the library draws
+ * shows the root's value. A layer added later outside the content group (the
+ * coming text layer) must set each of these names itself, or the report stops
+ * being true for the names it leaves out.
+ *
  * STATIC, not computed from what was actually drawn: a container whose children
  * are all cropped away would have no triggers, so the warning would fall silent
  * in exactly the configuration where it is most needed.
@@ -124,6 +132,8 @@ export const CONTAINER_SHADOWED_ATTRIBUTES = new Map([
                    childTarget: 'grid-line' }],
   ['background', { names: ['x', 'y', 'width', 'height', 'stroke', 'fill'],
                    childTarget: 'background-zone' }],
+  ['root',       { names: ['fill', 'stroke', 'stroke-linejoin', 'stroke-linecap', 'stroke-width'],
+                   childTarget: 'content' }],
 ]);
 
 /** The `bliss-` prefix every structural class carries and no target repeats. */
@@ -140,12 +150,14 @@ export const targetOfClass = (className) => className.slice(CLASS_PREFIX.length)
  * membership at the emitters, so a target is silent when its class exists and
  * nothing drew it, and reported when no element could ever carry it.
  *
- * `root` is in here even though a bare key already reaches the root. C8 dropped
- * `svg--` on the rule that a second spelling for one target is a duplicate;
- * that rule is knowingly outweighed, because the value of this vocabulary is
- * that every class the library writes is addressable, and an exception for the
- * outermost element is the one a reader would trip on. The collision it creates
- * is resolved where the root's attributes are built, and reported.
+ * `root` is in here even though a bare key already reaches the root for the
+ * attributes that describe the image (`isImageAttribute`). An `svg--` spelling
+ * was dropped on the rule that a second spelling for one target is a
+ * duplicate; that rule is knowingly outweighed, because the value of this
+ * vocabulary is that every class the library writes is addressable, and an
+ * exception for the outermost element is the one a reader would trip on. The
+ * collision it creates is resolved where the root's attributes are built, and
+ * reported.
  */
 export const LAYER_TARGETS = new Set(
   Object.values(ELEMENT_CLASSES).flat().map(targetOfClass)
@@ -191,6 +203,39 @@ export const LIBRARY_OWNED_ROOT_ATTRIBUTES = new Set(['data-generator']);
 /** Whether a written name is the root stamp, judged like the set above. */
 export const isLibraryOwnedRootAttribute = (name) =>
   LIBRARY_OWNED_ROOT_ATTRIBUTES.has(String(name).toLowerCase());
+
+/**
+ * The attributes that describe the IMAGE rather than style the drawing. A bare
+ * global key with one of these names goes on the root `<svg>`; every other bare
+ * global key styles the symbol and goes on its content group.
+ *
+ * Closed on purpose: an open table of SVG semantics is what this module
+ * refuses to build. A name left off styles the symbol, which is what nearly
+ * every attribute is for, and what a name of the author's own is assumed to be.
+ * - `role`, `aria-*`: assistive technology reads them on the image, not on a
+ *   group inside it.
+ * - `id`, `class`, `data-*`: they name the image for a page's scripts and
+ *   styles, or record something about it.
+ * - `lang`: the language of the image's title and description.
+ * - `tabindex`: the image is what takes focus.
+ * - `preserveAspectRatio`, `overflow`, `viewBox`, `width`, `height`: the
+ *   viewport's own, and meaningless on a group.
+ * SVG 1.1's other root-only names (`version`, `baseProfile`, `zoomAndPan`,
+ * `contentScriptType`, `contentStyleType`) are left off: they do nothing on
+ * either element, so listing them would promise more than it delivers.
+ *
+ * Judged on the STORED name, which the vocabulary has already resolved
+ * (`TabIndex` is stored as `tabindex`, `ariaLabel` as `aria-label`). XML names
+ * are case-sensitive, so `Role` and `dataX` are names of the author's own.
+ */
+const IMAGE_ATTRIBUTES = new Set([
+  'role', 'id', 'class', 'lang', 'tabindex',
+  'preserveAspectRatio', 'overflow', 'viewBox', 'width', 'height',
+]);
+
+/** Whether a stored attribute name describes the image (the list above). */
+export const isImageAttribute = (name) =>
+  IMAGE_ATTRIBUTES.has(name) || name.startsWith('aria-') || name.startsWith('data-');
 
 /**
  * The written options whose whole job is to compute the root's `viewBox`. When
@@ -802,12 +847,13 @@ export const WARNING_CODES = Object.freeze({
   // markup that looks like a working link and is not one.
   MISPLACED_LINK_ATTRIBUTE: 'MISPLACED_LINK_ATTRIBUTE',
   // an attribute that reached a container whose children each carry the same
-  // name, so the child's value is the one that takes effect and the written one
-  // cannot show. Two mechanisms, one remedy: an inherited paint value is beaten
-  // by the child's own, while geometry a group cannot carry is inert there. It
-  // is still emitted where it was asked for; the report names the target that
-  // works. Silent when the container is not drawn, since there is then no
-  // landing site to describe.
+  // name (for the root, a paint name the content group carries), so the child's
+  // value is the one that takes effect and the written one cannot show. Two
+  // mechanisms, one remedy: an inherited paint value is beaten by the child's
+  // own, while geometry a group cannot carry is inert there. It is still
+  // emitted where it was asked for; the report names the target that works.
+  // Silent when the container is not drawn, since there is then no landing
+  // site to describe.
   MISPLACED_CONTAINER_ATTRIBUTE: 'MISPLACED_CONTAINER_ATTRIBUTE',
   // a coordinate (`:x,y`) or an option (`[opts]` at any scope) on a TSP/QSP
   // space: a space is a pure word-separator with no ink to position or style,
@@ -866,8 +912,9 @@ export const WARNING_CODES = Object.freeze({
   // not a conflict and stays silent.
   MULTIPLE_GEOMETRY_VALUES: 'MULTIPLE_GEOMETRY_VALUES',
   // one attribute written twice for one element: a bare global key and the
-  // `root--` spelling of the same attribute, or a curated option and a raw key
-  // that reach the same attribute on the same element. The key that NAMES its
+  // `root--` or `content--` spelling of the same attribute, whichever names the
+  // element the bare key lands on, or a curated option and a raw key that
+  // reach the same attribute on the same element. The key that NAMES its
   // target wins, because it states a destination where the other has to be
   // resolved to one, and the displaced key is named. It reports more-than-one
   // rather than value-lost, so two equal values still raise it. Silent when the
@@ -1297,11 +1344,14 @@ export const unsafeAttributeNameMessage = (key) =>
 // we know perfectly well, and `--x` names none at all. The same split
 // `parseLayerAttributeKey` makes, so the reason reported is the reason the key
 // was actually rejected. The closing advice says where the attribute lands
-// when written with no prefix, which is the root only in the global bracket:
-// anywhere lower it lands on the element it is written on.
+// when written with no prefix: below the global bracket, on the element it is
+// written on; in it, on the symbol, or on the root <svg> for an attribute that
+// describes the image, by the list the global walk routes a bare key with.
 const unresolvedLayerKeyMessage = (key, level) => {
-  const layer = key.slice(0, key.lastIndexOf('--'));
-  const bareLandsOn = level === 'global' ? 'the root' : 'this element';
+  const separator = key.lastIndexOf('--');
+  const layer = key.slice(0, separator);
+  const bareLandsOn = level !== 'global' ? 'this element'
+    : isImageAttribute(key.slice(separator + 2)) ? 'the root <svg>' : 'the symbol';
   const targets = `A target is a class the library writes, without the "bliss-" prefix, and the attribute follows the LAST "--": ${[...LAYER_TARGETS].join(', ')}. Write the attribute with no prefix to put it on ${bareLandsOn}.`;
   if (!LAYER_TARGETS.has(layer)) {
     return layer === ''

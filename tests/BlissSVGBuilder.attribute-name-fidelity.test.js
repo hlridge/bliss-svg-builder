@@ -77,11 +77,11 @@ describe('BlissSVGBuilder attribute name fidelity', () => {
     // rather than assumed: it is the one key the library both computes and
     // publishes under another name, so a rename reaching the author's half
     // leaves one surface half-working, setting stroke-width while computing
-    // nothing. Measured in that state: `<svg … stroke-width="1">` with the dot
+    // nothing. Measured in that state: `<g class="bliss-content" … stroke-width="1">` with the dot
     // unchanged.
     it('converts it when it is the options argument', () => {
       const builder = new BlissSVGBuilder('B4', { strokeWidth: 1 });
-      expect(builder.svgCode).toMatch(/<svg[^>]*\sstroke-width="1"/);
+      expect(builder.svgCode).toMatch(/<g class="bliss-content"[^>]*\sstroke-width="1"/);
       expect(builder.svgCode).not.toContain('strokeWidth');
     });
 

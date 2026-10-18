@@ -67,9 +67,9 @@ const codes = (builder) => builder.warnings.map((w) => w.code);
 const globalForm = (key) => reports(new BlissSVGBuilder(`[${key}=x]||B291`));
 
 // A bare attribute written below global scope lands on the element it is
-// written on, so the one sentence of the global wording that names the root
+// written on, so the one sentence of the global wording that names the symbol
 // names this element instead.
-const belowGlobal = (report) => ({ ...report, message: report.message.replace('put it on the root.', 'put it on this element.') });
+const belowGlobal = (report) => ({ ...report, message: report.message.replace('put it on the symbol.', 'put it on this element.') });
 
 const saves = (builder) => `${builder.toString()} ${JSON.stringify(builder.toJSON())}`;
 
@@ -115,12 +115,12 @@ describe('BlissSVGBuilder name refusal scope', () => {
     });
 
     it('closes an unknown target with advice that is true where it was written', () => {
-      // note: the global wording sends a bare attribute to the root, which is
-      // where it lands only when written in the global bracket
+      // note: the global wording sends a bare styling attribute to the symbol,
+      // which is where it lands only when written in the global bracket
       const [report] = reports(new BlissSVGBuilder('[nosuch--fill=x]B291'));
 
       expect(report.message).toMatch(/Write the attribute with no prefix to put it on this element\.$/);
-      expect(globalForm('nosuch--fill')[0].message).toMatch(/Write the attribute with no prefix to put it on the root\.$/);
+      expect(globalForm('nosuch--fill')[0].message).toMatch(/Write the attribute with no prefix to put it on the symbol\.$/);
     });
   });
 

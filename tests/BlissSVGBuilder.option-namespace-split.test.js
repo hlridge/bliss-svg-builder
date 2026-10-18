@@ -103,18 +103,20 @@ describe('BlissSVGBuilder option namespace split', () => {
       // beside it still computes. One bag would put them in each other's way.
       const b = render(objectInput({ myOwnAttr: 'blue', 'stroke-width': 2 }));
       expect(b.svgCode).toContain('myOwnAttr="blue"');
-      expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="2"/);
+      expect(b.svgCode).toMatch(/<g class="bliss-content"[^>]*\sstroke-width="2"/);
       expect(warningsBesidesSpelling(b)).toEqual([]);
     });
 
-    it('collides with the attribute it publishes, exactly as a bracket does', () => {
+    it('reports its root-- twin as shadowed, exactly as a bracket does', () => {
       // While the key was inert this was the row that noticed a rename coming
       // back, and the absence of a warning was the point. `strokeWidth` IS the
-      // curated option on this channel now, so it is the ordinary
-      // curated-versus-named-target collision and the two surfaces agree.
+      // curated option on this channel now, so it lands on the content group as
+      // the curated spelling does, the `root--` twin is the root paint that
+      // group's own value shadows, and the two surfaces agree.
       const b = render(objectInput({ strokeWidth: 2, 'root--stroke-width': 3 }));
-      expect(b.warnings.map((w) => w.code)).toEqual(['MULTIPLE_ATTRIBUTE_VALUES']);
-      expect(b.warnings[0].source).toBe('stroke-width');
+      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_CONTAINER_ATTRIBUTE']);
+      expect(b.warnings[0].source).toBe('root--stroke-width');
+      expect(b.svgCode).toMatch(/<g class="bliss-content"[^>]*\sstroke-width="2"/);
       expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="3"/);
       expect(b.svgCode).not.toContain('strokeWidth');
     });
@@ -156,15 +158,16 @@ describe('BlissSVGBuilder option namespace split', () => {
       expect(b.warnings).toEqual([]);
     });
 
-    it('collides with the attribute it used to be emitted beside', () => {
+    it('reports the root-- twin it used to be emitted beside as shadowed', () => {
       // Before ingest resolved the name these were two different attributes, a
       // camel author key and a `root--` key, and the absence of a warning was
-      // the point. `strokeWidth` is now the curated option, so this is the
-      // ordinary curated-versus-named-target collision and the named target
-      // wins.
+      // the point. `strokeWidth` is now the curated option, so it lands on the
+      // content group, and the `root--` key is the root paint that group's own
+      // value shadows.
       const b = render('[strokeWidth=2;root--stroke-width=3]||B291');
-      expect(b.warnings.map((w) => w.code)).toEqual(['MULTIPLE_ATTRIBUTE_VALUES']);
-      expect(b.warnings[0].source).toBe('stroke-width');
+      expect(b.warnings.map((w) => w.code)).toEqual(['MISPLACED_CONTAINER_ATTRIBUTE']);
+      expect(b.warnings[0].source).toBe('root--stroke-width');
+      expect(b.svgCode).toMatch(/<g class="bliss-content"[^>]*\sstroke-width="2"/);
       expect(b.svgCode).toMatch(/<svg[^>]*\sstroke-width="3"/);
       expect(b.svgCode).not.toContain('strokeWidth');
     });
@@ -280,7 +283,7 @@ describe('BlissSVGBuilder option namespace split', () => {
     });
 
     it.each([
-      ['at the root', '[color=red;stroke-width=2]||B291', /<svg[^>]*\sstroke="red"[^>]*\sstroke-width="2"/],
+      ['on the content group', '[color=red;stroke-width=2]||B291', /<g class="bliss-content"[^>]*\sstroke="red"[^>]*\sstroke-width="2"/],
       ['at element scope', '[color=red;stroke-width=2]B291', /<g stroke-width="2" stroke="red">/],
     ])('reaches the markup %s', (_where, dsl, placed) => {
       // Options PRECEDE the code, so `B291[color=red]` would be an unknown code
@@ -290,11 +293,11 @@ describe('BlissSVGBuilder option namespace split', () => {
       // anywhere in the document: both names inherit down onto the shapes, so a
       // plain `toContain` passes with the values on the wrong element.
       //
-      // The root half pins the paint defaults `#svgCode` writes, NOT this
-      // chunk's published walk, which at the root only registers the two names
-      // so a `root--` key can collide with them; that collision is pinned in
-      // `layer-sub-targets.test.js`. The element half is the walk: nothing else
-      // emits these two below the root.
+      // The global half pins the paint defaults `#svgCode` writes on the content
+      // group, NOT this chunk's published walk, which at global scope only
+      // registers the two names so a `content--` key can collide with them; that
+      // collision is pinned in `global-placement.test.js`. The element half is
+      // the walk: nothing else emits these two below the content group.
       expect(render(dsl).svgCode).toMatch(placed);
       expect(warningsBesidesSpelling(render(dsl))).toEqual([]);
     });
@@ -302,7 +305,7 @@ describe('BlissSVGBuilder option namespace split', () => {
     it.each([
       ['curated first', '[color=red;stroke=blue]'],
       ['raw first', '[stroke=blue;color=red]'],
-    ])('lets a raw name beat a curated one at the root, %s', (_order, bracket) => {
+    ])('lets a raw name beat a curated one on the content group, %s', (_order, bracket) => {
       // Two bags have no order between them, so the order is stated rather than
       // inherited: published pair first, author's keys second. That reproduces
       // the single bag's behaviour, where the options pass rebuilt it with every

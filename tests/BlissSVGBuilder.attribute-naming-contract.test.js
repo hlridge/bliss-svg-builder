@@ -213,16 +213,19 @@ describe('the attribute naming contract', () => {
 
   describe('when published output is read back', () => {
     it.each([
-      ['class 1', '[margin-top=3]||[stroke-width=2]|B291'],
-      ['class 2', '[viewBox=0 0 9 9;aria-label=x]||B291'],
-      ['class 3', '[dataAttr=1;data-attr=2]||B291'],
-      ['class 4', '[root--stroke-width=3]||B291'],
-    ])('re-ingests %s to the same picture, and republishes it unchanged', (_klass, input) => {
+      ['class 1', '[margin-top=3]||[stroke-width=2]|B291', []],
+      ['class 2', '[viewBox=0 0 9 9;aria-label=x]||B291', []],
+      ['class 3', '[dataAttr=1;data-attr=2]||B291', []],
+      // the root's stroke-width is shadowed by the content group's own, and the
+      // report has to come back with the key
+      ['class 4', '[root--stroke-width=3]||B291', ['MISPLACED_CONTAINER_ATTRIBUTE']],
+    ])('re-ingests %s to the same picture, and republishes it unchanged', (_klass, input, codes) => {
       const original = render(input);
       const published = original.toJSON();
       const reingested = new BlissSVGBuilder(published);
 
-      expect(reingested.warnings).toEqual([]);
+      expect(reingested.warnings.map(w => w.code)).toEqual(codes);
+      expect(reingested.warnings).toEqual(original.warnings);
       expect(reingested.svgCode).toBe(original.svgCode);
       // Publication has to be a fixed point, not merely accepted: a transform
       // that moved a name a second time would pass the picture check on the

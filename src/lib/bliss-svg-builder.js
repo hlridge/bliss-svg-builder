@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -270,12 +270,14 @@ const readComposition = (input) => {
 // External consumers always go through src/index.js, where the static is set.
 class BlissSVGBuilder {
   #processedOptions;
-  // Global `<layer>--<attribute>` values, grouped by the layer they name, and
-  // applied at that layer's emission point. Rebuilt with globalSvgAttributes.
+  // Where the global walk puts each global key, rebuilt together on every pass:
+  // the root <svg>'s attributes, the content group's, the `<target>--<attribute>`
+  // values for every other target (grouped by target and applied at that
+  // target's emission point), and a bare vector-effect for the content's paths.
+  #rootAttributes = {};
+  #contentAttributes = {};
   #layerAttributes = {};
-  // Root attribute names that arrived as `root--`, so the render pass can tell
-  // a destination the author named from one the library resolved to.
-  #rootPrefixedNames = new Set();
+  #globalVectorEffect;
   #sharedOptions;
   #mutationCtx;
   #warnings = [];
@@ -1810,8 +1812,11 @@ class BlissSVGBuilder {
     this.#processedOptions = blissObj.options;
 
     // Global options split three ways: the named vocabulary was consumed above,
-    // a `<layer>--<attribute>` key goes to the layer it names, and everything
-    // else goes to the root.
+    // a `<layer>--<attribute>` key goes to the target it names, and a bare key
+    // goes where it applies: the root <svg> for an attribute that describes the
+    // image, the content group for everything else, which styles the symbol.
+    // The grid and the background are never restyled by a bare key; they have
+    // options of their own.
     // The two computed values that also reach the markup, resolved to the names
     // they reach it under. Everything else the library computes is consumed by
     // the emitters, and everything the author wrote is emitted exactly as typed.
@@ -1829,53 +1834,58 @@ class BlissSVGBuilder {
     // The first is what a warning names: kebab-casing exactly these two gives
     // `stroke-width` and `color`, the options an author actually writes.
     //
-    // At the ROOT this walk does not decide the markup, which surprises everyone
-    // who reads it: `#svgCode` builds the root tag from its own paint defaults,
-    // where `stroke` is the computed colour and `stroke-width` the computed
-    // width, and the value this walk writes lands on top of an identical one.
-    // What it decides is the REPORT. Registering the two names here is what lets
-    // a `root--stroke` collide with a curated `color` and say so; delete the
-    // walk and the markup is byte-identical while the collision goes silent.
-    // Element scope is the opposite: there the walk is the only thing that emits
-    // them.
+    // At global scope this walk does not decide the markup, which surprises
+    // everyone who reads it: `#svgCode` builds the content group from its own
+    // paint defaults, where `stroke` is the computed colour and `stroke-width`
+    // the computed width, and the value this walk writes lands on top of an
+    // identical one. What it decides is the REPORT. Registering the two names
+    // here is what lets a `content--stroke` collide with a curated `color` and
+    // say so; delete the walk and the markup is byte-identical while the
+    // collision goes silent. Element scope is the opposite: there the walk is
+    // the only thing that emits them.
     const publishedPairs = [...PUBLICATION_MAP].flatMap(([name, attribute]) =>
       // Own-key test, not `in`, which walks the prototype chain.
       Object.hasOwn(this.#processedOptions, name)
         ? [[camelToKebab(name), attribute, this.#processedOptions[name]]]
         : []);
-    this.globalSvgAttributes = {};
+    this.#rootAttributes = {};
+    this.#contentAttributes = {};
     this.#layerAttributes = {};
-    // Which key wrote each root attribute, and whether it named the root
-    // explicitly. Explicit beats resolved in EITHER order, so this is an
-    // invariant rather than an artifact of the iteration order, the same way
-    // the element emitter resolves an explicit `stroke` against a `color`.
-    const rootAttributeSource = new Map();
-    // Names that arrived as `root--`. The vector-effect relocation reads this:
-    // it repairs the library's own default destination, so it belongs to the
-    // bare channel and never to a key that named the root deliberately.
-    this.#rootPrefixedNames = new Set();
-    const setRootAttribute = (name, key, explicit, value) => {
-      const prior = rootAttributeSource.get(name);
-      // Two bare keys are one channel and keep the silence they have always
-      // had. NOT last-wins, though it reads that way: the walk above visits the
-      // published pair before the author's keys, so a raw `stroke` lands second
-      // and beats a curated `color` whatever order they were written in. The
-      // report exists for the collision this feature creates, between a bare key
-      // and the `root--` spelling of the same attribute.
-      if (prior && (explicit || prior.explicit)) {
-        const winner = explicit ? key : prior.key;
-        const loser = explicit ? prior.key : key;
-        this.#warnings.push({
-          code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
-          message: `"${winner}" and "${loser}" both set "${name}" on the root, and only one value can be written there, so "${winner}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
-          source: loser,
-        });
-        if (!explicit) return;
-      }
-      rootAttributeSource.set(name, { key, explicit });
-      if (explicit) this.#rootPrefixedNames.add(name);
-      this.globalSvgAttributes[name] = value;
+    this.#globalVectorEffect = undefined;
+    // One setter per element a key can land on, so a collision is judged where
+    // two values would meet and nowhere else: `root--stroke` beside `color`
+    // reaches two elements and collides with nothing, while `content--stroke`
+    // beside `color` is two values for one attribute of one element.
+    const attributeSetter = (attributes, element) => {
+      // Which key wrote each attribute, and whether it named the element
+      // explicitly. Explicit beats resolved in EITHER order, so this is an
+      // invariant rather than an artifact of the iteration order, the same way
+      // the element emitter resolves an explicit `stroke` against a `color`.
+      const sources = new Map();
+      return (name, key, explicit, value) => {
+        const prior = sources.get(name);
+        // Two bare keys are one channel and keep the silence they have always
+        // had. NOT last-wins, though it reads that way: the walk below visits
+        // the published pair before the author's keys, so a raw `stroke` lands
+        // second and beats a curated `color` whatever order they were written
+        // in. The report exists for the collision a target prefix creates,
+        // between a bare key and the prefixed spelling of the same attribute.
+        if (prior && (explicit || prior.explicit)) {
+          const winner = explicit ? key : prior.key;
+          const loser = explicit ? prior.key : key;
+          this.#warnings.push({
+            code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
+            message: `"${winner}" and "${loser}" both set "${name}" on ${element}, and only one value can be written there, so "${winner}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
+            source: loser,
+          });
+          if (!explicit) return;
+        }
+        sources.set(name, { key, explicit });
+        attributes[name] = value;
+      };
     };
+    const setRootAttribute = attributeSetter(this.#rootAttributes, 'the root');
+    const setContentAttribute = attributeSetter(this.#contentAttributes, 'the content group');
 
     // Whether the element a target names is painted at all, decided from the
     // processed options exactly as the emitters decide it. A report about what an
@@ -1910,6 +1920,8 @@ class BlissSVGBuilder {
     // here reports whether or not it drew, which is loudly wrong rather than
     // silently inheriting the background's answer.
     const containerIsDrawn = (layer) => {
+      // The root and the content group it wraps are written for every picture.
+      if (layer === 'root') return true;
       if (layer === 'grid') return Boolean(grid);
       if (layer === 'background') return [...backgroundDraws.values()].some(Boolean);
       return true;
@@ -1970,25 +1982,32 @@ class BlissSVGBuilder {
         // emitted where it was asked for, and only the silence about it goes.
         const container = CONTAINER_SHADOWED_ATTRIBUTES.get(target.layer);
         if (container?.names.includes(target.attribute) && containerIsDrawn(target.layer)) {
+          const fix = `${container.childTarget}--${target.attribute}`;
           this.#warnings.push({
             code: WARNING_CODES.MISPLACED_CONTAINER_ATTRIBUTE,
             // What an author can observe, and nothing about the mechanism: the
             // paint names are inherited and the child's own value beats them,
             // while `x`, `y`, `width`, `height` and `d` are geometry a group
             // never carries, so naming inheritance would be false for half the
-            // list.
-            message: `"${key}" was emitted on the ${target.layer} group, but each of its children carries its own "${target.attribute}", and the child's value is the one that takes effect, so the one written on the group never shows. Write "${container.childTarget}--${target.attribute}" to reach the children themselves.`,
+            // list. The root has one child that matters, so it is named.
+            message: target.layer === 'root'
+              ? `"${key}" was emitted on the root <svg>, but the content group carries its own "${target.attribute}", and that is the value that takes effect, so the one written on the root never shows. Write "${fix}" to reach the content group.`
+              : `"${key}" was emitted on the ${target.layer} group, but each of its children carries its own "${target.attribute}", and the child's value is the one that takes effect, so the one written on the group never shows. Write "${fix}" to reach the children themselves.`,
             source: key,
           });
         }
+        // The prefix suspends name RESOLUTION, never name GUARDS, so a prefixed
+        // root or content key has faced every guard the bare branch faces (the
+        // stamp's among them, in the judge above). It goes into the same map
+        // the bare keys build, which is what lets the collision report, the
+        // geometry displacement report and the element's attribute merge see it
+        // without knowing it arrived prefixed.
         if (target.layer === 'root') {
-          // The prefix suspends name RESOLUTION, never name GUARDS, so a
-          // prefixed root key has faced every guard the bare branch faces (the
-          // stamp's among them, in the judge above). It goes into the same set
-          // the bare keys build, which is what lets the geometry displacement
-          // report and the root's attribute merge see it without knowing it
-          // arrived prefixed.
           setRootAttribute(target.attribute, key, true, value);
+          continue;
+        }
+        if (target.layer === 'content') {
+          setContentAttribute(target.attribute, key, true, value);
           continue;
         }
         (this.#layerAttributes[target.layer] ??= {})[target.attribute] = value;
@@ -2003,7 +2022,20 @@ class BlissSVGBuilder {
         });
         continue;
       }
-      setRootAttribute(attrName, key, false, value);
+      // The level-0 element builds the global <a> from these, reading them from
+      // the options bag, so no element here carries them.
+      if (ANCHOR_ATTRIBUTE_NAMES.includes(attrName)) continue;
+      // vector-effect is not inherited, so on a group it would be a dead
+      // attribute; it is relocated onto the content's paths, where it takes
+      // effect. That repairs the library's OWN default destination, so it
+      // belongs to the bare key alone: `content--vector-effect` and
+      // `root--vector-effect` name an element deliberately and stay there as
+      // written, dead, and neither collides with this one.
+      if (attrName === 'vector-effect') {
+        this.#globalVectorEffect = value;
+        continue;
+      }
+      (isImageAttribute(attrName) ? setRootAttribute : setContentAttribute)(attrName, key, false, value);
     }
 
     // A raw target displaces a written curated option when both reach the same
@@ -2046,7 +2078,7 @@ class BlissSVGBuilder {
 
     // A written viewBox states the value the geometry options exist to compute,
     // so it wins and they are named rather than left looking effective.
-    if (this.globalSvgAttributes['viewBox'] && writtenGeometryOptions.length > 0) {
+    if (this.#rootAttributes['viewBox'] && writtenGeometryOptions.length > 0) {
       this.#warnings.push({
         code: WARNING_CODES.MULTIPLE_GEOMETRY_VALUES,
         message: `The viewBox was written directly, so "${writtenGeometryOptions.join('", "')}" no longer shapes it. Remove the viewBox to size the picture with the options, or remove the options to size it by hand.`,
@@ -6199,8 +6231,11 @@ class BlissSVGBuilder {
     let gridPath = "";
     // Never assigned yet, and deliberately kept: two coming features emit a
     // <text> layer here (a caption for the whole SVG, and a gloss under one
-    // word). Whichever lands first must set its own `fill`, because this layer
-    // sits outside the content group and inherits `fill="none"` from the root.
+    // word). This layer sits outside the content group, so it inherits none of
+    // the paint defaults, and it WOULD inherit a paint written as `root--fill`
+    // or `root--stroke`, which the root's entry in CONTAINER_SHADOWED_ATTRIBUTES
+    // reports as never showing. Whichever lands first must set every paint name
+    // in that entry itself.
     let svgText = "";
 
     // The authored attributes for one element: every class it carries, applied
@@ -6332,24 +6367,11 @@ class BlissSVGBuilder {
 
     const generator = LIB_VERSION ? `bliss-svg-builder/${LIB_VERSION}` : 'bliss-svg-builder';
 
-    // The five paint defaults belong to the DOCUMENT, so they sit on the root
-    // beside the author's own global values rather than on an inner group that
-    // would shadow them. They were on the content group so that a DSL-set value
-    // could not be contradicted by a default written above it; moving the
-    // default target moves the defaults with it, same reason at a new address.
-    const paintDefaults = {
-      fill: 'none',
-      stroke: color,
-      'stroke-linejoin': 'round',
-      'stroke-linecap': 'round',
-      'stroke-width': strokeWidth,
-    };
-
     // The root's attributes are a MERGE, not a fixed string, so a user value can
     // replace a computed one rather than appending a duplicate (two width
-    // attributes is invalid XML). Order matters: computed values first, then
-    // anything the author supplied, then the guard for the two names the library
-    // owns.
+    // attributes is invalid XML). Computed values first, then anything the
+    // author supplied; the two names the library owns never arrive, since the
+    // walk refuses them.
     const rootAttrs = {
       xmlns: 'http://www.w3.org/2000/svg',
       'data-generator': generator,
@@ -6357,31 +6379,31 @@ class BlissSVGBuilder {
       height: round(svgHeight),
       viewBox: `${round(viewBoxX)} ${round(viewBoxY)} ${round(viewBoxWidth)} ${round(viewBoxHeight)}`,
       class: ELEMENT_CLASSES.root.join(' '),
-      ...paintDefaults,
-      ...this.globalSvgAttributes,
+      ...this.#rootAttributes,
     };
     // The spread above let an authored `class` overwrite the structural name;
     // put it back in front, keeping the position the literal established.
-    rootAttrs.class = mergeStructuralClass(ELEMENT_CLASSES.root.join(' '), this.globalSvgAttributes['class']);
+    rootAttrs.class = mergeStructuralClass(ELEMENT_CLASSES.root.join(' '), this.#rootAttributes['class']);
 
-    // Link attributes belong to the level-0 anchor wrap, never to a layer.
-    for (const name of ANCHOR_ATTRIBUTE_NAMES) delete rootAttrs[name];
-    // vector-effect is non-inherited, so on the root it would be a dead
-    // attribute; relocate it onto the glyph paths, where it takes effect.
-    // Always remove it (even an empty value); only stamp the paths when there
-    // is a value, matching the element-scope handling in BlissElement.
-    // Relocation repairs the library's OWN default destination, so it belongs
-    // to the bare channel alone. `root--vector-effect` names the root
-    // deliberately and is emitted there verbatim, dead, exactly as
-    // `content--vector-effect` is.
-    let contentInner = content;
-    if ('vector-effect' in rootAttrs && !this.#rootPrefixedNames.has('vector-effect')) {
-      const vectorEffect = rootAttrs['vector-effect'];
-      delete rootAttrs['vector-effect'];
-      if (vectorEffect) contentInner = BlissElement.applyVectorEffectToPaths(content, vectorEffect);
-    }
-
-    const contentAttrs = layerAttributes(ELEMENT_CLASSES.content, {}, authoredFor(ELEMENT_CLASSES.content));
+    // The five paint defaults sit on the content group, where the author's
+    // global styling lands, so a value written globally replaces its default
+    // in place rather than being contradicted by a default on an element below
+    // it. Nothing above the content group sets a paint, so a host page's
+    // `svg { fill: currentColor }` styles the root alone and the content
+    // group's own `fill="none"` keeps the outlines unfilled.
+    const paintDefaults = {
+      fill: 'none',
+      stroke: color,
+      'stroke-linejoin': 'round',
+      'stroke-linecap': 'round',
+      'stroke-width': strokeWidth,
+    };
+    const contentAttrs = layerAttributes(ELEMENT_CLASSES.content, paintDefaults, this.#contentAttributes);
+    // A bare global vector-effect, stamped where it takes effect (see the walk);
+    // only a value stamps, matching the element-scope handling in BlissElement.
+    const contentInner = this.#globalVectorEffect
+      ? BlissElement.applyVectorEffectToPaths(content, this.#globalVectorEffect)
+      : content;
 
     let svgStr = [
       `<svg ${formatAttributes(rootAttrs)}>`,

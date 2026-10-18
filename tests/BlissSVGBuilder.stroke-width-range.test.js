@@ -42,16 +42,16 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The dot-sizing formula itself, see `BlissSVGBuilder.dot-sizing.test.js`.
  */
 
-const rootTag = (svg) => svg.match(/<svg[^>]*>/)[0];
+const contentTag = (svg) => svg.match(/<g class="bliss-content"[^>]*>/)[0];
 const codes = (builder) => builder.warnings.map(w => w.code);
 
 describe('BlissSVGBuilder stroke-width range', () => {
   describe('when the width is negative', () => {
-    it('refuses it and leaves the library default on the root', () => {
+    it('refuses it and leaves the library default on the content group', () => {
       const builder = new BlissSVGBuilder('[stroke-width=-2]||B291');
 
       // was floored to 0, which drew an invisible stroke nobody asked for
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(codes(builder)).toContain('OUT_OF_RANGE_OPTION_VALUE');
     });
 
@@ -61,7 +61,7 @@ describe('BlissSVGBuilder stroke-width range', () => {
 
       expect(warning.source).toBe('stroke-width=-2');
       // the message names no replacement, because nothing is written in place
-      // of a refused value: at the root the library default shows through, and
+      // of a refused value: at global scope the library default shows through, and
       // below it whatever the element inherits does, so naming one would be
       // false at three of the four scopes this option can be written at
       expect(warning.message).toContain('-2');
@@ -75,7 +75,7 @@ describe('BlissSVGBuilder stroke-width range', () => {
       // pins the boundary at 0 rather than at any particular negative value:
       // every other negative case here writes exactly -2, so `written < 0`
       // could be weakened to `written <= -2` and nothing would notice
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(codes(builder)).toContain('OUT_OF_RANGE_OPTION_VALUE');
       expect(builder.svgCode).not.toContain('stroke-width="-0.5"');
     });
@@ -101,7 +101,7 @@ describe('BlissSVGBuilder stroke-width range', () => {
       const builder = new BlissSVGBuilder(input);
 
       // was `<g stroke-width="0">`; nothing is written now, so the element
-      // draws at the width it inherits from the root
+      // draws at the width it inherits from the content group
       expect(builder.svgCode).not.toContain('<g stroke-width=');
       expect(builder.svgCode).not.toContain('stroke-width="-2"');
       expect(codes(builder)).toContain('OUT_OF_RANGE_OPTION_VALUE');
@@ -113,16 +113,16 @@ describe('BlissSVGBuilder stroke-width range', () => {
         groups: [{ glyphs: [{ parts: [{ codeName: 'B291' }] }] }],
       });
 
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(codes(builder)).toContain('OUT_OF_RANGE_OPTION_VALUE');
     });
   });
 
   describe('when the width is not a finite number', () => {
-    it('leaves the library default on the root and reports it', () => {
+    it('leaves the library default on the content group and reports it', () => {
       const builder = new BlissSVGBuilder('[stroke-width=Infinity]||B291');
 
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(codes(builder)).toContain('OUT_OF_RANGE_OPTION_VALUE');
     });
 
@@ -137,9 +137,9 @@ describe('BlissSVGBuilder stroke-width range', () => {
       const builder = new BlissSVGBuilder('[stroke-width=3]||[stroke-width=Infinity]B291');
 
       // nothing is written for the character, so it draws at the width the
-      // root sets, not at the library default; the message must not promise
+      // content group sets, not at the library default; the message must not promise
       // the default here
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="3"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="3"');
       expect(builder.svgCode).not.toContain('<g stroke-width=');
     });
 
@@ -162,7 +162,7 @@ describe('BlissSVGBuilder stroke-width range', () => {
     it('refuses a negative infinity as non-finite rather than as negative', () => {
       const builder = new BlissSVGBuilder('[stroke-width=-Infinity]||B291');
 
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(codes(builder)).toContain('OUT_OF_RANGE_OPTION_VALUE');
       // both arms report the same code, so only the message separates them,
       // and the finiteness check has to run before the negative one or this
@@ -178,7 +178,7 @@ describe('BlissSVGBuilder stroke-width range', () => {
       // was the one member of the family that stayed silent, because the
       // `!isNaN` guard skipped the branch without a word; the gate answers
       // that question and reports it now
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(codes(builder)).toEqual(['INVALID_OPTION_VALUE']);
     });
 
@@ -190,7 +190,7 @@ describe('BlissSVGBuilder stroke-width range', () => {
       // zero against a default of 0.5, both silently and neither typed
       const builder = new BlissSVGBuilder(input);
 
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0.5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0.5"');
       expect(builder.svgCode).toBe(new BlissSVGBuilder('B291').svgCode);
       expect(codes(builder)).toEqual(['INVALID_OPTION_VALUE']);
     });
@@ -209,14 +209,14 @@ describe('BlissSVGBuilder stroke-width range', () => {
     it('accepts zero in silence', () => {
       const builder = new BlissSVGBuilder('[stroke-width=0]||B291');
 
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="0"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="0"');
       expect(builder.warnings).toEqual([]);
     });
 
     it('accepts a width above the retired 1.5 ceiling in silence', () => {
       const builder = new BlissSVGBuilder('[stroke-width=5]||B291');
 
-      expect(rootTag(builder.svgCode)).toContain('stroke-width="5"');
+      expect(contentTag(builder.svgCode)).toContain('stroke-width="5"');
       expect(builder.warnings).toEqual([]);
     });
   });

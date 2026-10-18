@@ -127,10 +127,14 @@ export interface BlissOptions {
   // ARIA standard owns is emitted under that owner's spelling whichever way it
   // was written (`strokeDasharray` and `stroke-dasharray` both set
   // `stroke-dasharray`); a name nobody owns is emitted exactly as written, and a
-  // `<target>--` key is always literal. At global scope a bare key lands on the
-  // root <svg>; `<target>--<attribute>` lands on the elements carrying that
-  // class, where a target is any class the library writes minus the `bliss-`
-  // prefix and the key splits at the LAST `--`
+  // `<target>--` key is always literal. At global scope a bare key styles the
+  // symbol, on its content group, except two kinds: the link attributes
+  // (`href` and its family) make the symbol a link, and the attributes that
+  // describe the image (`role`, `aria-*`, `id`, `class`, `data-*`, `lang`,
+  // `tabindex`, `preserveAspectRatio`, `overflow`, `viewBox`, `width`,
+  // `height`) land on the root <svg>. `<target>--<attribute>` lands on the
+  // elements carrying that class, where a target is any class the library
+  // writes minus the `bliss-` prefix and the key splits at the LAST `--`
   // (`'grid-line--sky--stroke-dasharray': 2`). At element scope the key lands on
   // that element's own <g>; a target prefix has nothing to name there, so it is
   // dropped and reported with `MISPLACED_LAYER_OPTION`, however it was written,

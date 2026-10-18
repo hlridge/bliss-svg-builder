@@ -89,7 +89,7 @@ describe('BlissSVGBuilder attribute collisions', () => {
 
   describe('when attributes do not collide', () => {
     it('keeps each global pass-through attribute emitted once', () => {
-      const tag = rootTag(new BlissSVGBuilder('[fill=blue;opacity=0.5]||H').svgCode);
+      const tag = contentGroupTag(new BlissSVGBuilder('[fill=blue;opacity=0.5]||H').svgCode);
 
       expect(tag).toContain('fill="blue"');
       expect(tag).toContain('opacity="0.5"');

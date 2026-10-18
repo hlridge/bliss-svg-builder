@@ -35,7 +35,7 @@ describe('BlissSVGBuilder structural classes', () => {
     it('leaves the content group named bliss-content', () => {
       const svg = new BlissSVGBuilder('B291').svgCode;
 
-      expect(svg.match(/<g class="bliss-content"[^>]*>/)[0]).toBe('<g class="bliss-content">');
+      expect(svg.match(/<g class="bliss-content"[^>]*>/)[0]).toBe('<g class="bliss-content" fill="none" stroke="#000000" stroke-linejoin="round" stroke-linecap="round" stroke-width="0.5">');
     });
   });
 
