@@ -1946,8 +1946,8 @@ class BlissSVGBuilder {
         // and what makes a camelCase SVG attribute expressible.
         //
         // RAW means we do not rename or reinterpret the attribute. It does not
-        // mean we will help write a file that cannot be parsed, or markup that
-        // reads as a working link and is not one, so the NAME is judged first.
+        // mean we will help write a file that cannot be parsed, so the NAME is
+        // judged first.
         // The judge is the one a key written below global scope is reported
         // by, so the same key says the same thing wherever it is written. A
         // name that declares the document breaks it wherever it lands, so that
@@ -1963,21 +1963,10 @@ class BlissSVGBuilder {
           if (nameRefusal.code !== WARNING_CODES.UNSAFE_ATTRIBUTE_NAME) this.#warnings.push(nameRefusal);
           continue;
         }
+        // No exception for the link attributes: `root--href` names an element
+        // as `root--role` does, and only a bare global `href` builds a link.
         const target = parseLayerAttributeKey(key);
-        // The anchor family has a real destination at the root (the <a> wrap)
-        // and none on a layer, so this guard exists here and nowhere else.
-        if (ANCHOR_ATTRIBUTE_NAMES.includes(target.attribute)) {
-          this.#warnings.push({
-            code: WARNING_CODES.MISPLACED_LINK_ATTRIBUTE,
-            // "target", not "layer": the guard covers every class the library
-            // writes, so calling `grid-line--sky` a layer names it as something
-            // it is not. The root is the one target with a name of its own.
-            message: `"${target.attribute}" only does anything on an <a> element, and ${target.layer === 'root' ? 'the root <svg>' : `the ${target.layer} target`} is not one, so it was dropped instead of being emitted as markup that looks like a working link.`,
-            source: key,
-          });
-          continue;
-        }
-        // Judged after the refusals above, so a name we drop is never also
+        // Judged after the refusal above, so a name we drop is never also
         // described as landing somewhere. No `continue` below it: the value IS
         // emitted where it was asked for, and only the silence about it goes.
         const container = CONTAINER_SHADOWED_ATTRIBUTES.get(target.layer);
@@ -2048,9 +2037,9 @@ class BlissSVGBuilder {
     // know which elements it reached.
     //
     // Read from #layerAttributes and never from the options bag: a refused raw
-    // key (unsafe name, reserved name, link attribute) is still in the bag and
-    // reaches no markup, so the bag would report a displacement that never
-    // happened. The map is what the emitters actually consume.
+    // key (an unsafe or a reserved name) is still in the bag and reaches no
+    // markup, so the bag would report a displacement that never happened. The
+    // map is what the emitters actually consume.
     const displaced = new Map();
     for (const [element, attributes] of Object.entries(CURATED_ATTRIBUTE_SOURCES)) {
       if (!elementIsDrawn(element)) continue;

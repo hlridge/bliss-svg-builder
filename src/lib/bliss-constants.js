@@ -840,12 +840,6 @@ export const WARNING_CODES = Object.freeze({
   // target inside a group, character or part. Dropped there rather than passing
   // through to the markup as a `<g layer--attr="...">` nothing can use.
   MISPLACED_LAYER_OPTION: 'MISPLACED_LAYER_OPTION',
-  // a link attribute (href, target, rel, download, hreflang, type,
-  // referrerpolicy) written for a LAYER. A link is an <a> element wrapping the
-  // content it links; a layer is a plain group or rect and is not one, so the
-  // attribute has nothing to act on and is dropped rather than shipped as
-  // markup that looks like a working link and is not one.
-  MISPLACED_LINK_ATTRIBUTE: 'MISPLACED_LINK_ATTRIBUTE',
   // an attribute that reached a container whose children each carry the same
   // name (for the root, a paint name the content group carries), so the child's
   // value is the one that takes effect and the written one cannot show. Two

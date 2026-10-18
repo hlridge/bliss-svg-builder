@@ -5,8 +5,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Pins the `<target>--<attribute>` channel past layer level: any class the
  * library writes into the markup is a target, spelled without the `bliss-`
  * prefix, and the key splits at the LAST `--`. That reaches the parts inside a
- * layer and the root `<svg>` alike, the root being the one target a bare global
- * key already reaches under another spelling.
+ * layer and the root `<svg>` alike, the root and the content group being the
+ * two targets a bare global key already reaches under another spelling.
  *
  * Covers:
  * - A key naming one grid-line family landing on that family alone, and a key
@@ -22,9 +22,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   that reaches the children is named, the value stays where it was asked for,
  *   and nothing is said where the container is not drawn or the children write
  *   no such attribute.
- * - `root--` naming the outermost element: it beats the bare spelling of the
- *   same attribute in either order and reports `MULTIPLE_ATTRIBUTE_VALUES`, it
- *   faces every guard the bare spelling faces, and it is left out of the
+ * - `root--` naming the outermost element: a paint name there is reported as
+ *   shadowed by the content group's own value, whichever order the bare
+ *   spelling is written in; it faces every guard the bare spelling faces; a
+ *   link attribute is written there as is; and it is left out of the
  *   `vector-effect` relocation the bare channel gets.
  * - `UNKNOWN_LAYER` for a target no class the library writes can supply,
  *   including an author-supplied class, a spelling that keeps the prefix, wrong
@@ -43,6 +44,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.layer-attribute-refusals.test.js`.
  * - The markup shape the targets are named after, see
  *   `BlissSVGBuilder.svg-structure.test.js`.
+ * - A bare global key colliding with its prefixed twin on one element (the
+ *   content group, or the root for an attribute that describes the image), see
+ *   `BlissSVGBuilder.global-placement.test.js`.
  */
 
 // A class is one whitespace-separated TOKEN of the class attribute. Substring or
@@ -50,6 +54,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 // "-" of "bliss-grid-line", so a prefix would match every class that extends it.
 const classesOf = (line) => new Set((line.match(/class="([^"]*)"/)?.[1] ?? '').split(/\s+/));
 const linesWithClass = (svg, cls) => svg.split('\n').filter(l => classesOf(l).has(cls));
+const contentTag = (svg) => svg.match(/<g class="bliss-content[^"]*"[^>]*>/)[0];
 
 describe('BlissSVGBuilder sub-element targets', () => {
   describe('when a key names one grid line family', () => {
@@ -106,58 +111,53 @@ describe('BlissSVGBuilder sub-element targets', () => {
   });
 
   describe('when a key names the root', () => {
-    it('paints the root and not the content group', () => {
-      const svg = new BlissSVGBuilder('[root--fill=red]||B291').svgCode;
+    it('paints the root, leaves the content group its own fill and reports the root value as shadowed', () => {
+      const builder = new BlissSVGBuilder('[root--fill=red]||B291');
 
-      expect(svg.split('\n')[0]).toContain('fill="red"');
-      expect(svg).toContain('<g class="bliss-content">');
+      expect(builder.svgCode.split('\n')[0]).toContain('fill="red"');
+      expect(contentTag(builder.svgCode)).toContain('fill="none"');
+      expect(builder.warnings.map(w => w.code)).toEqual(['MISPLACED_CONTAINER_ATTRIBUTE']);
     });
 
     it.each([
-      ['the curated alias', '[color=red;root--stroke=blue]||B291', 'stroke="blue"', 'color', 'root--stroke'],
+      ['the curated alias', '[color=red;root--stroke=blue]||B291', 'stroke', 'red', 'blue'],
       // NOT a reverse-order row, though it reads like one: the options pass hands
       // every curated key to the split loop first, so this runs the identical
-      // iteration as the row above. The `fill` rows below are what reverse it.
-      ['the curated alias written second', '[root--stroke=blue;color=red]||B291', 'stroke="blue"', 'color', 'root--stroke'],
-      ['two explicit widths', '[stroke-width=2;root--stroke-width=3]||B291', 'stroke-width="3"', 'stroke-width', 'root--stroke-width'],
-    ])('lets the named target beat %s and reports the loser', (_case, input, expected, loser, winner) => {
+      // iteration as the row above
+      ['the curated alias written second', '[root--stroke=blue;color=red]||B291', 'stroke', 'red', 'blue'],
+      ['an explicit width', '[stroke-width=2;root--stroke-width=3]||B291', 'stroke-width', '2', '3'],
+    ])('keeps %s on the content group and reports the root-- value as shadowed', (_case, input, name, bare, prefixed) => {
+      // the two keys reach two elements, so neither displaces the other and
+      // nothing reports MULTIPLE_ATTRIBUTE_VALUES; that collision moved with the
+      // styling to the content group, see global-placement.test.js
       const builder = new BlissSVGBuilder(input);
-      const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
 
-      expect(builder.svgCode.split('\n')[0]).toContain(expected);
-      expect(warning).toBeDefined();
-      // the spelling the author could have written, never the internal camelCase
-      expect(warning.source).toBe(loser);
-      expect(warning.message).not.toContain('strokeWidth');
-      // pins the surviving key by name; "remove whichever you did not mean" is
-      // unusable if the message names the wrong one, and a mutant that swapped
-      // the two survived the whole suite until this line existed
-      expect(warning.message).toContain(`so "${winner}" was used`);
+      expect(contentTag(builder.svgCode)).toContain(` ${name}="${bare}"`);
+      expect(builder.svgCode.split('\n')[0]).toContain(` ${name}="${prefixed}"`);
+      expect(builder.warnings.map(w => w.code)).toEqual(['MISPLACED_CONTAINER_ATTRIBUTE']);
+      expect(builder.warnings[0].source).toBe(`root--${name}`);
     });
 
     it.each([
       ['ahead of it', '[root--fill=red;fill=blue]||B291'],
       ['behind it', '[fill=blue;root--fill=red]||B291'],
-    ])('wins and names the bare key with that key %s', (_case, input) => {
-      // pins explicit-beats-resolved in the loop order the rows above cannot
-      // reach; killed the two mutants that narrowed the collision guard to
-      // `prior && explicit` and dropped its `if (!explicit) return`.
-      // The curated spellings above cannot show this: the options pass hands
-      // every curated key to the split loop BEFORE any raw key, whatever order
-      // they were written in, so `color` and `stroke-width` only ever arrive
-      // bare-first. `fill` is not curated and keeps its written position, which
-      // is the only way to run the loop the other way round
+    ])('keeps both fills on their own elements with the bare key %s', (_case, input) => {
+      // `fill` is not curated and keeps its written position, so these two run
+      // the walk in both orders; the explicit-beats-resolved pins that rode on
+      // them moved to `content--fill`, in global-placement.test.js
       const builder = new BlissSVGBuilder(input);
 
       expect(builder.svgCode.split('\n')[0]).toContain('fill="red"');
-      expect(builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES').source).toBe('fill');
+      expect(contentTag(builder.svgCode)).toContain('fill="blue"');
+      expect(builder.warnings.map(w => w.code)).toEqual(['MISPLACED_CONTAINER_ATTRIBUTE']);
     });
 
-    it('reports a duplicate even when the two values are equal', () => {
-      // MULTIPLE_ reports more-than-one, not value-lost
+    it('reports a root paint as shadowed even when it equals the content group value', () => {
+      // the report says the root's value never shows, which holds whatever the
+      // two values are
       const builder = new BlissSVGBuilder('[fill=red;root--fill=red]||B291');
 
-      expect(builder.warnings.map(w => w.code)).toContain('MULTIPLE_ATTRIBUTE_VALUES');
+      expect(builder.warnings.map(w => w.code)).toEqual(['MISPLACED_CONTAINER_ATTRIBUTE']);
     });
 
     it('leaves two bare keys alone', () => {
@@ -175,13 +175,22 @@ describe('BlissSVGBuilder sub-element targets', () => {
     it.each([
       ['the provenance stamp', '[root--data-generator=mine]||B291', 'RESERVED_ATTRIBUTE_NAME', 'mine'],
       ['the namespace',        '[root--xmlns=x]||B291',             'RESERVED_ATTRIBUTE_NAME', 'xmlns="x"'],
-      ['a link attribute',     '[root--href=https://example.com]||B291', 'MISPLACED_LINK_ATTRIBUTE', 'example.com'],
     ])('refuses %s', (_case, input, code, absent) => {
       const builder = new BlissSVGBuilder(input);
 
       expect(builder.warnings.map(w => w.code)).toContain(code);
       expect(builder.svgCode).toContain('data-generator="bliss-svg-builder');
       expect(builder.svgCode).not.toContain(absent);
+    });
+
+    it('writes a link attribute on the root as written, silently, and builds no link', () => {
+      // `root--` names the root deliberately; only the bare global href builds
+      // an <a>
+      const builder = new BlissSVGBuilder('[root--href=https://example.com]||B291');
+
+      expect(builder.svgCode.split('\n')[0]).toContain(' href="https://example.com"');
+      expect(builder.svgCode).not.toContain('<a ');
+      expect(builder.warnings).toEqual([]);
     });
 
     it('does not relocate a vector-effect that names the root', () => {
@@ -543,10 +552,11 @@ describe('BlissSVGBuilder sub-element targets', () => {
 
     it.each([
       ['a displaced curated option',     '[grid;grid-sky-color=blue;grid-line--stroke=red]||B291', 'MULTIPLE_ATTRIBUTE_VALUES',     'stroke="red"'],
-      ['a duplicated root attribute',    '[fill=red;root--fill=red]||B291',                        'MULTIPLE_ATTRIBUTE_VALUES',     'fill="red"'],
+      ['a duplicated root attribute',    '[role=img;root--role=img]||B291',                        'MULTIPLE_ATTRIBUTE_VALUES',     'role="img"'],
+      ['a shadowed root paint',          '[fill=red;root--fill=red]||B291',                        'MISPLACED_CONTAINER_ATTRIBUTE', 'fill="red"'],
       ['a shadowed container attribute', '[grid;grid--stroke=red]||B291',                          'MISPLACED_CONTAINER_ATTRIBUTE', '<g class="bliss-grid" shape-rendering="crispEdges" stroke="red">'],
     ])('reports %s again after a round trip', (_case, input, code, emitted) => {
-      // nothing is refused in these three: every key is emitted and the picture
+      // nothing is refused in these four: every key is emitted and the picture
       // is unchanged by the round trip. What has to survive is the REPORT, since
       // a stored composition that renders the same way and goes quiet would hide
       // the very thing it was told about

@@ -2,21 +2,19 @@ import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins what the `<target>--<attribute>` channel refuses. The channel is RAW,
- * which means the library does not rename or reinterpret an attribute; it does
- * not mean the library will help write a file that cannot be parsed, or ship
- * an attribute that looks like a working link and is not one. Three refusals,
- * each on its own reason.
+ * Pins what the `<target>--<attribute>` channel refuses, and what it writes as
+ * is. The channel is RAW, which means the library does not rename or
+ * reinterpret an attribute; it does not mean the library will help write a
+ * file that cannot be parsed.
  *
  * Covers:
  * - `xmlns` refused on every layer, not only the root: a second namespace
  *   declaration moves that subtree out of SVG.
  * - `data-generator` left alone on a layer, where it collides with nothing,
  *   and still guarded on the root, where it is the library's own stamp.
- * - The link attributes dropped from every layer with a report, since a link
- *   is an `<a>` element and no layer is one, and the report naming what it
- *   refused: a target for anything inside the picture, the root `<svg>` for the
- *   outermost element.
+ * - The link attributes behind a target, the root's included, written as is
+ *   and in silence like any other attribute behind a prefix, saved as written
+ *   and reloaded silently: only the bare global `href` builds a link.
  * - A key naming a target that does not exist, an empty target half and an
  *   empty attribute half, each reported once, each with its own reason, and
  *   each round-tripping. An attribute name carrying its own `--` joins them,
@@ -102,7 +100,7 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
     it('emits data-generator on the layer, where it collides with nothing', () => {
       const builder = new BlissSVGBuilder('[content--data-generator=me]||B291');
 
-      expect(builder.svgCode).toContain('<g class="bliss-content" data-generator="me">');
+      expect(builder.svgCode).toMatch(/<g class="bliss-content"[^>]* data-generator="me">/);
       expect(codes(builder)).not.toContain('RESERVED_ATTRIBUTE_NAME');
     });
 
@@ -122,60 +120,68 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       ['hreflang', '[content--hreflang=en]||B291'],
       ['type', '[content--type=text]||B291'],
       ['referrerpolicy', '[content--referrerpolicy=no-referrer]||B291'],
-    ])('drops %s from the content layer and reports it', (name, input) => {
+    ])('writes %s on the content group as written, silently', (name, input) => {
       const builder = new BlissSVGBuilder(input);
 
-      expect(builder.svgCode).not.toContain(`${name}=`);
-      expect(codes(builder)).toContain('MISPLACED_LINK_ATTRIBUTE');
+      expect(builder.svgCode).toMatch(new RegExp(`<g class="bliss-content"[^>]* ${name}="`));
+      expect(builder.svgCode).not.toContain('<a ');
+      expect(builder.warnings).toEqual([]);
     });
 
     it.each([
-      ['grid', '[grid;grid--href=https://example.com]||B291'],
-      ['background', '[background=beige;background--href=https://example.com]||B291'],
-    ])('drops href from the %s layer and reports it', (_layer, input) => {
+      ['grid group', '[grid;grid--href=https://example.com]||B291', /<g class="bliss-grid"[^>]* href="https:\/\/example\.com"/],
+      ['background group', '[background=beige;background--href=https://example.com]||B291', /<g class="bliss-background"[^>]* href="https:\/\/example\.com"/],
+      ['sky line', '[grid;grid-line--sky--href=https://example.com]||B291', /class="[^"]*bliss-grid-line--sky"[^>]* href="https:\/\/example\.com"/],
+      ['root', '[root--href=https://example.com]||B291', /<svg [^>]* href="https:\/\/example\.com"/],
+    ])('writes href on the %s as written, silently, and builds no link', (_target, input, placed) => {
+      // a link attribute behind a prefix is an attribute like any other: the
+      // author named where it goes, and only the bare global href builds an <a>
       const builder = new BlissSVGBuilder(input);
 
-      // it was emitted onto a bare <rect> or <g>, which does nothing at all,
-      // so the markup looked like a link that had simply stopped working
-      expect(builder.svgCode).not.toContain('https://example.com');
-      expect(codes(builder)).toContain('MISPLACED_LINK_ATTRIBUTE');
+      expect(builder.svgCode).toMatch(placed);
+      expect(builder.svgCode).not.toContain('<a ');
+      expect(builder.warnings).toEqual([]);
     });
 
-    it('names the attribute and the layer in the warning', () => {
-      const warning = new BlissSVGBuilder('[content--href=https://example.com]||B291').warnings
-        .find(w => w.code === 'MISPLACED_LINK_ATTRIBUTE');
+    it('emits content--href on the content group and on nothing else', () => {
+      const svg = new BlissSVGBuilder('[content--href=https://example.com]||B291').svgCode;
 
-      expect(warning.source).toBe('content--href');
-      expect(warning.message).toContain('href');
-      expect(warning.message).toContain('content');
+      expect(occurrences(svg, 'href=')).toBe(1);
+      expect(rootTag(svg)).not.toContain('href=');
     });
 
-    it('calls a sub-element a target and the root an element', () => {
-      // the guard covers all fourteen targets, so "the grid-line--sky layer"
-      // would name a path as something it is not
-      const messageFor = (input) => new BlissSVGBuilder(input).warnings
-        .find(w => w.code === 'MISPLACED_LINK_ATTRIBUTE').message;
-
-      expect(messageFor('[grid;grid-line--sky--href=https://example.com]||B291'))
-        .toContain('the grid-line--sky target is not one');
-      expect(messageFor('[root--href=https://example.com]||B291'))
-        .toContain('the root <svg> is not one');
-    });
-
-    it('reports the layer spelling even when the layer is not drawn', () => {
+    it('emits nothing and stays silent when the layer is not drawn', () => {
       const builder = new BlissSVGBuilder('[grid--href=https://example.com]||B291');
 
-      expect(codes(builder)).toContain('MISPLACED_LINK_ATTRIBUTE');
+      expect(builder.svgCode).not.toContain('example.com');
+      expect(builder.warnings).toEqual([]);
     });
 
     it('leaves the bare global spelling building its anchor wrap', () => {
       const builder = new BlissSVGBuilder('[href=https://example.com]||B291');
 
       expect(builder.svgCode).toContain('<a href="https://example.com"');
-      expect(codes(builder)).not.toContain('MISPLACED_LINK_ATTRIBUTE');
+      expect(builder.warnings).toEqual([]);
     });
 
-    it('keeps the refused key in the serialized string', () => {
+    it.each([
+      '[content--href=https://example.com]||B291',
+      '[grid;grid--href=https://example.com]||B291',
+      '[background=beige;background--href=https://example.com]||B291',
+      '[grid;grid-line--sky--href=https://example.com]||B291',
+      '[root--href=https://example.com]||B291',
+      '[grid--href=https://example.com]||B291',
+    ])('saves %s as written and reloads it silently to the same picture', (input) => {
+      const builder = new BlissSVGBuilder(input);
+      const reloaded = new BlissSVGBuilder(builder.toString());
+
+      expect(builder.toString()).toBe(input);
+      expect(reloaded.svgCode).toBe(builder.svgCode);
+      expect(reloaded.warnings).toEqual([]);
+      expect(new BlissSVGBuilder(builder.toJSON()).svgCode).toBe(builder.svgCode);
+    });
+
+    it('keeps the key in the serialized string', () => {
       const builder = new BlissSVGBuilder('[content--href=https://example.com]||B291');
 
       expect(builder.toString()).toContain('content--href=https://example.com');
@@ -223,8 +229,16 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
       // wrong spelling it could name is the prefixed one, which this vocabulary
       // refuses (`bliss-grid--opacity` is an UNKNOWN_LAYER row above)
       for (const warning of [unknown, empty]) {
-        expect(warning.message).toContain('Write the attribute with no prefix to put it on the root.');
+        expect(warning.message).toContain('Write the attribute with no prefix to put it on the symbol.');
       }
+    });
+
+    it('sends an attribute that describes the image to the root in the remedy', () => {
+      // a bare global key styles the symbol, except the closed list of
+      // attributes that describe the image, which go on the root <svg>
+      const warning = new BlissSVGBuilder('[foo--role=img]||B291').warnings[0];
+
+      expect(warning.message).toContain('Write the attribute with no prefix to put it on the root <svg>.');
     });
 
     it('does not call the content target unknown when only the attribute is missing', () => {
@@ -252,7 +266,6 @@ describe('BlissSVGBuilder layer attribute refusals', () => {
   describe('when a refused layer key is stored and read back', () => {
     it.each([
       ['a reserved name', '[content--xmlns=x]||B291', 'RESERVED_ATTRIBUTE_NAME'],
-      ['a link attribute', '[content--href=https://example.com]||B291', 'MISPLACED_LINK_ATTRIBUTE'],
       ['an unsafe name', '[content--onclick=alert(1)]||B291', 'UNSAFE_ATTRIBUTE_NAME'],
       ['an unknown layer', '[foo--x=1]||B291', 'UNKNOWN_LAYER'],
       ['an empty layer name', '[--x=1]||B291', 'UNKNOWN_LAYER'],

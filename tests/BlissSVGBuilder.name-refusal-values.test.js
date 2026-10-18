@@ -245,11 +245,11 @@ describe('BlissSVGBuilder name refusal values', () => {
       expect(codes(builder)).toEqual(['INVALID_OPTION_VALUE']);
     });
 
-    it('keeps the hint for a value it can write, which is emitted on the root as written', () => {
+    it('keeps the hint for a value it can write, which is emitted on the content group as written', () => {
       const builder = new BlissSVGBuilder(compositionWith('global', { autoVertical: true }));
 
       expect(codes(builder)).toEqual(['MISPLACED_OPTION_SPELLING']);
-      expect(builder.svgCode).toMatch(/^<svg [^>]*autoVertical="true"/);
+      expect(builder.svgCode).toMatch(/<g class="bliss-content"[^>]*autoVertical="true"/);
       expect(builder.toString()).toBe('[autoVertical]||B291');
     });
   });
@@ -368,11 +368,12 @@ describe('BlissSVGBuilder name refusal values', () => {
   describe('when a key is refused for what it does rather than for its name', () => {
     // note: these names are usable and the report is about the attribute's
     // effect, so a value with no text form is refused as on a name of your own
-    it('refuses a value with no text form on a link attribute behind a target as an ordinary value', () => {
+    it('refuses a value with no text form on a link attribute behind a target as an ordinary value, and writes one with text as written', () => {
       const withText = new BlissSVGBuilder('B291', { 'content--href': 'x' });
 
       expect(codes(new BlissSVGBuilder('B291', { 'content--href': null }))).toEqual(['INVALID_OPTION_VALUE']);
-      expect(codes(withText)).toEqual(['MISPLACED_LINK_ATTRIBUTE']);
+      expect(codes(withText)).toEqual([]);
+      expect(withText.svgCode).toMatch(/<g class="bliss-content"[^>]*href="x"/);
       expect(withText.toString()).toBe('[content--href=x]||B291');
     });
 
