@@ -24,6 +24,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   else first inside the `<a>`; never stamped by `vector-effect`.
  * - Precedence by document order: a part's link after its character's rect, a
  *   later part's link after an earlier one's, a nested link inside its word's.
+ * - A link that holds another link: its content in a bare `<g>`, so no `<a>`
+ *   is ever the direct child of an `<a>`; none added where the outer link has
+ *   its own group, or where it holds no link.
  * - No `pointer-events="bounding-box"` anywhere.
  *
  * Does NOT cover:
@@ -141,7 +144,7 @@ describe('BlissSVGBuilder element link area', () => {
       const svg = new BlissSVGBuilder('[href=#w]|[href=#c]B313').svgCode;
 
       expect(svg).toContain(
-        `${linkOpen('#w')}${hitRect(-1, -1, 10, 22)}${linkOpen('#c')}${hitRect(-1, -1, 10, 22)}${B313}</a></a>`);
+        `${linkOpen('#w')}${hitRect(-1, -1, 10, 22)}<g>${linkOpen('#c')}${hitRect(-1, -1, 10, 22)}${B313}</a></g></a>`);
     });
 
     it('holds no rect when the word has no characters', () => {
@@ -176,7 +179,7 @@ describe('BlissSVGBuilder element link area', () => {
       const svg = new BlissSVGBuilder('[href=#c]B313;[href=#p]>B81').svgCode;
 
       expect(svg).toContain(
-        `${linkOpen('#c')}${hitRect(-1, -1, 10, 22)}${B313}${linkOpen('#p')}${hitRect(2.5, 3.5, 3, 3)}${B81_ON_B313}</a></a>`);
+        `${linkOpen('#c')}${hitRect(-1, -1, 10, 22)}<g>${B313}${linkOpen('#p')}${hitRect(2.5, 3.5, 3, 3)}${B81_ON_B313}</a></g></a>`);
     });
 
     it('lets the later of two overlapping linked parts come last', () => {
@@ -206,6 +209,36 @@ describe('BlissSVGBuilder element link area', () => {
       const svg = new BlissSVGBuilder('[href=#x;vector-effect=non-scaling-stroke]B313').svgCode;
 
       expect(svg).toContain(`${linkOpen('#x')}${hitRect(-1, -1, 10, 22)}<path vector-effect="non-scaling-stroke" d="M0,10`);
+    });
+  });
+
+  describe('when a link holds another link', () => {
+    // note: Chromium and WebKit draw nothing of an <a> whose parent is an <a>
+    // (SVG 1.1 lets an a element hold anything but itself): written directly
+    // inside its word's link, a linked character vanished in Chrome and Safari
+    // while Firefox, resvg and librsvg drew it (measured 2026-10-19)
+    it.each([
+      ['a linked character in a linked word', '[href=#w]|B313/[href=#c]B291',
+        `${linkOpen('#w')}${hitRect(-1, -1, 20, 22)}<g><path d="M0,10`],
+      ['a linked part in an unlinked character of a linked word', '[href=#w]|B313;[href=#p]>B81',
+        `${linkOpen('#w')}${hitRect(-1, -1, 10, 22)}<g>${B313}${linkOpen('#p')}`],
+      ['three links, word, character and part', '[href=#w]|[href=#c]B313;[href=#p]>B81',
+        `${linkOpen('#w')}${hitRect(-1, -1, 10, 22)}<g>${linkOpen('#c')}${hitRect(-1, -1, 10, 22)}<g>${B313}${linkOpen('#p')}`],
+      ['a global link around them', '[href=#g]||[href=#w]|[href=#c]B313',
+        `${linkOpen('#w')}${hitRect(-1, -1, 10, 22)}<g>${linkOpen('#c')}`],
+    ])('puts the outer link\'s content in a bare group, for %s', (_case, input, expected) => {
+      const svg = new BlissSVGBuilder(input).svgCode;
+
+      expect(svg).toContain(expected);
+      expect(svg).not.toMatch(/<a [^>]*>(<rect [^>]*\/>)?(<path [^>]*\/>)*<a /);
+    });
+
+    it('adds no group when the outer link already has one of its own', () => {
+      // pins the bare group to the branch without one: the coloured word's
+      // own <g> already keeps the character's link off the word's <a>
+      const svg = new BlissSVGBuilder('[href=#w;color=red]|[href=#c]B313').svgCode;
+
+      expect(svg).toContain(`${linkOpen('#w')}<g stroke="red">${hitRect(-1, -1, 10, 22)}${linkOpen('#c')}`);
     });
   });
 

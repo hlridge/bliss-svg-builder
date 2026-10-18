@@ -98,6 +98,10 @@ export class BlissElement {
    * nested link paint over it: a part's link wins over its character's, a
    * character's over its word's, and a later part's over an earlier one's.
    *
+   * A link that holds another link and has no <g> of its own puts its content
+   * in a bare one: Chromium and WebKit draw nothing of an <a> whose parent is
+   * an <a> (SVG 1.1 lets an a element hold anything but itself).
+   *
    * @param {string} content - The content to wrap (raw path data or HTML string)
    * @param {Object} processed - The library's computed values, of which only the
    *   two in PUBLICATION_MAP reach the markup
@@ -119,12 +123,13 @@ export class BlissElement {
 
     if (hasHref) {
       const area = hitBox();
-      const wrappedContent = (area ? BlissElement.#hitRect(area) : '')
-        + stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
+      const rect = area ? BlissElement.#hitRect(area) : '';
+      const inner = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
       if (groupAttrs) {
-        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${wrappedContent}</g></a>`;
+        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${rect}${inner}</g></a>`;
       }
-      return `<a ${anchorAttrs} style="cursor: pointer;">${wrappedContent}</a>`;
+      const body = content.includes('<a ') ? `<g>${inner}</g>` : inner;
+      return `<a ${anchorAttrs} style="cursor: pointer;">${rect}${body}</a>`;
     }
 
     if (groupAttrs) {
