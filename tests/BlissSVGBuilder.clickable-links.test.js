@@ -13,12 +13,15 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * hierarchical option levels.
  *
  * Covers:
- * - `<a>` wrapping when `href` is set; `style="cursor: pointer;"` and the
- *   inner `<g pointer-events="bounding-box">` are part of the wrapper contract.
+ * - `<a>` wrapping when `href` is set; `style="cursor: pointer;"` and a
+ *   transparent hit rect as the first child, inside the element's `<g>` when
+ *   it has one, are part of the wrapper contract (the rect's geometry is
+ *   pinned in `BlissSVGBuilder.element-link-area.test.js`).
  * - Standard anchor attribute pass-through: `target`, `rel`, `download`,
  *   `hreflang`, `type`, `referrerpolicy`, and combinations.
  * - Anchor / group attribute separation: stroke/fill/opacity stay on `<g>`,
- *   never bleed onto `<a>`; custom `pointer-events` overrides the default.
+ *   never bleed onto `<a>`; a custom `pointer-events` lands on that `<g>`,
+ *   around the hit rect.
  * - `href` applied at the global / word / character / part levels, including
  *   stacked hrefs at multiple levels in one expression.
  * - Mixed clickable + non-clickable content: characters or words without
@@ -77,13 +80,13 @@ describe('BlissSVGBuilder clickable links', () => {
       expect(svg).not.toContain('</a>');
     });
 
-    it('wraps anchor around a pointer-events="bounding-box" group when href is provided', () => {
+    it('puts a transparent hit rect first inside the anchor when href is provided', () => {
       const builder = new BlissSVGBuilder('[href="/page"]B291');
       const svg = builder.svgCode;
 
       expect(svg).toContain('<a href="/page" style="cursor: pointer;">');
-      expect(svg).toContain('<g pointer-events="bounding-box">');
-      expect(svg).toContain('<path d="');
+      expect(svg).toMatch(/<a href="\/page" style="cursor: pointer;"><rect [^>]*fill="transparent" stroke="none"\/><path d="/);
+      expect(svg).not.toContain('pointer-events');
     });
   });
 
@@ -153,11 +156,11 @@ describe('BlissSVGBuilder clickable links', () => {
       expect(svg).toContain('</g></a>');
     });
 
-    it('adds pointer-events="bounding-box" to <g> inside <a>', () => {
+    it('puts the hit rect first inside the <g> inside <a>', () => {
       const builder = new BlissSVGBuilder('[href=#test;fill=blue]B291');
       const svg = builder.svgCode;
 
-      expect(svg).toContain('<g fill="blue" pointer-events="bounding-box">');
+      expect(svg).toMatch(/<a href="#test" style="cursor: pointer;"><g fill="blue"><rect [^>]*fill="transparent" stroke="none"\/><path d="/);
     });
 
     it('handles multiple styling attributes in <g> tag', () => {
@@ -168,15 +171,17 @@ describe('BlissSVGBuilder clickable links', () => {
       expect(svg).toContain('stroke="red"');
       expect(svg).toContain('fill="blue"');
       expect(svg).toContain('opacity="0.5"');
-      expect(svg).toContain('pointer-events="bounding-box"');
+      expect(svg).toMatch(/<g stroke="red" fill="blue" opacity="0.5"><rect [^>]*fill="transparent" stroke="none"\/>/);
+      expect(svg).not.toContain('pointer-events');
     });
 
-    it('allows custom pointer-events to override default', () => {
+    it('puts the hit rect inside a custom pointer-events group, which governs it', () => {
       const builder = new BlissSVGBuilder('[href=#test;pointer-events=none]B291');
       const svg = builder.svgCode;
 
       expect(svg).toContain('pointer-events="none"');
       expect(svg).not.toContain('pointer-events="bounding-box"');
+      expect(svg).toMatch(/<g pointer-events="none"><rect [^>]*fill="transparent" stroke="none"\/>/);
     });
   });
 
@@ -373,7 +378,9 @@ describe('BlissSVGBuilder clickable links', () => {
       expect(svg).toContain('href="/word"');
       expect(svg).toContain('stroke="black"');
       expect(svg).toContain('fill="red"');
-      expect(svg).toContain('pointer-events="bounding-box"');
+      expect(svg).not.toContain('bounding-box');
+      // one hit rect for the global link, one for the word's
+      expect(svg.match(/fill="transparent" stroke="none"/g)).toHaveLength(2);
     });
 
     it('handles all anchor attributes together with styling', () => {
@@ -381,7 +388,7 @@ describe('BlissSVGBuilder clickable links', () => {
       const svg = builder.svgCode;
 
       expect(svg).toContain('<a href="https://example.com" target="_blank" rel="noopener" download="file" style="cursor: pointer;">');
-      expect(svg).toContain('<g stroke="red" fill="blue" pointer-events="bounding-box">');
+      expect(svg).toMatch(/<g stroke="red" fill="blue"><rect [^>]*fill="transparent" stroke="none"\/>/);
     });
 
     it('nests <a> > <g> > <path> in that order', () => {
@@ -427,14 +434,17 @@ describe('BlissSVGBuilder clickable links', () => {
       const builder = new BlissSVGBuilder('[href=/root;fill=red]B291');
 
       expect(builder.svgCode)
-        .toContain('<a href="/root" style="cursor: pointer;"><g fill="red" pointer-events="bounding-box"><path d="');
+        .toMatch(/<a href="\/root" style="cursor: pointer;"><g fill="red"><rect [^>]*fill="transparent" stroke="none"\/><path d="/);
     });
 
     it('does not wrap already-tagged child content as path data', () => {
       const builder = new BlissSVGBuilder('[href=/root]||[fill=red]|B291');
 
-      expect(builder.svgCode)
-        .toContain('<a href="/root" style="cursor: pointer;"><g pointer-events="bounding-box"><g fill="red"><path d="');
+      // the global link sits outside the content group, holding its rect; the
+      // word's tagged group stays inside
+      expect(builder.svgCode).toContain(
+        '<a href="/root" style="cursor: pointer;">\n    <rect x="-0.75" y="-0.75" width="100%" height="100%" fill="transparent" stroke="none"/>\n    <g class="bliss-content"');
+      expect(builder.svgCode).toMatch(/<g class="bliss-content"[^>]*>\n\s*<g fill="red"><path d="/);
       expect(builder.svgCode).not.toContain('<path d="<g');
     });
 
@@ -449,10 +459,12 @@ describe('BlissSVGBuilder clickable links', () => {
       expect(groupTag).not.toContain('hreflang=');
     });
 
-    it('passes only anchor-related options through the root wrapper from direct BlissElement construction', () => {
+    it('writes no link at the root level from direct BlissElement construction', () => {
       // The whole anchor family and `fill` are uncurated, so the builder's
       // options pass puts every one of them in the author's bag. A hand-built
-      // node carries them where a built one would.
+      // node carries them where a built one would, and the root level writes
+      // none of them: the builder draws the global link around the content
+      // group, see global-link-attributes.test.js.
       const element = new BlissElement({
         authoredOptions: {
           href: '/root',
@@ -467,9 +479,7 @@ describe('BlissSVGBuilder clickable links', () => {
       });
       const content = element.getSvgContent();
 
-      expect(content).toContain('<a href="/root" target="_blank" rel="noopener" download="file.svg" hreflang="sv" type="image/svg+xml"');
-      expect(content).toContain('<g pointer-events="bounding-box"><path d="M0,0h2"/></g>');
-      expect(content).not.toContain('fill="red"');
+      expect(content).toBe('M0,0h2');
     });
   });
 

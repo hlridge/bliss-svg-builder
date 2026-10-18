@@ -250,6 +250,23 @@ export const ANCHOR_ATTRIBUTE_NAMES = Object.freeze(
 );
 
 /**
+ * The writing band's height: every character spans y 0 to 20 in its own
+ * frame, however much of it the ink fills.
+ */
+export const BAND_HEIGHT = 20;
+
+/**
+ * How far a linked element's clickable area reaches past what it covers. Ink
+ * is drawn on the stroke's centre line, so an area that stopped there would
+ * leave the outer half of every edge stroke unclickable. A character's area
+ * reaches HIT_MARGIN past the band and past its base span (less where a
+ * neighbour is closer, so the two meet halfway); a part's reaches
+ * PART_HIT_MARGIN past its ink box on every side.
+ */
+export const HIT_MARGIN = 1;
+export const PART_HIT_MARGIN = 0.5;
+
+/**
  * The written options whose whole job is to compute the root's `viewBox`. When
  * an author writes the `viewBox` directly, the value these produced is replaced,
  * so they are reported as displaced rather than left to look effective.

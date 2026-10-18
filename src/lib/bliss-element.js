@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -49,6 +49,7 @@ export class BlissElement {
   #previousElement;
   #classifiedParts; // Cached result of #classifyParts (level 2 only)
   #isFused = false; // Two or more base parts: no spacing data (level 2 only)
+  #linkArea; // { left, right } in its own frame, set by the root once the layout is final (levels 1 and 2)
 
   /**
    * Stamps a non-inherited `vector-effect` onto bare <path> elements.
@@ -88,13 +89,25 @@ export class BlissElement {
    * Wraps content with <a> and/or <g> tags based on options.
    * Ensures consistent wrapping behavior across all element levels.
    *
+   * A link's first child is a transparent rect over the element's area: a
+   * link is hit only where something paints, and the rect paints that area
+   * without showing (`transparent` is a paint, `none` is not), so the link
+   * answers a click anywhere in it and not only on the strokes. It sits inside
+   * the element's own <g>, so a `transform` or `pointer-events` written there
+   * governs it too, and before the content, so the element's ink and any
+   * nested link paint over it: a part's link wins over its character's, a
+   * character's over its word's, and a later part's over an earlier one's.
+   *
    * @param {string} content - The content to wrap (raw path data or HTML string)
    * @param {Object} processed - The library's computed values, of which only the
    *   two in PUBLICATION_MAP reach the markup
    * @param {Object} authored - The author's own keys, emitted as they were typed
+   * @param {function(): ?{x: number, y: number, width: number, height: number}} hitBox -
+   *   the area a link covers, in the content's own coordinates; called only for
+   *   an element that builds a link, and null where it covers nothing
    * @returns {string} The wrapped content
    */
-  static #wrapWithAnchorAndGroup(content, processed, authored) {
+  static #wrapWithAnchorAndGroup(content, processed, authored, hitBox) {
     const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(processed, authored);
 
     // Content that starts with '<' is already wrapped in proper tags
@@ -105,7 +118,9 @@ export class BlissElement {
     const stamp = (inner) => vectorEffect ? BlissElement.applyVectorEffectToPaths(inner, vectorEffect) : inner;
 
     if (hasHref) {
-      const wrappedContent = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
+      const area = hitBox();
+      const wrappedContent = (area ? BlissElement.#hitRect(area) : '')
+        + stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
       if (groupAttrs) {
         return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${wrappedContent}</g></a>`;
       }
@@ -124,6 +139,80 @@ export class BlissElement {
     return content;
   }
 
+  /**
+   * A link's hit rect. Its numbers are rounded as the builder rounds the
+   * picture's own, which removes the float noise of summed positions.
+   */
+  static #hitRect({ x, y, width, height }) {
+    const round = (num) => parseFloat(num.toFixed(4));
+    return `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" fill="transparent" stroke="none"/>`;
+  }
+
+  /** A linked part's area: its ink box plus PART_HIT_MARGIN on every side. */
+  static #inkHitBox({ minX, minY, width, height }) {
+    return {
+      x: minX - PART_HIT_MARGIN,
+      y: minY - PART_HIT_MARGIN,
+      width: width + 2 * PART_HIT_MARGIN,
+      height: height + 2 * PART_HIT_MARGIN,
+    };
+  }
+
+  /**
+   * A linked word's or character's area: its link area across the band plus
+   * HIT_MARGIN above and below, placed from its frame's origin. Null without an
+   * area, as for a word of no characters. A character overlapped by both
+   * neighbours can be left an area of no width, never a negative one.
+   */
+  #bandHitBox(originX, originY) {
+    if (!this.#linkArea) return null;
+    return {
+      x: originX + this.#linkArea.left,
+      y: originY - HIT_MARGIN,
+      width: Math.max(0, this.#linkArea.right - this.#linkArea.left),
+      height: BAND_HEIGHT + 2 * HIT_MARGIN,
+    };
+  }
+
+  /**
+   * Gives every word and character its link area, in its own frame (root
+   * only, once the layout is final). A character's runs across its base span,
+   * indicators ignored, plus HIT_MARGIN on each side, or half the gap to the
+   * next character in reading order where that is less, across a word space
+   * too: two neighbours closer than twice the margin meet halfway, whether or
+   * not the other is linked. A word's joins its characters'. Done here because
+   * a character cannot see a neighbour in another word from its own frame.
+   * Spaces and characters that draw nothing are not characters here: no area
+   * of their own, and no neighbour to anyone.
+   */
+  #assignLinkAreas() {
+    // Base spans in the root's frame, in reading order.
+    const characters = this.#children
+      .filter(group => !group.#isSpaceGroup)
+      .flatMap(group => group.#children
+        .filter(glyph => glyph.#children.length > 0)
+        .map(glyph => {
+          const origin = group.#relativeToParentX + glyph.#relativeToParentX;
+          const { left, right } = glyph.#baseSpan;
+          return { group, glyph, origin, left: origin + left, right: origin + right };
+        }));
+
+    const words = new Map(); // group -> its characters' areas joined, in the root's frame
+    characters.forEach(({ group, glyph, origin, left, right }, i) => {
+      const previous = characters[i - 1];
+      const next = characters[i + 1];
+      const areaLeft = left - (previous ? Math.min(HIT_MARGIN, (left - previous.right) / 2) : HIT_MARGIN);
+      const areaRight = right + (next ? Math.min(HIT_MARGIN, (next.left - right) / 2) : HIT_MARGIN);
+      glyph.#linkArea = { left: areaLeft - origin, right: areaRight - origin };
+      const word = words.get(group) ?? { left: areaLeft, right: areaRight };
+      words.set(group, { left: Math.min(word.left, areaLeft), right: Math.max(word.right, areaRight) });
+    });
+
+    for (const [group, { left, right }] of words) {
+      group.#linkArea = { left: left - group.#relativeToParentX, right: right - group.#relativeToParentX };
+    }
+  }
+
   static #separateAnchorAndGroupOptions(processed, authored) {
     const computed = processed && typeof processed === 'object' ? processed : {};
     const written = authored && typeof authored === 'object' ? authored : {};
@@ -131,7 +220,6 @@ export class BlissElement {
     const anchorAttrs = [];
     const groupAttrs = new Map(); // attrName -> value; deduped, explicit name beats alias
     let hasHref = false;
-    let hasPointerEvents = false;
     let vectorEffect = null;
 
     // The two computed values the library publishes first, then everything the
@@ -177,7 +265,6 @@ export class BlissElement {
         if (isDocumentDefiningAttribute(key)) continue;
         // vector-effect is non-inherited; capture it for relocation onto paths
         if (key === 'vector-effect') { vectorEffect = value; continue; }
-        if (key === 'pointer-events') hasPointerEvents = true;
         // Each attribute name is emitted once (issue #28). On a collision the
         // explicitly-named attribute wins over an alias (color -> stroke,
         // strokeWidth -> stroke-width). The walk above already puts the aliases
@@ -188,10 +275,6 @@ export class BlissElement {
           groupAttrs.set(key, value);
         }
       }
-    }
-
-    if (hasHref && !hasPointerEvents) {
-      groupAttrs.set('pointer-events', 'bounding-box');
     }
 
     const groupAttrStrings = [...groupAttrs].map(([name, value]) => `${name}="${value}"`);
@@ -473,6 +556,8 @@ export class BlissElement {
       this.#relativeToParentX = this.#childStartOffset + (this.#blissObj.x ?? 0);
       this.#relativeToParentY = this.#blissObj.y ?? 0;
 
+      this.#assignLinkAreas();
+
       this.getSvgContent = (x = 0, y = 0) => {
         const childContents = this.#children.map(child =>
           child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
@@ -572,9 +657,9 @@ export class BlissElement {
       }
 
       this.getSvgContent = (x = 0, y = 0) => {
-        const childContents = this.#children.map(child =>
-          child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-        );
+        const originX = this.#relativeToParentX + x;
+        const originY = this.#relativeToParentY + y;
+        const childContents = this.#children.map(child => child.getSvgContent(originX, originY));
 
         const hasTaggedContent = childContents.some(c => c.startsWith('<'));
         const hasRawContent = childContents.some(c => !c.startsWith('<'));
@@ -583,7 +668,8 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
-        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions);
+        return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
+          () => this.#bandHitBox(originX, originY));
       };
 
       // A fail-flagged group (group.errorCode) can no longer reach here: the
@@ -778,9 +864,9 @@ export class BlissElement {
           }
 
           this.getSvgContent = (x = 0, y = 0) => {
-            const childContents = this.#children.map(child =>
-              child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
-            );
+            const originX = this.#relativeToParentX + x;
+            const originY = this.#relativeToParentY + y;
+            const childContents = this.#children.map(child => child.getSvgContent(originX, originY));
 
             const hasTaggedContent = childContents.some(c => c.startsWith('<'));
             const hasRawContent = childContents.some(c => !c.startsWith('<'));
@@ -789,7 +875,8 @@ export class BlissElement {
               ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
               : childContents.join('');
 
-            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions);
+            return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
+              () => this.#bandHitBox(originX, originY));
           };
         }
       } else {
@@ -978,8 +1065,18 @@ export class BlissElement {
   get baseGlyphWidth() {
     if (this.#level !== 2) throw new Error('baseGlyphWidth can only be called on glyph elements (level 2)');
 
+    const { left, right } = this.#baseSpan;
+    return right - left;
+  }
+
+  /**
+   * Where the base glyph sits in this character's own frame (level 2): the
+   * span baseGlyphWidth measures and a link's area is built on. Indicators
+   * never count, as they never count toward spacing.
+   */
+  get #baseSpan() {
     const parts = this.#children;
-    if (parts.length === 0) return 0;
+    if (parts.length === 0) return { left: 0, right: 0 };
 
     // Use cached classification (computed once in constructor)
     const { glyphParts } = this.#classifiedParts;
@@ -990,10 +1087,8 @@ export class BlissElement {
     const minRelativeX = Math.min(...spacingParts.map(part => part.#relativeToParentX));
     const maxRelativeXPlusWidth = Math.max(...spacingParts.map(part => part.#relativeToParentX + part.width));
     // When minRelativeX > 0, the left boundary is still the element's origin (0).
-    // Only subtract negative offsets (e.g., indicator overhang).
-    const baseGlyphWidth = maxRelativeXPlusWidth - Math.min(0, minRelativeX);
-
-    return baseGlyphWidth;
+    // Only a negative offset (e.g., indicator overhang) moves it.
+    return { left: Math.min(0, minRelativeX), right: maxRelativeXPlusWidth };
   }
 
   get baseGroupWidth() {
@@ -1038,7 +1133,7 @@ export class BlissElement {
   get height() {
     if (this.#leafHeight !== undefined) return this.#leafHeight;
     if (this.#level === 2) {
-      return 20;
+      return BAND_HEIGHT;
     }
     if (this.#children && this.#children.length > 0) {
       return Math.max(...this.#children.map(child => child.#relativeToParentY + child.height));
@@ -1437,7 +1532,8 @@ export class BlissElement {
         pathOptions
       );
 
-      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.authoredOptions);
+      return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.authoredOptions,
+        () => BlissElement.#inkHitBox(this.#calculateBounds(x, y)));
     };
   }
 
@@ -1522,7 +1618,8 @@ export class BlissElement {
         ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
         : childContents.join('');
 
-      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions);
+      return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
+        () => BlissElement.#inkHitBox(this.#calculateBounds(x, y)));
     };
   }
 }
