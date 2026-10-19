@@ -53,6 +53,7 @@ export const ELEMENT_CLASSES = Object.freeze({
   gridEarth:      ['bliss-grid-line', 'bliss-grid-line--major', 'bliss-grid-line--earth'],
   content:        ['bliss-content'],
   elementBackgroundBox: ['bliss-element-background', 'bliss-element-background--box'],
+  elementBackgroundInk: ['bliss-element-background', 'bliss-element-background--ink'],
 });
 
 /**
@@ -64,6 +65,7 @@ export const ELEMENT_CLASSES = Object.freeze({
  */
 export const BACKGROUND_AREA_ELEMENTS = Object.freeze({
   box: 'elementBackgroundBox',
+  ink: 'elementBackgroundInk',
 });
 
 /**
@@ -78,8 +80,12 @@ export const BACKGROUND_AREA_ELEMENTS = Object.freeze({
  * Add an option to a chain here and it becomes reportable the moment something
  * writes it; leave one out and that option is silently never named as displaced.
  * Every name in every chain carries a row in `layer-sub-targets.test.js` (the
- * element backgrounds' in `element-background-layer.test.js`), since an entry
- * no test reaches can be deleted with the whole suite green.
+ * element backgrounds' in `element-background-layer.test.js` and
+ * `ink-areas.test.js`), since an entry no test reaches can be deleted with the
+ * whole suite green.
+ *
+ * A box takes its paint as `fill`, an ink area as `stroke`: the two are told
+ * apart by class, so the report names the attribute each one's paint reached.
  */
 export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   gridMinor:  { stroke: ['grid-minor-color', 'grid-color'],
@@ -97,6 +103,7 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   zoneMid:    { fill: ['background-mid', 'background'] },
   zoneBottom: { fill: ['background-bottom', 'background'] },
   elementBackgroundBox: { fill: ['background'] },
+  elementBackgroundInk: { stroke: ['background'] },
 });
 
 /**
@@ -283,6 +290,16 @@ export const BAND_HEIGHT = 20;
  */
 export const HIT_MARGIN = 1;
 export const PART_HIT_MARGIN = 0.5;
+
+/**
+ * How far an ink area reaches past the lines it follows, on each side, for a
+ * background and a link alike: the element's lines drawn again twice this much
+ * wider (a 0.5 line becomes 1), and a filled letter outlined by twice this.
+ */
+export const INK_AREA_MARGIN = 0.25;
+
+/** The width the symbol's lines are drawn at when no `stroke-width` is written. */
+export const DEFAULT_STROKE_WIDTH = 0.5;
 
 /**
  * The written options whose whole job is to compute the root's `viewBox`. When

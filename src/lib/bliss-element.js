@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, INK_AREA_MARGIN, DEFAULT_STROKE_WIDTH, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -97,11 +97,13 @@ export class BlissElement {
    * A link's first child is a transparent rect over the element's area: a
    * link is hit only where something paints, and the rect paints that area
    * without showing (`transparent` is a paint, `none` is not), so the link
-   * answers a click anywhere in it and not only on the strokes. It sits inside
-   * the element's own <g>, so a `transform` or `pointer-events` written there
-   * governs it too, and before the content, so the element's ink and any
-   * nested link paint over it: a part's link wins over its character's, a
-   * character's over its word's, and a later part's over an earlier one's.
+   * answers a click anywhere in it and not only on the strokes. Under
+   * `link-area=ink` its lines, drawn again in transparent, take the rect's
+   * place (#linkHit). Either sits inside the element's own <g>, so a
+   * `transform` or `pointer-events` written there governs it too, and before
+   * the content, so the element's ink and any nested link paint over it: a
+   * part's link wins over its character's, a character's over its word's, and
+   * a later part's over an earlier one's.
    *
    * A link that holds another link and has no <g> of its own puts its content
    * in a bare one: Chromium and WebKit draw nothing of an <a> whose parent is
@@ -111,12 +113,12 @@ export class BlissElement {
    * @param {Object} processed - The library's computed values, of which only the
    *   two in PUBLICATION_MAP reach the markup
    * @param {Object} authored - The author's own keys, emitted as they were typed
-   * @param {function(): ?{x: number, y: number, width: number, height: number}} hitBox -
-   *   the area a link covers, in the content's own coordinates; called only for
-   *   an element that builds a link, and null where it covers nothing
+   * @param {function(): string} linkHit - the markup that makes a link answer a
+   *   click, drawn first inside it; called only for an element that builds a
+   *   link, and '' where it covers nothing
    * @returns {string} The wrapped content
    */
-  static #wrapWithAnchorAndGroup(content, processed, authored, hitBox) {
+  static #wrapWithAnchorAndGroup(content, processed, authored, linkHit) {
     const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(processed, authored);
 
     // Content that starts with '<' is already wrapped in proper tags
@@ -127,14 +129,13 @@ export class BlissElement {
     const stamp = (inner) => vectorEffect ? BlissElement.applyVectorEffectToPaths(inner, vectorEffect) : inner;
 
     if (hasHref) {
-      const area = hitBox();
-      const rect = area ? BlissElement.#hitRect(area) : '';
+      const hit = linkHit();
       const inner = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
       if (groupAttrs) {
-        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${rect}${inner}</g></a>`;
+        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${hit}${inner}</g></a>`;
       }
       const body = content.includes('<a ') ? `<g>${inner}</g>` : inner;
-      return `<a ${anchorAttrs} style="cursor: pointer;">${rect}${body}</a>`;
+      return `<a ${anchorAttrs} style="cursor: pointer;">${hit}${body}</a>`;
     }
 
     if (groupAttrs) {
@@ -262,46 +263,113 @@ export class BlissElement {
   }
 
   /**
-   * The box this element's own background paints, in the content's
-   * coordinates, from the origin of the frame it sits in; null where it paints
-   * none. A word's or a character's is its paint area across the band, a
-   * part's its ink box plus PART_HIT_MARGIN: the shapes a link's area takes.
-   * An element with no paint area paints nothing: a word of no characters, a
-   * character that draws nothing, and the root, which is never given one, as
-   * its background is the picture's own, drawn by the builder.
+   * What makes this element's link answer a click, drawn first inside the
+   * link: a transparent rect over `box()`, its area, or where the `link-area`
+   * it inherits is `ink`, its lines drawn again in transparent (#inkArea), so
+   * only the lines and INK_AREA_MARGIN around them answer. The group sets
+   * `fill="none"` for the reason an ink background does (#backgroundMarkup).
+   * '' where it covers nothing. `x` and `y` are the origin of the frame this
+   * element sits in, as getSvgContent takes them.
    */
-  #backgroundBox(x, y) {
-    if (this.#background === '') return null;
-    if (this.#level <= 2) {
-      return BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea);
+  #linkHit(x, y, box) {
+    if (this.#getInheritedOption('linkArea') === 'ink') {
+      const paint = 'transparent';
+      const ink = this.#inkArea(x, y, paint);
+      return ink ? `<g fill="none" stroke="${paint}" stroke-width="${ink.width}">${ink.lines}</g>` : '';
     }
-    return BlissElement.#inkHitBox(this.#calculateBounds(x, y));
+    const area = box();
+    return area ? BlissElement.#hitRect(area) : '';
   }
 
   /**
-   * Visits every element at or below this one that paints a background, with
-   * its box, in the order the backgrounds are drawn: pre-order, so a word
-   * comes before its characters, a character before its parts, and an earlier
-   * part before a later one. `x` and `y` are the origin of the frame this
-   * element sits in, as getSvgContent takes them.
+   * This element's lines as an ink area draws them: rendered again in the
+   * halo mode getSvgContent takes, in `paint`, each line widened by twice
+   * INK_AREA_MARGIN and each letter filled in `paint` and outlined by as much.
+   * Returns the lines, and the width a group strokes them at (the element's
+   * computed width, widened alike); null where it draws no line, as ZSA does.
+   * Built from the widths the library computes: the element's own attributes
+   * reach its lines, not its ink area, as they do not reach a box.
+   */
+  #inkArea(x, y, paint) {
+    const outline = 2 * INK_AREA_MARGIN;
+    const lines = this.getSvgContent(x, y, { paint, outline, element: this });
+    if (lines === '') return null;
+    return {
+      lines: lines.startsWith('<') ? lines : `<path d="${lines}"/>`,
+      width: roundForMarkup((this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) + outline),
+    };
+  }
+
+  /**
+   * This element's content in the halo mode of getSvgContent, where it writes
+   * none of its wrappers (no link, none of its attributes) but a width of its
+   * own, re-stated widened on a group exactly where its ink states it. The
+   * painted element's own width goes on its ink area's group instead.
+   */
+  #haloWrap(content, halo) {
+    const options = this.#blissObj.options ?? {};
+    if (halo.element === this || !Object.hasOwn(options, 'strokeWidth')) return content;
+    const lines = content.startsWith('<') ? content : `<path d="${content}"/>`;
+    return `<g stroke-width="${roundForMarkup(options.strokeWidth + halo.outline)}">${lines}</g>`;
+  }
+
+  /**
+   * What this element's own background draws, in the content's coordinates,
+   * from the origin of the frame it sits in, by the `background-area` it
+   * inherits: `{ area: 'box', box }` or `{ area: 'ink', lines, width }`
+   * (#inkArea); null where it draws none. A word's or a character's box is
+   * its paint area across the band, a part's its ink box plus PART_HIT_MARGIN:
+   * the shapes a link's area takes. An ink area draws nothing where there is no
+   * line. A word or a character with no paint area draws nothing: a word of no
+   * characters, a character that draws nothing, and the root, which is never
+   * given one, as its background is the picture's own, drawn by the builder.
+   */
+  #backgroundDrawing(x, y) {
+    if (this.#background === '') return null;
+    if (this.#level <= 2 && !this.#paintArea) return null;
+    if (this.#getInheritedOption('backgroundArea') === 'ink') {
+      const ink = this.#inkArea(x, y, this.#background);
+      return ink && { area: 'ink', ...ink };
+    }
+    const box = this.#level <= 2
+      ? BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea)
+      : BlissElement.#inkHitBox(this.#calculateBounds(x, y));
+    return { area: 'box', box };
+  }
+
+  /**
+   * Visits every element at or below this one that draws a background, with
+   * what it draws, in the order the backgrounds are drawn: pre-order, so a
+   * word comes before its characters, a character before its parts, and an
+   * earlier part before a later one. `x` and `y` are the origin of the frame
+   * this element sits in, as getSvgContent takes them.
    */
   #visitBackgrounds(visit, x = 0, y = 0) {
-    const box = this.#backgroundBox(x, y);
-    if (box) visit(this, box);
+    const drawing = this.#backgroundDrawing(x, y);
+    if (drawing) visit(this, drawing);
     for (const child of this.#children) {
       child.#visitBackgrounds(visit, this.#relativeToParentX + x, this.#relativeToParentY + y);
     }
   }
 
   /**
-   * This element's background as markup: a rect over its box in its paint.
-   * The rect sets `stroke="none"` itself, or the content group's stroke would
-   * outline it. Its classes make it a target of the layer attributes, which
-   * the builder writes through the formatter it shares with the tree; a tree
-   * built without one writes the classes and the computed attributes alone.
+   * This element's background as markup, in its paint: a rect over its box,
+   * or a group stroking its lines. The rect sets `stroke="none"` itself, or the
+   * content group's stroke would outline it; the group sets `fill="none"`, or a
+   * `fill` written for the whole symbol, which lands on the content group,
+   * would fill every enclosure it rings. Their classes make them targets of
+   * the layer attributes, which the builder writes through the formatter it
+   * shares with the tree; a tree built without one writes the classes and the
+   * computed attributes alone.
    */
-  #backgroundMarkup(box) {
-    const classes = ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS.box];
+  #backgroundMarkup(drawing) {
+    const classes = ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS[drawing.area]];
+    const format = this.#sharedOptions.formatLayerAttributes ?? BlissElement.#ownLayerAttributes;
+    if (drawing.area === 'ink') {
+      const computed = { fill: 'none', stroke: this.#background, 'stroke-width': drawing.width };
+      return `<g ${format(classes, computed)}>${drawing.lines}</g>`;
+    }
+    const { box } = drawing;
     const computed = {
       x: roundForMarkup(box.x),
       y: roundForMarkup(box.y),
@@ -310,7 +378,6 @@ export class BlissElement {
       fill: this.#background,
       stroke: 'none',
     };
-    const format = this.#sharedOptions.formatLayerAttributes ?? BlissElement.#ownLayerAttributes;
     return `<rect ${format(classes, computed)}/>`;
   }
 
@@ -323,13 +390,14 @@ export class BlissElement {
 
   /**
    * The ELEMENT_CLASSES entries of the element backgrounds this tree draws,
-   * found by the walk that draws them, without rendering (root only). The
-   * builder reads it to report a layer attribute that displaces a written
-   * `background`, which it can judge only once the tree is built.
+   * found by the walk that draws them (root only), which renders an ink
+   * area's lines to learn whether it has any. The builder reads it to report
+   * a layer attribute that displaces a written `background`, which it can
+   * judge only once the tree is built.
    */
   get drawnBackgroundElements() {
     const drawn = new Set();
-    this.#visitBackgrounds(() => drawn.add(BACKGROUND_AREA_ELEMENTS.box));
+    this.#visitBackgrounds((element, drawing) => drawn.add(BACKGROUND_AREA_ELEMENTS[drawing.area]));
     return drawn;
   }
 
@@ -699,7 +767,7 @@ export class BlissElement {
         // follows as svgContent would write it alone: raw path data in a path
         // of its own.
         const backgrounds = [];
-        this.#visitBackgrounds((element, box) => backgrounds.push(element.#backgroundMarkup(box)), x, y);
+        this.#visitBackgrounds((element, drawing) => backgrounds.push(element.#backgroundMarkup(drawing)), x, y);
         if (backgrounds.length === 0) return ink;
         return backgrounds.join('') + (ink.startsWith('<') ? ink : `<path d="${ink}"/>`);
       };
@@ -787,10 +855,10 @@ export class BlissElement {
         this.#advanceX = this.baseGroupWidth + this.#sharedOptions.charSpace;
       }
 
-      this.getSvgContent = (x = 0, y = 0) => {
+      this.getSvgContent = (x = 0, y = 0, halo = null) => {
         const originX = this.#relativeToParentX + x;
         const originY = this.#relativeToParentY + y;
-        const childContents = this.#children.map(child => child.getSvgContent(originX, originY));
+        const childContents = this.#children.map(child => child.getSvgContent(originX, originY, halo));
 
         const hasTaggedContent = childContents.some(c => c.startsWith('<'));
         const hasRawContent = childContents.some(c => !c.startsWith('<'));
@@ -799,8 +867,9 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
+        if (halo) return this.#haloWrap(content, halo);
         return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-          () => BlissElement.#bandHitBox(originX, originY, this.#linkArea));
+          () => this.#linkHit(x, y, () => BlissElement.#bandHitBox(originX, originY, this.#linkArea)));
       };
 
       // A fail-flagged group (group.errorCode) can no longer reach here: the
@@ -994,10 +1063,10 @@ export class BlissElement {
             this.#advanceX = this.baseGlyphWidth + this.#sharedOptions.charSpace;
           }
 
-          this.getSvgContent = (x = 0, y = 0) => {
+          this.getSvgContent = (x = 0, y = 0, halo = null) => {
             const originX = this.#relativeToParentX + x;
             const originY = this.#relativeToParentY + y;
-            const childContents = this.#children.map(child => child.getSvgContent(originX, originY));
+            const childContents = this.#children.map(child => child.getSvgContent(originX, originY, halo));
 
             const hasTaggedContent = childContents.some(c => c.startsWith('<'));
             const hasRawContent = childContents.some(c => !c.startsWith('<'));
@@ -1006,8 +1075,9 @@ export class BlissElement {
               ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
               : childContents.join('');
 
+            if (halo) return this.#haloWrap(content, halo);
             return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-              () => BlissElement.#bandHitBox(originX, originY, this.#linkArea));
+              () => this.#linkHit(x, y, () => BlissElement.#bandHitBox(originX, originY, this.#linkArea)));
           };
         }
       } else {
@@ -1625,7 +1695,7 @@ export class BlissElement {
     this.#leafX = definition.x;
     this.#leafY = definition.y;
     
-    this.getSvgContent = (x = 0, y = 0) => {
+    this.getSvgContent = (x = 0, y = 0, halo = null) => {
       // Build path options with inheritance: extraPathOptions < inherited < element-level
       // Use #getInheritedOption for options which already handle the inheritance chain
       const inheritedColor = this.#getInheritedOption('color');
@@ -1655,7 +1725,10 @@ export class BlissElement {
         ...this.#extraPathOptions,
         ...(inheritedColor !== undefined && { color: inheritedColor }),
         ...(inheritedStrokeWidth !== undefined && { baseStrokeWidth: inheritedStrokeWidth }),
-        ...dotPathOpts
+        ...dotPathOpts,
+        // An ink area draws the lines in its own paint, the widths a shape
+        // states itself widened by the outline (#inkArea).
+        ...(halo && { color: halo.paint, outline: halo.outline }),
       };
       const pathData = definition.getPath(
         this.#relativeToParentX + x,
@@ -1663,8 +1736,9 @@ export class BlissElement {
         pathOptions
       );
 
+      if (halo) return this.#haloWrap(pathData, halo);
       return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.authoredOptions,
-        () => BlissElement.#inkHitBox(this.#calculateBounds(x, y)));
+        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y))));
     };
   }
 
@@ -1737,9 +1811,9 @@ export class BlissElement {
     this.#anchorOffsetX = this.#blissObj.anchorOffsetX || 0;
     this.#anchorOffsetY = this.#blissObj.anchorOffsetY || 0;
 
-    this.getSvgContent = (x = 0, y = 0) => {
+    this.getSvgContent = (x = 0, y = 0, halo = null) => {
       const childContents = this.#children.map(child =>
-        child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y)
+        child.getSvgContent(this.#relativeToParentX + x, this.#relativeToParentY + y, halo)
       );
 
       const hasTaggedContent = childContents.some(c => c.startsWith('<'));
@@ -1749,8 +1823,9 @@ export class BlissElement {
         ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
         : childContents.join('');
 
+      if (halo) return this.#haloWrap(content, halo);
       return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-        () => BlissElement.#inkHitBox(this.#calculateBounds(x, y)));
+        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y))));
     };
   }
 }

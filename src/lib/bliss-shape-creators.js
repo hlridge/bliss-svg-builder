@@ -19,7 +19,9 @@ export function hasPathData(char) {
 
 /**
  * Creates a text fallback glyph for characters without hardcoded path data.
- * Uses SVG <text> element which relies on system fonts.
+ * Uses SVG <text> element which relies on system fonts. Its getPath takes the
+ * `color` it is filled in and an `outline`, the width it is stroked at (0, no
+ * stroke, unless an ink area draws it).
  *
  * @param {string} str - The character or string to render.
  * @return {object} A glyph object compatible with createExternalGlyph.
@@ -47,7 +49,7 @@ export function createTextFallbackGlyph(str) {
       const baseline = 16;
       const textX = x - 0.3;
       const textY = y + baseline;
-      return `${closePath}<text x="${textX}" y="${textY}" font-family="Liberation Sans, sans-serif" font-size="5.7" stroke-width="0" fill="${fill}">${safeStr}</text>${openPath}`;
+      return `${closePath}<text x="${textX}" y="${textY}" font-family="Liberation Sans, sans-serif" font-size="5.7" stroke-width="${options.outline ?? 0}" fill="${fill}">${safeStr}</text>${openPath}`;
     },
     width,
     y: approxMinY,
@@ -487,6 +489,7 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
      * @param {number} baseStrokeWidth - The stroke-width of a normal line in the SVG, used to derive other dimensions of the dot.
      * @param {number} extraDotWidth - A dot's outer diameter is the normal line stroke-width + extraDotWidth.
      * @param {number} [settings.dotWidth] - Optional absolute rendered diameter; when set, overrides baseStrokeWidth/extraDotWidth (ink stroke-width = dotWidth/2).
+     * @param {number} [settings.outline] - Added to the dot's stroke-width alone (an ink area's), so its outer diameter grows by exactly that much around the same circle.
      * @returns {Object} - An object with closePath, openPath, dotPath and openPath properties.
      */
     getDotData: (x, y, settings = { baseStrokeWidth: defaultBaseStrokeWidth, extraDotWidth: defaultExtraDotWidth }) => {
@@ -494,9 +497,10 @@ export function createDot(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth = 0
         ? settings.dotWidth / 2
         : (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
       const dotStrokeRadius = dotStrokeWidth / 2;
+      const outline = settings.outline ?? 0;
       return {
         closePath: `"/>`,
-        openWrapper: `<g stroke-width="${dotStrokeWidth}">`,
+        openWrapper: `<g stroke-width="${dotStrokeWidth + outline}">`,
         openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
         closeDotPath: `"/>`,
@@ -541,6 +545,7 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
      * @param {number} baseStrokeWidth - The stroke-width of a normal line in the SVG, used to derive other dimensions of the comma.
      * @param {number} extraDotWidth - A dot's outer diameter is the normal line stroke-width + extraDotWidth.
      * @param {number} [settings.dotWidth] - Optional absolute rendered dot diameter; when set, overrides baseStrokeWidth/extraDotWidth (ink stroke-width = dotWidth/2). The comma tail scales off it too.
+     * @param {number} [settings.outline] - Added to the dot's and the tail's stroke-widths alone (an ink area's): the tail's curve still scales off the dot's own width, so the comma keeps its shape.
      * @returns {Object} - An object with closePath, openDotPath, dotPath, commaPath and openPath properties.
      */
     getCommaData: (x, y, settings = { baseStrokeWidth: defaultBaseStrokeWidth, extraDotWidth: defaultExtraDotWidth }) => {
@@ -549,6 +554,7 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
         : (settings.baseStrokeWidth + settings.extraDotWidth) / 2;
       const dotStrokeRadius = dotStrokeWidth / 2;
       const commaStrokeWidth = dotStrokeWidth * 2 / 3;
+      const outline = settings.outline ?? 0;
       const commaStartX = commaStrokeWidth + x;
       const commaStartY = y;
       const commaEndX = commaStrokeWidth * -2;
@@ -557,12 +563,12 @@ export function createComma(defaultBaseStrokeWidth = 0.5, defaultExtraDotWidth =
       const commaQY = commaStrokeWidth * 2.5;
       return {
         closePath: `"/>`,
-        openDotWrapper: `<g stroke-width="${dotStrokeWidth}">`,
+        openDotWrapper: `<g stroke-width="${dotStrokeWidth + outline}">`,
         openDotPath: `<path d="`,
         dotPath: `M${x - dotStrokeRadius},${y}a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${dotStrokeRadius * 2},0a${dotStrokeRadius},${dotStrokeRadius} 0 1,1 ${-dotStrokeRadius * 2},0`,
         closeDotPath: `"/>`,
         closeDotWrapper: `</g>`,
-        openCommaWrapper: `<g stroke-width="${commaStrokeWidth}">`,
+        openCommaWrapper: `<g stroke-width="${commaStrokeWidth + outline}">`,
         openCommaPath: `<path d="`,
         commaPath: `M${commaStartX},${commaStartY}q${commaQX},${commaQY} ${commaEndX},${commaEndY}`,
         closeCommaPath: `"/>`,
@@ -618,7 +624,10 @@ export function createFiber(height) {
 }
 
 /**
- * Creates an external glyph object for the given rendered character.
+ * Creates an external glyph object for the given rendered character. Its
+ * getPath takes the `color` the letter is filled in and an `outline`: with
+ * none the letter is filled only (`stroke="none"`); with one (an ink area's)
+ * it is stroked at that width too, in the stroke its group sets.
  *
  * @param {string} char - The rendered character (e.g. "a" from input code "Xa").
  * @return {object} An object with getPath, width, kerningRules, char, glyphCode, isExternalGlyph properties.
@@ -645,7 +654,8 @@ export function createExternalGlyph(char) {
         (_, mx, my) => `M${round(parseFloat(mx) + x + adjustX)},${round(parseFloat(my) + y + adjustY)}`
       );
       const fill = options.color || "#000000";
-      const openGlyphPath = `<path stroke="none" fill="${fill}" d="`;
+      const stroke = options.outline ? `stroke-width="${options.outline}"` : 'stroke="none"';
+      const openGlyphPath = `<path ${stroke} fill="${fill}" d="`;
       return `${closePath}${openGlyphPath}${transformedPath}${closePath}${openPath}`;
     },
     width: aObj.width || 0,
