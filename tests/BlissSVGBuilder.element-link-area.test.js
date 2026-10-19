@@ -37,6 +37,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.global-link-attributes.test.js`.
  * - Anchor mechanics (attribute separation, the protocol allowlist, href at
  *   each level), see `BlissSVGBuilder.clickable-links.test.js`.
+ * - A link set in an alias's `defaultOptions`: like any alias option it lands
+ *   on each part the alias draws, so a two-mark alias gives two part links (a
+ *   part bracket on the same alias gives one over both); the alias rule is
+ *   pinned in `BlissSVGBuilder.alias-options-on-parts.test.js`.
  * - Linking by ink instead of area (`link-area=ink`), not built yet (backlog,
  *   "Link an element by its ink instead of its area").
  * - How a browser hit-tests the rect, which no test in this suite can observe.
