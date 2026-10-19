@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -15,6 +15,10 @@ import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js
 // the nested compound-indicator layout (#handleCompositeElement) so the two
 // cannot drift.
 const INDICATOR_GAP = 1;
+
+// Rounds a number the tree writes into a rect as the builder rounds the
+// picture's own (4 decimals), which removes the float noise of summed positions.
+const roundForMarkup = (num) => parseFloat(num.toFixed(4));
 
 export class BlissElement {
   //#region Private Properties
@@ -50,6 +54,7 @@ export class BlissElement {
   #classifiedParts; // Cached result of #classifyParts (level 2 only)
   #isFused = false; // Two or more base parts: no spacing data (level 2 only)
   #linkArea; // { left, right } in its own frame, set by the root once the layout is final (levels 1 and 2)
+  #paintArea; // the same for its background, the margins shared between painted neighbours instead
 
   /**
    * Stamps a non-inherited `vector-effect` onto bare <path> elements.
@@ -144,16 +149,16 @@ export class BlissElement {
     return content;
   }
 
-  /**
-   * A link's hit rect. Its numbers are rounded as the builder rounds the
-   * picture's own, which removes the float noise of summed positions.
-   */
+  /** A link's hit rect, its numbers rounded as the picture's own are. */
   static #hitRect({ x, y, width, height }) {
-    const round = (num) => parseFloat(num.toFixed(4));
+    const round = roundForMarkup;
     return `<rect x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" fill="transparent" stroke="none"/>`;
   }
 
-  /** A linked part's area: its ink box plus PART_HIT_MARGIN on every side. */
+  /**
+   * A linked or painted part's area: its ink box plus PART_HIT_MARGIN on every
+   * side.
+   */
   static #inkHitBox({ minX, minY, width, height }) {
     return {
       x: minX - PART_HIT_MARGIN,
@@ -164,17 +169,18 @@ export class BlissElement {
   }
 
   /**
-   * A linked word's or character's area: its link area across the band plus
-   * HIT_MARGIN above and below, placed from its frame's origin. Null without an
-   * area, as for a word of no characters. A character overlapped by both
-   * neighbours can be left an area of no width, never a negative one.
+   * A linked or painted word's or character's area: its link area or its paint
+   * area across the band plus HIT_MARGIN above and below, placed from its
+   * frame's origin. Null without an area, as for a word of no characters. A
+   * character overlapped by both neighbours can be left an area of no width,
+   * never a negative one.
    */
-  #bandHitBox(originX, originY) {
-    if (!this.#linkArea) return null;
+  static #bandHitBox(originX, originY, area) {
+    if (!area) return null;
     return {
-      x: originX + this.#linkArea.left,
+      x: originX + area.left,
       y: originY - HIT_MARGIN,
-      width: Math.max(0, this.#linkArea.right - this.#linkArea.left),
+      width: Math.max(0, area.right - area.left),
       height: BAND_HEIGHT + 2 * HIT_MARGIN,
     };
   }
@@ -188,49 +194,143 @@ export class BlissElement {
   }
 
   /**
-   * Gives every word and character its link area, in its own frame (root
-   * only, once the layout is final). A character's runs across its base span,
-   * indicators ignored, plus HIT_MARGIN on each side. Toward a linked
-   * neighbour (the next character in reading order, across a word space too,
-   * linked itself or by its word) it takes half the gap where that is less,
-   * so two links closer than twice the margin meet halfway; toward any other
-   * it keeps the full margin at any gap, since no other link is there to
-   * share it. A part's link, or the global one, does not make its character
-   * linked. A word's area joins its characters'. Done here because a
+   * The paint this element's own `background` puts behind it, or '' for none.
+   * Never inherited: a word's background is one area, never one per
+   * character, or a translucent paint would darken where two overlap. An empty
+   * value paints nothing, as at global scope.
+   */
+  get #background() {
+    return this.#blissObj.options?.background ?? '';
+  }
+
+  /**
+   * Gives every word and character its link area and its paint area, in its
+   * own frame (root only, once the layout is final). The two are built alike,
+   * each sharing its margins only with neighbours of its own kind. A
+   * character's area runs across its base span, indicators ignored, plus
+   * HIT_MARGIN on each side. Toward a linked neighbour (the next character in
+   * reading order, across a word space too, linked itself or by its word) its
+   * link area takes half the gap where that is less, so two links closer than
+   * twice the margin meet halfway; toward any other it keeps the full margin
+   * at any gap, since no other link is there to share it. Its paint area does
+   * the same toward a painted neighbour, painted itself or by its word. A
+   * part's link or background, or the global one, does not count for its
+   * character. A word's area joins its characters'. Done here because a
    * character cannot see a neighbour in another word from its own frame.
    * Spaces and characters that draw nothing are not characters here: no area
    * of their own, and no neighbour to anyone.
    */
-  #assignLinkAreas() {
+  #assignAreas() {
     // Base spans in the root's frame, in reading order.
     const characters = this.#children
       .filter(group => !group.#isSpaceGroup)
       .flatMap(group => {
         const wordLinked = group.#buildsLink;
+        const wordPainted = group.#background !== '';
         return group.#children
           .filter(glyph => glyph.#children.length > 0)
           .map(glyph => {
             const origin = group.#relativeToParentX + glyph.#relativeToParentX;
             const { left, right } = glyph.#baseSpan;
             const linked = wordLinked || glyph.#buildsLink;
-            return { group, glyph, origin, linked, left: origin + left, right: origin + right };
+            const painted = wordPainted || glyph.#background !== '';
+            return { group, glyph, origin, linked, painted, left: origin + left, right: origin + right };
           });
       });
 
-    const words = new Map(); // group -> its characters' areas joined, in the root's frame
-    characters.forEach(({ group, glyph, origin, left, right }, i) => {
-      const previous = characters[i - 1];
-      const next = characters[i + 1];
-      const areaLeft = left - (previous?.linked ? Math.min(HIT_MARGIN, (left - previous.right) / 2) : HIT_MARGIN);
-      const areaRight = right + (next?.linked ? Math.min(HIT_MARGIN, (next.left - right) / 2) : HIT_MARGIN);
-      glyph.#linkArea = { left: areaLeft - origin, right: areaRight - origin };
-      const word = words.get(group) ?? { left: areaLeft, right: areaRight };
-      words.set(group, { left: Math.min(word.left, areaLeft), right: Math.max(word.right, areaRight) });
-    });
+    // Per kind: which neighbours share its margins, and where its area is kept.
+    const kinds = [
+      [character => character.linked, (element, area) => { element.#linkArea = area; }],
+      [character => character.painted, (element, area) => { element.#paintArea = area; }],
+    ];
+    for (const [shares, setArea] of kinds) {
+      const words = new Map(); // group -> its characters' areas joined, in the root's frame
+      characters.forEach(({ group, glyph, origin, left, right }, i) => {
+        const previous = characters[i - 1];
+        const next = characters[i + 1];
+        const areaLeft = left - (previous && shares(previous) ? Math.min(HIT_MARGIN, (left - previous.right) / 2) : HIT_MARGIN);
+        const areaRight = right + (next && shares(next) ? Math.min(HIT_MARGIN, (next.left - right) / 2) : HIT_MARGIN);
+        setArea(glyph, { left: areaLeft - origin, right: areaRight - origin });
+        const word = words.get(group) ?? { left: areaLeft, right: areaRight };
+        words.set(group, { left: Math.min(word.left, areaLeft), right: Math.max(word.right, areaRight) });
+      });
 
-    for (const [group, { left, right }] of words) {
-      group.#linkArea = { left: left - group.#relativeToParentX, right: right - group.#relativeToParentX };
+      for (const [group, { left, right }] of words) {
+        setArea(group, { left: left - group.#relativeToParentX, right: right - group.#relativeToParentX });
+      }
     }
+  }
+
+  /**
+   * The box this element's own background paints, in the content's
+   * coordinates, from the origin of the frame it sits in; null where it paints
+   * none. A word's or a character's is its paint area across the band, a
+   * part's its ink box plus PART_HIT_MARGIN: the shapes a link's area takes.
+   * An element with no paint area paints nothing: a word of no characters, a
+   * character that draws nothing, and the root, which is never given one, as
+   * its background is the picture's own, drawn by the builder.
+   */
+  #backgroundBox(x, y) {
+    if (this.#background === '') return null;
+    if (this.#level <= 2) {
+      return BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea);
+    }
+    return BlissElement.#inkHitBox(this.#calculateBounds(x, y));
+  }
+
+  /**
+   * Visits every element at or below this one that paints a background, with
+   * its box, in the order the backgrounds are drawn: pre-order, so a word
+   * comes before its characters, a character before its parts, and an earlier
+   * part before a later one. `x` and `y` are the origin of the frame this
+   * element sits in, as getSvgContent takes them.
+   */
+  #visitBackgrounds(visit, x = 0, y = 0) {
+    const box = this.#backgroundBox(x, y);
+    if (box) visit(this, box);
+    for (const child of this.#children) {
+      child.#visitBackgrounds(visit, this.#relativeToParentX + x, this.#relativeToParentY + y);
+    }
+  }
+
+  /**
+   * This element's background as markup: a rect over its box in its paint.
+   * The rect sets `stroke="none"` itself, or the content group's stroke would
+   * outline it. Its classes make it a target of the layer attributes, which
+   * the builder writes through the formatter it shares with the tree; a tree
+   * built without one writes the classes and the computed attributes alone.
+   */
+  #backgroundMarkup(box) {
+    const classes = ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS.box];
+    const computed = {
+      x: roundForMarkup(box.x),
+      y: roundForMarkup(box.y),
+      width: roundForMarkup(box.width),
+      height: roundForMarkup(box.height),
+      fill: this.#background,
+      stroke: 'none',
+    };
+    const format = this.#sharedOptions.formatLayerAttributes ?? BlissElement.#ownLayerAttributes;
+    return `<rect ${format(classes, computed)}/>`;
+  }
+
+  /** A layer's attributes with no author's to add: its classes, then what was computed. */
+  static #ownLayerAttributes(classes, computed) {
+    return Object.entries({ class: classes.join(' '), ...computed })
+      .map(([name, value]) => `${name}="${value}"`)
+      .join(' ');
+  }
+
+  /**
+   * The ELEMENT_CLASSES entries of the element backgrounds this tree draws,
+   * found by the walk that draws them, without rendering (root only). The
+   * builder reads it to report a layer attribute that displaces a written
+   * `background`, which it can judge only once the tree is built.
+   */
+  get drawnBackgroundElements() {
+    const drawn = new Set();
+    this.#visitBackgrounds(() => drawn.add(BACKGROUND_AREA_ELEMENTS.box));
+    return drawn;
   }
 
   static #separateAnchorAndGroupOptions(processed, authored) {
@@ -576,7 +676,7 @@ export class BlissElement {
       this.#relativeToParentX = this.#childStartOffset + (this.#blissObj.x ?? 0);
       this.#relativeToParentY = this.#blissObj.y ?? 0;
 
-      this.#assignLinkAreas();
+      this.#assignAreas();
 
       this.getSvgContent = (x = 0, y = 0) => {
         const childContents = this.#children.map(child =>
@@ -588,9 +688,20 @@ export class BlissElement {
 
         // Nothing is wrapped here: every global option, the link included,
         // is written by the builder around the content group.
-        return hasTaggedContent && hasRawContent
+        const ink = hasTaggedContent && hasRawContent
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
+
+        // Every word, character and part background comes first, beneath all
+        // of the ink: a background drawn inside its own element would hide the
+        // ink of every earlier neighbour or part it reaches under. Every link
+        // is drawn after them too, so none takes a link's click. The ink
+        // follows as svgContent would write it alone: raw path data in a path
+        // of its own.
+        const backgrounds = [];
+        this.#visitBackgrounds((element, box) => backgrounds.push(element.#backgroundMarkup(box)), x, y);
+        if (backgrounds.length === 0) return ink;
+        return backgrounds.join('') + (ink.startsWith('<') ? ink : `<path d="${ink}"/>`);
       };
     } else if (this.#level === 1) {
       // Group level
@@ -689,7 +800,7 @@ export class BlissElement {
           : childContents.join('');
 
         return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-          () => this.#bandHitBox(originX, originY));
+          () => BlissElement.#bandHitBox(originX, originY, this.#linkArea));
       };
 
       // A fail-flagged group (group.errorCode) can no longer reach here: the
@@ -896,7 +1007,7 @@ export class BlissElement {
               : childContents.join('');
 
             return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-              () => this.#bandHitBox(originX, originY));
+              () => BlissElement.#bandHitBox(originX, originY, this.#linkArea));
           };
         }
       } else {

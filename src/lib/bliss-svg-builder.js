@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -1822,6 +1822,12 @@ class BlissSVGBuilder {
         return parts;
       })(),
       keys: new Set(),
+      // How the tree writes the attributes of an element it paints itself (a
+      // word's, a character's or a part's background), so a key naming its
+      // class reaches it as one naming any other layer does. Read at render
+      // time, after the walk below has filled the layer attributes.
+      formatLayerAttributes: (classes, computed) =>
+        formatAttributes(layerAttributes(classes, computed, this.#authoredFor(classes))),
     };
     if (blissObj._parseWarnings) {
       this.#warnings.push(...blissObj._parseWarnings);
@@ -2064,30 +2070,39 @@ class BlissSVGBuilder {
     // key (an unsafe or a reserved name) is still in the bag and reaches no
     // markup, so the bag would report a displacement that never happened. The
     // map is what the emitters actually consume.
-    const displaced = new Map();
-    for (const [element, attributes] of Object.entries(CURATED_ATTRIBUTE_SOURCES)) {
-      if (!elementIsDrawn(element)) continue;
-      const targets = ELEMENT_CLASSES[element].map(targetOfClass);
-      for (const [attribute, chain] of Object.entries(attributes)) {
-        // The most specific target the author wrote for this element wins, the
-        // same class-order rule the emitter applies.
-        const rawTarget = targets
-          .filter(t => Object.hasOwn(this.#layerAttributes[t] ?? {}, attribute)).at(-1);
-        const curatedKey = chain.find(k => writtenOptions.has(k));
-        if (!rawTarget || !curatedKey) continue;
-        const rawKey = `${rawTarget}--${attribute}`;
-        const id = `${rawKey} ${curatedKey}`;
-        if (!displaced.has(id)) displaced.set(id, { rawKey, curatedKey, attribute, elements: [] });
-        displaced.get(id).elements.push(targets.at(-1));
+    //
+    // Run twice, over the elements each moment can judge: here for the ones
+    // the builder draws, and once the element tree is built for the element
+    // backgrounds, which only the tree knows it draws.
+    const reportDisplacedOptions = (isDrawn, isWritten) => {
+      const displaced = new Map();
+      for (const [element, attributes] of Object.entries(CURATED_ATTRIBUTE_SOURCES)) {
+        if (!isDrawn(element)) continue;
+        const targets = ELEMENT_CLASSES[element].map(targetOfClass);
+        for (const [attribute, chain] of Object.entries(attributes)) {
+          // The most specific target the author wrote for this element wins, the
+          // same class-order rule the emitter applies.
+          const rawTarget = targets
+            .filter(t => Object.hasOwn(this.#layerAttributes[t] ?? {}, attribute)).at(-1);
+          const curatedKey = chain.find(isWritten);
+          if (!rawTarget || !curatedKey) continue;
+          const rawKey = `${rawTarget}--${attribute}`;
+          const id = `${rawKey} ${curatedKey}`;
+          if (!displaced.has(id)) displaced.set(id, { rawKey, curatedKey, attribute, elements: [] });
+          displaced.get(id).elements.push(targets.at(-1));
+        }
       }
-    }
-    for (const { rawKey, curatedKey, attribute, elements } of displaced.values()) {
-      this.#warnings.push({
-        code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
-        message: `"${rawKey}" and "${curatedKey}" both set "${attribute}" on ${elements.join(', ')}, so "${rawKey}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
-        source: curatedKey,
-      });
-    }
+      for (const { rawKey, curatedKey, attribute, elements } of displaced.values()) {
+        this.#warnings.push({
+          code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
+          message: `"${rawKey}" and "${curatedKey}" both set "${attribute}" on ${elements.join(', ')}, so "${rawKey}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
+          source: curatedKey,
+        });
+      }
+    };
+    const drawnByTree = new Set(Object.values(BACKGROUND_AREA_ELEMENTS));
+    reportDisplacedOptions((element) => !drawnByTree.has(element) && elementIsDrawn(element),
+      (key) => writtenOptions.has(key));
 
     // A written viewBox states the value the geometry options exist to compute,
     // so it wins and they are named rather than left looking effective.
@@ -2100,6 +2115,12 @@ class BlissSVGBuilder {
     }
 
     this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });
+
+    // The element backgrounds' displacements, now that the tree says which it
+    // draws. One is drawn only where a `background` was written on its
+    // element, so every key in their chains counts as written.
+    const drawnBackgrounds = this.composition.drawnBackgroundElements;
+    reportDisplacedOptions((element) => drawnBackgrounds.has(element), () => true);
 
     // The output side. Every value that got here passed its own gate, so what
     // is judged is the arithmetic: two terms can sum past the largest double,
@@ -6217,6 +6238,15 @@ class BlissSVGBuilder {
     };
   }
 
+  // The authored attributes for one element: every class it carries, applied
+  // general to specific, so the more specific class wins. That is the order the
+  // classes are written in, which is what makes the precedence readable in the
+  // markup rather than a rule to look up. Every key looked up here comes from
+  // ELEMENT_CLASSES and never from input, so an inherited name cannot reach it.
+  #authoredFor(classes) {
+    return Object.assign({}, ...classes.map(c => this.#layerAttributes[targetOfClass(c)] ?? {}));
+  }
+
   get #svgCode() {
     const {
       width, height, cropTop, cropBottom, cropLeft, cropRight, gridOffsetX,
@@ -6258,18 +6288,10 @@ class BlissSVGBuilder {
     // in that entry itself.
     let svgText = "";
 
-    // The authored attributes for one element: every class it carries, applied
-    // general to specific, so the more specific class wins. That is the order the
-    // classes are written in, which is what makes the precedence readable in the
-    // markup rather than a rule to look up. Every key looked up here comes from
-    // ELEMENT_CLASSES and never from input, so an inherited name cannot reach it.
-    const authoredFor = (classes) =>
-      Object.assign({}, ...classes.map(c => this.#layerAttributes[targetOfClass(c)] ?? {}));
-
     // `background--` names the group, which is the background's single node; the
     // rects that paint are reached with `background-zone--`.
     const backgroundWrapper = `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.background,
-      {}, authoredFor(ELEMENT_CLASSES.background)))}>`;
+      {}, this.#authoredFor(ELEMENT_CLASSES.background)))}>`;
 
     let backgroundContent = '';
     if (hasZones) {
@@ -6289,7 +6311,7 @@ class BlissSVGBuilder {
       const zoneRect = (classes, y, height, fill) =>
         `    <rect ${formatAttributes(layerAttributes(classes,
           { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill },
-          authoredFor(classes)))}/>`;
+          this.#authoredFor(classes)))}/>`;
 
       const zoneRects = [
         topColor ? zoneRect(ELEMENT_CLASSES.zoneTop, topY, topHeight, topColor) : '',
@@ -6301,7 +6323,7 @@ class BlissSVGBuilder {
     } else if (background !== "") {
       const paper = `    <rect ${formatAttributes(layerAttributes(ELEMENT_CLASSES.backgroundZone,
         { x: viewBox.x, y: viewBox.y, width: '100%', height: '100%', stroke: 'none', fill: background },
-        authoredFor(ELEMENT_CLASSES.backgroundZone)))}/>`;
+        this.#authoredFor(ELEMENT_CLASSES.backgroundZone)))}/>`;
       backgroundContent = `${backgroundWrapper}\n${paper}\n  </g>`;
     }
 
@@ -6360,7 +6382,7 @@ class BlissSVGBuilder {
       const gridLine = (classes, strokeWidth, stroke, d) =>
         `    <path ${formatAttributes(layerAttributes(classes,
           { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square',
-            'stroke-linejoin': 'miter', d }, authoredFor(classes)))}/>`;
+            'stroke-linejoin': 'miter', d }, this.#authoredFor(classes)))}/>`;
 
       const gridLines = [
         minorD  ? gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD)  : '',
@@ -6379,7 +6401,7 @@ class BlissSVGBuilder {
         '    }',
         '  </style>',
         `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.grid,
-          { 'shape-rendering': 'crispEdges' }, authoredFor(ELEMENT_CLASSES.grid)))}>`,
+          { 'shape-rendering': 'crispEdges' }, this.#authoredFor(ELEMENT_CLASSES.grid)))}>`,
         gridLines,
         '  </g>',
       ].join('\n');

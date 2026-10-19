@@ -16,10 +16,16 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   with a fill option on the glyph wrapping the mix in a <g>.
  * - Composite level: raw sub-part children mixed with tagged sub-part
  *   children, with a fill option on the composite wrapping the mix.
+ * - Root level: an element background written first and the raw ink after
+ *   it in a <path> of its own, by a tree built without the builder, which
+ *   writes the background's classes and computed attributes alone.
  * - Predefined leaf extraPathOptions passed through to the leaf's
  *   getPath function when no inherited override is present.
  *
  * Does NOT cover:
+ * - The element backgrounds' boxes and their layer as the builder draws
+ *   them, see `BlissSVGBuilder.element-backgrounds.test.js` and
+ *   `BlissSVGBuilder.element-background-layer.test.js`.
  * - The <g options> wrapping mechanism itself or option inheritance
  *   across levels, see `BlissSVGBuilder.hierarchical-options.test.js`.
  * - getPath callable-ness validation (predefined-element invariant), see
@@ -151,6 +157,20 @@ describe('BlissElement path wrapping', () => {
 
       expect(element.getSvgContent())
         .toBe('<g fill="red"><g data-leaf="tagged"><path d="M0,0h1"/></g><path d="M3,0h2"/></g>');
+    });
+  });
+
+  describe('when the root writes an element background before raw ink', () => {
+    test('wraps the raw ink in a <path> after the background, written with its classes and computed attributes alone', () => {
+      const element = new BlissElement({
+        groups: [{ glyphs: [{ ...rawGlyph(), options: { background: 'yellow' } }] }]
+      });
+
+      // pins the tree's own formatting where no builder supplies one; a hand
+      // mutant that dropped it survived every builder row (2026-10-19)
+      expect(element.getSvgContent()).toBe(
+        '<rect class="bliss-element-background bliss-element-background--box" x="-1" y="-1" width="4" height="22" fill="yellow" stroke="none"/>'
+        + '<path d="M0,0h2"/>');
     });
   });
 

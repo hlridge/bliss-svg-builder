@@ -52,6 +52,18 @@ export const ELEMENT_CLASSES = Object.freeze({
   gridSky:        ['bliss-grid-line', 'bliss-grid-line--major', 'bliss-grid-line--sky'],
   gridEarth:      ['bliss-grid-line', 'bliss-grid-line--major', 'bliss-grid-line--earth'],
   content:        ['bliss-content'],
+  elementBackgroundBox: ['bliss-element-background', 'bliss-element-background--box'],
+});
+
+/**
+ * The element a word's, a character's or a part's background is drawn as,
+ * keyed by the `background-area` word that draws it. These are the painted
+ * elements the element tree draws rather than the builder, so whether one is
+ * drawn is known only once the tree is built, after the global walk; the
+ * displacement report judges them there.
+ */
+export const BACKGROUND_AREA_ELEMENTS = Object.freeze({
+  box: 'elementBackgroundBox',
 });
 
 /**
@@ -65,8 +77,9 @@ export const ELEMENT_CLASSES = Object.freeze({
  *
  * Add an option to a chain here and it becomes reportable the moment something
  * writes it; leave one out and that option is silently never named as displaced.
- * Every name in every chain carries a row in `layer-sub-targets.test.js`, since
- * an entry no test reaches can be deleted with the whole suite green.
+ * Every name in every chain carries a row in `layer-sub-targets.test.js` (the
+ * element backgrounds' in `element-background-layer.test.js`), since an entry
+ * no test reaches can be deleted with the whole suite green.
  */
 export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   gridMinor:  { stroke: ['grid-minor-color', 'grid-color'],
@@ -83,6 +96,7 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   zoneTop:    { fill: ['background-top', 'background'] },
   zoneMid:    { fill: ['background-mid', 'background'] },
   zoneBottom: { fill: ['background-bottom', 'background'] },
+  elementBackgroundBox: { fill: ['background'] },
 });
 
 /**
@@ -263,6 +277,9 @@ export const BAND_HEIGHT = 20;
  * reaches HIT_MARGIN past the band and past its base span (less where a
  * linked neighbour is closer, so the two links meet halfway); a part's
  * reaches PART_HIT_MARGIN past its ink box on every side.
+ *
+ * An element background's box is the same shape with the same margins, shared
+ * between painted neighbours instead of linked ones.
  */
 export const HIT_MARGIN = 1;
 export const PART_HIT_MARGIN = 0.5;
