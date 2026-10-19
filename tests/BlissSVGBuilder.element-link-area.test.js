@@ -9,11 +9,14 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *
  * Covers:
  * - A character's area: its base span (stroke centres) plus 1 unit on each
- *   side, and y -1 to 21 in its own frame however short its ink; on a side
- *   where the next character in reading order is closer than 2 units, half the
- *   gap, across a word space too, whether or not that neighbour is linked. A
- *   character that draws nothing is nobody's neighbour, and one overlapped
- *   from both sides keeps an area of no width, never a negative one.
+ *   side, and y -1 to 21 in its own frame however short its ink. Toward a
+ *   linked neighbour (the next character in reading order, linked itself or
+ *   by its word) closer than 2 units, half the gap, across a word space too;
+ *   toward any other, the full unit at any gap, a neighbour that only holds a
+ *   linked part, sits under the global link or has its href refused included.
+ *   A character that draws nothing is nobody's neighbour, and one overlapped
+ *   from both sides by linked neighbours keeps an area of no width, never a
+ *   negative one.
  * - A word's area: its characters' areas joined; a word of no characters
  *   holds no rect.
  * - A part's area: its ink box plus 0.5 all round, wherever its character
@@ -61,21 +64,34 @@ describe('BlissSVGBuilder element link area', () => {
     it.each([
       ['2 units away', 'B313/[href=#x]B291', hitRect(9, -1, 10, 22)],
       ['4 units away', '[char-space=4]||B313/[href=#x]B291', hitRect(11, -1, 10, 22)],
-      ['1 unit away on its left', 'B313/AK:1/[href=#x]B291', hitRect(8.5, -1, 9.5, 22)],
-      ['1 unit away on its right', '[href=#x]B313/AK:1/B291', hitRect(-1, -1, 9.5, 22)],
-      ['in the previous word, 1 unit away', '[word-space=1]||B313//[href=#x]B291', hitRect(8.5, -1, 9.5, 22)],
-      ['in the next word, 1 unit away', '[word-space=1]||[href=#x]B313//B291', hitRect(-1, -1, 9.5, 22)],
-    ])('takes min(1, half the gap) toward an unlinked neighbour %s', (_case, input, rect) => {
-      // pins the half-gap rule (a full margin always, or neighbours sought only
-      // within the word, would give 8 and 10 on the 1-unit rows)
+      ['1 unit away on its left', 'B313/AK:1/[href=#x]B291', hitRect(8, -1, 10, 22)],
+      ['1 unit away on its right', '[href=#x]B313/AK:1/B291', hitRect(-1, -1, 10, 22)],
+      ['in the previous word, 1 unit away', '[word-space=1]||B313//[href=#x]B291', hitRect(8, -1, 10, 22)],
+      ['in the next word, 1 unit away', '[word-space=1]||[href=#x]B313//B291', hitRect(-1, -1, 10, 22)],
+      ['0.7 units away', '[char-space=0.7]||B313/B291/[href=#x]B291', hitRect(16.4, -1, 10, 22)],
+      ['overlapping it on both sides', 'B313/AK:-6/[href=#x]B1/AK:-4/B291', hitRect(1, -1, 2, 22)],
+    ])('takes the full unit toward an unlinked neighbour %s', (_case, input, rect) => {
+      // pins the full margin beside an unlinked neighbour: no other link
+      // collides there, so nothing cuts the area short (half the gap whatever
+      // the neighbour, the rule this replaced, gives 8.5 and 9.5 on the 1-unit
+      // rows)
       const svg = new BlissSVGBuilder(input).svgCode;
 
       expect(svg).toContain(`${linkOpen('#x')}${rect}`);
       expect(hitRects(svg)).toEqual([rect]);
     });
 
-    it('meets a linked neighbour halfway when they are 1 unit apart', () => {
-      const svg = new BlissSVGBuilder('[href=#a]B313/AK:1/[href=#b]B291').svgCode;
+    it.each([
+      ['each linked itself, in one word', '[href=#a]B313/AK:1/[href=#b]B291'],
+      ['each linked itself, across a word space', '[word-space=1]||[href=#a]B313//[href=#b]B291'],
+      ['the earlier linked by its word', '[word-space=1]||[href=#w]|B313//[href=#c]B291'],
+      ['the later linked by its word', '[word-space=1]||[href=#c]B313//[href=#w]|B291'],
+    ])('meets a linked neighbour halfway when they are 1 unit apart, %s', (_case, input) => {
+      // pins the half gap between two links, sought across a word space too (a
+      // full margin always, or neighbours sought only within the word, give 9
+      // and 8), and a character of a linked word counting as linked (counting
+      // only a character's own link, or only a word's, gives 8 or 9)
+      const svg = new BlissSVGBuilder(input).svgCode;
 
       expect(hitRects(svg)).toEqual([hitRect(-1, -1, 9.5, 22), hitRect(8.5, -1, 9.5, 22)]);
     });
@@ -87,31 +103,48 @@ describe('BlissSVGBuilder element link area', () => {
     });
 
     it.each([
-      ['an options-only token', 'B313/[color=red]/[href=#x]B291'],
-      ['an unknown code', 'B313/QQQ/[href=#x]B291'],
-    ])('measures the gap past a character that draws nothing, here %s', (_case, input) => {
-      // the token between sits at x=10, where B291 starts: counted as a
-      // neighbour, it would leave B291 no margin on its left (x="10")
+      ['only a part of it is linked', 'B313;[href=#p]>B81/AK:1/[href=#x]B291'],
+      ['only the global link covers it', '[href=#g]||B313/AK:1/[href=#x]B291'],
+      ['its href is refused', '[href=javascript:alert(1)]B313/AK:1/[href=#x]B291'],
+    ])('treats a neighbour as unlinked when %s', (_case, input) => {
+      // pins what counts as linked: a character's own link or its word's, and
+      // only one that is drawn (counting these would give x="8.5")
       const svg = new BlissSVGBuilder(input).svgCode;
 
-      expect(hitRects(svg)).toEqual([hitRect(9, -1, 10, 22)]);
+      expect(svg).toContain(`${linkOpen('#x')}${hitRect(8, -1, 10, 22)}`);
     });
 
-    it('leaves a character overlapped from both sides an area of no width', () => {
+    it.each([
+      ['an options-only token', 'B313/[color=red]/[href=#x]B291', [hitRect(9, -1, 10, 22)]],
+      ['an unknown code', 'B313/QQQ/[href=#x]B291', [hitRect(9, -1, 10, 22)]],
+      ['an options-only token in a linked word', '[href=#w]|B313/[color=red]/[href=#x]B291',
+        [hitRect(-1, -1, 20, 22), hitRect(9, -1, 10, 22)]],
+      ['an unknown code in a linked word', '[href=#w]|B313/QQQ/[href=#x]B291',
+        [hitRect(-1, -1, 20, 22), hitRect(9, -1, 10, 22)]],
+    ])('measures the gap past a character that draws nothing, here %s', (_case, input, rects) => {
+      // the token between sits at x=10, where B291 starts: counted as a
+      // neighbour, and linked by its word, it would leave B291 no margin on its
+      // left (x="10")
+      const svg = new BlissSVGBuilder(input).svgCode;
+
+      expect(hitRects(svg)).toEqual(rects);
+    });
+
+    it('leaves a character overlapped from both sides by linked neighbours an area of no width', () => {
       // B313 ends at 8 and B291 starts at -2 around B1 at 2, so halfway on each
       // side crosses over (5 on the left, 0 on the right); pins the width
       // stopping at 0 rather than going negative
-      const svg = new BlissSVGBuilder('B313/AK:-6/[href=#x]B1/AK:-4/B291').svgCode;
+      const svg = new BlissSVGBuilder('[href=#a]B313/AK:-6/[href=#x]B1/AK:-4/[href=#b]B291').svgCode;
 
-      expect(hitRects(svg)).toEqual([hitRect(5, -1, 0, 22)]);
+      expect(hitRects(svg)).toEqual([hitRect(-1, -1, 6, 22), hitRect(5, -1, 0, 22), hitRect(0, -1, 7, 22)]);
     });
 
     it('rounds the rect to 4 decimals, as the picture rounds its own numbers', () => {
       // pins the rounding: the linked B291 sits at 8.7 + 8 + 0.7, and unrounded
       // its rect reads x="17.049999999999997" width="9.350000000000001"
-      const svg = new BlissSVGBuilder('[char-space=0.7]||B313/B291/[href=#x]B291').svgCode;
+      const svg = new BlissSVGBuilder('[char-space=0.7]||B313/[href=#a]B291/[href=#x]B291').svgCode;
 
-      expect(hitRects(svg)).toEqual([hitRect(17.05, -1, 9.35, 22)]);
+      expect(svg).toContain(`${linkOpen('#x')}${hitRect(17.05, -1, 9.35, 22)}`);
     });
 
     it('keeps the base span when an indicator overhangs it', () => {

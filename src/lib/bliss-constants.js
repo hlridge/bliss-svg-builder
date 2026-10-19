@@ -260,8 +260,8 @@ export const BAND_HEIGHT = 20;
  * is drawn on the stroke's centre line, so an area that stopped there would
  * leave the outer half of every edge stroke unclickable. A character's area
  * reaches HIT_MARGIN past the band and past its base span (less where a
- * neighbour is closer, so the two meet halfway); a part's reaches
- * PART_HIT_MARGIN past its ink box on every side.
+ * linked neighbour is closer, so the two links meet halfway); a part's
+ * reaches PART_HIT_MARGIN past its ink box on every side.
  */
 export const HIT_MARGIN = 1;
 export const PART_HIT_MARGIN = 0.5;

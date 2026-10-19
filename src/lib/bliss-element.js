@@ -180,13 +180,24 @@ export class BlissElement {
   }
 
   /**
+   * Whether this word or character draws a link of its own: judged by the
+   * walk its wrap makes, so a refused href counts as no link here too.
+   */
+  get #buildsLink() {
+    return BlissElement.#separateAnchorAndGroupOptions(this.#blissObj.options, this.#blissObj.authoredOptions).hasHref;
+  }
+
+  /**
    * Gives every word and character its link area, in its own frame (root
    * only, once the layout is final). A character's runs across its base span,
-   * indicators ignored, plus HIT_MARGIN on each side, or half the gap to the
-   * next character in reading order where that is less, across a word space
-   * too: two neighbours closer than twice the margin meet halfway, whether or
-   * not the other is linked. A word's joins its characters'. Done here because
-   * a character cannot see a neighbour in another word from its own frame.
+   * indicators ignored, plus HIT_MARGIN on each side. Toward a linked
+   * neighbour (the next character in reading order, across a word space too,
+   * linked itself or by its word) it takes half the gap where that is less,
+   * so two links closer than twice the margin meet halfway; toward any other
+   * it keeps the full margin at any gap, since no other link is there to
+   * share it. A part's link, or the global one, does not make its character
+   * linked. A word's area joins its characters'. Done here because a
+   * character cannot see a neighbour in another word from its own frame.
    * Spaces and characters that draw nothing are not characters here: no area
    * of their own, and no neighbour to anyone.
    */
@@ -194,20 +205,24 @@ export class BlissElement {
     // Base spans in the root's frame, in reading order.
     const characters = this.#children
       .filter(group => !group.#isSpaceGroup)
-      .flatMap(group => group.#children
-        .filter(glyph => glyph.#children.length > 0)
-        .map(glyph => {
-          const origin = group.#relativeToParentX + glyph.#relativeToParentX;
-          const { left, right } = glyph.#baseSpan;
-          return { group, glyph, origin, left: origin + left, right: origin + right };
-        }));
+      .flatMap(group => {
+        const wordLinked = group.#buildsLink;
+        return group.#children
+          .filter(glyph => glyph.#children.length > 0)
+          .map(glyph => {
+            const origin = group.#relativeToParentX + glyph.#relativeToParentX;
+            const { left, right } = glyph.#baseSpan;
+            const linked = wordLinked || glyph.#buildsLink;
+            return { group, glyph, origin, linked, left: origin + left, right: origin + right };
+          });
+      });
 
     const words = new Map(); // group -> its characters' areas joined, in the root's frame
     characters.forEach(({ group, glyph, origin, left, right }, i) => {
       const previous = characters[i - 1];
       const next = characters[i + 1];
-      const areaLeft = left - (previous ? Math.min(HIT_MARGIN, (left - previous.right) / 2) : HIT_MARGIN);
-      const areaRight = right + (next ? Math.min(HIT_MARGIN, (next.left - right) / 2) : HIT_MARGIN);
+      const areaLeft = left - (previous?.linked ? Math.min(HIT_MARGIN, (left - previous.right) / 2) : HIT_MARGIN);
+      const areaRight = right + (next?.linked ? Math.min(HIT_MARGIN, (next.left - right) / 2) : HIT_MARGIN);
       glyph.#linkArea = { left: areaLeft - origin, right: areaRight - origin };
       const word = words.get(group) ?? { left: areaLeft, right: areaRight };
       words.set(group, { left: Math.min(word.left, areaLeft), right: Math.max(word.right, areaRight) });
