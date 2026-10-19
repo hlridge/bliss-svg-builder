@@ -25,6 +25,7 @@ export const KNOWN_OPTION_KEYS = new Set([
   'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
   'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
   'color', 'background', 'background-top', 'background-mid', 'background-bottom',
+  'background-area', 'link-area',
   'text', 'svg-desc', 'svg-title', 'svg-height', 'error-placeholder',
   'key'
 ]);
@@ -699,6 +700,10 @@ export function generateKey() {
  *   genuinely applies per element via option inheritance.
  * - x/y/key and kerning are excluded: positioning and identity, handled by
  *   their own extraction logic.
+ * - `background` is excluded, and so are the two area options
+ *   (`background-area`, `link-area`): each acts at every scope, and below the
+ *   global bracket a background paints its own word, character or part. Its
+ *   three zones stay: they are bands of the writing grid.
  */
 export const GLOBAL_ONLY_OPTION_KEYS = new Set([
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
@@ -707,7 +712,7 @@ export const GLOBAL_ONLY_OPTION_KEYS = new Set([
   'grid-minor-color', 'grid-sky-color', 'grid-earth-color',
   'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
   'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
-  'background', 'background-top', 'background-mid', 'background-bottom',
+  'background-top', 'background-mid', 'background-bottom',
   'center', 'min-width', 'char-space', 'word-space', 'external-glyph-space',
   'svg-title', 'svg-desc', 'svg-height', 'error-placeholder'
 ]);
@@ -1153,6 +1158,18 @@ export const writtenNumber = (value) => {
   return typeof value === 'string' ? numberFromText(value) : NaN;
 };
 
+/**
+ * True when an option was written without a value. Blank rather than absent: a
+ * bare key arrives as `true`, an empty value as '', a quoted blank as
+ * whitespace, and an omitted one as null or undefined. Shared by the two
+ * judges that give a missing value a refusal of its own, the numeric one and
+ * the keyword one, so they cannot disagree on what counts as missing.
+ */
+const isWrittenWithoutValue = (rawValue) => (
+  rawValue === true || rawValue === null || rawValue === undefined
+  || (typeof rawValue === 'string' && rawValue.trim() === '')
+);
+
 export const judgeNumericOptionValue = (key, rawValue) => {
   const policy = NUMERIC_OPTION_POLICY.get(key);
   if (!policy) return null;
@@ -1161,13 +1178,9 @@ export const judgeNumericOptionValue = (key, rawValue) => {
   // route, and a template literal throws on a symbol and on the three objects
   // `textOfValue` names. Every value that converts reads exactly as before.
   const source = rawValue === true ? key : `${key}=${textOfValue(rawValue)}`;
-  // Blank rather than absent: a bare key arrives as `true`, an empty value as
-  // '', a quoted blank as whitespace, and an omitted one as null or undefined.
-  // Number() turns every one of them into 0, so each would otherwise set a
+  // Number() turns every blank value into 0, so each would otherwise set a
   // spacing nobody typed.
-  const isBlank = rawValue === true || rawValue === null || rawValue === undefined
-    || (typeof rawValue === 'string' && rawValue.trim() === '');
-  if (isBlank) {
+  if (isWrittenWithoutValue(rawValue)) {
     return {
       code: WARNING_CODES.INVALID_OPTION_VALUE,
       message: `"${key}" needs a number and was written without one, ${tail}`,
@@ -1309,6 +1322,57 @@ export const judgeTextOptionValue = (key, rawValue) => {
     code: WARNING_CODES.INVALID_OPTION_VALUE,
     message: `"${key}" needs a text value and ${shown} is not one, ${tail}`,
     source: `${key}=${textOfValue(rawValue)}`,
+  };
+};
+
+/**
+ * The curated options that take one WORD from a closed list, and the words
+ * each takes, in the order a refusal names them.
+ *
+ * A family of its own because its judge enforces the list: every other value
+ * is refused, so the list is the whole truth about what the option accepts,
+ * and that is what lets the option's declared type name its words rather than
+ * `string`. A text option cannot be typed that way, since the text gate
+ * honours any text it is given.
+ *
+ * The keys stay text options as well (derived into `TEXT_OPTION_KEYS`), so a
+ * value with no text form is refused first, by the text gate in that gate's
+ * words, and only a value that has one reaches the judge below.
+ */
+export const KEYWORD_OPTION_VALUES = new Map([
+  ['background-area', ['box', 'ink']],
+  ['link-area', ['box', 'ink']],
+]);
+
+/**
+ * Judges one written value for a keyword option. Same two arms as the numeric
+ * and text judges: the value is honoured when it is exactly one of the
+ * option's words, or refused, and then the option falls back exactly as if it
+ * had never been written.
+ *
+ * Exactly, as `crop=auto` is matched: `INK` is refused, not read as `ink`. A
+ * judge that folded case would honour a spelling the saved string then keeps
+ * as typed, and every other reader of that string would have to fold it too.
+ *
+ * A value written without one is refused in words of its own, as the numeric
+ * judge refuses it: a bare key arrives as `true`, which the author never wrote,
+ * so quoting it would name a value nobody typed. The message is phrased for an
+ * option of two words, which is every one there is.
+ *
+ * Returns null when the value is honoured, so the caller assigns it; otherwise
+ * the warning to report, and the caller assigns nothing.
+ */
+export const judgeKeywordOptionValue = (key, rawValue) => {
+  const words = KEYWORD_OPTION_VALUES.get(key);
+  if (!words || words.includes(rawValue)) return null;
+  const takes = `"${key}" takes ${words.join(' or ')}`;
+  const tail = 'so it was ignored: the option keeps the value it would have had without it.';
+  return {
+    code: WARNING_CODES.INVALID_OPTION_VALUE,
+    message: isWrittenWithoutValue(rawValue)
+      ? `${takes} and was written without one, ${tail}`
+      : `${takes}, and ${describeRefusedValue(rawValue)} is neither, ${tail}`,
+    source: rawValue === true ? key : `${key}=${textOfValue(rawValue)}`,
   };
 };
 

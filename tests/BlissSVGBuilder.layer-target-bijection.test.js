@@ -48,6 +48,10 @@ const CONFIGURATIONS = [
   '[grid;background-top=red;background-mid=green;background-bottom=blue]||B291',
   '[grid]||B291//H',
   'B291',
+  // The probe writes into the first bracket, which has to be a global one: an
+  // element background is written on its element, after it.
+  '[background-area=box]||[background=yellow]B291',
+  '[background-area=ink]||[background=yellow]B291',
 ];
 
 // A class is one whitespace-separated TOKEN. Substring or \b matching is wrong

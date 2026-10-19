@@ -546,6 +546,7 @@ describe('BlissSVGBuilder option value gate', () => {
         'grid-minor-color', 'grid-sky-color', 'grid-earth-color', 'color',
         'background', 'background-top', 'background-mid', 'background-bottom',
         'text', 'svg-desc', 'svg-title', 'error-placeholder', 'key',
+        'background-area', 'link-area',
       ]);
       const expected = [...KNOWN_OPTION_KEYS].filter((k) => !NON_NUMERIC.has(k));
       expect([...NUMERIC_OPTION_POLICY.keys()].sort()).toEqual(expected.sort());

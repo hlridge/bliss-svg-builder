@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
-import { KNOWN_OPTION_KEYS } from '../src/lib/bliss-constants.js';
+import { KNOWN_OPTION_KEYS, KEYWORD_OPTION_VALUES } from '../src/lib/bliss-constants.js';
 
 /**
  * Pins the curated half of the attribute naming contract: an option the library
@@ -62,6 +62,10 @@ const CURATED_CAMEL_SPELLINGS = [...KNOWN_OPTION_KEYS]
   .filter((key) => key.includes('-'))
   .map((key) => key.replace(/-(.)/g, (_, letter) => letter.toUpperCase()));
 
+// The value a generated row writes: 1 for every option but a keyword one,
+// which takes only its own words, so its first word stands in.
+const valueFor = (kebab) => KEYWORD_OPTION_VALUES.get(kebab)?.[0] ?? 1;
+
 describe('BlissSVGBuilder option spelling', () => {
   describe('when a curated option is written the way JavaScript spells it', () => {
     it('has a spelling to test in the derived list', () => {
@@ -81,8 +85,8 @@ describe('BlissSVGBuilder option spelling', () => {
 
     it.each(CURATED_CAMEL_SPELLINGS)('renders %s identically to its curated spelling', (camel) => {
       const kebab = camel.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-      const b = render(`[${camel}=1]||B291`);
-      expect(b.svgCode).toBe(render(`[${kebab}=1]||B291`).svgCode);
+      const b = render(`[${camel}=${valueFor(kebab)}]||B291`);
+      expect(b.svgCode).toBe(render(`[${kebab}=${valueFor(kebab)}]||B291`).svgCode);
       expect(b.warnings).toEqual([]);
     });
 
@@ -91,7 +95,7 @@ describe('BlissSVGBuilder option spelling', () => {
       // nothing about which spelling was stored, and the serializer reads the
       // stored bag.
       const kebab = camel.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-      expect(render(`[${camel}=1]||B291`).toString()).toBe(`[${kebab}=1]||B291`);
+      expect(render(`[${camel}=${valueFor(kebab)}]||B291`).toString()).toBe(`[${kebab}=${valueFor(kebab)}]||B291`);
     });
 
     it('resolves the name before the scope gates', () => {

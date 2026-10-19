@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
-import { KNOWN_OPTION_KEYS } from '../src/lib/bliss-constants.js';
+import { KNOWN_OPTION_KEYS, KEYWORD_OPTION_VALUES } from '../src/lib/bliss-constants.js';
 
 /**
  * Pins what an options bag does when it arrives inside a composition OBJECT: the
@@ -82,6 +82,10 @@ const CURATED_CAMEL_SPELLINGS = [...KNOWN_OPTION_KEYS]
   .filter((key) => key.includes('-'))
   .map((key) => key.replace(/-(.)/g, (_, letter) => letter.toUpperCase()));
 
+// The value a generated row writes: 1 for every option but a keyword one,
+// which takes only its own words, so its first word stands in.
+const valueFor = (kebab) => KEYWORD_OPTION_VALUES.get(kebab)?.[0] ?? 1;
+
 describe('BlissSVGBuilder object-input options', () => {
   describe('when a curated option is written the way JavaScript spells it', () => {
     it('has a spelling to test in the derived list', () => {
@@ -100,8 +104,8 @@ describe('BlissSVGBuilder object-input options', () => {
 
     it.each(CURATED_CAMEL_SPELLINGS)('renders %s identically to its curated spelling', (camel) => {
       const kebab = camel.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
-      const b = build(atDocument({ [camel]: 1 }));
-      expect(b.svgCode).toBe(build(atDocument({ [kebab]: 1 })).svgCode);
+      const b = build(atDocument({ [camel]: valueFor(kebab) }));
+      expect(b.svgCode).toBe(build(atDocument({ [kebab]: valueFor(kebab) })).svgCode);
       expect(b.warnings).toEqual([]);
     });
 

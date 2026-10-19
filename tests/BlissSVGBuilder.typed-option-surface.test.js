@@ -9,6 +9,7 @@ import {
   NUMERIC_OPTION_POLICY,
   BOOLEAN_OPTION_KEYS,
   TEXT_OPTION_KEYS,
+  KEYWORD_OPTION_VALUES,
   programmaticOptionKey,
 } from '../src/lib/bliss-constants.js';
 
@@ -114,14 +115,20 @@ const expectedOptionTypes = () => {
     [[...BOOLEAN_OPTION_KEYS], 'boolean'],
     [[...TEXT_OPTION_KEYS, 'key'], 'string'],
   ];
+  // A keyword option takes exactly the words its judge accepts, so its type is
+  // those words. It is derived into the text family too, and comes last so the
+  // Map keeps its words rather than `string`.
+  const keywords = [...KEYWORD_OPTION_VALUES].map(([key, words]) =>
+    [programmaticOptionKey(key), words.map((word) => `'${word}'`).join(' | ')]);
   // `INTERNAL_OPTIONS` holds both spellings of each kerning name, which resolve
   // to one row, so the pairs are deduped rather than asserted twice.
   return [
-    ...new Map(
-      families.flatMap(([keys, type]) =>
+    ...new Map([
+      ...families.flatMap(([keys, type]) =>
         keys.map(programmaticOptionKey).map((option) => [option, type]),
       ),
-    ),
+      ...keywords,
+    ]),
   ];
 };
 
@@ -236,10 +243,12 @@ describe('BlissSVGBuilder typed option surface', () => {
       // option may not, because the value gate accepts anything for those, so
       // the sweep cannot tell a real keyword from an invented one: `grid` typed
       // `boolean | 'auto'` renders in silence, and the declaration would be the
-      // only thing claiming `'auto'` means something.
+      // only thing claiming `'auto'` means something. A keyword option's row is
+      // its words and nothing else: its judge refuses every other value, so
+      // there the sweep CAN tell a real word from an invented one.
       const members = [...declaredOptionTypes().get(option)];
       const literals = type === 'number' ? members.filter((member) => member.startsWith("'")) : [];
-      expect([...members].sort()).toEqual([type, ...literals].sort());
+      expect([...members].sort()).toEqual([...type.split(' | '), ...literals].sort());
     });
 
     it('covers every declared row by one of the value gate families', () => {

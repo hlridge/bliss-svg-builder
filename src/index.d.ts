@@ -100,10 +100,29 @@ export interface BlissOptions {
 
   // Colors and background
   color?: string;
+  /**
+   * A color painted behind the lines. In the global bracket (`[…]||`) it is
+   * the whole picture's background; on a word, a character or a part it paints
+   * behind that element alone.
+   */
   background?: string;
   backgroundTop?: string;
   backgroundMid?: string;
   backgroundBottom?: string;
+  /**
+   * The shape a word's, character's or part's `background` paints: `'box'`, the
+   * default, or `'ink'`, a halo around its lines. Inherited, so in the global
+   * bracket it shapes every such background in the picture; the picture's own
+   * background always covers the whole picture.
+   */
+  backgroundArea?: 'box' | 'ink';
+  /**
+   * Where a word's, character's or part's link answers a click: `'box'`, the
+   * default, its whole area, or `'ink'`, its lines and a little around them.
+   * Inherited like `backgroundArea`; a link written in the global bracket stays
+   * clickable across the whole picture.
+   */
+  linkArea?: 'box' | 'ink';
 
   // Text and metadata
   text?: string;
