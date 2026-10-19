@@ -136,10 +136,11 @@ export interface BlissOptions {
   // elements carrying that class, where a target is any class the library
   // writes minus the `bliss-` prefix and the key splits at the LAST `--`
   // (`'grid-line--sky--stroke-dasharray': 2`). At element scope the key lands on
-  // that element's own <g>; a target prefix has nothing to name there, so it is
-  // dropped and reported with `MISPLACED_LAYER_OPTION`, however it was written,
-  // or with the refusal its name would get at global scope when it would get
-  // one there too (`UNKNOWN_LAYER` for `nosuch--fill`).
+  // that element's own <g>, and a link attribute on its <a>; a target prefix has
+  // nothing to name there, so it is dropped and reported with
+  // `MISPLACED_LAYER_OPTION`, however it was written, or with the refusal its
+  // name would get at global scope when it would get one there too
+  // (`UNKNOWN_LAYER` for `nosuch--fill`).
   // Includes `boolean` so the boolean options (`grid`, `center`,
   // `errorPlaceholder`) conform to the index signature; without it `tsc` rejects
   // this interface. It is also what keeps the kebab spelling of a curated option

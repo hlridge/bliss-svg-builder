@@ -6,7 +6,9 @@ Any option that Bliss SVG Builder doesn't recognize as a built-in option is pass
 
 The builder maintains a set of known option keys (`color`, `stroke-width`, `margin`, `grid`, etc.). When you set an option that isn't in this set, it passes through to the SVG output as an attribute.
 
-Where a pass-through attribute lands depends on the level you set it at. A **global** option goes on the root `<svg>` element, so it covers the whole picture: the artwork, and the paper and grid if you have switched them on. Anything inside that sets its own value for that attribute keeps it, which is what the prefixed spellings further down are for. A **word**, **character**, or **part** option goes on a `<g>` that wraps just that word, character, or part.
+Where a pass-through attribute lands depends on the level you set it at, and the rule is that an option applies to what it is written on. A **word**, **character**, or **part** option goes on a `<g>` that wraps just that word, character, or part. A **global** option applies to the whole symbol: it goes on the group that holds the artwork, beside the library's own painting defaults, so it never restyles the reference grid or the paper, which have options of their own.
+
+Two kinds of global attribute go elsewhere. The ones that describe the image rather than style the drawing go on the root `<svg>`: `role`, `aria-*`, `id`, `class`, `data-*`, `lang`, `tabindex`, `preserveAspectRatio` and `overflow`, along with the root's own `viewBox`, `width` and `height`. And `href` makes the whole picture a link, as described under [Links with href](#links-with-href). To put any other attribute somewhere else, on the root or the grid for instance, name the place, as described under [Targeting One Part of the Picture](#targeting-one-part-of-the-picture).
 
 **A name the library or a standard owns works in either casing and comes back in its owner's spelling. A name nobody owns comes back exactly as you wrote it.** So `preserveAspectRatio` comes out as `preserveAspectRatio` whether you write it that way, as `preserve-aspect-ratio`, or all in lower case, while a `data-` attribute of your own is emitted letter for letter as you typed it.
 
@@ -14,7 +16,7 @@ Where a pass-through attribute lands depends on the level you set it at. A **glo
 [opacity=0.5]||B313
 ```
 
-<Demo code="[opacity=0.5]||B313" title="opacity fades the whole picture" />
+<Demo code="[opacity=0.5]||B313" title="opacity fades the symbol" />
 
 ```
 [stroke-dasharray=2,1]||B313
@@ -39,14 +41,14 @@ The SVG names this covers are the ones SVG defines for the elements the library 
 
 ## Targeting One Part of the Picture
 
-A global option applies to everything. When you want just one part of the output, prefix the attribute with the name of the thing you mean, using a double dash.
+A global option styles the whole symbol. When you want a different part of the output, prefix the attribute with the name of the thing you mean, using a double dash.
 
 **The rule is one sentence: every class the library writes is addressable, by that same name with the `bliss-` prefix removed.** The group with `class="bliss-grid"` is `grid--`, the sky line with `class="bliss-grid-line bliss-grid-line--sky"` is `grid-line--sky--`, and the root `<svg>`, which carries `class="bliss-root"`, is `root--`. The table below is the whole vocabulary, and the library derives it from the classes its own drawing writes rather than keeping it by hand, so it cannot drift from the markup, and a class added in a later release is targetable the moment it exists. A class of your own, added with the `class` option, is not a target: it names your rule, not one of ours.
 
 | Target | Where it lands |
 |--------|----------------|
-| *(none)* | the root `<svg>`, so the whole picture |
-| `root--` | the same root `<svg>`, named rather than assumed |
+| *(none)* | the symbol, or the root `<svg>` for [the attributes that describe the image](#how-it-works) |
+| `root--` | the root `<svg>`, for any attribute, so the whole image, paper and grid included |
 | `background--` | the group holding the background rectangles |
 | `background-zone--` | every background rectangle |
 | `background-zone--top--`, `--mid--`, `--bottom--` | one zone rectangle |
@@ -74,9 +76,13 @@ The families overlap exactly as the classes do. The sky and earth lines carry `b
 
 <Demo code="[grid;grid--opacity=0.3]||B313" title="A faded grid behind full-strength artwork" />
 
-Compare that with the unprefixed spelling, which fades the grid and the artwork together:
+Compare that with the unprefixed spelling, which fades the artwork and leaves the grid alone, and with `root--`, which fades the whole image, grid and all:
 
-<Demo code="[grid;opacity=0.3]||B313" title="Everything faded" />
+<Demo code="[grid;opacity=0.3]||B313" title="The artwork faded, the grid at full strength" />
+
+<Demo code="[grid;root--opacity=0.3]||B313" title="Everything faded" />
+
+Renderers do not all agree about effects written on the root itself: Safari ignores `root--transform`, for one, and a `root--style` filter is measured in pixels by some renderers and in grid units by others (see [Using CSS `filter`](#using-css-filter)).
 
 The prefixed form is a raw channel: the attribute name is emitted exactly as written, and it goes where you sent it, with no interpretation. That is what makes `content--color` reach the real `color` attribute, where the plain `color` option is a friendlier name for `stroke`. It is also why the two spellings of `vector-effect` do different things: written plain, the library knows it only works on the shapes themselves and moves it down onto the character paths, while `root--vector-effect` writes it on the root `<svg>`, where it has no effect, because naming a target asks for a place and not for a result.
 
@@ -86,30 +92,30 @@ A target prefix only means something at global scope, since these parts belong t
 
 Those two facts have one consequence worth stating outright. A literal spelling can be asked for at global scope and nowhere else: on a word, character or part, a name SVG or ARIA owns arrives under its owner's spelling and there is no way to insist on another, because the only channel that would have carried one is refused there. Nothing you would want is lost, since the spelling you are denied is a misspelling no renderer acts on. The exception worth naming is SVG's own `color`, which is a real attribute rather than a misspelling and which the friendlier `color` option occupies at every scope. Set it through `style` instead, which passes through untouched: `[style=color:red]B313` puts `style="color:red"` on that character's group.
 
-Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, or markup that reads as a working link and is not one, so two names are refused behind a prefix, each reported:
+Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, so `xmlns` is refused behind any prefix, and reported. A second namespace declaration moves that whole subtree out of SVG, and nothing renders it. This one is refused wherever you write it, on the root and at word, character and part scope as well. See [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name).
 
-- `xmlns`, on any target. A second namespace declaration moves that whole subtree out of SVG, and nothing renders it. This one is refused wherever you write it, on the root and at word, character and part scope as well. See [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name).
-- The link attributes (`href`, `target`, `rel`, `download`, `hreflang`, `type`, `referrerpolicy`), on any target. A link is an `<a>` element wrapping the content it links, and no target is one, so the attribute would sit where every engine ignores it. Written without a prefix they are not refused. They belong to the `<a>` wrapper described under [Links with href](#links-with-href): write an `href` and they travel onto it. Write one without an `href` and there is no wrapper to carry it, so it is dropped. See [`MISPLACED_LINK_ATTRIBUTE`](/reference/warning-codes#misplaced-link-attribute).
+`data-generator` is refused on the root alone: the library owns it there, where it stamps what produced the file, so `root--data-generator` is refused like the bare spelling, but `[content--data-generator=mine]||` collides with nothing and is emitted like any other data attribute.
 
-`data-generator` is not in that list: the library owns it on the root, where it stamps what produced the file, so `root--data-generator` is refused there like the bare spelling, but `[content--data-generator=mine]||` collides with nothing and is emitted like any other data attribute.
+The link attributes (`href`, `target`, `rel`, `download`, `hreflang`, `type`, `referrerpolicy`) are raw behind a prefix like any other name, so `[content--href=https://example.com]||` writes a plain `href` on the content group. That is not a link: a link is an `<a>` element around what it links, and no target is one. An `href` written without a prefix is what builds the link, as described under [Links with href](#links-with-href).
 
 ### When a value is written but cannot show
 
-Two of the targets are containers. `background--` and `grid--` name groups, and a value written on a group can fail to show for either of two reasons: a paint name such as `stroke` is passed down to the shapes inside, which set their own and so beat it, and a geometry name such as `width` is inert on a group, which carries no geometry to begin with. Both end the same way, so both are reported the same way. The value is emitted where you asked for it, and you are told which target reaches the shapes:
+Three of the targets are containers. `background--` and `grid--` name groups, and a value written on a group can fail to show for either of two reasons: a paint name such as `stroke` is passed down to the shapes inside, which set their own and so beat it, and a geometry name such as `width` is inert on a group, which carries no geometry to begin with. `root--` is the third, for paint alone: the content group sets its own painting defaults, so a default written on the root instead never reaches the artwork. All of these end the same way, so they are reported the same way. The value is emitted where you asked for it, and you are told which target reaches what you meant:
 
 ```
-[grid;grid--stroke=red]||B313   →  reports, and points at grid-line--stroke
+[grid;grid--stroke=red]||B313        →  reports, and points at grid-line--stroke
+[color=red;root--stroke=blue]||B313  →  red strokes; reports, and points at content--stroke
 ```
 
-The names this covers are the ones the group's own drawing writes on its children: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, and `x`, `y`, `width`, `height`, `stroke` and `fill` for the background. Every other name lands on the group and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit and `grid--shape-rendering` replaces the value the grid sets for itself (in Safari the lines keep their own, which an inline `@supports` rule gives them). A name outside the list that a group cannot use is inert without a word from us, `background--rx` among them, since a group has no corners to round: saying which of those are meaningful would mean publishing a judgement about every SVG attribute, and this list only claims to know the names the library writes itself. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
+The names this covers are the ones each container's own drawing writes on what it holds: `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d` for the grid, `x`, `y`, `width`, `height`, `stroke` and `fill` for the background, and the five painting defaults (`fill`, `stroke`, `stroke-width`, `stroke-linecap` and `stroke-linejoin`) for the root. Every other name lands where you sent it and behaves as SVG says it should, so `grid--opacity` fades the whole grid as a unit and `grid--shape-rendering` replaces the value the grid sets for itself (in Safari the lines keep their own, which an inline `@supports` rule gives them). A name outside the list that a group cannot use is inert without a word from us, `background--rx` among them, since a group has no corners to round: saying which of those are meaningful would mean publishing a judgement about every SVG attribute, and this list only claims to know the names the library writes itself. See [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute).
 
-A third case says nothing at all, because there is nothing to say. A target whose element this picture does not contain is silent: `[grid-line--sky--stroke=red]||` with no `grid` emits nothing and reports nothing, and so does `background-zone--mid--fill` when no zones are set. Switch the grid or the zone on, and the same key works.
+Another case says nothing at all, because there is nothing to say. A target whose element this picture does not contain is silent: `[grid-line--sky--stroke=red]||` with no `grid` emits nothing and reports nothing, and so does `background-zone--mid--fill` when no zones are set. Switch the grid or the zone on, and the same key works.
 
 The other report is for two keys that set one attribute on one target. The key that names its target wins, because the other one has to be resolved to a target first, and the one that lost is named:
 
 ```
 [grid;grid-color=red;grid-line--stroke=blue]||B313  →  blue lines; "grid-color" is named
-[color=red;root--stroke=blue]||B313                 →  blue strokes; "color" is named
+[color=red;content--stroke=blue]||B313              →  blue strokes; "color" is named
 ```
 
 See [`MULTIPLE_ATTRIBUTE_VALUES`](/reference/warning-codes#multiple-attribute-values).
@@ -127,22 +133,22 @@ Bliss SVG Builder sets `stroke-linejoin` and `stroke-linecap` to `round` by defa
 The `style` attribute passes through like any other, so you can apply inline CSS at whichever level you target (global, one part of the picture, word, character, or part):
 
 ```
-[content--style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313
+[style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313
 ```
 
-<Demo code="[content--style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313" title="CSS filter via style pass-through" />
+<Demo code="[style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313" title="CSS filter via style pass-through" />
 
 ### Using CSS `filter`
 
 Which spelling you use decides what the lengths mean, and the difference is large enough to surprise you.
 
-**Inside the picture** (`content--style`, or a word, character or part option) the filter applies to a `<g>` within the SVG coordinate system. It behaves as part of the artwork: the effect stays locked to the symbol and scales with it.
+**Inside the picture** (a plain global `style`, or one on a word, character or part) the filter applies to a `<g>` within the SVG coordinate system. It behaves as part of the artwork: the effect stays locked to the symbol and scales with it.
 
 - **Filter lengths are in grid units, not screen pixels.** Inside the SVG a CSS length is read in the symbol's own coordinate system, the same units as the strokes, so `drop-shadow(2px 2px 2px ...)` really means `drop-shadow(2 2 2 ...)` in grid units. At this scale that is a lot: a stroke is only 0.5 units wide, and most symbols span just 4 to 8 units (some as little as 2), so a 2-unit offset and blur is several times the line width and about the size of a small symbol, nothing like the 2 pixels the `px` suffix suggests. Grid units are also what let the shadow scale with the symbol rather than stay a fixed screen size, so its size in pixels depends on how large the SVG is displayed. Think in grid units, where even `1px` (one grid unit) is already a prominent shadow.
 - **Multiple `drop-shadow()`s chain,** exactly as they do in any CSS filter list: each one is applied to the result of the previous.
 - **A tight viewBox clips an outward shadow.** Add margin to give it room.
 
-**On the whole picture** (a plain global `style`) the filter applies to the root `<svg>`, which your page treats like any other element. Lengths are ordinary CSS pixels there, so `2px` really is 2 pixels, the effect covers the paper and grid as well as the artwork, and it is not clipped by the viewBox. It does not scale with the symbol.
+**On the whole image** (`root--style`) the filter applies to the root `<svg>`, which your page treats like any other element. In a browser the lengths are ordinary CSS pixels there, so `2px` really is 2 pixels, the effect covers the paper and grid as well as the artwork, and it is not clipped by the viewBox. It does not scale with the symbol. Not every renderer reads it that way: resvg, which draws SVG outside the browser, takes these lengths in grid units, as it does inside the picture.
 
 Browsers render CSS filters on SVG groups inconsistently. This is a browser limitation, not specific to Bliss SVG Builder:
 
@@ -166,13 +172,21 @@ This is useful when you need to reference the SVG from external CSS or JavaScrip
 
 ## Links with href
 
-When an element-level option includes `href`, the builder wraps that character in an SVG `<a>` element, making it a clickable link:
+An `href` makes what it is written on a clickable link, by wrapping it in an SVG `<a>` element. On a word, character, or part it links just that element:
 
 ```
 B313/[href=https://blissary.com]B291
 ```
 
 <Demo code="B313/[href=https://blissary.com]B291" title="Second character is a clickable link" />
+
+Written globally, it makes the whole picture one link, clickable anywhere inside it, the margins, paper and grid included:
+
+```
+[href=https://blissary.com]||B313
+```
+
+<Demo code="[href=https://blissary.com]||B313" title="The whole picture is a link" />
 
 ### Supported Link Attributes
 
@@ -188,18 +202,19 @@ These attributes are placed on the `<a>` element (not the `<g>`):
 | `type` | MIME type hint |
 | `referrerpolicy` | Referrer policy |
 
-All other element-level attributes go on the wrapping `<g>` element, so you can combine links with visual styling:
+Every other attribute goes where it would go without the link, so you can combine links with visual styling. On a character, the styling sits on a `<g>` inside its `<a>`:
 
 ```
-[href=https://example.com;color=blue]||B313
+[href=https://example.com;color=blue]B313
 ```
 
-<Demo code="[href=https://example.com;color=blue]||B313" title="Linked and colored" />
+<Demo code="[href=https://example.com;color=blue]B313" title="Linked and colored" />
 
 ### Automatic Behaviors
 
-- **Pointer cursor**: Links automatically get `cursor: pointer`
-- **Pointer events**: `pointer-events="bounding-box"` is added to the `<g>` wrapper so the entire character area is clickable, not just the strokes
+- **Pointer cursor**: Links automatically get `cursor: pointer`.
+- **Hit area**: every link holds a transparent rectangle, so it is clickable across a whole area rather than only on its strokes, in every browser. A global link's covers the picture. A character's covers its full 20-unit height and its width, plus 1 grid unit on every side, so the outer half of each stroke is inside it; an indicator never widens it, and where a neighbouring character that is linked too is closer than 2 units, the two meet halfway. A word's spans its characters, and a part's covers its own ink plus half a unit. A `transform` on a linked element turns its area with it.
+- **Overlapping links**: the innermost one wins, so a linked part takes the clicks on its own area inside a linked character, a character does the same inside a linked word, and any of them inside a global link.
 
 ## Safety
 
@@ -211,11 +226,11 @@ Pass-through attributes are sanitized:
 
 ## SVG Structure
 
-The root `<svg>` carries the document's own attributes: the size and `viewBox`, a `data-generator` attribute naming the library version, the default painting values, and anything you set globally. Each part below it carries its own `<target>--` attributes; word-, character-, and part-level attributes go on nested `<g>` elements inside the content group.
+The root `<svg>` carries the document's own attributes: the size and `viewBox`, a `data-generator` attribute naming the library version, its `bliss-root` class, and the global attributes that describe the image. The content group carries the default painting values and every other attribute you set globally. Each part of the picture carries its own `<target>--` attributes; word-, character-, and part-level attributes go on nested `<g>` elements inside the content group.
 
 ```html
 <svg xmlns="..." data-generator="bliss-svg-builder/..." width="..." height="..." viewBox="..."
-     class="bliss-root" fill="none" stroke="#000000" stroke-width="0.5" ...>
+     class="bliss-root">
   <g class="bliss-background">
     <rect class="bliss-background-zone" .../>
   </g>
@@ -224,15 +239,17 @@ The root `<svg>` carries the document's own attributes: the size and `viewBox`, 
     <path class="bliss-grid-line bliss-grid-line--minor" .../>
     <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" .../>
   </g>
-  <g class="bliss-content">
+  <g class="bliss-content" fill="none" stroke="#000000" stroke-width="0.5" ...>
     <!-- character paths -->
   </g>
 </svg>
 ```
 
+With a global `href`, the content group sits inside an `<a>` element, after a transparent rectangle that covers the picture (see [Links with href](#links-with-href)).
+
 The background is a group in every case, holding one rectangle that covers the picture, or one rectangle for each zone you set, so `background--` means the same thing whichever you asked for.
 
-Because the painting defaults sit on the root, an attribute you set globally sits beside them and replaces the one it names for everything that does not set its own. Most of the artwork sets none, so a global `stroke` reaches every character. Two things do set their own, and both are worth knowing. The grid lines and the background rectangles carry their own paint, which is what the targets above are for. And a dot carries its own `stroke-width`, because a dot's size is derived from that width rather than drawn with it, so the two spellings part company on dots: `[stroke-width=2]||` grows the dot along with everything else, while `[content--stroke-width=2]||` thickens the strokes and leaves the dot exactly where it was.
+Because the painting defaults sit on the content group, a styling attribute you set globally sits beside them and replaces the one it names for everything in the artwork that does not set its own. Most of the artwork sets none, so a global `stroke` reaches every character. The grid and the paper sit outside that group, so global styling never reaches them, which is what their own options and the targets above are for. One more thing is worth knowing: a dot is sized from the `stroke-width` option, so the two spellings part company on dots. `[stroke-width=2]||` grows each dot to suit the heavier line, while `[content--stroke-width=2]||` only strokes the dot it already had more heavily, so it comes out smaller.
 
 ### Class names
 

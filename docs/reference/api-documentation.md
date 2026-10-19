@@ -94,7 +94,7 @@ Use for: `.svg` file export, standalone SVG documents.
 
 ### `svgContent`
 
-Returns only the inner SVG content (paths and groups) without the `<svg>` wrapper:
+Returns only the composition's own markup (paths, and the groups and links of word, character and part options), without the `<svg>` wrapper and without anything a global option adds, such as the painting defaults or a global link:
 
 ```js
 const builder = new BlissSVGBuilder('B313');

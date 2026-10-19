@@ -300,25 +300,14 @@ When the key would be refused at global scope as well, because of its name, you 
 [content--xmlns=x]B291    →  RESERVED_ATTRIBUTE_NAME: xmlns is refused everywhere
 ```
 
-### `MISPLACED_LINK_ATTRIBUTE`
-
-A link attribute written behind a target prefix: `href`, `target`, `rel`, `download`, `hreflang`, `type` or `referrerpolicy` after any target name, `root--` and the sub-element targets included. A link is an `<a>` element wrapping the content it links, and no target is one, so the attribute is dropped. The message names the target you wrote.
-
-```
-[content--href=https://example.com]||B291   →  warns, no attribute emitted
-[background=beige;background--href=…]||B291 →  warns, no attribute emitted
-[root--href=https://example.com]||B291      →  warns: the root <svg> is not one either
-```
-
-The prefixed channel emits an attribute name exactly as written, and this is one of the few places it refuses instead. Emitted, these attributes sit on a plain `<g>`, `<rect>`, `<path>` or the root `<svg>`, where every engine ignores them, so the markup would read as a link that had simply stopped working. The written key survives `toString()`, so it re-reports rather than disappearing from a stored composition.
-
 ### `MISPLACED_CONTAINER_ATTRIBUTE`
 
-An attribute written on one of the two container targets, `background--` or `grid--`, under a name that container's own drawing writes on each of the shapes inside it. The attribute is emitted on the group exactly as written and then never shows. Two mechanisms produce that one outcome: a paint name is passed down to the shapes, which set their own and so beat it, while a geometry name is inert on a group, which carries none. The message states what the two share, that the shape's value is the one that takes effect, and names the target that reaches the shapes:
+An attribute written on one of the three container targets, `background--`, `grid--` or `root--`, under a name that the container's own drawing writes on what it holds. The attribute is emitted exactly as written and then never shows. Two mechanisms produce that one outcome: a paint name is passed down to what the container holds, which sets its own and so beats it, while a geometry name is inert on a group, which carries none. The message states what the two share, that the inner value is the one that takes effect, and names the target that reaches it:
 
 ```
 [grid;grid--stroke=red]||B291                     →  points at grid-line--stroke
 [background=beige;background--fill=red]||B291     →  points at background-zone--fill
+[color=red;root--stroke=blue]||B291               →  red strokes; points at content--stroke
 ```
 
 The names, per container:
@@ -327,6 +316,7 @@ The names, per container:
 |--------|-----------------|---------------|
 | `grid--` | `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `d` | `grid-line--` |
 | `background--` | `x`, `y`, `width`, `height`, `stroke`, `fill` | `background-zone--` |
+| `root--` | `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` | `content--` |
 
 The rule behind those lists is "every name the container's own drawing writes on its children", which is why `rx` and `opacity` are absent (nothing writes them on a child, so `grid--opacity` fades the grid as a unit and `background--rx` is simply inert), and why `shape-rendering` is absent too: the grid group carries that one itself, so a written value replaces it rather than being shadowed. One caveat the list cannot express is that the library also ships an inline `@supports` rule setting `shape-rendering` on the grid lines in WebKit, and a CSS rule beats a value inherited from the group, so in Safari the lines keep theirs. `class` is the single exception to the rule: every child carries one, but so does the group, and a `class` you write there merges with the group's own name.
 
@@ -462,7 +452,8 @@ Two keys setting one attribute on one element, where only one value can be writt
 ```
 [grid;grid-color=red;grid-line--stroke=blue]||B291    →  blue lines; "grid-color" is named
 [background=beige;background-zone--fill=blue]||B291   →  a blue background; "background" is named
-[color=red;root--stroke=blue]||B291                   →  a blue stroke; "color" is named
+[color=red;content--stroke=blue]||B291                →  a blue stroke; "color" is named
+[role=img;root--role=none]||B291                      →  role="none"; "role" is named
 ```
 
 One pairing is deliberately outside this: an option whose job is to COMPUTE something, beside a raw key naming one of the attributes it computed. `[svg-height=99;root--height=50]||` writes your 50 and says nothing, even though the width beside it was worked out for 99. Overriding a computed value by hand is you taking the result off the library, so nothing is inferred on your behalf and nothing is reported; the picture is yours to keep consistent. `viewBox` is the exception to the exception, because there the options exist only to produce it, and writing one raises [`MULTIPLE_GEOMETRY_VALUES`](#multiple-geometry-values).
@@ -503,9 +494,9 @@ Splitting at the last `--` is what lets a target carry one of its own, so `grid-
 
 The test is a target this library **knows**, not one it happens to be drawing. `[grid--opacity=0.3]||` with the grid switched off is silent and emits nothing, exactly as the named `[grid-color=red]` is silent there, and a sub-element that this render leaves out is silent for the same reason.
 
-Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the whole picture, write it without a prefix. A value from JavaScript with no text form (`{ 'foo--x': null }`) is reported the same way but not kept, since it has nothing to save.
+Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the symbol, write it without a prefix (an attribute that describes the image, such as `aria-label`, then goes on the root `<svg>`, and the message says which). A value from JavaScript with no text form (`{ 'foo--x': null }`) is reported the same way but not kept, since it has nothing to save.
 
-Written below global scope (`[foo--x=1]B291`), the key is reported with this code too, but dropped rather than kept, because a prefixed key cannot act there whatever its target (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). The message then says that the attribute without a prefix goes on the element you wrote it on, not on the root.
+Written below global scope (`[foo--x=1]B291`), the key is reported with this code too, but dropped rather than kept, because a prefixed key cannot act there whatever its target (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). The message then says that the attribute without a prefix goes on the element you wrote it on, not on the symbol.
 
 ## Refused Because the Name Is the Library's
 

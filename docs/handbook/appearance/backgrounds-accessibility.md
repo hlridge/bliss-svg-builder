@@ -61,16 +61,16 @@ const builder = new BlissSVGBuilder(
 
 ```html
 <svg xmlns="..." data-generator="bliss-svg-builder/..." width="..." height="..." viewBox="..."
-     class="bliss-root" fill="none" stroke="#000000" ...>
+     class="bliss-root">
   <title>Feeling</title>
   <desc>Heart symbol representing emotion</desc>
-  <g class="bliss-content">
+  <g class="bliss-content" fill="none" stroke="#000000" ...>
     <!-- paths -->
   </g>
 </svg>
 ```
 
-For inline SVGs, you can also add `aria-label` directly on the surrounding HTML element as an alternative. Setting it as a global option works too, and lands where assistive technology reads it:
+For inline SVGs, you can also add `aria-label` directly on the surrounding HTML element as an alternative. Setting it as a global option works too: it goes on the `<svg>` itself, so the picture is announced as one labelled image:
 
 ```js
 const builder = new BlissSVGBuilder('[role=img;aria-label=Feeling]||B313');
