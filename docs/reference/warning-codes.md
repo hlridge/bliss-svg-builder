@@ -120,11 +120,12 @@ Every option follows one rule: the value you write is either used exactly as wri
 
 ### `INVALID_OPTION_VALUE`
 
-A value the option cannot use. Either something that is not a number where a number is needed, or something with no text form at all where the value is written into the picture.
+A value the option cannot use: something that is not a number where a number is needed, a word that an option taking a fixed set of words does not take (`background-area` and `link-area` take `box` or `ink`, in lower case), or something with no text form at all where the value is written into the picture.
 
 ```
 [crop-top=aut0]||B291        →  warns, the picture is not cropped
 [stroke-width=abc]||B291     →  warns, the default 0.5 is drawn
+[link-area=INK;href=#a]B291  →  warns, the link keeps its whole area
 [margin]||B291               →  warns, the default margin is used
 [margin=]||B291              →  warns, the default margin is used
 ```
@@ -248,7 +249,7 @@ A canvas-wide option key placed at word, character, or part scope. These keys co
 [grid]|B313//B431      →  renders both words, grid dropped
 ```
 
-The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background`/`background-*`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
+The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background-top`, `background-mid`, `background-bottom`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
 
 The report is the same however the key reaches that scope: a bracket, a bracket inside a custom code's `codeString`, a composition object, `setOptions()` or the options of an adding or replacing method, and `setTransientOptions()`. Only the last sentence of the message changes, to say where the key goes in the notation you were using:
 
@@ -290,6 +291,12 @@ A target-prefixed option (`grid--opacity`, `content--color`, `grid-line--sky--st
 
 Any other option in the same bracket is kept, so `[grid--opacity=0.3;fill=red]|B291` still renders the word filled red.
 
+One target is the exception: `element-background--` names the [backgrounds of words, characters and parts](/handbook/appearance/backgrounds-accessibility#classes-and-keys), so on a word, character or part it is kept and styles the backgrounds inside that element:
+
+```
+[element-background--rx=1;background=yellow]B291  →  valid: rounds that character's box
+```
+
 Dropping it is what keeps it out of the drawing. An unrecognized key is passed through to the SVG as an attribute, so leaving the prefixed key in place would put `grid--opacity="0.3"` into the output, where it means nothing to any renderer. To style just that element, write the attribute without a prefix.
 
 When the key would be refused at global scope as well, because of its name, you get that refusal instead of this warning, since moving the key would only trade one warning for the other. The key is dropped all the same:
@@ -299,6 +306,8 @@ When the key would be refused at global scope as well, because of its name, you 
 [content--onclick=x]B291  →  UNSAFE_ATTRIBUTE_NAME: an event handler
 [content--xmlns=x]B291    →  RESERVED_ATTRIBUTE_NAME: xmlns is refused everywhere
 ```
+
+An `element-background--` key with a refused name gets the same report but is kept, as it would be at global scope: `[element-background--onclick=x]B291` reports `UNSAFE_ATTRIBUTE_NAME` and stays in `toString()`.
 
 ### `MISPLACED_CONTAINER_ATTRIBUTE`
 
@@ -454,6 +463,7 @@ Two keys setting one attribute on one element, where only one value can be writt
 [background=beige;background-zone--fill=blue]||B291   →  a blue background; "background" is named
 [color=red;content--stroke=blue]||B291                →  a blue stroke; "color" is named
 [role=img;root--role=none]||B291                      →  role="none"; "role" is named
+[element-background--fill=red;background=yellow]B291   →  a red box; "background" is named
 ```
 
 One pairing is deliberately outside this: an option whose job is to COMPUTE something, beside a raw key naming one of the attributes it computed. `[svg-height=99;root--height=50]||` writes your 50 and says nothing, even though the width beside it was worked out for 99. Overriding a computed value by hand is you taking the result off the library, so nothing is inferred on your behalf and nothing is reported; the picture is yours to keep consistent. `viewBox` is the exception to the exception, because there the options exist only to produce it, and writing one raises [`MULTIPLE_GEOMETRY_VALUES`](#multiple-geometry-values).
@@ -488,7 +498,7 @@ A global option written in `<target>--<attribute>` form that does not resolve to
 [content--=red]||B291  →  warns: names the content target but no attribute
 ```
 
-Every message but the last one lists the whole vocabulary, so you never have to look it up: `root`, `background`, `background-zone`, `background-zone--top`, `background-zone--mid`, `background-zone--bottom`, `grid`, `grid-line`, `grid-line--minor`, `grid-line--medium`, `grid-line--major`, `grid-line--sky`, `grid-line--earth` and `content`.
+Every message but the last one lists the whole vocabulary, so you never have to look it up: `root`, `background`, `background-zone`, `background-zone--top`, `background-zone--mid`, `background-zone--bottom`, `grid`, `grid-line`, `grid-line--minor`, `grid-line--medium`, `grid-line--major`, `grid-line--sky`, `grid-line--earth`, `content`, `element-background`, `element-background--box` and `element-background--ink`.
 
 Splitting at the last `--` is what lets a target carry one of its own, so `grid-line--sky--stroke-dasharray` resolves to the sky line and `stroke-dasharray`. The cost is that an attribute name with a `--` inside it cannot be reached behind a prefix: `content--data--foo` reads as a target called `content--data`, which nothing carries, and is reported here.
 
@@ -496,7 +506,7 @@ The test is a target this library **knows**, not one it happens to be drawing. `
 
 Like `UNKNOWN_CODE`, the key is **kept** in serialized output: `foo` may be a target this library emits later, and dropping the key would lose what you wrote. To put the attribute on the symbol, write it without a prefix (an attribute that describes the image, such as `aria-label`, then goes on the root `<svg>`, and the message says which). A value from JavaScript with no text form (`{ 'foo--x': null }`) is reported the same way but not kept, since it has nothing to save.
 
-Written below global scope (`[foo--x=1]B291`), the key is reported with this code too, but dropped rather than kept, because a prefixed key cannot act there whatever its target (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). The message then says that the attribute without a prefix goes on the element you wrote it on, not on the symbol.
+Written below global scope (`[foo--x=1]B291`), the key is reported with this code too, but dropped rather than kept, because a prefixed key cannot act there unless it names `element-background` (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). The message then says that the attribute without a prefix goes on the element you wrote it on, not on the symbol. A key that names `element-background` but no attribute, `[element-background--=x]B291`, is reported and kept, as at global scope.
 
 ## Refused Because the Name Is the Library's
 
@@ -587,7 +597,7 @@ builder.part(0).setTransientOptions({ 'on-click': 'x' });
 // warns, and nothing is emitted; other keys in the same call are kept
 ```
 
-Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. A prefixed key written below global scope (`[content--onclick=x]B291`) is dropped instead, though still reported with this code, since it could not act there whatever its name (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). And a value from JavaScript with no text form (`{ onclick: null }`) has nothing to save, so it is not stored at all.
+Other options in the same bracket are kept, and the refused key **survives `toString()`**, so it re-warns when the composition is read back rather than disappearing from stored data without trace. A prefixed key written below global scope (`[content--onclick=x]B291`) is dropped instead, though still reported with this code, since it could not act there whatever its name; an `element-background--` key is kept there, as at global scope (see [`MISPLACED_LAYER_OPTION`](#misplaced-layer-option)). And a value from JavaScript with no text form (`{ onclick: null }`) has nothing to save, so it is not stored at all.
 
 ## Misplaced Channel
 

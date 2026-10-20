@@ -57,6 +57,8 @@ A global option styles the whole symbol. When you want a different part of the o
 | `grid-line--minor--`, `--medium--`, `--major--` | one family of grid lines |
 | `grid-line--sky--`, `--earth--` | the sky line, or the earth line |
 | `content--` | the group holding the Bliss artwork |
+| `element-background--` | every [background of a word, character or part](/handbook/appearance/backgrounds-accessibility#backgrounds-on-words-characters-and-parts) |
+| `element-background--box--`, `--ink--` | the boxes alone, or the halos alone |
 
 ```
 [grid;grid-line--sky--stroke-dasharray=0.5]||B313
@@ -88,9 +90,9 @@ The prefixed form is a raw channel: the attribute name is emitted exactly as wri
 
 Being raw, it is the one channel where [the naming rule](#which-name-is-emitted) does not run, so it is also how you ask for a spelling that rule would otherwise settle for you. `[root--view-box=0 0 5 5]||` puts a literal `view-box` on the root, beside the real `viewBox` the library computed, and the two sit there as the different attributes they are.
 
-A target prefix only means something at global scope, since these parts belong to the document as a whole. Written on a word, character or part it is dropped and reported, however it was written: in a bracket, in a composition object, or through a method such as `setOptions()`. A prefix that matches no class the library writes, such as `foo--x`, is reported too, and nothing is emitted for it.
+A target prefix only means something at global scope, since these parts belong to the document as a whole. Written on a word, character or part it is dropped and reported, however it was written: in a bracket, in a composition object, or through a method such as `setOptions()`. The one exception is `element-background--`, because the backgrounds it reaches belong to words, characters and parts: written on one of those, it styles the backgrounds inside it (see [Classes and Keys](/handbook/appearance/backgrounds-accessibility#classes-and-keys)). A prefix that matches no class the library writes, such as `foo--x`, is reported too, and nothing is emitted for it.
 
-Those two facts have one consequence worth stating outright. A literal spelling can be asked for at global scope and nowhere else: on a word, character or part, a name SVG or ARIA owns arrives under its owner's spelling and there is no way to insist on another, because the only channel that would have carried one is refused there. Nothing you would want is lost, since the spelling you are denied is a misspelling no renderer acts on. The exception worth naming is SVG's own `color`, which is a real attribute rather than a misspelling and which the friendlier `color` option occupies at every scope. Set it through `style` instead, which passes through untouched: `[style=color:red]B313` puts `style="color:red"` on that character's group.
+Those two facts have one consequence worth stating outright. A literal spelling can be asked for at global scope and nowhere else: on the group around a word, character or part, a name SVG or ARIA owns arrives under its owner's spelling and there is no way to insist on another, because the only channel that would have carried one is refused there (an `element-background--` key reaches the element's backgrounds, never its group). Nothing you would want is lost, since the spelling you are denied is a misspelling no renderer acts on. The exception worth naming is SVG's own `color`, which is a real attribute rather than a misspelling and which the friendlier `color` option occupies at every scope. Set it through `style` instead, which passes through untouched: `[style=color:red]B313` puts `style="color:red"` on that character's group.
 
 Raw means the library does not rename or reinterpret your attribute. It does not mean it will write a file that cannot be parsed, so `xmlns` is refused behind any prefix, and reported. A second namespace declaration moves that whole subtree out of SVG, and nothing renders it. This one is refused wherever you write it, on the root and at word, character and part scope as well. See [`RESERVED_ATTRIBUTE_NAME`](/reference/warning-codes#reserved-attribute-name).
 
@@ -216,6 +218,16 @@ Every other attribute goes where it would go without the link, so you can combin
 - **Hit area**: every link holds a transparent rectangle, so it is clickable across a whole area rather than only on its strokes, in every browser. A global link's covers the picture. A character's covers its full 20-unit height and its width, plus 1 grid unit on every side, so the outer half of each stroke is inside it; an indicator never widens it, and where a neighbouring character that is linked too is closer than 2 units, the two meet halfway. A word's spans its characters, and a part's covers its own ink plus half a unit. A `transform` on a linked element turns its area with it.
 - **Overlapping links**: the innermost one wins, so a linked part takes the clicks on its own area inside a linked character, a character does the same inside a linked word, and any of them inside a global link.
 
+### Linking by the Lines
+
+`link-area=ink` makes a link answer on its lines and 0.4 of a unit around them, instead of its whole area:
+
+```
+[link-area=ink;href=https://blissary.com]B313
+```
+
+It is inherited, so `[link-area=ink]||` applies it to every link on a word, character or part, while a global link stays clickable across the whole picture. `link-padding` sets how far either kind of area reaches, with the same defaults as [`background-padding`](/handbook/appearance/backgrounds-accessibility#how-far-a-background-reaches), and two linked neighbours that would overlap meet between them the same way.
+
 ## Safety
 
 Pass-through attributes are sanitized:
@@ -240,12 +252,15 @@ The root `<svg>` carries the document's own attributes: the size and `viewBox`, 
     <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" .../>
   </g>
   <g class="bliss-content" fill="none" stroke="#000000" stroke-width="0.5" ...>
+    <rect class="bliss-element-background bliss-element-background--box" .../>  <!-- only with a background on a word, character or part -->
     <!-- character paths -->
   </g>
 </svg>
 ```
 
 With a global `href`, the content group sits inside an `<a>` element, after a transparent rectangle that covers the picture (see [Links with href](#links-with-href)).
+
+The backgrounds of words, characters and parts come first inside the content group, before any line, so a global effect such as `opacity` or `transform` reaches them as part of the artwork.
 
 The background is a group in every case, holding one rectangle that covers the picture, or one rectangle for each zone you set, so `background--` means the same thing whichever you asked for.
 
@@ -259,6 +274,7 @@ These are all the classes the library writes:
 - `bliss-background` on the background group, `bliss-background-zone` on every rectangle inside it, and `bliss-background-zone--top`, `--mid`, `--bottom` on the rectangle for each zone you set
 - `bliss-grid` on the grid group, `bliss-grid-line` on every line, and `bliss-grid-line--minor`, `--medium`, `--major` by family, with `--sky` and `--earth` on the two reference lines, which carry `--major` as well
 - `bliss-content` on the group holding the artwork
+- `bliss-element-background` on every background of a word, character or part, with `bliss-element-background--box` on a box and `bliss-element-background--ink` on a halo
 
 Anything else the library draws, including the character paths and the `<g>` around a word, character or part, carries no class of ours. These names are stable from this release on, so it is safe to write CSS and query selectors against them, and each one doubles as a target: remove `bliss-` and put the attribute after a `--`.
 

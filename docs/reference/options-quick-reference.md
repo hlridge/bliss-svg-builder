@@ -10,9 +10,9 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 
 **A definition's own options** (its `defaultOptions`, or a built-in's own look such as the dotted line of `REFSQUARE`) belong to the part the code is: a character, word or global option does not override them, and a part bracket where the code is used does.
 
-**Scope:** the [Rendering](#rendering) and [Dots](#dots) options (plus [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through)) cascade at every scope: global `[opts]||`, word `[opts]|`, character `[opts]`, part `[opts]>`. Everything else on this page is canvas-wide and takes effect only at global scope; written at any other scope, in a bracket or from JavaScript, the key is dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning.
+**Scope:** the [Rendering](#rendering) and [Dots](#dots) options (plus [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through)) cascade at every scope: global `[opts]||`, word `[opts]|`, character `[opts]`, part `[opts]>`. The [Backgrounds and Links](#backgrounds-and-links) options work at every scope too. Everything else on this page is canvas-wide and takes effect only at global scope; written at any other scope, in a bracket or from JavaScript, the key is dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning.
 
-**Where a pass-through attribute lands:** at global scope it styles the symbol, on the group holding the artwork, and never reaches the grid or the paper. The attributes that describe the image (`role`, `aria-*`, `id`, `class`, `data-*`, `lang`, `tabindex`, `preserveAspectRatio`, `overflow`, and the root's own `viewBox`, `width` and `height`) go on the root `<svg>` instead, and `href` makes the whole picture a link. Prefix an attribute to target one part of the output instead: every class the library writes is a target, spelled without the `bliss-` prefix, and the attribute follows the last `--`, so `root--`, `background--`, `background-zone--top--`, `grid--`, `grid-line--sky--` and `content--` are all keys you can write. At any other scope the attribute goes on the `<g>` wrapping that element, and a prefixed key there is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning, however it was written, or with the refusal its name would get at global scope when it would get one there too. `xmlns` is refused behind a prefix, since it would move the subtree out of SVG. See [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through).
+**Where a pass-through attribute lands:** at global scope it styles the symbol, on the group holding the artwork, and never reaches the grid or the paper. The attributes that describe the image (`role`, `aria-*`, `id`, `class`, `data-*`, `lang`, `tabindex`, `preserveAspectRatio`, `overflow`, and the root's own `viewBox`, `width` and `height`) go on the root `<svg>` instead, and `href` makes the whole picture a link. Prefix an attribute to target one part of the output instead: every class the library writes is a target, spelled without the `bliss-` prefix, and the attribute follows the last `--`, so `root--`, `background--`, `background-zone--top--`, `grid--`, `grid-line--sky--`, `content--` and `element-background--` are all keys you can write. At any other scope the attribute goes on the `<g>` wrapping that element, and a prefixed key there is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning, however it was written, or with the refusal its name would get at global scope when it would get one there too. The one exception is `element-background--`, which is kept there and styles the backgrounds of that element and everything inside it. `xmlns` is refused behind a prefix, since it would move the subtree out of SVG. See [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through).
 
 ---
 
@@ -39,6 +39,20 @@ Options can be set in the [DSL string](/handbook/syntax-options/options-system) 
 | `sdot-width` | unset | 0 or more | Absolute rendered SDOT diameter. Overrides `sdot-extra-width` and the half-default |
 
 Precedence within a dot type: **absolute wins over relative**. These options cascade at every scope (global, word, character, part), like `color` and `stroke-width`.
+
+---
+
+## Backgrounds and Links
+
+These work at every scope. `background` is not inherited; the other four are, and in the global bracket they reach the backgrounds and links of words, characters and parts, never the picture's own background or a global link. See [Backgrounds on Words, Characters and Parts](/handbook/appearance/backgrounds-accessibility#backgrounds-on-words-characters-and-parts) and [Linking by the Lines](/handbook/syntax-options/svg-pass-through#linking-by-the-lines).
+
+| Option | Default | Range | Description |
+|--------|---------|-------|-------------|
+| `background` | - | Any color | In the global bracket, the picture's background (and the default for the zones); on a word, character or part, a background behind that element alone |
+| `background-area` | `box` | `box` or `ink` | The shape of a word's, character's or part's background: a box, or a halo around its lines |
+| `background-padding` | 1, 0.5 or 0.4 | 0 or more | How far a background reaches past what it surrounds, in grid units: 1 around a word's or a character's box, 0.5 around a part's, 0.4 around each line of a halo |
+| `link-area` | `box` | `box` or `ink` | Where a link on a word, character or part answers a click: its whole area, or its lines and 0.4 around them |
+| `link-padding` | 1, 0.5 or 0.4 | 0 or more | How far a link's area reaches, with the same defaults as `background-padding` |
 
 ---
 
@@ -145,7 +159,6 @@ One position per part and one kerning value per character, however you spell it.
 | `svg-height` | Auto | Number (px) | SVG element height |
 | `svg-title` | - | String | Accessible title |
 | `svg-desc` | - | String | Accessible description |
-| `background` | - | Color | Background color (or bulk default for zones) |
 | `background-top` | - | Color | Top zone background (above y=8) |
 | `background-mid` | - | Color | Mid zone background (y=8 to y=16) |
 | `background-bottom` | - | Color | Bottom zone background (below y=16) |

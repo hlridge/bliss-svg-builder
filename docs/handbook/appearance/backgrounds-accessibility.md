@@ -2,9 +2,11 @@
 
 ## Background Color
 
-Add a background with the `background` option:
+Add a background with the `background` option. In the global bracket it colors the whole picture:
 
 <Demo code="[background=#f5f5f5]||B313" title="Light gray background" />
+
+Written on a word, a character or a part, it paints behind that element alone, as described under [Backgrounds on Words, Characters and Parts](#backgrounds-on-words-characters-and-parts).
 
 ## Zone Backgrounds
 
@@ -48,6 +50,72 @@ The `background` option acts as a default for all three zones when any zone opti
 <Demo code="[background=#f5f5f5;background-mid=#e8f5e9]||B313" title="Gray default, green mid override" />
 
 When `background` is used alone (without any zone options), it produces a single rect covering the whole picture rather than three.
+
+## Backgrounds on Words, Characters and Parts
+
+On a word, a character or a part, `background` paints behind that element alone, so one picture can give each word a color of its own, as when words are color-coded by part of speech:
+
+<Demo code="[background=#fde68a]|B313/B291//[background=#bfdbfe]|B431" title="A background for each word" />
+
+```
+[background=yellow]|B313/B291    →  paints behind the word
+[background=yellow]B313          →  behind the character
+B313;[background=yellow]>B81     →  behind the part
+```
+
+A character's background covers the full height of the writing area, however far its lines reach, and the width of its lines, plus one grid unit on every side, so the outer half of each line is inside it. Indicators never widen it. Next to a character that is painted too and closer than two units, the two meet halfway; next to one that is not, it keeps its full unit, even where that reaches under the neighbour's lines. A word's background is one area across its characters, and a part's covers its own lines plus half a unit.
+
+<Demo code="[background=#fde68a]B313/AK:1/[background=#bfdbfe]B291" title="Two painted characters meet halfway" />
+
+These backgrounds are drawn beneath all the lines, over the grid and the picture's own background, so a translucent color lets the grid show through:
+
+<Demo code="[grid]||[background=rgba(250,204,21,0.4)]|B313/B291//B431" title="A translucent word background over the grid" />
+
+The zone options (`background-top` and the other two) belong to the picture and stay in the global bracket.
+
+### Painting Around the Lines
+
+`background-area=ink` paints a halo around the lines instead of a box: the lines are drawn again in the background color, 0.4 of a unit wider on each side. An enclosure gets a ring rather than a filled square, and a character's halo includes its indicators:
+
+<Demo code="[background-area=ink;background=#fde68a]B313;B81/[background-area=ink;background=#bfdbfe]B291" title="Halos around the lines" />
+
+Like `color`, it is inherited, so `[background-area=ink]||` gives every background in the picture a halo. The picture's own background still covers the whole picture. The default is `box`.
+
+### How Far a Background Reaches
+
+`background-padding` sets how far a background reaches past what it surrounds, in grid units, in place of the default: 1 around a word's or a character's box, 0.5 around a part's, and 0.4 around each line of a halo. It is inherited too, and the picture's own background ignores it.
+
+<Demo code="[background-padding=0.4;background=#fde68a]|B313/B291//B431" title="A word background reaching 0.4 units" />
+
+0 is allowed: a halo then hides under its lines, and a box stops at the top and bottom of the writing area and at the centres of the outermost lines. Two painted neighbours that would overlap meet between them: halfway when both reach that far, otherwise where the shorter one ends. A negative padding is refused with [`OUT_OF_RANGE_OPTION_VALUE`](/reference/warning-codes#out-of-range-option-value).
+
+### Effects Reach the Background
+
+An element's effects reach its background as well as its lines: `transform` (with `transform-origin` and `transform-box`), `opacity`, `filter`, `clip-path`, `mask`, `display` and `visibility`, written as options or in `style`. So `[transform=rotate(45);background=yellow]B313` turns the box with the character, and a halo follows each line it surrounds, even where one character inside a painted word is turned on its own (a word's box stays where the layout puts it). The element's colors, its `class` and its `id` stay with its lines.
+
+<Demo code="[margin=1.5]||[background-area=ink;background=#fde68a]|B313/[transform=rotate(15 14 12)]B291" title="A word's halo turning with one of its characters" />
+
+The background is a layer of its own beneath all the lines, so three of these effects come out a little differently than they would on one drawing:
+
+- `opacity` fades the background and the lines as two layers, so the color shows through the faded lines instead of hiding under them.
+- A `clip-path`, or a `transform-origin` with `transform-box=fill-box`, is measured on the background's own box, which is larger than the lines': `[clip-path=inset(0 0 50% 0);background=yellow]B313` cuts the box at its middle, y 10, and the lines at theirs, y 12.
+- A `filter` runs on the background and on the lines separately, so a drop shadow falls from the lines onto their own background.
+
+Only those names reach a background, spelled as above. CSS's separate `rotate`, `scale` and `translate` properties and the `mask-` longhands, written in a `style`, move or mask the lines alone.
+
+### Classes and Keys
+
+Each of these backgrounds carries the class `bliss-element-background`, along with `bliss-element-background--box` on a box (a `<rect>`) or `bliss-element-background--ink` on a halo (a group of lines). A stylesheet can select them, and so can a [target key](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture): `[element-background--rx=1]||` rounds the corners of every box.
+
+Unlike the picture's other targets, an `element-background--` key also works on a word, a character or a part, where it styles every background inside that element, its own included. For each attribute the nearest key wins, and it replaces a farther key's value whole, `class` and `style` included:
+
+```
+[element-background--class=noun]|[background=yellow]B313/[element-background--class=verb;background=green]B291
+```
+
+That gives the first box the class `noun` and the second `verb`, ready for a stylesheet of your own.
+
+A translucent halo is painted twice where its own lines overlap, as where a dot touches a line, so it comes out darker there. To lay the color once, make it solid and fade the layer instead: `[element-background--opacity=0.4]||` with `background=red`, rather than `background=rgba(255,0,0,0.4)`.
 
 ## Accessible Labels
 

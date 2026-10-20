@@ -117,6 +117,10 @@ Options use **camelCase** keys with native JavaScript types. The DSL spells the 
 | `backgroundTop` | `background-top` | string | `'#fce4ec'` |
 | `backgroundMid` | `background-mid` | string | `'#e8f5e9'` |
 | `backgroundBottom` | `background-bottom` | string | `'#e3f2fd'` |
+| `backgroundArea` | `background-area` | string | `'ink'` |
+| `backgroundPadding` | `background-padding` | number | `0.5` |
+| `linkArea` | `link-area` | string | `'ink'` |
+| `linkPadding` | `link-padding` | number | `0.5` |
 | `center` | `center` | boolean | `false` |
 | `errorPlaceholder` | `error-placeholder` | boolean | `true` |
 | `crop` | `crop` | number or string | `'auto'` |

@@ -216,24 +216,29 @@ In this example:
 
 ## Which Options Support Scoping?
 
-Built-in visual options can be applied at any scope:
+These built-in options can be applied at any scope:
 
 | Option | Global | Word | Character | Part |
 |--------|:------:|:----:|:---------:|:----:|
 | `color` | ✓ | ✓ | ✓ | ✓ |
 | `stroke-width` | ✓ | ✓ | ✓ | ✓ |
+| `background` | ✓ | ✓ | ✓ | ✓ |
+| `background-area`, `background-padding` | ✓ | ✓ | ✓ | ✓ |
+| `link-area`, `link-padding` | ✓ | ✓ | ✓ | ✓ |
+
+`background` is the one that is not inherited: in the global bracket it colors the whole picture, and on a word, character or part it paints behind that element alone (see [Backgrounds on Words, Characters and Parts](/handbook/appearance/backgrounds-accessibility#backgrounds-on-words-characters-and-parts)). The area and padding options are inherited like `color`, and in the global bracket they shape the backgrounds and links of words, characters and parts, never the picture's own background or a global link.
 
 [SVG pass-through attributes](/handbook/syntax-options/svg-pass-through) (like `fill`, `opacity`, `stroke-dasharray`, etc.) also work at any scope.
 
-One pass-through form is global-only: a key that [names a part of the picture](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture) before the attribute, such as `grid--opacity` or `grid-line--sky--stroke`. Those parts belong to the document as a whole, so below global scope the key is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning, whether you wrote it in a bracket or passed it from JavaScript. Write the attribute without the prefix to put it on the element you are already scoping to. If the key would be refused at global scope too, for example because the target does not exist or the attribute is an event handler, the warning is that refusal instead, since moving the key would not make it work.
+One pass-through form is global-only: a key that [names a part of the picture](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture) before the attribute, such as `grid--opacity` or `grid-line--sky--stroke`. Those parts belong to the document as a whole, so below global scope the key is dropped with a [`MISPLACED_LAYER_OPTION`](/reference/warning-codes#misplaced-layer-option) warning, whether you wrote it in a bracket or passed it from JavaScript. Write the attribute without the prefix to put it on the element you are already scoping to. If the key would be refused at global scope too, for example because the target does not exist or the attribute is an event handler, the warning is that refusal instead, since moving the key would not make it work. The one exception is `element-background--`: the backgrounds it names belong to words, characters and parts, so on one of those it is kept and styles the backgrounds inside it (see [Classes and Keys](/handbook/appearance/backgrounds-accessibility#classes-and-keys)).
 
-Canvas-wide options configure the whole SVG (its margins, grid, backgrounds, spacing, metadata), so they only take effect at global scope (`[opts]||`). Placed at word, character, or part scope they are dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning and the content renders unchanged:
+Canvas-wide options configure the whole SVG (its margins, grid, background zones, spacing, metadata), so they only take effect at global scope (`[opts]||`). Placed at word, character, or part scope they are dropped with a [`MISPLACED_GLOBAL_OPTION`](/reference/warning-codes#misplaced-global-option) warning and the content renders unchanged:
 
 | Family | Keys |
 |--------|------|
 | Margins & cropping | `margin`, `margin-top/-bottom/-left/-right`, `crop`, `crop-top/-bottom/-left/-right` |
 | Grid | `grid`, `grid-color`, `grid-major/-medium/-minor/-sky/-earth-color`, `grid-stroke-width` and the matching `grid-*-stroke-width` keys |
-| Backgrounds | `background`, `background-top`, `background-mid`, `background-bottom` |
+| Background zones | `background-top`, `background-mid`, `background-bottom` |
 | Layout & spacing | `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space` |
 | SVG document | `svg-title`, `svg-desc`, `svg-height` |
 | Diagnostics | `error-placeholder` |
