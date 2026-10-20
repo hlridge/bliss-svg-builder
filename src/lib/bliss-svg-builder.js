@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -806,9 +806,15 @@ class BlissSVGBuilder {
         // prefix is routing rather than markup: `grid-line--sky--onclick` must
         // be judged on `onclick`. When the prefix names no target, the whole key
         // is not an attribute name either, so judging it here would report the
-        // wrong defect on top of the UNKNOWN_LAYER the split loop already raises.
+        // wrong defect on top of the UNKNOWN_LAYER the split loop raises. The
+        // split loop reads the global bracket alone; below it, the one layer key
+        // the scope judge keeps is an element background's, so an unresolved one
+        // (`element-background--`, no attribute) is reported here, in its words.
         const target = isLayerAttributeKey(key) ? parseLayerAttributeKey(key) : null;
-        if (isLayerAttributeKey(key) && !target) continue;
+        if (isLayerAttributeKey(key) && !target) {
+          if (!isTopLevel) this.#warnings.push(layerKeyNameRefusal(key));
+          continue;
+        }
         const name = target ? target.attribute : key;
         if (!isSafeAttributeName(name)) {
           this.#warnings.push({
@@ -832,6 +838,11 @@ class BlissSVGBuilder {
       }
       const { processed, authored } = this.#processOptions(obj.options, isTopLevel);
       obj.options = processed;
+      // Below the global bracket, where the split loop does not reach, an
+      // element background's keys leave the element's own attributes for the
+      // backgrounds inside it (#takeBackgroundKeys).
+      const backgroundKeys = isTopLevel ? null : BlissSVGBuilder.#takeBackgroundKeys(authored);
+      if (backgroundKeys) obj.backgroundKeys = backgroundKeys;
       // Assigned unconditionally on every node that carries options, so the
       // field is present or the node had no options at all. Every reader still
       // guards with `?? {}`, because the second case is ordinary.
@@ -852,6 +863,25 @@ class BlissSVGBuilder {
         this.#processAllOptions(part, false);
       }
     }
+  }
+
+  // Takes an element background's keys out of one element's authored options,
+  // where its <g> would emit each as an unknown attribute, and returns the
+  // usable ones shaped as the layer attributes are (`{ target: { attribute:
+  // value } }`), for every background inside the element; null when it wrote
+  // none. A key whose name is refused goes nowhere: the name loop has reported
+  // it, and the authoring tree still holds it, so it is saved and reported
+  // again on reload, as the same key after `||` is.
+  static #takeBackgroundKeys(authored) {
+    let keys = null;
+    for (const [key, value] of Object.entries(authored)) {
+      if (!isElementLayerKey(key)) continue;
+      delete authored[key];
+      if (layerKeyNameRefusal(key)) continue;
+      const { layer, attribute } = parseLayerAttributeKey(key);
+      ((keys ??= {})[layer] ??= {})[attribute] = value;
+    }
+    return keys;
   }
 
   #rawBlissObj; // Stored for toJSON() round-trip
@@ -1836,10 +1866,11 @@ class BlissSVGBuilder {
       keys: new Set(),
       // How the tree writes the attributes of an element it paints itself (a
       // word's, a character's or a part's background), so a key naming its
-      // class reaches it as one naming any other layer does. Read at render
-      // time, after the walk below has filled the layer attributes.
-      formatLayerAttributes: (classes, computed) =>
-        formatAttributes(layerAttributes(classes, computed, this.#authoredFor(classes))),
+      // class reaches it as one naming any other layer does, and so do the
+      // keys written on the elements around it (`levels`, #layerKeys). Read at
+      // render time, after the walk below has filled the layer attributes.
+      formatLayerAttributes: (classes, computed, levels) =>
+        formatAttributes(layerAttributes(classes, computed, this.#authoredFor(classes, levels))),
     };
     if (blissObj._parseWarnings) {
       this.#warnings.push(...blissObj._parseWarnings);
@@ -2078,42 +2109,48 @@ class BlissSVGBuilder {
     // families is ONE statement about the input, and the reader still needs to
     // know which elements it reached.
     //
-    // Read from #layerAttributes and never from the options bag: a refused raw
-    // key (an unsafe or a reserved name) is still in the bag and reaches no
-    // markup, so the bag would report a displacement that never happened. The
-    // map is what the emitters actually consume.
+    // Read from #layerAttributes and the element backgrounds' keys and never
+    // from the options bags: a refused raw key (an unsafe or a reserved name)
+    // is still in its bag and reaches no markup, so the bag would report a
+    // displacement that never happened. The maps are what the emitters
+    // actually consume.
     //
     // Run twice, over the elements each moment can judge: here for the ones
     // the builder draws, and once the element tree is built for the element
-    // backgrounds, which only the tree knows it draws.
-    const reportDisplacedOptions = (isDrawn, isWritten) => {
+    // backgrounds, which only the tree knows it draws. `instancesOf(element)`
+    // lists, for each drawn instance of that element, the keys written on the
+    // elements around it (#layerKeys' `levels`): `[[]]` for an element the
+    // builder draws, which only the global bracket reaches, and none for one
+    // not drawn.
+    const reportDisplacedOptions = (instancesOf, isWritten) => {
       const displaced = new Map();
       for (const [element, attributes] of Object.entries(CURATED_ATTRIBUTE_SOURCES)) {
-        if (!isDrawn(element)) continue;
-        const targets = ELEMENT_CLASSES[element].map(targetOfClass);
-        for (const [attribute, chain] of Object.entries(attributes)) {
-          // The most specific target the author wrote for this element wins, the
-          // same class-order rule the emitter applies.
-          const rawTarget = targets
-            .filter(t => Object.hasOwn(this.#layerAttributes[t] ?? {}, attribute)).at(-1);
-          const curatedKey = chain.find(isWritten);
-          if (!rawTarget || !curatedKey) continue;
-          const rawKey = `${rawTarget}--${attribute}`;
-          const id = `${rawKey} ${curatedKey}`;
-          if (!displaced.has(id)) displaced.set(id, { rawKey, curatedKey, attribute, elements: [] });
-          displaced.get(id).elements.push(targets.at(-1));
+        const classes = ELEMENT_CLASSES[element];
+        for (const levels of instancesOf(element)) {
+          const keys = this.#layerKeys(classes, levels);
+          for (const [attribute, chain] of Object.entries(attributes)) {
+            // The key in force wins: the nearest, then the most specific
+            // target, the same rule the emitter applies.
+            const rawKey = keys.filter(([name]) => name === attribute).at(-1)?.[2];
+            const curatedKey = chain.find(isWritten);
+            if (!rawKey || !curatedKey) continue;
+            // One report per key, however many instances it reaches.
+            const id = `${rawKey} ${curatedKey}`;
+            if (!displaced.has(id)) displaced.set(id, { rawKey, curatedKey, attribute, elements: new Set() });
+            displaced.get(id).elements.add(targetOfClass(classes.at(-1)));
+          }
         }
       }
       for (const { rawKey, curatedKey, attribute, elements } of displaced.values()) {
         this.#warnings.push({
           code: WARNING_CODES.MULTIPLE_ATTRIBUTE_VALUES,
-          message: `"${rawKey}" and "${curatedKey}" both set "${attribute}" on ${elements.join(', ')}, so "${rawKey}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
+          message: `"${rawKey}" and "${curatedKey}" both set "${attribute}" on ${[...elements].join(', ')}, so "${rawKey}" was used: a key that names its target beats one that has to be resolved to it. Remove whichever you did not mean.`,
           source: curatedKey,
         });
       }
     };
     const drawnByTree = new Set(Object.values(BACKGROUND_AREA_ELEMENTS));
-    reportDisplacedOptions((element) => !drawnByTree.has(element) && elementIsDrawn(element),
+    reportDisplacedOptions((element) => (!drawnByTree.has(element) && elementIsDrawn(element) ? [[]] : []),
       (key) => writtenOptions.has(key));
 
     // A written viewBox states the value the geometry options exist to compute,
@@ -2129,10 +2166,12 @@ class BlissSVGBuilder {
     this.composition = new BlissElement(blissObj, { sharedOptions: this.#sharedOptions });
 
     // The element backgrounds' displacements, now that the tree says which it
-    // draws. One is drawn only where a `background` was written on its
-    // element, so every key in their chains counts as written.
-    const drawnBackgrounds = this.composition.drawnBackgroundElements;
-    reportDisplacedOptions((element) => drawnBackgrounds.has(element), () => true);
+    // draws and which keys reach each. One is drawn only where a `background`
+    // was written on its element, so every key in their chains counts as
+    // written.
+    const drawnBackgrounds = this.composition.drawnBackgrounds;
+    reportDisplacedOptions((element) => drawnBackgrounds
+      .filter(drawn => drawn.element === element).map(drawn => drawn.levels), () => true);
 
     // The output side. Every value that got here passed its own gate, so what
     // is judged is the arithmetic: two terms can sum past the largest double,
@@ -5362,9 +5401,10 @@ class BlissSVGBuilder {
   // every use of it, at character or part level depending on how the use is
   // written. So a key can be a default only if it means the same thing at every
   // use, and five kinds cannot:
-  // - A builder-canvas (global-only) key and a layer key act on the whole SVG,
-  //   so they are inert at every use, and a ;; overlay stores the definition
-  //   NAME, so no parse boundary would ever report them.
+  // - A builder-canvas (global-only) key and a layer key (but an element
+  //   background's) act on the whole SVG, so they are inert at every use, and
+  //   a ;; overlay stores the definition NAME, so no parse boundary would ever
+  //   report them.
   // - A position or kerning key says where ONE use sits: in its parent, or
   //   after its neighbour. As a default neither had one meaning. Kerning
   //   applied where the definition stood as a character and was saved as a
@@ -5410,8 +5450,10 @@ class BlissSVGBuilder {
         throw new Error(`${callName}("${code}"): ${subject} cannot include ${named}; it configures the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
       // Same reasoning one step along: a layer key targets a layer of the whole
-      // SVG, so it is inert wherever a definition's defaults attach.
-      if (isLayerAttributeKey(normalized)) {
+      // SVG, so it is inert wherever a definition's defaults attach. An element
+      // background's is not: it styles the backgrounds inside the element it
+      // is written on, so as a default it means the same thing at every use.
+      if (isLayerAttributeKey(normalized) && !isElementLayerKey(normalized)) {
         throw new Error(`${callName}("${code}"): ${subject} cannot include the layer option "${key}"; it targets a layer of the whole SVG and would be inert on a definition. Set it in the global bracket ([...]||) or the builder options instead.`);
       }
       // The stored name is the one that acts where the definition is used, and
@@ -6250,13 +6292,26 @@ class BlissSVGBuilder {
     };
   }
 
-  // The authored attributes for one element: every class it carries, applied
-  // general to specific, so the more specific class wins. That is the order the
-  // classes are written in, which is what makes the precedence readable in the
-  // markup rather than a rule to look up. Every key looked up here comes from
-  // ELEMENT_CLASSES and never from input, so an inherited name cannot reach it.
-  #authoredFor(classes) {
-    return Object.assign({}, ...classes.map(c => this.#layerAttributes[targetOfClass(c)] ?? {}));
+  // Every layer key that reaches one element, as [attribute, value, key],
+  // farthest first: the global bracket's, then `levels`, the keys an element
+  // background's word, character and part wrote (#takeBackgroundKeys),
+  // outermost first; within each, every class the element carries, general to
+  // specific. So the last entry for an attribute is the one in force: the
+  // nearest key, and within one element the more specific class. That is the
+  // order the classes are written in, which is what makes the precedence
+  // readable in the markup rather than a rule to look up. Every target looked
+  // up here comes from ELEMENT_CLASSES and never from input, so an inherited
+  // name cannot reach it.
+  #layerKeys(classes, levels = []) {
+    return [this.#layerAttributes, ...levels].flatMap(keys => classes.flatMap((c) => {
+      const target = targetOfClass(c);
+      return Object.entries(keys[target] ?? {}).map(([attribute, value]) => [attribute, value, `${target}--${attribute}`]);
+    }));
+  }
+
+  // The authored attributes for one element, each from the key in force.
+  #authoredFor(classes, levels = []) {
+    return Object.fromEntries(this.#layerKeys(classes, levels).map(([attribute, value]) => [attribute, value]));
   }
 
   get #svgCode() {

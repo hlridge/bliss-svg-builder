@@ -5,7 +5,10 @@
  * Three families of key are bound to one scope: the canvas-wide keys (global
  * only, `MISPLACED_GLOBAL_OPTION`), the two kerning keys (character only,
  * `MISPLACED_KERNING_OPTION`) and a target-prefixed key (global only,
- * `MISPLACED_LAYER_OPTION`). The bracket has refused them for a long time; the
+ * `MISPLACED_LAYER_OPTION`; an element background's three targets act on the
+ * element they are written on, see
+ * `BlissSVGBuilder.element-background-keys.test.js`). The bracket has
+ * refused them for a long time; the
  * other routes kept the key, said nothing, and wrote it back out through
  * `toString()`, so the same composition reported nothing until it was saved
  * and reloaded.

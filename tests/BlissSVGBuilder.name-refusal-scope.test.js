@@ -33,6 +33,9 @@
  *   report in each notation, see `BlissSVGBuilder.option-scope-wording.test.js`.
  * - The stamp refused on the root, and a name refused while its value is
  *   wrong as well, see `BlissSVGBuilder.text-option-values.test.js`.
+ * - An element background's three targets, which act below global scope
+ *   too, so a refused name there is kept and reported on every load, as after
+ *   `||`, see `BlissSVGBuilder.element-background-keys.test.js`.
  * - A value with no text form on a refused name, on every route, see
  *   `BlissSVGBuilder.name-refusal-values.test.js`; on the transient channel,
  *   see `BlissSVGBuilder.transient-refusal-values.test.js`.

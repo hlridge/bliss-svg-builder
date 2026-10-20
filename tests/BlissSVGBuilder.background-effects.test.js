@@ -36,6 +36,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Styling written after `||`, which lands on the content group and so
  *   reaches the layer whole, the root writing no copy of its own, see
  *   `BlissSVGBuilder.element-background-layer.test.js`.
+ * - An `element-background--` key written on an element, an attribute of
+ *   its backgrounds and not an effect, see
+ *   `BlissSVGBuilder.element-background-key-reach.test.js`.
  * - How a browser draws a copy (opacity as two layers, a clip or a
  *   `transform-box` origin measured on the background's own box, a filter
  *   run on each), which no test in this suite can observe.

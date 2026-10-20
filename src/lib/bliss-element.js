@@ -468,17 +468,32 @@ export class BlissElement {
 
   /**
    * Visits every element at or below this one that draws a background, with
-   * what it draws, in the order the backgrounds are drawn: pre-order, so a
-   * word comes before its characters, a character before its parts, and an
-   * earlier part before a later one. `x` and `y` are the origin of the frame
-   * this element sits in, as getSvgContent takes them.
+   * what it draws and the keys that reach it (#backgroundKeyLevels), in the
+   * order the backgrounds are drawn: pre-order, so a word comes before its
+   * characters, a character before its parts, and an earlier part before a
+   * later one. `x` and `y` are the origin of the frame this element sits in,
+   * as getSvgContent takes them; `levels` the keys written around it.
    */
-  #visitBackgrounds(visit, x = 0, y = 0) {
+  #visitBackgrounds(visit, x = 0, y = 0, levels = []) {
+    const keys = this.#backgroundKeyLevels(levels);
     const drawing = this.#backgroundDrawing(x, y);
-    if (drawing) visit(this, drawing);
+    if (drawing) visit(this, drawing, keys);
     for (const child of this.#children) {
-      child.#visitBackgrounds(visit, this.#relativeToParentX + x, this.#relativeToParentY + y);
+      child.#visitBackgrounds(visit, this.#relativeToParentX + x, this.#relativeToParentY + y, keys);
     }
+  }
+
+  /**
+   * The element backgrounds' keys that reach this element's background and
+   * every one inside it: `levels`, those written on the elements around it,
+   * outermost first, then its own, which the builder took out of its options.
+   * A new array, never the parent's extended in place, since its siblings
+   * share that one. The root has none: the global bracket's keys are the
+   * builder's own.
+   */
+  #backgroundKeyLevels(levels) {
+    const own = this.#blissObj.backgroundKeys;
+    return own ? [...levels, own] : levels;
   }
 
   /**
@@ -491,12 +506,14 @@ export class BlissElement {
    * backgrounds. The root writes no copy: a global effect lands on the
    * content group, which holds the layer. '' where nothing at or below this
    * element draws a background. `x` and `y` are the origin of the frame this
-   * element sits in, as getSvgContent takes them.
+   * element sits in, as getSvgContent takes them; `levels` the keys written
+   * around it (#backgroundKeyLevels).
    */
-  #backgroundLayer(x = 0, y = 0) {
+  #backgroundLayer(x = 0, y = 0, levels = []) {
+    const keys = this.#backgroundKeyLevels(levels);
     const drawing = this.#backgroundDrawing(x, y);
-    const layer = (drawing ? this.#backgroundMarkup(drawing) : '') + this.#children
-      .map(child => child.#backgroundLayer(this.#relativeToParentX + x, this.#relativeToParentY + y))
+    const layer = (drawing ? this.#backgroundMarkup(drawing, keys) : '') + this.#children
+      .map(child => child.#backgroundLayer(this.#relativeToParentX + x, this.#relativeToParentY + y, keys))
       .join('');
     if (layer === '' || this.#level === 0) return layer;
     const effects = this.#effectAttributes;
@@ -510,15 +527,16 @@ export class BlissElement {
    * `fill` written for the whole symbol, which lands on the content group,
    * would fill every enclosure it rings. Their classes make them targets of
    * the layer attributes, which the builder writes through the formatter it
-   * shares with the tree; a tree built without one writes the classes and the
+   * shares with the tree, with the keys that reach this background (`levels`,
+   * #backgroundKeyLevels); a tree built without one writes the classes and the
    * computed attributes alone.
    */
-  #backgroundMarkup(drawing) {
+  #backgroundMarkup(drawing, levels) {
     const classes = ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS[drawing.area]];
     const format = this.#sharedOptions.formatLayerAttributes ?? BlissElement.#ownLayerAttributes;
     if (drawing.area === 'ink') {
       const computed = { fill: 'none', stroke: this.#background, 'stroke-width': drawing.width };
-      return `<g ${format(classes, computed)}>${drawing.lines}</g>`;
+      return `<g ${format(classes, computed, levels)}>${drawing.lines}</g>`;
     }
     const { box } = drawing;
     const computed = {
@@ -529,7 +547,7 @@ export class BlissElement {
       fill: this.#background,
       stroke: 'none',
     };
-    return `<rect ${format(classes, computed)}/>`;
+    return `<rect ${format(classes, computed, levels)}/>`;
   }
 
   /** A layer's attributes with no author's to add: its classes, then what was computed. */
@@ -540,15 +558,17 @@ export class BlissElement {
   }
 
   /**
-   * The ELEMENT_CLASSES entries of the element backgrounds this tree draws,
-   * found by the walk that draws them (root only), which renders an ink
-   * area's lines to learn whether it has any. The builder reads it to report
-   * a layer attribute that displaces a written `background`, which it can
-   * judge only once the tree is built.
+   * Every element background this tree draws, as `{ element, levels }`: its
+   * ELEMENT_CLASSES entry and the keys that reach it (#backgroundKeyLevels),
+   * found by the walk that draws them (root only), which renders an ink area's
+   * lines to learn whether it has any. The builder reads it to report a layer
+   * attribute that displaces a written `background`, which it can judge only
+   * once the tree is built.
    */
-  get drawnBackgroundElements() {
-    const drawn = new Set();
-    this.#visitBackgrounds((element, drawing) => drawn.add(BACKGROUND_AREA_ELEMENTS[drawing.area]));
+  get drawnBackgrounds() {
+    const drawn = [];
+    this.#visitBackgrounds((element, drawing, levels) =>
+      drawn.push({ element: BACKGROUND_AREA_ELEMENTS[drawing.area], levels }));
     return drawn;
   }
 

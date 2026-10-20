@@ -186,6 +186,19 @@ export const LAYER_TARGETS = new Set(
 );
 
 /**
+ * The targets a key may name below the global bracket as well as in it: the
+ * element backgrounds' classes, minus the prefix. Every other target is one
+ * layer of the whole SVG, so it acts only from `||`; an element background is
+ * drawn for each word, character or part that writes a `background`, so a key
+ * written on one of them styles every element background inside it, its own
+ * included, the nearest key winning. Derived from the elements the tree paints,
+ * so a background area added later is targetable at every scope at once.
+ */
+export const ELEMENT_LAYER_TARGETS = new Set(
+  Object.values(BACKGROUND_AREA_ELEMENTS).flatMap((element) => ELEMENT_CLASSES[element]).map(targetOfClass)
+);
+
+/**
  * Attribute names that state what the FILE is rather than anything about the
  * picture, so they are refused wherever they are written. `xmlns` has exactly
  * one legal value here: a second declaration, at any depth, moves that subtree
@@ -367,6 +380,18 @@ export const parseLayerAttributeKey = (key) => {
   if (!LAYER_TARGETS.has(layer) || !attribute) return null;
   return { layer, attribute };
 };
+
+/**
+ * True for a key whose target is an element background's
+ * (`ELEMENT_LAYER_TARGETS`), the one kind a word, a character or a part may
+ * carry. The target is read before the LAST `--`, as `parseLayerAttributeKey`
+ * reads it, so `element-backgrounds--fill` and `element-background----fill`
+ * name no such target. An attribute is not required: `element-background--`
+ * is written where it can act, so it is kept there and its missing name
+ * reported, as it is after `||`, rather than dropped as misplaced.
+ */
+export const isElementLayerKey = (key) =>
+  isLayerAttributeKey(key) && ELEMENT_LAYER_TARGETS.has(key.slice(0, key.lastIndexOf('--')));
 
 /**
  * Returns false for event handler attribute names (on*) or names containing
@@ -1491,10 +1516,12 @@ const unresolvedLayerKeyMessage = (key, level) => {
  * The report a target-prefixed key earns for its NAME, in the words of the
  * global form, or null when its name is one the global form emits.
  *
- * Three askers, so that none of them can word or rule it differently: the
+ * Four askers, so that none of them can word or rule it differently: the
  * global split, which reports it; the scope judge, which reports it IN PLACE
- * OF the misplacement when the same key is written below global scope; and
- * the name judge below. The lower report used to be the misplacement, whose
+ * OF the misplacement when the same key is written below global scope; the
+ * options pass, for an element background's key written below global scope,
+ * where it is at home and so reported as the global split reports it; and the
+ * name judge below. The lower report used to be the misplacement, whose
  * advice to move the key into the global bracket led the author straight to
  * this refusal without ever naming it.
  *
@@ -1551,8 +1578,10 @@ export const layerKeyNameRefusal = (key, level = 'global') => {
  * ordinary name anywhere else. A caller that cannot know where the bag will
  * act (a definition's defaults, which act where the code is used, never on
  * the root) passes none. A target-prefixed key is judged in the words of the
- * global form, the only scope it reaches this judge from: written lower, the
- * scope judge refuses it first, in that scope's words.
+ * global form, the only scope it reaches this judge from but for an element
+ * background's, which is at home at every scope and earns the same words
+ * wherever it is written: written lower, any other is refused first by the
+ * scope judge, in that scope's words.
  *
  * The two internal names in `INTERNAL_ONLY_SPELLINGS` are not here. They
  * name no option and refuse nothing: the pass-through emits a value written
@@ -1727,7 +1756,9 @@ const SCOPE_BOUND_OPTIONS = [
   },
   {
     home: 'global',
-    has: (key) => isLayerAttributeKey(key),
+    // An element background's target is at home at every scope, so it is not
+    // bound here: written on an element, it styles the backgrounds inside it.
+    has: (key) => isLayerAttributeKey(key) && !isElementLayerKey(key),
     code: WARNING_CODES.MISPLACED_LAYER_OPTION,
     diagnosis: (written, level) => `Layer option (${written}) ignored at ${level} level: it names a layer of the whole SVG.`,
     fix: (written, scope) =>
@@ -1865,8 +1896,9 @@ export const isScopeRefusal = (warning) =>
  * `defaultOptions`, and only those: the defaults attach wherever the definition
  * is used, which the stage cannot know when they are declared, and no key bound
  * to a scope can be among them, since `define()` refuses every one (canvas-wide,
- * target-prefixed, kerning) as a definition error. A definition's code string
- * is DSL text, so its brackets are judged at part scope wherever it is expanded.
+ * target-prefixed but for an element background's target, which is bound to
+ * none, kerning) as a definition error. A definition's code string is DSL text,
+ * so its brackets are judged at part scope wherever it is expanded.
  *
  * @param {Iterable<[string, unknown]>} writtenEntries - keys as written, with their values
  * @param {(warning: object) => void} [warn] - where to send a refusal

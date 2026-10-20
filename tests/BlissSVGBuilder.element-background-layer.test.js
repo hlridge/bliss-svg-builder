@@ -35,6 +35,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   see `BlissSVGBuilder.background-effects.test.js`.
  * - The target vocabulary as a whole, see
  *   `BlissSVGBuilder.layer-target-bijection.test.js`.
+ * - The same keys written on a word, a character or a part, see
+ *   `BlissSVGBuilder.element-background-keys.test.js` and
+ *   `BlissSVGBuilder.element-background-key-reach.test.js`.
  *
  * @issue: #29
  */
