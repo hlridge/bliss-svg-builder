@@ -41,8 +41,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   on each part the alias draws, so a two-mark alias gives two part links (a
  *   part bracket on the same alias gives one over both); the alias rule is
  *   pinned in `BlissSVGBuilder.alias-options-on-parts.test.js`.
- * - Linking by ink instead of area (`link-area=ink`), not built yet (backlog,
- *   "Link an element by its ink instead of its area").
+ * - Linking by ink instead of area (`link-area=ink`), see
+ *   `BlissSVGBuilder.ink-areas.test.js`.
+ * - A padding other than the default (`link-padding`), and unequal linked
+ *   neighbours, see `BlissSVGBuilder.area-padding.test.js`.
  * - How a browser hit-tests the rect, which no test in this suite can observe.
  */
 

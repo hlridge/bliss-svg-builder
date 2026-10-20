@@ -123,6 +123,23 @@ export interface BlissOptions {
    * clickable across the whole picture.
    */
   linkArea?: 'box' | 'ink';
+  /**
+   * How far a word's, character's or part's `background` reaches past what it
+   * surrounds, in grid units, replacing the default: 1 around a word's or a
+   * character's box (the full writing height by its width), 0.5 around a
+   * part's lines, 0.4 around each line of an `'ink'` area. Where two painted
+   * neighbours would overlap, they meet between them instead. Inherited like
+   * `backgroundArea`; 0 is allowed, a negative value is refused.
+   */
+  backgroundPadding?: number;
+  /**
+   * How far a word's, character's or part's link answers a click past what it
+   * surrounds: the same defaults and the same meeting rule as
+   * `backgroundPadding`, between linked neighbours. Inherited like `linkArea`;
+   * a link written in the global bracket stays clickable across the whole
+   * picture.
+   */
+  linkPadding?: number;
 
   // Text and metadata
   text?: string;

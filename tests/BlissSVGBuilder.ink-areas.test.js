@@ -3,13 +3,14 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
  * Pins the ink areas: `background-area=ink` paints an element's own lines again
- * beneath them, a quarter unit wider on each side, and `link-area=ink` puts the
- * same lines, transparent, in place of a link's rect, so the link answers on
- * its lines and a quarter unit around them.
+ * beneath them, by default 0.4 of a unit wider on each side, and `link-area=ink`
+ * puts the same lines, transparent, in place of a link's rect, so the link
+ * answers on its lines and 0.4 around them.
  *
  * Covers:
  * - The area's markup: a group of the element's lines with `fill="none"`,
- *   stroked in the paint at the element's computed width plus half a unit,
+ *   stroked in the paint at the element's computed width plus 0.8 (twice the
+ *   default padding),
  *   first in the content group, and no rect.
  * - What the lines are: a character's indicators included; an enclosure
  *   ringed, never filled, whatever fill the symbol carries; ZSA drawing no
@@ -18,7 +19,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   background below it; a character's own `box` beating its word's `ink`; the
  *   picture's own background staying the whole picture.
  * - Widths: a character's `stroke-width`, the symbol's, and one inside a
- *   painted word each widened by half a unit; a width written in `style` not
+ *   painted word each widened by 0.8; a width written in `style` not
  *   followed; a dot's and a comma's own widths widened with their paths kept;
  *   a letter and a text character filled in the paint and outlined; a summed
  *   width rounded to four decimals.
@@ -36,6 +37,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   layer, see `BlissSVGBuilder.element-background-layer.test.js`.
  * - The options' admission, see
  *   `BlissSVGBuilder.element-background-options.test.js`.
+ * - A padding other than the default (`background-padding`, `link-padding`),
+ *   see `BlissSVGBuilder.area-padding.test.js`.
  * - Pass-through attributes on the painted element (an author's attributes,
  *   `vector-effect`): none reaches its ink area.
  * - How a browser or a renderer draws and hit-tests the areas, which no test
@@ -76,12 +79,12 @@ const letterA = (attributes) => LETTER_A.replace('stroke="none" fill="#000000"',
 
 describe('BlissSVGBuilder ink areas', () => {
   describe('when a character is painted by its ink', () => {
-    it('draws its lines again in the paint, half a unit wider, beneath them and with no box', () => {
-      // pins the outline: none leaves the area at 0.5, hidden under the line,
-      // and a quarter unit in all draws it at 0.75
+    it('draws its lines again in the paint, 0.8 wider, beneath them and with no box', () => {
+      // pins the outline, twice the padding: none leaves the area at 0.5,
+      // hidden under the line, and the padding once draws it at 0.9
       const svg = build('[background-area=ink;background=yellow]B313').svgCode;
 
-      expect(contentOf(svg)).toBe(`${inkArea('yellow', 1, B313)}${B313}`);
+      expect(contentOf(svg)).toBe(`${inkArea('yellow', 1.3, B313)}${B313}`);
       expect(svg).not.toContain('<rect');
     });
 
@@ -91,14 +94,14 @@ describe('BlissSVGBuilder ink areas', () => {
     ])('rings an enclosure and never fills it, %s', (_case, input) => {
       // the area states fill="none" itself: a global fill lands on the content
       // group, and an area inheriting it would paint a filled square
-      expect(contentOf(build(input).svgCode)).toBe(`${inkArea('yellow', 1, B291)}${B291}`);
+      expect(contentOf(build(input).svgCode)).toBe(`${inkArea('yellow', 1.3, B291)}${B291}`);
     });
 
     it('includes its indicators', () => {
       const lines = '<path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6M3,6l1,-2M4,4l1,2"/>';
 
       expect(contentOf(build('[background-area=ink;background=yellow]B313;B81').svgCode))
-        .toBe(`${inkArea('yellow', 1, lines)}${lines}`);
+        .toBe(`${inkArea('yellow', 1.3, lines)}${lines}`);
     });
 
     it('draws no area for ZSA, which has no line to follow, silently', () => {
@@ -112,9 +115,9 @@ describe('BlissSVGBuilder ink areas', () => {
   describe('when the area option is inherited', () => {
     it.each([
       ['a word', '[background-area=ink]|[background=yellow]B313/[background=red]B291',
-        `${inkArea('yellow', 1, B313)}${inkArea('red', 1, B291_AT_10)}${B313_B291}`],
+        `${inkArea('yellow', 1.3, B313)}${inkArea('red', 1.3, B291_AT_10)}${B313_B291}`],
       ['the symbol', '[background-area=ink]||[background=yellow]B313',
-        `${inkArea('yellow', 1, B313)}${B313}`],
+        `${inkArea('yellow', 1.3, B313)}${B313}`],
     ])('paints every background below %s by its ink', (_case, input, expected) => {
       expect(contentOf(build(input).svgCode)).toBe(expected);
     });
@@ -138,19 +141,19 @@ describe('BlissSVGBuilder ink areas', () => {
 
     it('draws a word\'s own white background as an ink area', () => {
       expect(contentOf(build('[background=white;background-area=ink]|B313').svgCode))
-        .toBe(`${inkArea('white', 1, B313)}${B313}`);
+        .toBe(`${inkArea('white', 1.3, B313)}${B313}`);
     });
   });
 
   describe('when a line width is set', () => {
     it.each([
       ['the character\'s own', '[background-area=ink;background=yellow;stroke-width=1]B313',
-        `${inkArea('yellow', 1.5, B313)}<g stroke-width="1">${B313}</g>`],
+        `${inkArea('yellow', 1.8, B313)}<g stroke-width="1">${B313}</g>`],
       ['the symbol\'s', '[stroke-width=1]||[background-area=ink;background=yellow]B313',
-        `${inkArea('yellow', 1.5, B313)}${B313}`],
+        `${inkArea('yellow', 1.8, B313)}${B313}`],
       ['a character\'s, inside a painted word', '[background-area=ink;background=yellow]|[stroke-width=1]B313/B291',
-        `${inkArea('yellow', 1, `<g stroke-width="1.5">${B313}</g>${B291_AT_10}`)}<g stroke-width="1">${B313}</g>${B291_AT_10}`],
-    ])('widens %s width by half a unit', (_case, input, expected) => {
+        `${inkArea('yellow', 1.3, `<g stroke-width="1.8">${B313}</g>${B291_AT_10}`)}<g stroke-width="1">${B313}</g>${B291_AT_10}`],
+    ])('widens %s width by 0.8', (_case, input, expected) => {
       // pins the nested width: the word's area alone would draw the thicker
       // character at the word's width, inside its own line
       expect(contentOf(build(input).svgCode)).toBe(expected);
@@ -160,15 +163,15 @@ describe('BlissSVGBuilder ink areas', () => {
       // the area is built from the widths the library computes
       const svg = build('[style=stroke-width:2;background-area=ink;background=yellow]B313').svgCode;
 
-      expect(contentOf(svg)).toBe(`${inkArea('yellow', 1, B313)}<g style="stroke-width:2">${B313}</g>`);
+      expect(contentOf(svg)).toBe(`${inkArea('yellow', 1.3, B313)}<g style="stroke-width:2">${B313}</g>`);
     });
 
     it('rounds each widened width to four decimals, as the picture\'s own numbers are', () => {
       // pins the rounding of both summed widths, the area's and a nested one:
-      // unrounded, 0.07 + 0.5 and 0.33 + 0.5 carry float noise
+      // unrounded, 0.07 + 0.8 and 0.33 + 0.8 carry float noise
       const svg = build('[background-area=ink;background=yellow;stroke-width=0.07]|[stroke-width=0.33]B313/B291').svgCode;
 
-      expect(contentOf(svg)).toBe(`${inkArea('yellow', 0.57, `<g stroke-width="0.83">${B313}</g>${B291_AT_10}`)}`
+      expect(contentOf(svg)).toBe(`${inkArea('yellow', 0.87, `<g stroke-width="1.13">${B313}</g>${B291_AT_10}`)}`
         + `<g stroke-width="0.07"><g stroke-width="0.33">${B313}</g>${B291_AT_10}</g>`);
     });
   });
@@ -176,49 +179,49 @@ describe('BlissSVGBuilder ink areas', () => {
   describe('when the lines carry widths of their own', () => {
     it.each([
       ['a dot', '[background-area=ink;background=yellow]B270',
-        `<g stroke-width="0.4165">${DOT}</g>`, `<g stroke-width="0.9165">${DOT}</g>`],
+        `<g stroke-width="0.4165">${DOT}</g>`, `<g stroke-width="1.2165">${DOT}</g>`],
       ['a dot of a set width', '[dot-width=1;background-area=ink;background=yellow]B270',
-        `<g stroke-width="0.5">${WIDE_DOT}</g>`, `<g stroke-width="1">${WIDE_DOT}</g>`],
+        `<g stroke-width="0.5">${WIDE_DOT}</g>`, `<g stroke-width="1.3">${WIDE_DOT}</g>`],
       ['a character drawn with the comma shape', '[background-area=ink;background=yellow]B5',
         `<g stroke-width="0.4165">${COMMA_DOT}</g><g stroke-width="0.2776666666666667">${COMMA_TAIL}</g>`,
-        `<g stroke-width="0.9165">${COMMA_DOT}</g><g stroke-width="0.7776666666666667">${COMMA_TAIL}</g>`],
-    ])('widens each width of %s by half a unit and keeps its path', (_case, input, ink, area) => {
+        `<g stroke-width="1.2165">${COMMA_DOT}</g><g stroke-width="1.0776666666666668">${COMMA_TAIL}</g>`],
+    ])('widens each width of %s by 0.8 and keeps its path', (_case, input, ink, area) => {
       // pins the geometry kept: widening a dot or a comma through its base
       // width would also grow the dot's circle and stretch the comma's tail
-      expect(contentOf(build(input).svgCode)).toBe(`${inkArea('yellow', 1, area)}${ink}`);
+      expect(contentOf(build(input).svgCode)).toBe(`${inkArea('yellow', 1.3, area)}${ink}`);
     });
   });
 
   describe('when the lines are a filled letter or text', () => {
-    it('fills a letter in the paint and outlines it by half a unit', () => {
+    it('fills a letter in the paint and outlines it by 0.8', () => {
       expect(LETTER_A).toMatch(/^<path stroke="none" fill="#000000" d="M0\.8628,16\.0301/);
       expect(contentOf(build('[background-area=ink;background=yellow]Xa').svgCode))
-        .toBe(`${inkArea('yellow', 1, letterA('stroke-width="0.5" fill="yellow"'))}${LETTER_A}`);
+        .toBe(`${inkArea('yellow', 1.3, letterA('stroke-width="0.8" fill="yellow"'))}${LETTER_A}`);
     });
 
     it('fills and outlines a character drawn as text the same way', () => {
       expect(contentOf(build('[background-area=ink;background=yellow]Xα').svgCode))
-        .toBe(`${inkArea('yellow', 1, textAlpha(0.5, 'yellow'))}${textAlpha(0, '#000000')}`);
+        .toBe(`${inkArea('yellow', 1.3, textAlpha(0.8, 'yellow'))}${textAlpha(0, '#000000')}`);
     });
   });
 
   describe('when a link answers on its ink', () => {
-    it('puts the lines, transparent and half a unit wider, in the link rect\'s place, with no class', () => {
+    it('puts the lines, transparent and 0.8 wider, in the link rect\'s place, with no class', () => {
       const svg = build('[link-area=ink;href=#a]B313').svgCode;
 
-      expect(contentOf(svg)).toBe(`${linkOpen('#a')}${linkInk(1, B313)}${B313}</a>`);
+      expect(contentOf(svg)).toBe(`${linkOpen('#a')}${linkInk(1.3, B313)}${B313}</a>`);
       expect(svg).not.toContain('<rect');
     });
 
     it.each([
       ['each character of a word that sets it', '[link-area=ink]|[href=#a]B313/[href=#b]B291',
-        `${linkOpen('#a')}${linkInk(1, B313)}${B313}</a>${linkOpen('#b')}${linkInk(1, B291_AT_10)}${B291_AT_10}</a>`],
+        `${linkOpen('#a')}${linkInk(1.3, B313)}${B313}</a>${linkOpen('#b')}${linkInk(1.3, B291_AT_10)}${B291_AT_10}</a>`],
       ['a part', 'B313;[link-area=ink;href=#p]>B81',
-        `${B313}${linkOpen('#p')}${linkInk(1, B81_ON_B313)}${B81_ON_B313}</a>`],
+        `${B313}${linkOpen('#p')}${linkInk(1.3, B81_ON_B313)}${B81_ON_B313}</a>`],
       ['a coloured character, inside its group', '[link-area=ink;href=#a;color=red]B313',
-        `${linkOpen('#a')}<g stroke="red">${linkInk(1, B313)}${B313}</g></a>`],
+        `${linkOpen('#a')}<g stroke="red">${linkInk(1.3, B313)}${B313}</g></a>`],
       ['a letter, filled in transparent', '[link-area=ink;href=#a]Xa',
-        `${linkOpen('#a')}${linkInk(1, letterA('stroke-width="0.5" fill="transparent"'))}${LETTER_A}</a>`],
+        `${linkOpen('#a')}${linkInk(1.3, letterA('stroke-width="0.8" fill="transparent"'))}${LETTER_A}</a>`],
     ])('draws the link\'s lines for %s', (_case, input, expected) => {
       expect(contentOf(build(input).svgCode)).toBe(expected);
     });
@@ -250,7 +253,7 @@ describe('BlissSVGBuilder ink areas', () => {
     it('reports a written stroke displacing the background it paints', () => {
       const builder = build('[element-background--ink--stroke=red]||[background-area=ink;background=yellow]B313');
 
-      expect(contentOf(builder.svgCode)).toBe(`${inkArea('red', 1, B313)}${B313}`);
+      expect(contentOf(builder.svgCode)).toBe(`${inkArea('red', 1.3, B313)}${B313}`);
       expect(builder.warnings).toEqual([{
         code: 'MULTIPLE_ATTRIBUTE_VALUES',
         message: '"element-background--ink--stroke" and "background" both set "stroke" on element-background--ink, '
@@ -264,7 +267,7 @@ describe('BlissSVGBuilder ink areas', () => {
       const builder = build('[element-background--fill=red]||[background-area=ink;background=yellow]B313');
 
       expect(contentOf(builder.svgCode)).toBe(
-        `<g class="bliss-element-background bliss-element-background--ink" fill="red" stroke="yellow" stroke-width="1">${B313}</g>${B313}`);
+        `<g class="bliss-element-background bliss-element-background--ink" fill="red" stroke="yellow" stroke-width="1.3">${B313}</g>${B313}`);
       expect(builder.warnings).toEqual([]);
     });
   });
@@ -284,7 +287,7 @@ describe('BlissSVGBuilder ink areas', () => {
       const transient = build('[href=#a]B313/B291');
       transient.group(0).setTransientOptions({ linkArea: 'ink' });
 
-      expect(contentOf(dsl.svgCode)).toBe(`${linkOpen('#a')}${linkInk(1, B313)}${B313}</a>${B291_AT_10}`);
+      expect(contentOf(dsl.svgCode)).toBe(`${linkOpen('#a')}${linkInk(1.3, B313)}${B313}</a>${B291_AT_10}`);
       for (const builder of [composition, handle, transient]) {
         expect(builder.svgCode).toBe(dsl.svgCode);
         expect(builder.warnings).toEqual([]);

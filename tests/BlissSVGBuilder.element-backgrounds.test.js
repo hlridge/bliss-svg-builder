@@ -33,6 +33,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.element-background-options.test.js`.
  * - The ink areas (`background-area=ink`), see
  *   `BlissSVGBuilder.ink-areas.test.js`.
+ * - A padding other than the default (`background-padding`), and unequal
+ *   painted neighbours, see `BlissSVGBuilder.area-padding.test.js`.
  * - `background=none` counting as a paint: it paints nothing visible, yet its
  *   character is a painted neighbour, as at global scope; no special case.
  * - Definitions beyond the two here: a definition's options land on each part

@@ -25,7 +25,7 @@ export const KNOWN_OPTION_KEYS = new Set([
   'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
   'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
   'color', 'background', 'background-top', 'background-mid', 'background-bottom',
-  'background-area', 'link-area',
+  'background-area', 'link-area', 'background-padding', 'link-padding',
   'text', 'svg-desc', 'svg-title', 'svg-height', 'error-placeholder',
   'key'
 ]);
@@ -278,25 +278,27 @@ export const ANCHOR_ATTRIBUTE_NAMES = Object.freeze(
 export const BAND_HEIGHT = 20;
 
 /**
- * How far a linked element's clickable area reaches past what it covers. Ink
- * is drawn on the stroke's centre line, so an area that stopped there would
- * leave the outer half of every edge stroke unclickable. A character's area
- * reaches HIT_MARGIN past the band and past its base span (less where a
- * linked neighbour is closer, so the two links meet halfway); a part's
- * reaches PART_HIT_MARGIN past its ink box on every side.
+ * How far a linked element's clickable area reaches past what it covers when
+ * no `link-padding` sets it. Ink is drawn on the stroke's centre line, so an
+ * area that stopped there would leave the outer half of every edge stroke
+ * unclickable. A word's or a character's area reaches HIT_MARGIN past the band
+ * and past its base span (less where a linked neighbour is closer, so the two
+ * links meet); a part's reaches PART_HIT_MARGIN past its ink box on every side.
  *
- * An element background's box is the same shape with the same margins, shared
- * between painted neighbours instead of linked ones.
+ * An element background's box is the same shape with the same defaults, which
+ * `background-padding` replaces, shared between painted neighbours instead of
+ * linked ones.
  */
 export const HIT_MARGIN = 1;
 export const PART_HIT_MARGIN = 0.5;
 
 /**
  * How far an ink area reaches past the lines it follows, on each side, for a
- * background and a link alike: the element's lines drawn again twice this much
- * wider (a 0.5 line becomes 1), and a filled letter outlined by twice this.
+ * background and a link alike, when no `background-padding` or `link-padding`
+ * sets it: the element's lines drawn again twice this much wider (a 0.5 line
+ * becomes 1.3), and a filled letter outlined by twice this.
  */
-export const INK_AREA_MARGIN = 0.25;
+export const INK_AREA_MARGIN = 0.4;
 
 /** The width the symbol's lines are drawn at when no `stroke-width` is written. */
 export const DEFAULT_STROKE_WIDTH = 0.5;
@@ -735,9 +737,10 @@ export function generateKey() {
  * - x/y/key and kerning are excluded: positioning and identity, handled by
  *   their own extraction logic.
  * - `background` is excluded, and so are the two area options
- *   (`background-area`, `link-area`): each acts at every scope, and below the
- *   global bracket a background paints its own word, character or part. Its
- *   three zones stay: they are bands of the writing grid.
+ *   (`background-area`, `link-area`) and the two paddings
+ *   (`background-padding`, `link-padding`): each acts at every scope, and
+ *   below the global bracket a background paints its own word, character or
+ *   part. Its three zones stay: they are bands of the writing grid.
  */
 export const GLOBAL_ONLY_OPTION_KEYS = new Set([
   'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
@@ -1057,7 +1060,7 @@ export const WARNING_CODES = Object.freeze({
  * an empty warnings array. Honour the value or refuse it; never substitute one
  * quietly.
  *
- * These 26 are exactly the numeric members of KNOWN_OPTION_KEYS. The two
+ * These 28 are exactly the numeric members of KNOWN_OPTION_KEYS. The two
  * numeric options NOT here are `relative-kerning` and `absolute-kerning`, which
  * are absent from that set as well (the parser promotes them rather than
  * dispatching on them) and carry their own gate, MALFORMED_KERNING_VALUE. They
@@ -1089,7 +1092,9 @@ export const NUMERIC_OPTION_POLICY = new Map([
   ['grid-minor-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
   ['grid-sky-stroke-width',    { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
   ['grid-earth-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
-  ['svg-height',               { kind: 'length', noun: 'height',   fallback: 'six times the viewBox height, in #svgCode' }],
+  ['background-padding',       { kind: 'length', noun: 'padding',  fallback: 'whatever is inherited, else the area default in bliss-element.js' }],
+  ['link-padding',             { kind: 'length', noun: 'padding',  fallback: 'whatever is inherited, else the area default in bliss-element.js' }],
+  ['svg-height',              { kind: 'length', noun: 'height',   fallback: 'six times the viewBox height, in #svgCode' }],
 ]);
 
 /**
@@ -1236,7 +1241,7 @@ export const judgeNumericOptionValue = (key, rawValue) => {
     };
   }
   // The key is quoted and leads rather than following an article, because an
-  // article cannot be chosen for 26 names at once: "a sdot-extra-width" and
+  // article cannot be chosen for 28 names at once: "a sdot-extra-width" and
   // "a external-glyph-space" are both wrong, and the rule that picks between
   // "a" and "an" is about sound, not spelling.
   if (!Number.isFinite(written)) {

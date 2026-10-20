@@ -538,7 +538,7 @@ describe('BlissSVGBuilder option value gate', () => {
 
   describe('when transcribing the policy table', () => {
     it('holds exactly the numeric members of the curated vocabulary', () => {
-      // Membership, not just size. Without this a typo keeps the count at 26,
+      // Membership, not just size. Without this a typo keeps the count at 28,
       // keeps every row's shape, and silently ungates the key it misspells,
       // because the gate returns null for a key it cannot find.
       const NON_NUMERIC = new Set([
@@ -550,7 +550,7 @@ describe('BlissSVGBuilder option value gate', () => {
       ]);
       const expected = [...KNOWN_OPTION_KEYS].filter((k) => !NON_NUMERIC.has(k));
       expect([...NUMERIC_OPTION_POLICY.keys()].sort()).toEqual(expected.sort());
-      expect(NUMERIC_OPTION_POLICY.size).toBe(26);
+      expect(NUMERIC_OPTION_POLICY.size).toBe(28);
     });
 
     it('carries the exact kind and noun for every key', () => {
@@ -587,6 +587,8 @@ describe('BlissSVGBuilder option value gate', () => {
         'grid-minor-stroke-width': 'length/grid line width',
         'grid-sky-stroke-width': 'length/grid line width',
         'grid-earth-stroke-width': 'length/grid line width',
+        'background-padding': 'length/padding',
+        'link-padding': 'length/padding',
         'svg-height': 'length/height',
       });
     });

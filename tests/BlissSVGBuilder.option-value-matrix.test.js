@@ -31,11 +31,11 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
  *   by this gate on any key or any surface. That is the no-upper-bound ruling
  *   stated across the whole vocabulary at once.
  * - The four element-scope surfaces (a bracket at character scope, `addGlyph`,
- *   `setOptions`, `setTransientOptions`) on the five keys that are legal at
+ *   `setOptions`, `setTransientOptions`) on the seven keys that are legal at
  *   element scope.
  * - A LEGAL value on every key: the six composition surfaces draw one picture
  *   between them, byte for byte, and warn nothing, and the four element
- *   surfaces do the same for the five keys they accept. A refusal matrix alone
+ *   surfaces do the same for the seven keys they accept. A refusal matrix alone
  *   passes against a build where nothing is honoured anywhere.
  * - Zero, which is the boundary the length arm reads and the one value no
  *   other row here writes.
@@ -65,14 +65,16 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
  * - A global-only key written at element scope. Every surface refuses it for
  *   its scope before its value is judged, see
  *   `BlissSVGBuilder.option-scope-admission.test.js`, which is why the
- *   element-scope rows are scoped to the five keys every element surface
+ *   element-scope rows are scoped to the seven keys every element surface
  *   accepts.
  */
 
 // A composition each key demonstrably acts on, plus whatever else has to be
 // written for it to act at all. The six grid widths draw nothing without a
 // `grid`, so their carrier writes one; `min-width` is inert below the natural
-// width, so its legal pair is wider. Both are asserted, not assumed, by the
+// width, so its legal pair is wider; a padding moves only a background or a
+// link, and a second bracket on the character is refused, so each padding's
+// carrier paints or links a part. All are asserted, not assumed, by the
 // carrier guard at the foot of this file.
 const CARRIER = {
   'stroke-width': { code: 'B291' },
@@ -89,6 +91,8 @@ const CARRIER = {
   'grid-minor-stroke-width': { code: 'B291', dsl: 'grid;', js: { grid: true } },
   'grid-sky-stroke-width': { code: 'B291', dsl: 'grid;', js: { grid: true } },
   'grid-earth-stroke-width': { code: 'B291', dsl: 'grid;', js: { grid: true } },
+  'background-padding': { code: 'B291;[background=yellow]>B81' },
+  'link-padding': { code: 'B291;[href=#a]>B81' },
 };
 
 const carrierFor = (key) => ({ code: 'B291', dsl: '', js: {}, ...CARRIER[key] });

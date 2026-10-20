@@ -693,6 +693,18 @@ class BlissSVGBuilder {
       else processed[programmaticOptionKey(key)] = rawOptions[key];
     }
 
+    // The paddings, how far a word's, character's or part's background or link
+    // area reaches past what it surrounds, processed under their programmatic
+    // names (`backgroundPadding`, `linkPadding`). LENGTHS: a negative one is
+    // refused, and 0 is honoured, an area hugging what it surrounds. A refusal
+    // assigns nothing, so the area takes the padding it would have had anyway.
+    for (const key of ['background-padding', 'link-padding']) {
+      if (!(key in rawOptions)) continue;
+      const refusal = judgeNumericOptionValue(key, rawOptions[key]);
+      if (refusal) this.#warnings.push(refusal);
+      else processed[programmaticOptionKey(key)] = Number(rawOptions[key]);
+    }
+
     // SVG element height (presentation size, not viewBox). A LENGTH: the root
     // width is derived from it, so a negative one emitted a negative width and
     // height on the <svg> itself. Zero is legal and draws an empty picture.

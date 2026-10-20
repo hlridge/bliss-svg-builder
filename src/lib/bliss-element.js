@@ -53,8 +53,8 @@ export class BlissElement {
   #previousElement;
   #classifiedParts; // Cached result of #classifyParts (level 2 only)
   #isFused = false; // Two or more base parts: no spacing data (level 2 only)
-  #linkArea; // { left, right } in its own frame, set by the root once the layout is final (levels 1 and 2)
-  #paintArea; // the same for its background, the margins shared between painted neighbours instead
+  #linkArea; // { left, right, padding } in its own frame, set by the root once the layout is final (levels 1 and 2)
+  #paintArea; // the same for its background, the paddings shared between painted neighbours instead
 
   /**
    * Stamps a non-inherited `vector-effect` onto bare <path> elements.
@@ -157,22 +157,22 @@ export class BlissElement {
   }
 
   /**
-   * A linked or painted part's area: its ink box plus PART_HIT_MARGIN on every
-   * side.
+   * A linked or painted part's area: its ink box plus its `padding`
+   * (#areaPadding) on every side.
    */
-  static #inkHitBox({ minX, minY, width, height }) {
+  static #inkHitBox({ minX, minY, width, height }, padding) {
     return {
-      x: minX - PART_HIT_MARGIN,
-      y: minY - PART_HIT_MARGIN,
-      width: width + 2 * PART_HIT_MARGIN,
-      height: height + 2 * PART_HIT_MARGIN,
+      x: minX - padding,
+      y: minY - padding,
+      width: width + 2 * padding,
+      height: height + 2 * padding,
     };
   }
 
   /**
    * A linked or painted word's or character's area: its link area or its paint
-   * area across the band plus HIT_MARGIN above and below, placed from its
-   * frame's origin. Null without an area, as for a word of no characters. A
+   * area across the band plus the area's padding above and below, placed from
+   * its frame's origin. Null without an area, as for a word of no characters. A
    * character overlapped by both neighbours can be left an area of no width,
    * never a negative one.
    */
@@ -180,10 +180,69 @@ export class BlissElement {
     if (!area) return null;
     return {
       x: originX + area.left,
-      y: originY - HIT_MARGIN,
+      y: originY - area.padding,
       width: Math.max(0, area.right - area.left),
-      height: BAND_HEIGHT + 2 * HIT_MARGIN,
+      height: BAND_HEIGHT + 2 * area.padding,
     };
+  }
+
+  /**
+   * The two kinds of area an element can have, each read from its own two
+   * options: its link's, where a click answers, and its background's. `has`
+   * says whether an element has an area of the kind; `keep` stores a word's
+   * or a character's in its own frame (#assignAreas).
+   */
+  static #LINK_AREAS = {
+    padding: 'linkPadding',
+    shape: 'linkArea',
+    has: element => element.#buildsLink,
+    keep: (element, area) => { element.#linkArea = area; },
+  };
+  static #PAINT_AREAS = {
+    padding: 'backgroundPadding',
+    shape: 'backgroundArea',
+    has: element => element.#background !== '',
+    keep: (element, area) => { element.#paintArea = area; },
+  };
+
+  /**
+   * How far this element's area of `kind` reaches past what it surrounds: the
+   * padding it inherits, else the default for the area's shape, INK_AREA_MARGIN
+   * past an ink area's lines, HIT_MARGIN past a word's or a character's band
+   * and base span, PART_HIT_MARGIN past a part's ink box. A word's or a
+   * character's may reach less toward a neighbour (#assignAreas).
+   */
+  #areaPadding(kind) {
+    const padding = this.#getInheritedOption(kind.padding);
+    if (padding !== undefined) return padding;
+    if (this.#getInheritedOption(kind.shape) === 'ink') return INK_AREA_MARGIN;
+    return this.#level <= 2 ? HIT_MARGIN : PART_HIT_MARGIN;
+  }
+
+  /**
+   * How far this word's or character's area of `kind` reaches past the base
+   * span of `glyph` (this character, or one of this word's) toward a
+   * neighbour, before any sharing: a box its padding, an ink area half the
+   * glyph's line width plus its padding, as its lines run along the span's
+   * edge.
+   */
+  #reach(kind, glyph) {
+    const padding = this.#areaPadding(kind);
+    if (this.#getInheritedOption(kind.shape) !== 'ink') return padding;
+    return (glyph.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) / 2 + padding;
+  }
+
+  /**
+   * How far an area of `padding` reaches toward a neighbour across `gap`, when
+   * the neighbour's own area of its kind reaches `other` toward it, or does
+   * not exist (null): min(padding, max(gap / 2, gap - other)). Two that both
+   * reach halfway meet there; one that stops short keeps its padding and the
+   * other reaches to meet it, as far as its own allows, so neither passes the
+   * other's lines. With no area to share, the full padding at any gap.
+   */
+  static #share(padding, other, gap) {
+    if (other === null) return padding;
+    return Math.min(padding, Math.max(gap / 2, gap - other));
   }
 
   /**
@@ -207,57 +266,58 @@ export class BlissElement {
   /**
    * Gives every word and character its link area and its paint area, in its
    * own frame (root only, once the layout is final). The two are built alike,
-   * each sharing its margins only with neighbours of its own kind. A
-   * character's area runs across its base span, indicators ignored, plus
-   * HIT_MARGIN on each side. Toward a linked neighbour (the next character in
-   * reading order, across a word space too, linked itself or by its word) its
-   * link area takes half the gap where that is less, so two links closer than
-   * twice the margin meet halfway; toward any other it keeps the full margin
-   * at any gap, since no other link is there to share it. Its paint area does
-   * the same toward a painted neighbour, painted itself or by its word. A
-   * part's link or background, or the global one, does not count for its
-   * character. A word's area joins its characters'. Done here because a
-   * character cannot see a neighbour in another word from its own frame.
-   * Spaces and characters that draw nothing are not characters here: no area
-   * of their own, and no neighbour to anyone.
+   * each from its own padding (#areaPadding) and sharing it only with
+   * neighbours of its own kind. A character's area runs across its base span,
+   * indicators ignored, plus its padding on each side. Toward a neighbour with
+   * an area of the same kind (the next character in reading order, across a
+   * word space too, by its own area or its word's) it reaches only as far as
+   * #share allows, the neighbour reaching the larger of its own area's reach
+   * and its word's (#reach); toward any other it keeps its padding at any gap,
+   * since no other area is there to share it. A word's area joins its
+   * characters' areas, each built again from the word's own padding. A part's
+   * link or background, or the global one, does not count for its character.
+   * Done here because a character cannot see a neighbour in another word from
+   * its own frame. Spaces and characters that draw nothing are not characters
+   * here: no area of their own, and no neighbour to anyone.
    */
   #assignAreas() {
     // Base spans in the root's frame, in reading order.
     const characters = this.#children
       .filter(group => !group.#isSpaceGroup)
-      .flatMap(group => {
-        const wordLinked = group.#buildsLink;
-        const wordPainted = group.#background !== '';
-        return group.#children
-          .filter(glyph => glyph.#children.length > 0)
-          .map(glyph => {
-            const origin = group.#relativeToParentX + glyph.#relativeToParentX;
-            const { left, right } = glyph.#baseSpan;
-            const linked = wordLinked || glyph.#buildsLink;
-            const painted = wordPainted || glyph.#background !== '';
-            return { group, glyph, origin, linked, painted, left: origin + left, right: origin + right };
-          });
-      });
+      .flatMap(group => group.#children
+        .filter(glyph => glyph.#children.length > 0)
+        .map(glyph => {
+          const origin = group.#relativeToParentX + glyph.#relativeToParentX;
+          const { left, right } = glyph.#baseSpan;
+          return { group, glyph, origin, left: origin + left, right: origin + right };
+        }));
 
-    // Per kind: which neighbours share its margins, and where its area is kept.
-    const kinds = [
-      [character => character.linked, (element, area) => { element.#linkArea = area; }],
-      [character => character.painted, (element, area) => { element.#paintArea = area; }],
-    ];
-    for (const [shares, setArea] of kinds) {
-      const words = new Map(); // group -> its characters' areas joined, in the root's frame
+    for (const kind of [BlissElement.#LINK_AREAS, BlissElement.#PAINT_AREAS]) {
+      // How far the areas of this kind on each character reach toward a
+      // neighbour, its own and its word's, the larger counting; null for none.
+      const reaches = characters.map(({ group, glyph }) => {
+        const holders = [group, glyph].filter(kind.has);
+        return holders.length > 0 ? Math.max(...holders.map(holder => holder.#reach(kind, glyph))) : null;
+      });
+      const words = new Map(); // group -> its characters' areas at its padding, joined, in the root's frame
       characters.forEach(({ group, glyph, origin, left, right }, i) => {
         const previous = characters[i - 1];
         const next = characters[i + 1];
-        const areaLeft = left - (previous && shares(previous) ? Math.min(HIT_MARGIN, (left - previous.right) / 2) : HIT_MARGIN);
-        const areaRight = right + (next && shares(next) ? Math.min(HIT_MARGIN, (next.left - right) / 2) : HIT_MARGIN);
-        setArea(glyph, { left: areaLeft - origin, right: areaRight - origin });
-        const word = words.get(group) ?? { left: areaLeft, right: areaRight };
-        words.set(group, { left: Math.min(word.left, areaLeft), right: Math.max(word.right, areaRight) });
+        const extent = padding => ({
+          left: left - (previous ? BlissElement.#share(padding, reaches[i - 1], left - previous.right) : padding),
+          right: right + (next ? BlissElement.#share(padding, reaches[i + 1], next.left - right) : padding),
+        });
+        const padding = glyph.#areaPadding(kind);
+        const own = extent(padding);
+        kind.keep(glyph, { left: own.left - origin, right: own.right - origin, padding });
+        const inWord = extent(group.#areaPadding(kind));
+        const word = words.get(group) ?? inWord;
+        words.set(group, { left: Math.min(word.left, inWord.left), right: Math.max(word.right, inWord.right) });
       });
 
       for (const [group, { left, right }] of words) {
-        setArea(group, { left: left - group.#relativeToParentX, right: right - group.#relativeToParentX });
+        const origin = group.#relativeToParentX;
+        kind.keep(group, { left: left - origin, right: right - origin, padding: group.#areaPadding(kind) });
       }
     }
   }
@@ -266,7 +326,7 @@ export class BlissElement {
    * What makes this element's link answer a click, drawn first inside the
    * link: a transparent rect over `box()`, its area, or where the `link-area`
    * it inherits is `ink`, its lines drawn again in transparent (#inkArea), so
-   * only the lines and INK_AREA_MARGIN around them answer. The group sets
+   * only the lines and its link's padding around them answer. The group sets
    * `fill="none"` for the reason an ink background does (#backgroundMarkup).
    * '' where it covers nothing. `x` and `y` are the origin of the frame this
    * element sits in, as getSvgContent takes them.
@@ -274,7 +334,7 @@ export class BlissElement {
   #linkHit(x, y, box) {
     if (this.#getInheritedOption('linkArea') === 'ink') {
       const paint = 'transparent';
-      const ink = this.#inkArea(x, y, paint);
+      const ink = this.#inkArea(x, y, paint, this.#areaPadding(BlissElement.#LINK_AREAS));
       return ink ? `<g fill="none" stroke="${paint}" stroke-width="${ink.width}">${ink.lines}</g>` : '';
     }
     const area = box();
@@ -283,15 +343,15 @@ export class BlissElement {
 
   /**
    * This element's lines as an ink area draws them: rendered again in the
-   * halo mode getSvgContent takes, in `paint`, each line widened by twice
-   * INK_AREA_MARGIN and each letter filled in `paint` and outlined by as much.
+   * halo mode getSvgContent takes, in `paint`, each line widened by twice the
+   * area's `padding` and each letter filled in `paint` and outlined by as much.
    * Returns the lines, and the width a group strokes them at (the element's
    * computed width, widened alike); null where it draws no line, as ZSA does.
    * Built from the widths the library computes: the element's own attributes
    * reach its lines, not its ink area, as they do not reach a box.
    */
-  #inkArea(x, y, paint) {
-    const outline = 2 * INK_AREA_MARGIN;
+  #inkArea(x, y, paint, padding) {
+    const outline = 2 * padding;
     const lines = this.getSvgContent(x, y, { paint, outline, element: this });
     if (lines === '') return null;
     return {
@@ -318,7 +378,7 @@ export class BlissElement {
    * from the origin of the frame it sits in, by the `background-area` it
    * inherits: `{ area: 'box', box }` or `{ area: 'ink', lines, width }`
    * (#inkArea); null where it draws none. A word's or a character's box is
-   * its paint area across the band, a part's its ink box plus PART_HIT_MARGIN:
+   * its paint area across the band, a part's its ink box plus its padding:
    * the shapes a link's area takes. An ink area draws nothing where there is no
    * line. A word or a character with no paint area draws nothing: a word of no
    * characters, a character that draws nothing, and the root, which is never
@@ -328,12 +388,12 @@ export class BlissElement {
     if (this.#background === '') return null;
     if (this.#level <= 2 && !this.#paintArea) return null;
     if (this.#getInheritedOption('backgroundArea') === 'ink') {
-      const ink = this.#inkArea(x, y, this.#background);
+      const ink = this.#inkArea(x, y, this.#background, this.#areaPadding(BlissElement.#PAINT_AREAS));
       return ink && { area: 'ink', ...ink };
     }
     const box = this.#level <= 2
       ? BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea)
-      : BlissElement.#inkHitBox(this.#calculateBounds(x, y));
+      : BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#PAINT_AREAS));
     return { area: 'box', box };
   }
 
@@ -1738,7 +1798,7 @@ export class BlissElement {
 
       if (halo) return this.#haloWrap(pathData, halo);
       return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.authoredOptions,
-        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y))));
+        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#LINK_AREAS))));
     };
   }
 
@@ -1825,7 +1885,7 @@ export class BlissElement {
 
       if (halo) return this.#haloWrap(content, halo);
       return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y))));
+        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#LINK_AREAS))));
     };
   }
 }
