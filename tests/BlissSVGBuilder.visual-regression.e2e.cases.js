@@ -25,8 +25,9 @@ import { codeToFilename } from './utils/case-filename.js';
  *   :   → #      (position / parameter suffix)
  *   @ax,ay       a def's anchorOffset, inside […]/{…} after the codeString.
  * Untouched: B-codes, shape codes, ^ (head marker), ! (strip-semantic), digits,
- * coordinates. OPTION cases ([opt]||content) get no rule mapping (codeToFilename
- * returns null) and keep a curated `opt-…` name.
+ * coordinates. OPTION cases (any options bracket: [opt]||content, or one on a
+ * word, a character or a part) get no rule mapping (codeToFilename returns null)
+ * and keep a curated `opt-…` name.
  *
  * shapeTests/customTests additionally use the case-sensitivity rule
  * `X[u]A` vs `X[l]a` for external characters (handled inline below, NOT by
@@ -575,6 +576,19 @@ const curatedCaseSpecs = [
   { code: 'B391;B92;B81;B90' },
   { code: 'B391;B84;B81;B90' },
   { code: 'B313/B1103;;B81;B90' },
+  // element backgrounds (GH #29): a word's, a character's and a part's box, an
+  // ink area over the grid and around a letter, a padding, an effect reaching a
+  // background, a key styling one. The name lists each bracket's options in
+  // order, a bracket below || named by where it sits (word, char, part), then
+  // the codes.
+  { code: '[background=yellow]|B313/B291', file: 'opt-word-background-yellow-B313_B291.svg' },
+  { code: '[background=yellow]B313/AK:1/[background=red]B291', file: 'opt-char-background-yellow-char-background-red-B313_AK#1_B291.svg' },
+  { code: 'B313;[background=yellow]>B81', file: 'opt-part-background-yellow-B313+B81.svg' },
+  { code: '[grid;background-area=ink]||[background=yellow]B303', file: 'opt-grid-background-area-ink-char-background-yellow-B303.svg' },
+  { code: '[background-area=ink;background=yellow]Xa', file: 'opt-char-background-area-ink-background-yellow-Xa.svg' },
+  { code: '[background-padding=0.5;background=yellow]|B313/B291', file: 'opt-word-background-padding-0.5-background-yellow-B313_B291.svg' },
+  { code: '[transform=rotate(10 9 12)]|B313;[background=yellow]>B81/B291', file: 'opt-word-transform-rotate-10-9-12-part-background-yellow-B313+B81_B291.svg' },
+  { code: '[element-background--style=fill-opacity:0.5;background=yellow]B313', file: 'opt-char-element-background--style-fill-opacity-0.5-background-yellow-B313.svg' },
 ];
 
 // filename DERIVED from code + curatedDefs so it is byte-identical to the

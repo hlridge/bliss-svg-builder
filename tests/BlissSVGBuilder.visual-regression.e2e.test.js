@@ -17,9 +17,13 @@
  *   `BlissSVGBuilder.visual-regression.e2e.cases.js` for the full list.
  * - R13-R16 curated-corpus rendering: head markers (^), word-level ;; overlay,
  *   atypical/baseless indicators, dot-sizing options, strip-semantic, kerning
- *   decimals, custom glyph/indicator defs, and malformed-input fail-render.
- *   Filenames are DERIVED from the code via `tests/utils/case-filename.js`; defs
- *   are registered in `beforeAll`. See the `curatedTests`/`curatedDefs` exports.
+ *   decimals, custom glyph/indicator defs, and malformed-input fail-render;
+ *   later additions to the same list: indicator-group centering, and element
+ *   backgrounds (a word's, a character's and a part's box, ink areas, a
+ *   padding, an effect reaching a background, a key styling one).
+ *   Filenames are DERIVED from the code via `tests/utils/case-filename.js`
+ *   (an option case keeps a curated `opt-…` name); defs are registered in
+ *   `beforeAll`. See the `curatedTests`/`curatedDefs` exports.
  * - viewBox normalization when generated and reference viewBoxes differ.
  * - Indicator-replacement/removal compositions: extends definitions in
  *   `beforeAll` (`B291B81`, `B291B97`, `B291B97B81`) so curated cases can

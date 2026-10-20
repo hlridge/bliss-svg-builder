@@ -41,8 +41,10 @@
 //                                           (both alias names dropped, flattened)
 //   MI = {glyph,isIndicator} B86;SDOT:3,4 @ -0.5,0:  MI  ->  {B86+SDOT#3,4@-0.5,0}.svg
 //
-// OPTION cases ([opt=val]||content) are NOT rule-derived: the conversion key
-// defines no mapping for [ ] = ||, so codeToFilename() returns null and the caller
+// OPTION cases are NOT rule-derived: an options bracket, global ([opt=val]||content)
+// or on a word, a character or a part ([opt]|B313, [opt]B313, B313;[opt]>B81), has
+// no mapping in the conversion key ([ ] = | > stay as written, and | cannot be
+// written in a Windows filename), so codeToFilename() returns null and the caller
 // keeps a curated descriptive "opt-..." name (with any embedded alias expanded via
 // expandAliasesInFilename).
 
@@ -125,8 +127,10 @@ function convertSeparators(s) {
     .replace(/:/g, '#');
 }
 
+// A bracket anywhere, not only a leading global one: no code contains [ or ]
+// (`X[` is an unknown code), so a bracket pair is always an options bracket.
 export function isOptionCode(code) {
-  return /^\[[^\]]*\]\|\|/.test(code);
+  return /\[[^\]]*\]/.test(code);
 }
 
 // code -> reference filename (with .svg), or null for option cases (caller keeps
