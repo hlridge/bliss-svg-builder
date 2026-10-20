@@ -104,13 +104,13 @@ export interface BlissOptions {
    * A color painted behind the lines. In the global bracket (`[…]||`) it is
    * the whole picture's background; on a word, a character or a part it paints
    * behind that element alone, beneath every line. That element's
-   * `transform`, `opacity`, `filter`, `clip-path`, `mask`, `display` and
-   * `visibility`, as options or in `style`, reach its background too; its
-   * paint and `class` reach only its lines. An `element-background--` key
-   * (`element-background--class`, `element-background--box--rx`) styles the
-   * backgrounds themselves: written on a word, a character or a part, it
-   * reaches every background inside that element, its own included, and for
-   * each attribute the nearest key wins.
+   * `transform` (with its `transform-origin` and `transform-box`), `opacity`,
+   * `filter`, `clip-path`, `mask`, `display` and `visibility`, as options or in
+   * `style`, reach its background too; its paint, `class` and `id` reach only
+   * its lines. An `element-background--` key (`element-background--class`,
+   * `element-background--box--rx`) styles the backgrounds themselves: written
+   * on a word, a character or a part, it reaches every background inside that
+   * element, its own included, and for each attribute the nearest key wins.
    */
   background?: string;
   backgroundTop?: string;
