@@ -28,7 +28,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Does NOT cover:
  * - Where the boxes sit in the picture (order, depth, styling, links,
  *   `svgContent`, the layer attributes), see
- *   `BlissSVGBuilder.element-background-layer.test.js`.
+ *   `BlissSVGBuilder.element-background-layer.test.js`, and an element's
+ *   effects reaching its box, see `BlissSVGBuilder.background-effects.test.js`.
  * - The options' admission and routes, see
  *   `BlissSVGBuilder.element-background-options.test.js`.
  * - The ink areas (`background-area=ink`), see

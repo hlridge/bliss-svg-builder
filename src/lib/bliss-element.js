@@ -20,6 +20,16 @@ const INDICATOR_GAP = 1;
 // picture's own (4 decimals), which removes the float noise of summed positions.
 const roundForMarkup = (num) => parseFloat(num.toFixed(4));
 
+// The attributes of an element's own <g> that reach its background as well as
+// its lines: what moves, clips, fades or hides the element as a whole. Paint
+// stays with the lines, and so do `class` and `id`, and how the lines blend,
+// take clicks or scale (`mix-blend-mode`, `isolation`, `pointer-events`,
+// `cursor`, `vector-effect`).
+const EFFECT_ATTRIBUTES = new Set([
+  'transform', 'transform-origin', 'transform-box',
+  'opacity', 'filter', 'clip-path', 'mask', 'display', 'visibility',
+]);
+
 export class BlissElement {
   //#region Private Properties
   #key
@@ -347,8 +357,10 @@ export class BlissElement {
    * area's `padding` and each letter filled in `paint` and outlined by as much.
    * Returns the lines, and the width a group strokes them at (the element's
    * computed width, widened alike); null where it draws no line, as ZSA does.
-   * Built from the widths the library computes: the element's own attributes
-   * reach its lines, not its ink area, as they do not reach a box.
+   * Built from the widths the library computes: of the element's own
+   * attributes only its effects reach its ink area, on the copy the layer
+   * puts around it (#backgroundLayer), and its descendants' effects reach
+   * their lines inside it (#haloWrap).
    */
   #inkArea(x, y, paint, padding) {
     const outline = 2 * padding;
@@ -362,15 +374,72 @@ export class BlissElement {
 
   /**
    * This element's content in the halo mode of getSvgContent, where it writes
-   * none of its wrappers (no link, none of its attributes) but a width of its
-   * own, re-stated widened on a group exactly where its ink states it. The
-   * painted element's own width goes on its ink area's group instead.
+   * none of its wrappers (no link, no paint, no class or id) but a width of
+   * its own, re-stated widened, and its effects (#effectAttributes), on one
+   * group exactly where its ink has its own, so the area moves, clips and
+   * hides with the lines. The painted element's own width goes on its ink
+   * area's group instead, and its own effects on the copy around the area
+   * (#backgroundLayer). Content with no line stays empty, so an area around
+   * no line draws nothing, whatever group its element writes.
    */
   #haloWrap(content, halo) {
+    if (halo.element === this || content === '') return content;
     const options = this.#blissObj.options ?? {};
-    if (halo.element === this || !Object.hasOwn(options, 'strokeWidth')) return content;
+    const width = Object.hasOwn(options, 'strokeWidth')
+      ? `stroke-width="${roundForMarkup(options.strokeWidth + halo.outline)}"`
+      : '';
+    const attributes = [width, this.#effectAttributes].filter(Boolean).join(' ');
+    if (attributes === '') return content;
     const lines = content.startsWith('<') ? content : `<path d="${content}"/>`;
-    return `<g stroke-width="${roundForMarkup(options.strokeWidth + halo.outline)}">${lines}</g>`;
+    return `<g ${attributes}>${lines}</g>`;
+  }
+
+  /**
+   * This element's effects (EFFECT_ATTRIBUTES), as its own <g> writes them
+   * and in its order: each effect attribute, and a `style` cut down to its
+   * effect declarations (#effectDeclarations), left out where it has none.
+   * Read from the walk that writes the <g>, so an attribute refused there is
+   * never copied. '' where the element has no effect.
+   */
+  get #effectAttributes() {
+    const { groupEntries } = BlissElement.#separateAnchorAndGroupOptions(this.#blissObj.options, this.#blissObj.authoredOptions);
+    return groupEntries.flatMap(([name, value]) => {
+      if (EFFECT_ATTRIBUTES.has(name)) return [`${name}="${value}"`];
+      const effects = name === 'style' ? BlissElement.#effectDeclarations(value) : '';
+      return effects ? [`style="${effects}"`] : [];
+    }).join(' ');
+  }
+
+  /**
+   * The declarations of a `style` value whose property is an effect, as
+   * written and in order, joined by `;`; '' where none is. The value is split
+   * at each `;` outside parentheses and quotes, and a property is read in any
+   * case and spacing, as CSS reads them. The value is stored escaped
+   * (escapeHtml), so a quote is `&quot;` or `&#39;` and every `&` begins an
+   * escape: each escape is read whole, its own `;` never a split.
+   */
+  static #effectDeclarations(style) {
+    const declarations = [''];
+    let quote = null;
+    let depth = 0;
+    for (const token of String(style).match(/&[^;]*;|[^]/g) ?? []) {
+      if (quote) {
+        if (token === quote) quote = null;
+      } else if (token === '&quot;' || token === '&#39;') {
+        quote = token;
+      } else if (token === '(') {
+        depth++;
+      } else if (token === ')') {
+        depth = Math.max(0, depth - 1);
+      } else if (token === ';' && depth === 0) {
+        declarations.push('');
+        continue;
+      }
+      declarations[declarations.length - 1] += token;
+    }
+    return declarations
+      .filter(declaration => EFFECT_ATTRIBUTES.has(declaration.split(':', 1)[0].trim().toLowerCase()))
+      .join(';');
   }
 
   /**
@@ -410,6 +479,28 @@ export class BlissElement {
     for (const child of this.#children) {
       child.#visitBackgrounds(visit, this.#relativeToParentX + x, this.#relativeToParentY + y);
     }
+  }
+
+  /**
+   * Every background at or below this element as the layer draws them: the
+   * tree pared down to its effects. This element's own background, then its
+   * children's, in the order #visitBackgrounds visits them, inside one copy
+   * of this element's effects (#effectAttributes) where it has any, so every
+   * background under one element shares that copy, as its lines share its
+   * <g>. A box ignores its descendants' effects, which reach only their own
+   * backgrounds. The root writes no copy: a global effect lands on the
+   * content group, which holds the layer. '' where nothing at or below this
+   * element draws a background. `x` and `y` are the origin of the frame this
+   * element sits in, as getSvgContent takes them.
+   */
+  #backgroundLayer(x = 0, y = 0) {
+    const drawing = this.#backgroundDrawing(x, y);
+    const layer = (drawing ? this.#backgroundMarkup(drawing) : '') + this.#children
+      .map(child => child.#backgroundLayer(this.#relativeToParentX + x, this.#relativeToParentY + y))
+      .join('');
+    if (layer === '' || this.#level === 0) return layer;
+    const effects = this.#effectAttributes;
+    return effects ? `<g ${effects}>${layer}</g>` : layer;
   }
 
   /**
@@ -525,11 +616,13 @@ export class BlissElement {
       }
     }
 
-    const groupAttrStrings = [...groupAttrs].map(([name, value]) => `${name}="${value}"`);
+    const groupEntries = [...groupAttrs];
+    const groupAttrStrings = groupEntries.map(([name, value]) => `${name}="${value}"`);
 
     return {
       anchorAttrs: anchorAttrs.join(' '),
       groupAttrs: groupAttrStrings.join(' '),
+      groupEntries,
       hasHref,
       vectorEffect
     };
@@ -822,14 +915,14 @@ export class BlissElement {
 
         // Every word, character and part background comes first, beneath all
         // of the ink: a background drawn inside its own element would hide the
-        // ink of every earlier neighbour or part it reaches under. Every link
-        // is drawn after them too, so none takes a link's click. The ink
-        // follows as svgContent would write it alone: raw path data in a path
-        // of its own.
-        const backgrounds = [];
-        this.#visitBackgrounds((element, drawing) => backgrounds.push(element.#backgroundMarkup(drawing)), x, y);
-        if (backgrounds.length === 0) return ink;
-        return backgrounds.join('') + (ink.startsWith('<') ? ink : `<path d="${ink}"/>`);
+        // ink of every earlier neighbour or part it reaches under. So an
+        // element's effects reach its background through a copy of them in
+        // the layer (#backgroundLayer). Every link is drawn after them too, so
+        // none takes a link's click. The ink follows as svgContent would write
+        // it alone: raw path data in a path of its own.
+        const backgrounds = this.#backgroundLayer(x, y);
+        if (backgrounds === '') return ink;
+        return backgrounds + (ink.startsWith('<') ? ink : `<path d="${ink}"/>`);
       };
     } else if (this.#level === 1) {
       // Group level

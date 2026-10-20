@@ -39,8 +39,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.element-background-options.test.js`.
  * - A padding other than the default (`background-padding`, `link-padding`),
  *   see `BlissSVGBuilder.area-padding.test.js`.
- * - Pass-through attributes on the painted element (an author's attributes,
- *   `vector-effect`): none reaches its ink area.
+ * - An element's effects (`transform`, `opacity` and the rest), which reach
+ *   its ink area and a descendant's lines inside it, see
+ *   `BlissSVGBuilder.background-effects.test.js`; its other pass-through
+ *   attributes (paint, `class`, `vector-effect`) reach none of it.
  * - How a browser or a renderer draws and hit-tests the areas, which no test
  *   in this suite can observe.
  *

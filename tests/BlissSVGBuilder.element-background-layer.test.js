@@ -12,9 +12,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   the first line.
  * - Depth: after the grid, and after the picture's own background, which stays
  *   in its own group outside the content group.
- * - Styling reach: styling written after `||` lands on the content group and
- *   so reaches the boxes along with the lines; an element's own `opacity`
- *   reaches its lines and not its box.
+ * - Styling reach: styling written after `||` lands on the content group
+ *   alone and so reaches the boxes along with the lines, with no copy of it in
+ *   the layer; an element's own `opacity` reaches its box too, in a copy of
+ *   its own.
  * - Links: a box beneath its element's link and the link's rect; the global
  *   link around the content group, boxes included.
  * - `svgContent` carrying the boxes, still the content group's inner markup.
@@ -29,9 +30,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.element-backgrounds.test.js`.
  * - The ink areas and their layer attributes, see
  *   `BlissSVGBuilder.ink-areas.test.js`.
- * - An element's own `transform`, `filter` or `clip-path`: like `opacity`,
- *   each reaches the element's lines and leaves its box in the shared layer;
- *   pinned for `opacity` only.
+ * - An element's other effects (`transform`, `filter`, `clip-path` and the
+ *   rest), in an option or in `style`, and how their copies nest and share,
+ *   see `BlissSVGBuilder.background-effects.test.js`.
  * - The target vocabulary as a whole, see
  *   `BlissSVGBuilder.layer-target-bijection.test.js`.
  *
@@ -95,10 +96,12 @@ describe('BlissSVGBuilder element background layer', () => {
         + `stroke-linecap="round" stroke-width="0.5" ${attribute}>\n    ${YELLOW_B313}${B313}\n`);
     });
 
-    it('fades an element\'s own lines and not its box', () => {
+    it('fades an element\'s own box with its lines, each in a group of its own', () => {
+      // the box stays in the shared layer, beneath every line, inside a copy
+      // of the element's opacity
       const svg = build('[opacity=0.5;background=yellow]B313').svgCode;
 
-      expect(contentOf(svg)).toBe(`${YELLOW_B313}<g opacity="0.5">${B313}</g>`);
+      expect(contentOf(svg)).toBe(`<g opacity="0.5">${YELLOW_B313}</g><g opacity="0.5">${B313}</g>`);
     });
   });
 

@@ -103,7 +103,10 @@ export interface BlissOptions {
   /**
    * A color painted behind the lines. In the global bracket (`[…]||`) it is
    * the whole picture's background; on a word, a character or a part it paints
-   * behind that element alone.
+   * behind that element alone, beneath every line. That element's
+   * `transform`, `opacity`, `filter`, `clip-path`, `mask`, `display` and
+   * `visibility`, as options or in `style`, reach its background too; its
+   * paint and `class` reach only its lines.
    */
   background?: string;
   backgroundTop?: string;
