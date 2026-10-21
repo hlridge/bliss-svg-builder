@@ -20,8 +20,9 @@ import { LAYER_TARGETS } from '../src/lib/bliss-constants.js';
  *   letter past a target passed through as any attribute is.
  * - A key on a space: MISPLACED_SPACE_DECORATION.
  * - A key that displaces a written `background`: MULTIPLE_ATTRIBUTE_VALUES as
- *   after `||`, once per key whatever it reaches, naming the nearest key; no
- *   report where a key reaches no painted background.
+ *   after `||`, once per key whatever it reaches, naming the nearest key, in
+ *   the order the backgrounds are drawn; no report where a key reaches no
+ *   painted background.
  * - A definition carrying a key as a default or in the bracket leading its
  *   code string, styling the background each use draws.
  *
@@ -185,6 +186,19 @@ describe('BlissSVGBuilder element background keys', () => {
 
       expect(contentOf(builder.svgCode)).toBe(`${box(-1, -1, 10, 22, 'blue')}${B313}`);
       expect(builder.warnings).toEqual([displaced('element-background--box--fill', 'fill', 'element-background--box')]);
+    });
+
+    it('reports two displaced keys in the order their backgrounds are drawn, the word\'s first', () => {
+      // pins the report walking the elements as the drawing does, parent
+      // before child: visiting the children first reported the character's
+      // key first and drew the same picture (a hand mutant, 2026-10)
+      const builder = build('[element-background--fill=red;background=yellow]|[element-background--box--fill=blue;background=green]B313');
+
+      expect(contentOf(builder.svgCode)).toBe(`${box(-1, -1, 10, 22, 'red')}${box(-1, -1, 10, 22, 'blue')}${B313}`);
+      expect(builder.warnings).toEqual([
+        displaced('element-background--fill', 'fill', 'element-background--box'),
+        displaced('element-background--box--fill', 'fill', 'element-background--box'),
+      ]);
     });
 
     it.each([
