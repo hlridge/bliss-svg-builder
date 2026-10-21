@@ -180,6 +180,14 @@ const sepiaMatrix = (rest) => colorMatrix([
   0.272 - 0.272 * rest, 0.534 - 0.534 * rest, 0.131 + 0.869 * rest, 0, 0,
   0, 0, 0, 1, 0,
 ]);
+// The matrix Filter Effects 1 gives `type="saturate"`, written out: resvg reads
+// that type's value only from 0 to 1 and draws a larger one as no change.
+const saturateMatrix = (amount) => colorMatrix([
+  0.213 + 0.787 * amount, 0.715 - 0.715 * amount, 0.072 - 0.072 * amount, 0, 0,
+  0.213 - 0.213 * amount, 0.715 + 0.285 * amount, 0.072 - 0.072 * amount, 0, 0,
+  0.213 - 0.213 * amount, 0.715 - 0.715 * amount, 0.072 + 0.928 * amount, 0, 0,
+  0, 0, 0, 1, 0,
+]);
 
 // A function that only recolors: its amount, clamped to `max` where CSS
 // clamps it and rounded as written, drawn by `primitive`. It reaches nothing
@@ -278,7 +286,7 @@ const FUNCTIONS = new Map([
   ['hue-rotate', hueRotate],
   ['invert', recolor(amount => rgbTransfer(`type="table" tableValues="${amount} ${roundForMarkup(1 - amount)}"`), 1)],
   ['opacity', recolor(amount => transfer(`<feFuncA type="table" tableValues="0 ${amount}"/>`), 1)],
-  ['saturate', recolor(amount => `<feColorMatrix type="saturate" values="${amount}"/>`)],
+  ['saturate', recolor(saturateMatrix)],
   ['sepia', recolor(amount => sepiaMatrix(1 - amount), 1)],
 ]);
 

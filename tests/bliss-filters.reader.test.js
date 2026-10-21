@@ -42,7 +42,8 @@ const shadow = (dx, dy, deviation, color) =>
   `<feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${deviation}" flood-color="${color}"/>`;
 const opacity = (amount) => `<feComponentTransfer><feFuncA type="table" tableValues="0 ${amount}"/></feComponentTransfer>`;
 const hueRotate = (degrees) => `<feColorMatrix type="hueRotate" values="${degrees}"/>`;
-const saturate = (amount) => `<feColorMatrix type="saturate" values="${amount}"/>`;
+// saturate(10), Filter Effects 1's saturate matrix at amount 10
+const SATURATE_10 = '<feColorMatrix type="matrix" values="8.083 -6.435 -0.648 0 0 -1.917 3.565 -0.648 0 0 -1.917 -6.435 9.352 0 0 0 0 0 1 0"/>';
 const brightness = (amount) => '<feComponentTransfer>'
   + `<feFuncR type="linear" slope="${amount}"/><feFuncG type="linear" slope="${amount}"/><feFuncB type="linear" slope="${amount}"/>`
   + '</feComponentTransfer>';
@@ -68,7 +69,7 @@ describe('bliss-filters reader', () => {
       ['opacity(.5)', [opacity(0.5)]],
       ['opacity(50%)', [opacity(0.5)]],
       ['brightness(+1)', [brightness(1)]],
-      ['saturate(1e1)', [saturate(10)]],
+      ['saturate(1e1)', [SATURATE_10]],
       ['blur(1e0px)', [blur(1)]],
       ['blur(0)', [blur(0)]],
       ['hue-rotate(0)', [hueRotate(0)]],

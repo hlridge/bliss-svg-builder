@@ -61,8 +61,10 @@ describe('bliss-filters primitives', () => {
       ['grayscale(2)', GRAYSCALE_1],
       ['sepia(0.5)', matrix('0.6965 0.3845 0.0945 0 0 0.1745 0.843 0.084 0 0 0.136 0.267 0.5655 0 0 0 0 0 1 0')],
       ['sepia(150%)', SEPIA_1],
-      ['saturate(0.4)', '<feColorMatrix type="saturate" values="0.4"/>'],
-      ['saturate(3)', '<feColorMatrix type="saturate" values="3"/>'],
+      // pins saturate as a matrix, never type="saturate": resvg reads that
+      // type's value only from 0 to 1 and draws saturate(3) unchanged
+      ['saturate(0.4)', matrix('0.5278 0.429 0.0432 0 0 0.1278 0.829 0.0432 0 0 0.1278 0.429 0.4432 0 0 0 0 0 1 0')],
+      ['saturate(3)', matrix('2.574 -1.43 -0.144 0 0 -0.426 1.57 -0.144 0 0 -0.426 -1.43 2.856 0 0 0 0 0 1 0')],
       ['hue-rotate(-90deg)', '<feColorMatrix type="hueRotate" values="-90"/>'],
       ['hue-rotate(450deg)', '<feColorMatrix type="hueRotate" values="450"/>'],
       ['invert(0.25)', transfer(rgbFuncs('type="table" tableValues="0.25 0.75"'))],
