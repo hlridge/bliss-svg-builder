@@ -32,8 +32,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.layer-attributes.test.js`,
  *   `BlissSVGBuilder.layer-sub-targets.test.js` and
  *   `BlissSVGBuilder.layer-attribute-refusals.test.js`.
- * - Converting a CSS `filter` function into an in-picture `<filter>`, which is
- *   not built yet (backlog, CSS filter pass-through).
+ * - The native `<filter>` a CSS filter function on the content group is drawn
+ *   as, see `BlissSVGBuilder.native-filter-layers.test.js`.
  */
 
 const rootTag = (svg) => svg.match(/<svg[^>]*>/)[0];
@@ -67,7 +67,6 @@ describe('BlissSVGBuilder global placement', () => {
 
     it.each([
       ['filter=url(#f)', 'filter="url(#f)"'],
-      ['style=filter:blur(1px)', 'style="filter:blur(1px)"'],
       ['clip-path=url(#c)', 'clip-path="url(#c)"'],
       ['mask=url(#m)', 'mask="url(#m)"'],
       ['transform=rotate(20)', 'transform="rotate(20)"'],
@@ -88,6 +87,15 @@ describe('BlissSVGBuilder global placement', () => {
 
       expect(contentTag(svg)).toBe(DEFAULT_CONTENT_TAG.replace(/>$/, ` ${attribute}>`));
       expect(rootTag(svg)).not.toContain(attribute.split('=')[0] + '=');
+    });
+
+    it('puts style=filter:blur(1px) on the content group after the defaults and not on the root', () => {
+      // the filter function is drawn as a native one the style points at (#34)
+      const svg = new BlissSVGBuilder('[style=filter:blur(1px)]||B313').svgCode;
+      const hash = svg.match(/bliss-filter-([0-9a-f]{8})-1/)?.[1];
+
+      expect(contentTag(svg)).toBe(DEFAULT_CONTENT_TAG.replace(/>$/, ` style="filter:url(#bliss-filter-${hash}-1)">`));
+      expect(rootTag(svg)).not.toContain('style=');
     });
 
     it('leaves every grid line undashed', () => {

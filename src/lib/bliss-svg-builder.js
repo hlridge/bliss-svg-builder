@@ -11,6 +11,7 @@ import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
+import { translateFilters, fillFilterIds } from "./bliss-filters.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
 // load so BlissElement can clone it without importing BlissParser itself.
@@ -117,10 +118,20 @@ function serializeOptionsWithPosition(node, skipKeys) {
   return serializeOptions({ ...position, ...node.options }, skipKeys);
 }
 
-// Renders one layer's attribute map as markup. An empty map yields an empty
-// string, so a tag built from it closes without a stray space.
-const formatAttributes = (attrs) =>
-  Object.entries(attrs).map(([name, value]) => `${name}="${value}"`).join(' ');
+// Renders one layer's attributes as markup, from [name, value] pairs or a
+// map. None yields an empty string, so a tag built from it closes without a
+// stray space.
+const formatEntries = (entries) => entries.map(([name, value]) => `${name}="${value}"`).join(' ');
+const formatAttributes = (attrs) => formatEntries(Object.entries(attrs));
+
+// The smallest box ({ minX, minY, maxX, maxY }) holding every one of `boxes`;
+// of none, the empty box, which holds nothing.
+const unionOf = (boxes) => ({
+  minX: Math.min(...boxes.map(box => box.minX)),
+  minY: Math.min(...boxes.map(box => box.minY)),
+  maxX: Math.max(...boxes.map(box => box.maxX)),
+  maxY: Math.max(...boxes.map(box => box.maxY)),
+});
 
 // A written viewBox as four numbers, or undefined when it does not read as
 // one: four values separated by whitespace or commas, each finite, and a size
@@ -6335,6 +6346,20 @@ class BlissSVGBuilder {
     const viewBox = parseViewBox(this.#rootAttributes.viewBox)
       ?? { x: viewBoxX, y: viewBoxY, width: viewBoxWidth, height: viewBoxHeight };
 
+    // A CSS filter on one of the picture's layers is drawn as a native
+    // <filter> (bliss-filters.js), numbered in the order the markup is written
+    // and written on its own line: the first child of the group it serves, or
+    // the line before the single shape. Its region covers the viewBox and what
+    // the element draws (`drawn()`, { minX, minY, maxX, maxY }, asked only
+    // where a filter translates). Every layer passes through here except the
+    // root, whose filter stays page CSS.
+    let filterCount = 0;
+    const filterContext = { viewBox, next: () => ++filterCount };
+    const layerMarkup = (attrs, drawn) => {
+      const { entries, defs } = translateFilters(Object.entries(attrs), () => ({ drawn: drawn() }), filterContext);
+      return { attributes: formatEntries(entries), filterLines: defs.map(def => `    ${def}`) };
+    };
+
     const svgTitle = this.#processedOptions.svgTitle ?? "";
     const svgDesc = this.#processedOptions.svgDesc ?? "";
     const background = this.#processedOptions.background ?? "";
@@ -6355,12 +6380,9 @@ class BlissSVGBuilder {
     // in that entry itself.
     let svgText = "";
 
-    // `background--` names the group, which is the background's single node; the
-    // rects that paint are reached with `background-zone--`.
-    const backgroundWrapper = `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.background,
-      {}, this.#authoredFor(ELEMENT_CLASSES.background)))}>`;
-
-    let backgroundContent = '';
+    // The rects that paint the background, each with the box it covers: the
+    // zones, or one paper over the whole viewBox.
+    let backgroundRects = [];
     if (hasZones) {
       const bulkBg = background;
       const topColor = backgroundTop || bulkBg;
@@ -6375,23 +6397,41 @@ class BlissSVGBuilder {
       const topHeight = round(Math.max(0, 8 - viewBox.y));
       const bottomHeight = round(Math.max(0, viewBox.y + viewBox.height - 16));
 
-      const zoneRect = (classes, y, height, fill) =>
-        `    <rect ${formatAttributes(layerAttributes(classes,
-          { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill },
-          this.#authoredFor(classes)))}/>`;
+      const zone = (classes, y, height, fill) => ({
+        classes,
+        computed: { x: zoneX, y, width: zoneWidth, height, stroke: 'none', fill },
+        box: { minX: zoneX, minY: y, maxX: zoneX + zoneWidth, maxY: y + height },
+      });
 
-      const zoneRects = [
-        topColor ? zoneRect(ELEMENT_CLASSES.zoneTop, topY, topHeight, topColor) : '',
-        midColor ? zoneRect(ELEMENT_CLASSES.zoneMid, 8, 8, midColor) : '',
-        bottomColor ? zoneRect(ELEMENT_CLASSES.zoneBottom, 16, bottomHeight, bottomColor) : '',
-      ].filter(Boolean).join('\n');
-
-      backgroundContent = `${backgroundWrapper}\n${zoneRects}\n  </g>`;
+      backgroundRects = [
+        topColor ? zone(ELEMENT_CLASSES.zoneTop, topY, topHeight, topColor) : null,
+        midColor ? zone(ELEMENT_CLASSES.zoneMid, 8, 8, midColor) : null,
+        bottomColor ? zone(ELEMENT_CLASSES.zoneBottom, 16, bottomHeight, bottomColor) : null,
+      ].filter(Boolean);
     } else if (background !== "") {
-      const paper = `    <rect ${formatAttributes(layerAttributes(ELEMENT_CLASSES.backgroundZone,
-        { x: viewBox.x, y: viewBox.y, width: '100%', height: '100%', stroke: 'none', fill: background },
-        this.#authoredFor(ELEMENT_CLASSES.backgroundZone)))}/>`;
-      backgroundContent = `${backgroundWrapper}\n${paper}\n  </g>`;
+      backgroundRects = [{
+        classes: ELEMENT_CLASSES.backgroundZone,
+        computed: { x: viewBox.x, y: viewBox.y, width: '100%', height: '100%', stroke: 'none', fill: background },
+        box: { minX: viewBox.x, minY: viewBox.y, maxX: viewBox.x + viewBox.width, maxY: viewBox.y + viewBox.height },
+      }];
+    }
+
+    // `background--` names the group, which is the background's single node; the
+    // rects that paint are reached with `background-zone--`. The group is
+    // written before its rects, so its filter is numbered first.
+    let backgroundContent = '';
+    if (backgroundRects.length > 0) {
+      const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.background, {}, this.#authoredFor(ELEMENT_CLASSES.background)),
+        () => unionOf(backgroundRects.map(({ box }) => box)));
+      backgroundContent = [
+        `  <g ${group.attributes}>`,
+        ...group.filterLines,
+        ...backgroundRects.flatMap(({ classes, computed, box }) => {
+          const rect = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => box);
+          return [...rect.filterLines, `    <rect ${rect.attributes}/>`];
+        }),
+        '  </g>',
+      ].join('\n');
     }
 
     // Grid boundaries adjusted for cropping
@@ -6445,19 +6485,35 @@ class BlissSVGBuilder {
       const earthD = 16 >= gridMinY && 16 <= gridMaxY ? hLine(16) : '';
 
       // The computed key order below is load-bearing: a reordered attribute is a
-      // diff in every grid assertion in the suite.
-      const gridLine = (classes, strokeWidth, stroke, d) =>
-        `    <path ${formatAttributes(layerAttributes(classes,
-          { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square',
-            'stroke-linejoin': 'miter', d }, this.#authoredFor(classes)))}/>`;
+      // diff in every grid assertion in the suite. Every line runs within one
+      // extent, from gridStartX across gridLineWidth and from gridMinY to
+      // gridMaxY, so its box is that extent widened by half its own width.
+      const gridLine = (classes, strokeWidth, stroke, d) => ({
+        classes,
+        computed: { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square', 'stroke-linejoin': 'miter', d },
+        box: {
+          minX: gridStartX - strokeWidth / 2,
+          minY: gridMinY - strokeWidth / 2,
+          maxX: gridStartX + gridLineWidth + strokeWidth / 2,
+          maxY: gridMaxY + strokeWidth / 2,
+        },
+      });
 
-      const gridLines = [
-        minorD  ? gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD)  : '',
-        mediumD ? gridLine(ELEMENT_CLASSES.gridMedium, gridMediumStrokeWidth, gridMediumColor, mediumD) : '',
-        majorD  ? gridLine(ELEMENT_CLASSES.gridMajor,  gridMajorStrokeWidth,  gridMajorColor,  majorD)  : '',
-        skyD    ? gridLine(ELEMENT_CLASSES.gridSky,    gridSkyStrokeWidth,    gridSkyColor,    skyD)    : '',
-        earthD  ? gridLine(ELEMENT_CLASSES.gridEarth,  gridEarthStrokeWidth,  gridEarthColor,  earthD)  : '',
-      ].filter(Boolean).join('\n');
+      const lines = [
+        minorD  ? gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD)  : null,
+        mediumD ? gridLine(ELEMENT_CLASSES.gridMedium, gridMediumStrokeWidth, gridMediumColor, mediumD) : null,
+        majorD  ? gridLine(ELEMENT_CLASSES.gridMajor,  gridMajorStrokeWidth,  gridMajorColor,  majorD)  : null,
+        skyD    ? gridLine(ELEMENT_CLASSES.gridSky,    gridSkyStrokeWidth,    gridSkyColor,    skyD)    : null,
+        earthD  ? gridLine(ELEMENT_CLASSES.gridEarth,  gridEarthStrokeWidth,  gridEarthColor,  earthD)  : null,
+      ].filter(Boolean);
+
+      // The group is written before its lines, so its filter is numbered first.
+      const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.grid, { 'shape-rendering': 'crispEdges' },
+        this.#authoredFor(ELEMENT_CLASSES.grid)), () => unionOf(lines.map(({ box }) => box)));
+      const gridLines = lines.flatMap(({ classes, computed, box }) => {
+        const line = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => box);
+        return [...line.filterLines, `    <path ${line.attributes}/>`];
+      }).join('\n');
 
       gridPath = [
         '  <style>',
@@ -6467,8 +6523,8 @@ class BlissSVGBuilder {
         `      .${ELEMENT_CLASSES.gridMinor[0]} { shape-rendering: geometricPrecision; }`,
         '    }',
         '  </style>',
-        `  <g ${formatAttributes(layerAttributes(ELEMENT_CLASSES.grid,
-          { 'shape-rendering': 'crispEdges' }, this.#authoredFor(ELEMENT_CLASSES.grid)))}>`,
+        `  <g ${group.attributes}>`,
+        ...group.filterLines,
         gridLines,
         '  </g>',
       ].join('\n');
@@ -6513,8 +6569,13 @@ class BlissSVGBuilder {
     const contentInner = this.#globalVectorEffect
       ? BlissElement.applyVectorEffectToPaths(content, this.#globalVectorEffect)
       : content;
+    // Written last of the layers, so its filter is numbered after theirs. Its
+    // region is the viewBox's: what the composition draws is not measured
+    // here, so ink a crop leaves outside the viewBox falls outside it.
+    const contentLayer = layerMarkup(contentAttrs, () => undefined);
     const contentGroup = [
-      `  <g ${formatAttributes(contentAttrs)}>`,
+      `  <g ${contentLayer.attributes}>`,
+      ...contentLayer.filterLines,
       `    ${contentInner}`,
       '  </g>',
     ];
@@ -6547,7 +6608,8 @@ class BlissSVGBuilder {
     // Clean up empty <path d=""/> elements from DOT/COMMA/external glyphs
     svgStr = svgStr.replace(/<path d=""\/>/g, '');
 
-    return svgStr;
+    // Only the finished markup can be hashed, so the filter ids are completed last.
+    return fillFilterIds(svgStr);
   }
 }
 

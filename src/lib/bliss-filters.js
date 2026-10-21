@@ -396,3 +396,54 @@ export const pictureHash = (text) => {
   }
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
+
+// Every generated filter id is the prefix, the picture's hash and a number.
+// The hash is known only once the picture is written, so a placeholder stands
+// for it until then: no author's text can hold one, as each reaches the markup
+// escaped and a raw `<` appears only in the library's own tags.
+const ID_PREFIX = 'bliss-filter-';
+const PENDING_ID = `${ID_PREFIX}<hash>-`;
+
+// The drawn box of an element that draws nothing, which adds nothing to a
+// region: the region is then the viewBox's alone.
+const NOTHING_DRAWN = Object.freeze({ minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
+
+/**
+ * One element's attributes with each CSS filter among them that translates
+ * pointed at a native <filter>: a `filter` attribute, and each `filter`
+ * declaration of a `style` (rewriteStyle). `entries` are the attributes as
+ * [name, value] pairs, escaped, in the order they are written; `site()`
+ * returns what the element draws, `{ drawn }` ({ minX, minY, maxX, maxY },
+ * undefined where it draws nothing), asked only where a filter translates;
+ * `context` is the picture's `{ viewBox, next }`, `next()` numbering the
+ * filters in the order the markup is written. Returns `{ entries, defs }`:
+ * the entries with each translated filter rewritten to `url(#id)`, and the
+ * <filter> markup for each, in order.
+ */
+export const translateFilters = (entries, site, context) => {
+  const defs = [];
+  let drawn;
+  const allocate = ({ primitives, reach }) => {
+    drawn ??= site().drawn ?? NOTHING_DRAWN;
+    const id = `${PENDING_ID}${context.next()}`;
+    defs.push(filterMarkup(id, primitives, filterRegion(context.viewBox, drawn, reach)));
+    return id;
+  };
+  const translated = entries.map(([name, value]) => {
+    if (name === 'style') return [name, rewriteStyle(value, allocate)];
+    if (name !== 'filter') return [name, value];
+    const filter = readFilterValue(value);
+    return [name, filter.kind === 'translated' ? `url(#${allocate(filter)})` : value];
+  });
+  return { entries: translated, defs };
+};
+
+/**
+ * The finished picture's markup with its filter ids completed by the
+ * picture's hash (pictureHash, over the markup with the ids still pending),
+ * so two different pictures on one page never share an id. A picture with
+ * no generated id is returned as it is, unhashed.
+ */
+export const fillFilterIds = (markup) => (markup.includes(PENDING_ID)
+  ? markup.replaceAll(PENDING_ID, `${ID_PREFIX}${pictureHash(markup)}-`)
+  : markup);
