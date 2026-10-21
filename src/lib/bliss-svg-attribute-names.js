@@ -9,11 +9,19 @@
  *
  * PROVENANCE, so this list can be regenerated rather than guessed at:
  *
- *   source   SVGO 4.0.1, `plugins/_collections.js` (MIT), retrieved 2026-09-10
+ *   source   SVGO 4.0.1, `plugins/_collections.js` (MIT), retrieved 2026-10-21
  *            from https://cdn.jsdelivr.net/npm/svgo@4.0.1/plugins/_collections.js
  *   recipe   for each element in SVG_ELEMENT_BASIS, union `elems[el].attrs`
  *            with every `attrsGroups[g]` named by `elems[el].attrsGroups`;
  *            then drop namespaced names, then add the link attributes below.
+ *   gap      `feDropShadow` has no `elems` entry: SVGO names it among the
+ *            filter primitives, but its collections describe SVG 1.1, which
+ *            predates it. It takes the attributes Filter Effects 1 gives it
+ *            (https://www.w3.org/TR/filter-effects-1/#feDropShadowElement),
+ *            each group read from `attrsGroups` like any other element's: the
+ *            `core`, `presentation` and `filterPrimitive` groups, plus `class`,
+ *            `style`, `in`, `stdDeviation`, `dx` and `dy`. All of them already
+ *            arrive through `feGaussianBlur` and `<text>`, so it adds no name.
  *   minus    namespaced names (`xlink:*`, `xml:*`). Neither entry point can
  *            deliver one, by two different mechanisms: an option bracket splits
  *            the key on the colon before any lookup could see it, and an
@@ -27,10 +35,10 @@
  *            routed names arrive through the 1.1 union: `target` from `<a>`,
  *            and `type` from `<style>` and nowhere else, which is why dropping
  *            `<style>` from the basis is not the isolated change it looks like.
- *   census   116 names: 13 camelCase, 50 hyphenated, 53 single-word, resolving
- *            to 116 distinct normalized keys.
+ *   census   129 names: 18 camelCase, 50 hyphenated, 61 single-word, resolving
+ *            to 129 distinct normalized keys.
  *
- * Eighteen of the 116 are inert in both directions and are kept anyway: the
+ * Sixteen of the 129 are inert in both directions and are kept anyway: the
  * `on*` event handlers are refused by the safety gate under every spelling, so
  * no canonicalization can make one live. They stay because the list is faithful
  * to its source, and because excluding them would be the kind of unstated
@@ -44,41 +52,48 @@
  * Scoped deliberately to the elements the library emits, and no wider. Every
  * name here is one the library may rewrite on the author's behalf, so a longer
  * list is a larger surface on which to rename something an author meant
- * literally. Generic SVG words like `in`, `result`, `mode` and `values` belong
- * to elements we do not emit, and stay out.
+ * literally. Generic SVG words such as `in`, `result` and `values` are here
+ * because the library emits the filter primitives that own them; `mode`
+ * (`<feBlend>`) and `operator` (`<feComposite>`) belong to elements it does
+ * not emit, and stay out.
  */
 
 /**
  * The elements the library puts in its output. Confirmed against the rendered
  * markup rather than read off the source: the vocabulary above is a union over
- * exactly these, so a feature that emits a tenth element leaves the vocabulary
- * short until it is added here.
+ * exactly these, so a feature that emits an element missing here leaves the
+ * vocabulary short until it is added.
  */
 export const SVG_ELEMENT_BASIS = new Set([
   'a', 'desc', 'g', 'path', 'rect', 'style', 'svg', 'text', 'title',
+  // the native filter a CSS `filter` inside the picture is drawn as
+  'feColorMatrix', 'feComponentTransfer', 'feDropShadow', 'feFuncA', 'feFuncB', 'feFuncG',
+  'feFuncR', 'feGaussianBlur', 'filter',
 ]);
 
 /** The owner's spelling of every attribute name in scope. */
 export const SVG_ATTRIBUTE_NAMES = new Set([
-  'alignment-baseline', 'baseProfile', 'baseline-shift', 'class', 'clip', 'clip-path',
-  'clip-rule', 'color', 'color-interpolation', 'color-interpolation-filters', 'color-profile',
-  'color-rendering', 'contentScriptType', 'contentStyleType', 'cursor', 'd', 'direction',
-  'display', 'dominant-baseline', 'download', 'dx', 'dy', 'enable-background',
-  'externalResourcesRequired', 'fill', 'fill-opacity', 'fill-rule', 'filter', 'flood-color',
-  'flood-opacity', 'font-family', 'font-size', 'font-size-adjust', 'font-stretch', 'font-style',
-  'font-variant', 'font-weight', 'glyph-orientation-horizontal', 'glyph-orientation-vertical',
-  'height', 'href', 'hreflang', 'id', 'image-rendering', 'lengthAdjust', 'letter-spacing',
-  'lighting-color', 'marker-end', 'marker-mid', 'marker-start', 'mask', 'media', 'onabort',
-  'onactivate', 'onclick', 'onerror', 'onfocusin', 'onfocusout', 'onload', 'onmousedown',
-  'onmousemove', 'onmouseout', 'onmouseover', 'onmouseup', 'onresize', 'onscroll', 'onunload',
-  'onzoom', 'opacity', 'overflow', 'paint-order', 'pathLength', 'pointer-events',
-  'preserveAspectRatio', 'referrerpolicy', 'rel', 'requiredExtensions', 'requiredFeatures',
-  'rotate', 'rx', 'ry', 'shape-rendering', 'stop-color', 'stop-opacity', 'stroke',
-  'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin',
+  'alignment-baseline', 'amplitude', 'baseProfile', 'baseline-shift', 'class', 'clip',
+  'clip-path', 'clip-rule', 'color', 'color-interpolation', 'color-interpolation-filters',
+  'color-profile', 'color-rendering', 'contentScriptType', 'contentStyleType', 'cursor', 'd',
+  'direction', 'display', 'dominant-baseline', 'download', 'dx', 'dy', 'enable-background',
+  'exponent', 'externalResourcesRequired', 'fill', 'fill-opacity', 'fill-rule', 'filter',
+  'filterRes', 'filterUnits', 'flood-color', 'flood-opacity', 'font-family', 'font-size',
+  'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight',
+  'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'height', 'href', 'hreflang',
+  'id', 'image-rendering', 'in', 'intercept', 'lengthAdjust', 'letter-spacing', 'lighting-color',
+  'marker-end', 'marker-mid', 'marker-start', 'mask', 'media', 'offset', 'onabort', 'onactivate',
+  'onclick', 'onerror', 'onfocusin', 'onfocusout', 'onload', 'onmousedown', 'onmousemove',
+  'onmouseout', 'onmouseover', 'onmouseup', 'onresize', 'onscroll', 'onunload', 'onzoom',
+  'opacity', 'overflow', 'paint-order', 'pathLength', 'pointer-events', 'preserveAspectRatio',
+  'primitiveUnits', 'referrerpolicy', 'rel', 'requiredExtensions', 'requiredFeatures', 'result',
+  'rotate', 'rx', 'ry', 'shape-rendering', 'slope', 'stdDeviation', 'stop-color', 'stop-opacity',
+  'stroke', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin',
   'stroke-miterlimit', 'stroke-opacity', 'stroke-width', 'style', 'systemLanguage', 'tabindex',
-  'target', 'text-anchor', 'text-decoration', 'text-overflow', 'text-rendering', 'textLength',
-  'title', 'transform', 'transform-origin', 'type', 'unicode-bidi', 'vector-effect', 'version',
-  'viewBox', 'visibility', 'width', 'word-spacing', 'writing-mode', 'x', 'y', 'zoomAndPan',
+  'tableValues', 'target', 'text-anchor', 'text-decoration', 'text-overflow', 'text-rendering',
+  'textLength', 'title', 'transform', 'transform-origin', 'type', 'unicode-bidi', 'values',
+  'vector-effect', 'version', 'viewBox', 'visibility', 'width', 'word-spacing', 'writing-mode',
+  'x', 'y', 'zoomAndPan',
 ]);
 
 /**

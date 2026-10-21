@@ -10,6 +10,9 @@
  *   compound-lowercase `hreflang`/`referrerpolicy` that no shape rule recovers).
  * - Answering "nobody owns this" for an author's own name, which is what keeps
  *   a made-up name emitting exactly as written.
+ * - Answering nothing for a standard's name on an element the library does not
+ *   emit (`mode`, `operator`), which is what keeps the vocabulary scoped to the
+ *   basis rather than to all of SVG.
  * - The declared element basis matching the elements the library actually
  *   emits, by equality, so a feature that emits a new element cannot silently
  *   leave the vocabulary short.
@@ -20,7 +23,7 @@
  *   options argument, and from a definition's defaults.
  * - The three cases the lookup must refuse: a name the library curates
  *   (`strokeWidth`), a `<target>--attribute` key, and a name nobody owns.
- * - The eighteen event handlers staying refused after canonicalization.
+ * - The sixteen event handlers staying refused after canonicalization.
  *
  * Does NOT cover:
  * - Markup a custom `getPath` returns. A definition whose `getPath` returns a
@@ -69,6 +72,8 @@ const REACHING_INPUTS = [
   'ZZZUNKNOWN',
   'B449;B81/B451;;B99',
   '[grid;background=red;svg-title=T;svg-desc=D;href=https://example.com;text=cap]||B449;B81/B451;;B99',
+  // a CSS filter drawn as a native <filter> (#34), one value per primitive family
+  '[filter=blur(1px) drop-shadow(1px 1px red) grayscale(1) invert(1) opacity(0.5)]B291',
 ];
 
 describe('BlissSVGBuilder SVG attribute vocabulary', () => {
@@ -84,6 +89,10 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
       ['preserve-aspect-ratio', 'preserveAspectRatio'],
       ['hrefLang', 'hreflang'],
       ['referrerPolicy', 'referrerpolicy'],
+      // the filter primitives the translation emits (#34) joined the basis
+      ['std-deviation', 'stdDeviation'],
+      ['filterunits', 'filterUnits'],
+      ['table-values', 'tableValues'],
     ])('resolves %s to the owner spelling %s', (written, owner) => {
       expect(svgAttributeSpelling(written)).toBe(owner);
     });
@@ -92,6 +101,13 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
       expect(svgAttributeSpelling('myOwnAttr')).toBeUndefined();
       expect(svgAttributeSpelling('dataAttr')).toBeUndefined();
       expect(svgAttributeSpelling('data-attr')).toBeUndefined();
+    });
+
+    // SVGO groups every filter primitive together, so the likely slip when the
+    // basis grows is regenerating over all of them: these two would then join.
+    it('answers undefined for a standard name on an element the library does not emit', () => {
+      expect(svgAttributeSpelling('mode')).toBeUndefined();
+      expect(svgAttributeSpelling('operator')).toBeUndefined();
     });
 
     it('answers undefined for a curated option the library owns instead', () => {
@@ -321,7 +337,7 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
   });
 
   describe('when an event handler name reaches the option system', () => {
-    // Eighteen on* names are in the vocabulary because the list is faithful to
+    // Sixteen on* names are in the vocabulary because the list is faithful to
     // its source, and resolution never runs on them: a name the safety gate
     // refuses is left exactly as written. These rows go red if a later change
     // to that gate opens an attribute surface through the vocabulary.

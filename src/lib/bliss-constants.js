@@ -495,7 +495,7 @@ const ARIA_PROGRAMMATIC_NAME = /^aria[A-Z]/;
  * Three kinds of key are then returned untouched.
  *
  * A name the library will REFUSE is not a name it renames, which is the reason
- * the eighteen event handlers in the vocabulary are inert in both directions
+ * the sixteen event handlers in the vocabulary are inert in both directions
  * rather than merely unemitted.
  *
  * A `<target>--attribute` key means its attribute LITERALLY, which is the one
