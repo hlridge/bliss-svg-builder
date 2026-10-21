@@ -413,20 +413,24 @@ const NOTHING_DRAWN = Object.freeze({ minX: Infinity, minY: Infinity, maxX: -Inf
  * pointed at a native <filter>: a `filter` attribute, and each `filter`
  * declaration of a `style` (rewriteStyle). `entries` are the attributes as
  * [name, value] pairs, escaped, in the order they are written; `site()`
- * returns what the element draws, `{ drawn }` ({ minX, minY, maxX, maxY },
- * undefined where it draws nothing), asked only where a filter translates;
- * `context` is the picture's `{ viewBox, next }`, `next()` numbering the
- * filters in the order the markup is written. Returns `{ entries, defs }`:
- * the entries with each translated filter rewritten to `url(#id)`, and the
- * <filter> markup for each, in order.
+ * returns what the element draws, `{ drawn, geometry }`, asked only where a
+ * filter translates: `drawn` its box with its lines ({ minX, minY, maxX,
+ * maxY }, undefined where it draws nothing), `geometry` the box of its
+ * geometry alone, given only by an element that can hold the thin-element
+ * shape (thinShape); `context` is the picture's `{ viewBox, next }`,
+ * `next()` numbering the filters. With no context, as for a tree rendered
+ * outside a picture, nothing is translated. Returns `{ entries, defs, shape
+ * }`: the entries with each translated filter rewritten to `url(#id)`, the
+ * <filter> markup for each, in order, and the thin-element shape or ''.
  */
 export const translateFilters = (entries, site, context) => {
+  if (!context) return { entries, defs: [], shape: '' };
   const defs = [];
-  let drawn;
+  let place;
   const allocate = ({ primitives, reach }) => {
-    drawn ??= site().drawn ?? NOTHING_DRAWN;
+    place ??= site();
     const id = `${PENDING_ID}${context.next()}`;
-    defs.push(filterMarkup(id, primitives, filterRegion(context.viewBox, drawn, reach)));
+    defs.push(filterMarkup(id, primitives, filterRegion(context.viewBox, place.drawn ?? NOTHING_DRAWN, reach)));
     return id;
   };
   const translated = entries.map(([name, value]) => {
@@ -435,15 +439,39 @@ export const translateFilters = (entries, site, context) => {
     const filter = readFilterValue(value);
     return [name, filter.kind === 'translated' ? `url(#${allocate(filter)})` : value];
   });
-  return { entries: translated, defs };
+  const shape = place?.drawn && place.geometry ? thinShape(place.drawn, place.geometry) : '';
+  return { entries: translated, defs, shape };
+};
+
+// A generated id still pending, its number captured.
+const PENDING_NUMBER = new RegExp(`${PENDING_ID}(\\d+)`, 'g');
+const PENDING_FILTER = new RegExp(`<filter id="${PENDING_ID}(\\d+)"`, 'g');
+
+/**
+ * The markup with its pending filter ids numbered 1, 2, 3, … in the order
+ * their <filter>s are written, and how many there are. The element tree
+ * writes a group after what it holds, and knows whether a copy of an
+ * element's effects holds anything only once that is written, so the numbers
+ * it draws as it goes run in no useful order; numbering by position makes
+ * them read down the document.
+ */
+export const numberFilters = (markup) => {
+  if (!markup.includes(PENDING_ID)) return { markup, count: 0 };
+  const order = new Map();
+  for (const [, drawn] of markup.matchAll(PENDING_FILTER)) order.set(drawn, order.size + 1);
+  return {
+    markup: markup.replace(PENDING_NUMBER, (_, drawn) => `${PENDING_ID}${order.get(drawn)}`),
+    count: order.size,
+  };
 };
 
 /**
- * The finished picture's markup with its filter ids completed by the
- * picture's hash (pictureHash, over the markup with the ids still pending),
- * so two different pictures on one page never share an id. A picture with
- * no generated id is returned as it is, unhashed.
+ * The markup with its filter ids completed by the picture's hash
+ * (pictureHash, over `picture`, the whole picture's markup with the ids still
+ * pending), so two different pictures on one page never share an id, and a
+ * part of a picture carries the ids the picture carries. Markup with no
+ * generated id is returned as it is, unhashed.
  */
-export const fillFilterIds = (markup) => (markup.includes(PENDING_ID)
-  ? markup.replaceAll(PENDING_ID, `${ID_PREFIX}${pictureHash(markup)}-`)
+export const fillFilterIds = (markup, picture = markup) => (markup.includes(PENDING_ID)
+  ? markup.replaceAll(PENDING_ID, `${ID_PREFIX}${pictureHash(picture)}-`)
   : markup);

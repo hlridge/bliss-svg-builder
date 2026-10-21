@@ -15,9 +15,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   ink area; paint, `class`, `id` and the other pass-through attributes
  *   (`mix-blend-mode`, `isolation`, `pointer-events`, `cursor`,
  *   `vector-effect`) never copied.
- * - Reading a `style`: split at each `;` outside parentheses and quotes, a
- *   property read in any case and spacing, each effect declaration copied as
- *   written and in order, and no copy for a `style` with none.
+ * - Reading a `style`: split at each `;` outside parentheses, quotes and
+ *   comments, a property read in any case, spacing and comments, each effect
+ *   declaration copied as written and in order, and no copy for a `style`
+ *   with none.
+ * - A filter's copy drawn as its own native filter, its region from what the
+ *   copy holds (#34).
  * - The layer as the tree pared down to its effects: copies nested outermost
  *   first, one copy shared by every background under one element, none for
  *   an element with nothing painted beneath it, the whole layer still first.
@@ -44,8 +47,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   run on each), which no test in this suite can observe.
  * - An effect written through a custom property
  *   (`transform:rotate(var(--r))`): the custom property is not copied, so the
- *   effect does not reach the background. CSS comments and escapes inside a
- *   `style` are not read.
+ *   effect does not reach the background. CSS escapes inside a `style` are
+ *   not read.
+ * - A filter's copy under a crop, in a word's ink area or in a link's lines,
+ *   see `BlissSVGBuilder.native-filters.test.js`.
  *
  * @issue: #29
  */
@@ -67,6 +72,15 @@ const contentOf = (svg) => {
   return svg.slice(start, svg.indexOf('\n', start)).trim();
 };
 
+// A filter is drawn as a native one (#34): its id, read from the picture's
+// hash, and the <filter> exactly as emitted, its region as [x, y, width, height].
+const idIn = (svg, n) => `bliss-filter-${svg.match(/bliss-filter-([0-9a-f]{8})-\d/)?.[1]}-${n}`;
+const filterDef = (id, [x, y, width, height]) => `<filter id="${id}" filterUnits="userSpaceOnUse" x="${x}" y="${y}"`
+  + ` width="${width}" height="${height}" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="1"/></filter>`;
+// blur(1px) reaches 3: B313's viewBox (-0.75 -0.75 9.5 21.5) grown by it, and its box (-1..9 x -1..21)
+const VIEWBOX_REGION = [-3.75, -3.75, 15.5, 27.5];
+const BOX_REGION = [-4, -4, 16, 28];
+
 const B313 = '<path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/>';
 const B291_AT_10 = '<path d="M10,8h8M10,16h8M10,8v8M18,8v8"/>';
 const B313_B291 = '<path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6M10,8h8M10,16h8M10,8v8M18,8v8"/>';
@@ -80,7 +94,6 @@ describe('BlissSVGBuilder background effects', () => {
       ['transform-origin', 'center'],
       ['transform-box', 'fill-box'],
       ['opacity', '0.5'],
-      ['filter', 'blur(1px)'],
       ['clip-path', 'inset(0 0 50% 0)'],
       ['mask', 'url(#m)'],
       ['display', 'none'],
@@ -99,6 +112,26 @@ describe('BlissSVGBuilder background effects', () => {
         .toBe(`<g ${attribute}>${YELLOW_HALO}</g><g ${attribute}>${B313}</g>`);
       expect(contentOf(build(`[style=${name}:${value};background-area=ink;background=yellow]B313`).svgCode))
         .toBe(`<g ${style}>${YELLOW_HALO}</g><g ${style}>${B313}</g>`);
+    });
+
+    it('copies filter=blur(1px) around its box and its ink area, written as an option or in style', () => {
+      // the copy and the lines each draw their own native filter, the copy's
+      // region from what it holds: the box reaches past the lines, the ink
+      // area stays inside the viewBox
+      const [attribute, style, inkAttribute, inkStyle] = [
+        '[filter=blur(1px);background=yellow]B313', '[style=filter:blur(1px);background=yellow]B313',
+        '[filter=blur(1px);background-area=ink;background=yellow]B313', '[style=filter:blur(1px);background-area=ink;background=yellow]B313',
+      ].map(input => build(input).svgCode);
+      const copied = (svg, channel, region, background) =>
+        `<g ${channel(idIn(svg, 1))}>${filterDef(idIn(svg, 1), region)}${background}</g>`
+        + `<g ${channel(idIn(svg, 2))}>${filterDef(idIn(svg, 2), VIEWBOX_REGION)}${B313}</g>`;
+      const asAttribute = (id) => `filter="url(#${id})"`;
+      const asStyle = (id) => `style="filter:url(#${id})"`;
+
+      expect(contentOf(attribute)).toBe(copied(attribute, asAttribute, BOX_REGION, YELLOW_B313));
+      expect(contentOf(style)).toBe(copied(style, asStyle, BOX_REGION, YELLOW_B313));
+      expect(contentOf(inkAttribute)).toBe(copied(inkAttribute, asAttribute, VIEWBOX_REGION, YELLOW_HALO));
+      expect(contentOf(inkStyle)).toBe(copied(inkStyle, asStyle, VIEWBOX_REGION, YELLOW_HALO));
     });
   });
 
@@ -128,10 +161,13 @@ describe('BlissSVGBuilder background effects', () => {
         'font-family:&#39;a(b&#39;;opacity:0.5', 'opacity:0.5'],
       ['a style with an unmatched closing parenthesis', 'color:red);opacity:0.5',
         'color:red);opacity:0.5', 'opacity:0.5'],
+      ['a style with a comment before a property', '/*x*/opacity:0.5;color:red',
+        '/*x*/opacity:0.5;color:red', '/*x*/opacity:0.5'],
     ])('copies only the effects from %s, as written and in order', (_case, style, emitted, copied) => {
       // the lines keep the whole style, the copy its effect declarations; pins
-      // the reader: each row fails if parentheses, quotes, an escape, or a
-      // property's case or spacing were read otherwise (hand mutants, 2026-10-20)
+      // the reader: each row fails if parentheses, quotes, an escape, a
+      // comment, or a property's case or spacing were read otherwise (hand
+      // mutants, 2026-10-20; the comment rows since the shared splitter, #34)
       const svg = build(`[style="${style}";background=yellow]B313`).svgCode;
 
       expect(contentOf(svg)).toBe(`<g style="${copied}">${YELLOW_B313}</g><g style="${emitted}">${B313}</g>`);
@@ -140,6 +176,9 @@ describe('BlissSVGBuilder background effects', () => {
     it.each([
       ['no effect', 'color:red;stroke-dasharray:1', 'color:red;stroke-dasharray:1'],
       ['an effect named only inside quotes', 'content:\'a;opacity:0\'', 'content:&#39;a;opacity:0&#39;'],
+      // regression: the splitter once broke at a ; inside a comment, so the
+      // copy faded a background the lines never faded
+      ['an effect named only inside a comment', 'color:red/*;opacity:0;*/', 'color:red/*;opacity:0;*/'],
     ])('writes no copy for a style with %s', (_case, style, emitted) => {
       expect(contentOf(build(`[style="${style}";background=yellow]B313`).svgCode))
         .toBe(`${YELLOW_B313}<g style="${emitted}">${B313}</g>`);
@@ -151,8 +190,10 @@ describe('BlissSVGBuilder background effects', () => {
       const svg = build('[transform=rotate(10)]|[opacity=0.5]B313;[background=yellow;filter=blur(1px)]>B81').svgCode;
 
       expect(contentOf(svg)).toBe(
-        `<g transform="rotate(10)"><g opacity="0.5"><g filter="blur(1px)">${box(2.5, 3.5, 3, 3, 'yellow')}</g></g></g>`
-        + `<g transform="rotate(10)"><g opacity="0.5">${B313}<g filter="blur(1px)"><path d="M3,6l1,-2M4,4l1,2"/></g></g></g>`);
+        `<g transform="rotate(10)"><g opacity="0.5"><g filter="url(#${idIn(svg, 1)})">${filterDef(idIn(svg, 1), VIEWBOX_REGION)}`
+        + `${box(2.5, 3.5, 3, 3, 'yellow')}</g></g></g>`
+        + `<g transform="rotate(10)"><g opacity="0.5">${B313}<g filter="url(#${idIn(svg, 2)})">${filterDef(idIn(svg, 2), VIEWBOX_REGION)}`
+        + '<path d="M3,6l1,-2M4,4l1,2"/></g></g></g>');
     });
 
     it('shares one copy between every background under one element', () => {

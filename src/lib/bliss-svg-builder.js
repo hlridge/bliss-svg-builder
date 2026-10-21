@@ -11,7 +11,7 @@ import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
-import { translateFilters, fillFilterIds } from "./bliss-filters.js";
+import { translateFilters, numberFilters, fillFilterIds } from "./bliss-filters.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
 // load so BlissElement can clone it without importing BlissParser itself.
@@ -1875,13 +1875,14 @@ class BlissSVGBuilder {
         return parts;
       })(),
       keys: new Set(),
-      // How the tree writes the attributes of an element it paints itself (a
-      // word's, a character's or a part's background), so a key naming its
-      // class reaches it as one naming any other layer does, and so do the
-      // keys written on the elements around it (`levels`, #layerKeys). Read at
-      // render time, after the walk below has filled the layer attributes.
-      formatLayerAttributes: (classes, computed, levels) =>
-        formatAttributes(layerAttributes(classes, computed, this.#authoredFor(classes, levels))),
+      // The attributes of an element the tree paints itself (a word's, a
+      // character's or a part's background), as [name, value] pairs, so a key
+      // naming its class reaches it as one naming any other layer does, and
+      // so do the keys written on the elements around it (`levels`,
+      // #layerKeys). Read at render time, after the walk below has filled the
+      // layer attributes. The tree translates their filters itself.
+      layerAttributeEntries: (classes, computed, levels) =>
+        Object.entries(layerAttributes(classes, computed, this.#authoredFor(classes, levels))),
     };
     if (blissObj._parseWarnings) {
       this.#warnings.push(...blissObj._parseWarnings);
@@ -4078,15 +4079,10 @@ class BlissSVGBuilder {
    * @returns {string} SVG content string
    */
   get svgContent() {
-    const content = this.composition.getSvgContent();
-
-    // If content already contains complete SVG tags (like <g> from hierarchical options), return as-is
-    if (content.startsWith('<')) {
-      return content;
-    }
-
-    // Otherwise, wrap raw path data in a <path> element
-    return `<path d="${content}"/>`;
+    const render = this.#contentRender();
+    // Its filter ids carry the whole picture's hash, as svgCode's do, so the
+    // whole picture is written only where the content holds one.
+    return render.filterCount === 0 ? render.content : fillFilterIds(render.content, this.#pictureMarkup(render));
   }
 
   /**
@@ -6325,39 +6321,61 @@ class BlissSVGBuilder {
     return Object.fromEntries(this.#layerKeys(classes, levels).map(([attribute, value]) => [attribute, value]));
   }
 
+  // The finished picture: only the finished markup can be hashed, so the
+  // filter ids are completed last.
   get #svgCode() {
-    const {
-      width, height, cropTop, cropBottom, cropLeft, cropRight, gridOffsetX,
-      viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight, svgWidth, svgHeight,
-    } = this.#computeGeometry();
+    return fillFilterIds(this.#pictureMarkup(this.#contentRender()));
+  }
 
-    // User-provided options with defaults
-    const color = this.#processedOptions.color ?? "#000000";
-    const strokeWidth = this.#processedOptions.strokeWidth ?? DEFAULT_STROKE_WIDTH;
-
-    const content = this.svgContent;
-
-    const round = (num) => parseFloat(num.toFixed(4));
-
+  // The first half of a render: the geometry, the viewBox the root carries,
+  // the picture's filter numbering, and the composition's markup as
+  // svgContent gives it. The tree translates its filters while it renders,
+  // reading the numbering from the shared options, which hold it for that
+  // render alone; its filters are then numbered in the order they are
+  // written, so the content's numbers come first and are the same however
+  // the content is read. Its ids wait for the picture's hash.
+  #contentRender() {
+    const geometry = this.#computeGeometry();
     // The viewBox the root carries: the author's when it reads as one, else
     // the computed one. What covers the whole picture (the paper, the zones,
     // the global link's rect) is placed from it, so a written viewBox leaves
     // no strip of the picture uncovered.
     const viewBox = parseViewBox(this.#rootAttributes.viewBox)
-      ?? { x: viewBoxX, y: viewBoxY, width: viewBoxWidth, height: viewBoxHeight };
+      ?? { x: geometry.viewBoxX, y: geometry.viewBoxY, width: geometry.viewBoxWidth, height: geometry.viewBoxHeight };
+    let count = 0;
+    const filters = { viewBox, next: () => ++count };
+    this.#sharedOptions.filters = filters;
+    const rendered = this.composition.getSvgContent();
+    this.#sharedOptions.filters = undefined;
+    // Raw path data is wrapped in a <path> of its own.
+    const content = numberFilters(rendered.startsWith('<') ? rendered : `<path d="${rendered}"/>`);
+    return { geometry, viewBox, filters, content: content.markup, filterCount: content.count };
+  }
+
+  // The picture around a content render (#contentRender), its filter ids
+  // still pending.
+  #pictureMarkup({ geometry, viewBox, filters, content }) {
+    const {
+      width, height, cropTop, cropBottom, cropLeft, cropRight, gridOffsetX,
+      viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight, svgWidth, svgHeight,
+    } = geometry;
+
+    // User-provided options with defaults
+    const color = this.#processedOptions.color ?? "#000000";
+    const strokeWidth = this.#processedOptions.strokeWidth ?? DEFAULT_STROKE_WIDTH;
+
+    const round = (num) => parseFloat(num.toFixed(4));
 
     // A CSS filter on one of the picture's layers is drawn as a native
-    // <filter> (bliss-filters.js), numbered in the order the markup is written
-    // and written on its own line: the first child of the group it serves, or
-    // the line before the single shape. Its region covers the viewBox and what
-    // the element draws (`drawn()`, { minX, minY, maxX, maxY }, asked only
-    // where a filter translates). Every layer passes through here except the
-    // root, whose filter stays page CSS.
-    let filterCount = 0;
-    const filterContext = { viewBox, next: () => ++filterCount };
-    const layerMarkup = (attrs, drawn) => {
-      const { entries, defs } = translateFilters(Object.entries(attrs), () => ({ drawn: drawn() }), filterContext);
-      return { attributes: formatEntries(entries), filterLines: defs.map(def => `    ${def}`) };
+    // <filter> (bliss-filters.js), numbered after the content's, in the order
+    // the markup is written, and written on its own line: the first child of
+    // the group it serves, or the line before the single shape. Its region
+    // covers the viewBox and what the element draws (`site()`, as
+    // translateFilters asks it, only where a filter translates). Every layer
+    // passes through here except the root, whose filter stays page CSS.
+    const layerMarkup = (attrs, site) => {
+      const { entries, defs, shape } = translateFilters(Object.entries(attrs), site, filters);
+      return { attributes: formatEntries(entries), filterLines: [...defs, shape].filter(Boolean).map(line => `    ${line}`) };
     };
 
     const svgTitle = this.#processedOptions.svgTitle ?? "";
@@ -6422,12 +6440,12 @@ class BlissSVGBuilder {
     let backgroundContent = '';
     if (backgroundRects.length > 0) {
       const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.background, {}, this.#authoredFor(ELEMENT_CLASSES.background)),
-        () => unionOf(backgroundRects.map(({ box }) => box)));
+        () => ({ drawn: unionOf(backgroundRects.map(({ box }) => box)) }));
       backgroundContent = [
         `  <g ${group.attributes}>`,
         ...group.filterLines,
         ...backgroundRects.flatMap(({ classes, computed, box }) => {
-          const rect = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => box);
+          const rect = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => ({ drawn: box }));
           return [...rect.filterLines, `    <rect ${rect.attributes}/>`];
         }),
         '  </g>',
@@ -6509,9 +6527,9 @@ class BlissSVGBuilder {
 
       // The group is written before its lines, so its filter is numbered first.
       const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.grid, { 'shape-rendering': 'crispEdges' },
-        this.#authoredFor(ELEMENT_CLASSES.grid)), () => unionOf(lines.map(({ box }) => box)));
+        this.#authoredFor(ELEMENT_CLASSES.grid)), () => ({ drawn: unionOf(lines.map(({ box }) => box)) }));
       const gridLines = lines.flatMap(({ classes, computed, box }) => {
-        const line = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => box);
+        const line = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => ({ drawn: box }));
         return [...line.filterLines, `    <path ${line.attributes}/>`];
       }).join('\n');
 
@@ -6570,9 +6588,11 @@ class BlissSVGBuilder {
       ? BlissElement.applyVectorEffectToPaths(content, this.#globalVectorEffect)
       : content;
     // Written last of the layers, so its filter is numbered after theirs. Its
-    // region is the viewBox's: what the composition draws is not measured
-    // here, so ink a crop leaves outside the viewBox falls outside it.
-    const contentLayer = layerMarkup(contentAttrs, () => undefined);
+    // region covers everything the composition draws, its lines and its
+    // element backgrounds, and a thin composition gets the shape that keeps
+    // it drawn, as an element's group does.
+    const contentLayer = layerMarkup(contentAttrs,
+      () => ({ drawn: this.composition.drawnArea, geometry: this.composition.effectiveBounds }));
     const contentGroup = [
       `  <g ${contentLayer.attributes}>`,
       ...contentLayer.filterLines,
@@ -6594,7 +6614,7 @@ class BlissSVGBuilder {
       '  </a>',
     ] : contentGroup;
 
-    let svgStr = [
+    const svgStr = [
       `<svg ${formatAttributes(rootAttrs)}>`,
       title,
       desc,
@@ -6606,10 +6626,7 @@ class BlissSVGBuilder {
     ].filter(Boolean).join('\n');
 
     // Clean up empty <path d=""/> elements from DOT/COMMA/external glyphs
-    svgStr = svgStr.replace(/<path d=""\/>/g, '');
-
-    // Only the finished markup can be hashed, so the filter ids are completed last.
-    return fillFilterIds(svgStr);
+    return svgStr.replace(/<path d=""\/>/g, '');
   }
 }
 

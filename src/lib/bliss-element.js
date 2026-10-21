@@ -9,6 +9,7 @@ import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT,
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
+import { translateFilters, splitDeclarations } from "./bliss-filters.js";
 
 // Horizontal gap (in glyph units) between consecutive indicators in a stack.
 // Shared by the character-level indicator layout (#positionIndicatorGroup) and
@@ -19,6 +20,26 @@ const INDICATOR_GAP = 1;
 // Rounds a number the tree writes into a rect as the builder rounds the
 // picture's own (4 decimals), which removes the float noise of summed positions.
 const roundForMarkup = (num) => parseFloat(num.toFixed(4));
+
+// Attributes as markup, from [name, value] pairs in the order they are written.
+const formatEntries = (entries) => entries.map(([name, value]) => `${name}="${value}"`).join(' ');
+
+// The smallest box ({ minX, minY, maxX, maxY }) holding every one of `boxes`
+// (at least one).
+const unionOf = (boxes) => ({
+  minX: Math.min(...boxes.map(box => box.minX)),
+  minY: Math.min(...boxes.map(box => box.minY)),
+  maxX: Math.max(...boxes.map(box => box.maxX)),
+  maxY: Math.max(...boxes.map(box => box.maxY)),
+});
+
+// A box grown by `distance` on every side; undefined stays undefined (nothing drawn).
+const grownBy = (box, distance) => box && {
+  minX: box.minX - distance,
+  minY: box.minY - distance,
+  maxX: box.maxX + distance,
+  maxY: box.maxY + distance,
+};
 
 // The attributes of an element's own <g> that reach its background as well as
 // its lines: what moves, clips, fades or hides the element as a whole. Paint
@@ -119,6 +140,11 @@ export class BlissElement {
    * in a bare one: Chromium and WebKit draw nothing of an <a> whose parent is
    * an <a> (SVG 1.1 lets an a element hold anything but itself).
    *
+   * A CSS filter among the group's attributes is drawn as a native one
+   * (`filters`): its <filter> is the group's first child, then the shape that
+   * keeps a thin element drawn, then what the group holds, the link's rect
+   * included.
+   *
    * @param {string} content - The content to wrap (raw path data or HTML string)
    * @param {Object} processed - The library's computed values, of which only the
    *   two in PUBLICATION_MAP reach the markup
@@ -126,10 +152,15 @@ export class BlissElement {
    * @param {function(): string} linkHit - the markup that makes a link answer a
    *   click, drawn first inside it; called only for an element that builds a
    *   link, and '' where it covers nothing
+   * @param {function(Array): Object} filters - translateFilters for this
+   *   element (#ownFilters), over the group's attribute entries
    * @returns {string} The wrapped content
    */
-  static #wrapWithAnchorAndGroup(content, processed, authored, linkHit) {
-    const { anchorAttrs, groupAttrs, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(processed, authored);
+  static #wrapWithAnchorAndGroup(content, processed, authored, linkHit, filters) {
+    const { anchorAttrs, groupEntries, hasHref, vectorEffect } = BlissElement.#separateAnchorAndGroupOptions(processed, authored);
+    const { entries, defs, shape } = filters(groupEntries);
+    const groupAttrs = formatEntries(entries);
+    const lead = defs.join('') + shape;
 
     // Content that starts with '<' is already wrapped in proper tags
     // Raw path data or fragments need wrapping
@@ -142,7 +173,7 @@ export class BlissElement {
       const hit = linkHit();
       const inner = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
       if (groupAttrs) {
-        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${hit}${inner}</g></a>`;
+        return `<a ${anchorAttrs} style="cursor: pointer;"><g ${groupAttrs}>${lead}${hit}${inner}</g></a>`;
       }
       const body = content.includes('<a ') ? `<g>${inner}</g>` : inner;
       return `<a ${anchorAttrs} style="cursor: pointer;">${hit}${body}</a>`;
@@ -150,7 +181,7 @@ export class BlissElement {
 
     if (groupAttrs) {
       const wrappedContent = stamp(needsPathWrapper ? `<path d="${content}"/>` : content);
-      return `<g ${groupAttrs}>${wrappedContent}</g>`;
+      return `<g ${groupAttrs}>${lead}${wrappedContent}</g>`;
     }
 
     if (vectorEffect) {
@@ -375,70 +406,57 @@ export class BlissElement {
   /**
    * This element's content in the halo mode of getSvgContent, where it writes
    * none of its wrappers (no link, no paint, no class or id) but a width of
-   * its own, re-stated widened, and its effects (#effectAttributes), on one
+   * its own, re-stated widened, and its effects (#effectEntries), on one
    * group exactly where its ink has its own, so the area moves, clips and
    * hides with the lines. The painted element's own width goes on its ink
    * area's group instead, and its own effects on the copy around the area
    * (#backgroundLayer). Content with no line stays empty, so an area around
-   * no line draws nothing, whatever group its element writes.
+   * no line draws nothing, whatever group its element writes. A filter in
+   * the copy is drawn as its own native one, covering the lines as the area
+   * widens them. `x` and `y` are the origin of the frame this element sits
+   * in, as getSvgContent takes them.
    */
-  #haloWrap(content, halo) {
+  #haloWrap(content, halo, x, y) {
     if (halo.element === this || content === '') return content;
     const options = this.#blissObj.options ?? {};
     const width = Object.hasOwn(options, 'strokeWidth')
-      ? `stroke-width="${roundForMarkup(options.strokeWidth + halo.outline)}"`
-      : '';
-    const attributes = [width, this.#effectAttributes].filter(Boolean).join(' ');
-    if (attributes === '') return content;
+      ? [['stroke-width', roundForMarkup(options.strokeWidth + halo.outline)]]
+      : [];
+    const { entries, defs } = translateFilters([...width, ...this.#effectEntries],
+      () => ({ drawn: grownBy(this.#drawnBox(x, y), halo.outline / 2) }), this.#sharedOptions.filters);
+    if (entries.length === 0) return content;
     const lines = content.startsWith('<') ? content : `<path d="${content}"/>`;
-    return `<g ${attributes}>${lines}</g>`;
+    return `<g ${formatEntries(entries)}>${defs.join('')}${lines}</g>`;
   }
 
   /**
    * This element's effects (EFFECT_ATTRIBUTES), as its own <g> writes them
-   * and in its order: each effect attribute, and a `style` cut down to its
-   * effect declarations (#effectDeclarations), left out where it has none.
-   * Read from the walk that writes the <g>, so an attribute refused there is
-   * never copied. '' where the element has no effect.
+   * and in its order, as [name, value] pairs: each effect attribute, and a
+   * `style` cut down to its effect declarations (#effectDeclarations), left
+   * out where it has none. Read from the walk that writes the <g>, so an
+   * attribute refused there is never copied. Empty where the element has no
+   * effect.
    */
-  get #effectAttributes() {
+  get #effectEntries() {
     const { groupEntries } = BlissElement.#separateAnchorAndGroupOptions(this.#blissObj.options, this.#blissObj.authoredOptions);
     return groupEntries.flatMap(([name, value]) => {
-      if (EFFECT_ATTRIBUTES.has(name)) return [`${name}="${value}"`];
+      if (EFFECT_ATTRIBUTES.has(name)) return [[name, value]];
       const effects = name === 'style' ? BlissElement.#effectDeclarations(value) : '';
-      return effects ? [`style="${effects}"`] : [];
-    }).join(' ');
+      return effects ? [['style', effects]] : [];
+    });
   }
 
   /**
    * The declarations of a `style` value whose property is an effect, as
-   * written and in order, joined by `;`; '' where none is. The value is split
-   * at each `;` outside parentheses and quotes, and a property is read in any
-   * case and spacing, as CSS reads them. The value is stored escaped
-   * (escapeHtml), so a quote is `&quot;` or `&#39;` and every `&` begins an
-   * escape: each escape is read whole, its own `;` never a split.
+   * written and in order, joined by `;`; '' where none is. Read as the filter
+   * translation reads a style (splitDeclarations), so the copy carries every
+   * filter its lines draw: split at each `;` outside parentheses, quotes,
+   * escapes and comments, a property read in any case, spacing and comments.
    */
   static #effectDeclarations(style) {
-    const declarations = [''];
-    let quote = null;
-    let depth = 0;
-    for (const token of String(style).match(/&[^;]*;|[^]/g) ?? []) {
-      if (quote) {
-        if (token === quote) quote = null;
-      } else if (token === '&quot;' || token === '&#39;') {
-        quote = token;
-      } else if (token === '(') {
-        depth++;
-      } else if (token === ')') {
-        depth = Math.max(0, depth - 1);
-      } else if (token === ';' && depth === 0) {
-        declarations.push('');
-        continue;
-      }
-      declarations[declarations.length - 1] += token;
-    }
-    return declarations
-      .filter(declaration => EFFECT_ATTRIBUTES.has(declaration.split(':', 1)[0].trim().toLowerCase()))
+    return splitDeclarations(style)
+      .filter(({ property }) => EFFECT_ATTRIBUTES.has(property))
+      .map(({ text }) => text)
       .join(';');
   }
 
@@ -446,7 +464,8 @@ export class BlissElement {
    * What this element's own background draws, in the content's coordinates,
    * from the origin of the frame it sits in, by the `background-area` it
    * inherits: `{ area: 'box', box }` or `{ area: 'ink', lines, width }`
-   * (#inkArea); null where it draws none. A word's or a character's box is
+   * (#inkArea), each with `drawn`, the box it covers ({ minX, minY, maxX,
+   * maxY }); null where it draws none. A word's or a character's box is
    * its paint area across the band, a part's its ink box plus its padding:
    * the shapes a link's area takes. An ink area draws nothing where there is no
    * line. A word or a character with no paint area draws nothing: a word of no
@@ -457,13 +476,15 @@ export class BlissElement {
     if (this.#background === '') return null;
     if (this.#level <= 2 && !this.#paintArea) return null;
     if (this.#getInheritedOption('backgroundArea') === 'ink') {
-      const ink = this.#inkArea(x, y, this.#background, this.#areaPadding(BlissElement.#PAINT_AREAS));
-      return ink && { area: 'ink', ...ink };
+      const padding = this.#areaPadding(BlissElement.#PAINT_AREAS);
+      const ink = this.#inkArea(x, y, this.#background, padding);
+      // the area strokes every line `padding` wider on each side than the line
+      return ink && { area: 'ink', ...ink, drawn: grownBy(this.#drawnBox(x, y), padding) };
     }
     const box = this.#level <= 2
       ? BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea)
       : BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#PAINT_AREAS));
-    return { area: 'box', box };
+    return { area: 'box', box, drawn: { minX: box.x, minY: box.y, maxX: box.x + box.width, maxY: box.y + box.height } };
   }
 
   /**
@@ -500,24 +521,31 @@ export class BlissElement {
    * Every background at or below this element as the layer draws them: the
    * tree pared down to its effects. This element's own background, then its
    * children's, in the order #visitBackgrounds visits them, inside one copy
-   * of this element's effects (#effectAttributes) where it has any, so every
+   * of this element's effects (#effectEntries) where it has any, so every
    * background under one element shares that copy, as its lines share its
    * <g>. A box ignores its descendants' effects, which reach only their own
    * backgrounds. The root writes no copy: a global effect lands on the
-   * content group, which holds the layer. '' where nothing at or below this
-   * element draws a background. `x` and `y` are the origin of the frame this
-   * element sits in, as getSvgContent takes them; `levels` the keys written
-   * around it (#backgroundKeyLevels).
+   * content group, which holds the layer. A filter in the copy is drawn as
+   * its own native one, covering what the copy holds, since a box reaches
+   * past the lines. Returns `{ markup, drawn }`: markup '' and drawn
+   * undefined where nothing at or below this element draws a background,
+   * else the union of what they cover. `x` and `y` are the origin of the
+   * frame this element sits in, as getSvgContent takes them; `levels` the
+   * keys written around it (#backgroundKeyLevels).
    */
   #backgroundLayer(x = 0, y = 0, levels = []) {
     const keys = this.#backgroundKeyLevels(levels);
     const drawing = this.#backgroundDrawing(x, y);
-    const layer = (drawing ? this.#backgroundMarkup(drawing, keys) : '') + this.#children
-      .map(child => child.#backgroundLayer(this.#relativeToParentX + x, this.#relativeToParentY + y, keys))
-      .join('');
-    if (layer === '' || this.#level === 0) return layer;
-    const effects = this.#effectAttributes;
-    return effects ? `<g ${effects}>${layer}</g>` : layer;
+    const layers = [
+      ...(drawing ? [{ markup: this.#backgroundMarkup(drawing, keys), drawn: drawing.drawn }] : []),
+      ...this.#children.map(child => child.#backgroundLayer(this.#relativeToParentX + x, this.#relativeToParentY + y, keys)),
+    ].filter(layer => layer.markup !== '');
+    if (layers.length === 0) return { markup: '', drawn: undefined };
+    const markup = layers.map(layer => layer.markup).join('');
+    const drawn = unionOf(layers.map(layer => layer.drawn));
+    if (this.#level === 0) return { markup, drawn };
+    const { entries, defs } = translateFilters(this.#effectEntries, () => ({ drawn }), this.#sharedOptions.filters);
+    return { markup: entries.length > 0 ? `<g ${formatEntries(entries)}>${defs.join('')}${markup}</g>` : markup, drawn };
   }
 
   /**
@@ -526,35 +554,37 @@ export class BlissElement {
    * content group's stroke would outline it; the group sets `fill="none"`, or a
    * `fill` written for the whole symbol, which lands on the content group,
    * would fill every enclosure it rings. Their classes make them targets of
-   * the layer attributes, which the builder writes through the formatter it
+   * the layer attributes, which the builder resolves through the function it
    * shares with the tree, with the keys that reach this background (`levels`,
    * #backgroundKeyLevels); a tree built without one writes the classes and the
-   * computed attributes alone.
+   * computed attributes alone. A filter among them is drawn as a native one,
+   * covering what the background covers: first inside the group, or just
+   * before the rect, which holds no child.
    */
   #backgroundMarkup(drawing, levels) {
     const classes = ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS[drawing.area]];
-    const format = this.#sharedOptions.formatLayerAttributes ?? BlissElement.#ownLayerAttributes;
+    const attributesOf = this.#sharedOptions.layerAttributeEntries ?? BlissElement.#ownLayerEntries;
+    const translated = (computed) =>
+      translateFilters(attributesOf(classes, computed, levels), () => ({ drawn: drawing.drawn }), this.#sharedOptions.filters);
     if (drawing.area === 'ink') {
-      const computed = { fill: 'none', stroke: this.#background, 'stroke-width': drawing.width };
-      return `<g ${format(classes, computed, levels)}>${drawing.lines}</g>`;
+      const { entries, defs } = translated({ fill: 'none', stroke: this.#background, 'stroke-width': drawing.width });
+      return `<g ${formatEntries(entries)}>${defs.join('')}${drawing.lines}</g>`;
     }
     const { box } = drawing;
-    const computed = {
+    const { entries, defs } = translated({
       x: roundForMarkup(box.x),
       y: roundForMarkup(box.y),
       width: roundForMarkup(box.width),
       height: roundForMarkup(box.height),
       fill: this.#background,
       stroke: 'none',
-    };
-    return `<rect ${format(classes, computed, levels)}/>`;
+    });
+    return `${defs.join('')}<rect ${formatEntries(entries)}/>`;
   }
 
-  /** A layer's attributes with no author's to add: its classes, then what was computed. */
-  static #ownLayerAttributes(classes, computed) {
-    return Object.entries({ class: classes.join(' '), ...computed })
-      .map(([name, value]) => `${name}="${value}"`)
-      .join(' ');
+  /** A layer's attribute entries with no author's to add: its classes, then what was computed. */
+  static #ownLayerEntries(classes, computed) {
+    return Object.entries({ class: classes.join(' '), ...computed });
   }
 
   /**
@@ -570,6 +600,20 @@ export class BlissElement {
     this.#visitBackgrounds((element, drawing, levels) =>
       drawn.push({ element: BACKGROUND_AREA_ELEMENTS[drawing.area], levels }));
     return drawn;
+  }
+
+  /**
+   * Everything this tree draws (root only), as { minX, minY, maxX, maxY }: its
+   * lines, each widened by half its own width (#drawnBox), and every element
+   * background; undefined where it draws nothing. The builder reads it for the
+   * region of a filter on the content group, which holds both.
+   */
+  get drawnArea() {
+    const boxes = [];
+    const lines = this.#drawnBox(0, 0);
+    if (lines) boxes.push(lines);
+    this.#visitBackgrounds((element, drawing) => boxes.push(drawing.drawn));
+    return boxes.length > 0 ? unionOf(boxes) : undefined;
   }
 
   static #separateAnchorAndGroupOptions(processed, authored) {
@@ -636,13 +680,9 @@ export class BlissElement {
       }
     }
 
-    const groupEntries = [...groupAttrs];
-    const groupAttrStrings = groupEntries.map(([name, value]) => `${name}="${value}"`);
-
     return {
       anchorAttrs: anchorAttrs.join(' '),
-      groupAttrs: groupAttrStrings.join(' '),
-      groupEntries,
+      groupEntries: [...groupAttrs],
       hasHref,
       vectorEffect
     };
@@ -940,7 +980,7 @@ export class BlissElement {
         // the layer (#backgroundLayer). Every link is drawn after them too, so
         // none takes a link's click. The ink follows as svgContent would write
         // it alone: raw path data in a path of its own.
-        const backgrounds = this.#backgroundLayer(x, y);
+        const backgrounds = this.#backgroundLayer(x, y).markup;
         if (backgrounds === '') return ink;
         return backgrounds + (ink.startsWith('<') ? ink : `<path d="${ink}"/>`);
       };
@@ -1040,9 +1080,9 @@ export class BlissElement {
           ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
           : childContents.join('');
 
-        if (halo) return this.#haloWrap(content, halo);
+        if (halo) return this.#haloWrap(content, halo, x, y);
         return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-          () => this.#linkHit(x, y, () => BlissElement.#bandHitBox(originX, originY, this.#linkArea)));
+          () => this.#linkHit(x, y, () => BlissElement.#bandHitBox(originX, originY, this.#linkArea)), this.#ownFilters(x, y));
       };
 
       // A fail-flagged group (group.errorCode) can no longer reach here: the
@@ -1248,9 +1288,9 @@ export class BlissElement {
               ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
               : childContents.join('');
 
-            if (halo) return this.#haloWrap(content, halo);
+            if (halo) return this.#haloWrap(content, halo, x, y);
             return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-              () => this.#linkHit(x, y, () => BlissElement.#bandHitBox(originX, originY, this.#linkArea)));
+              () => this.#linkHit(x, y, () => BlissElement.#bandHitBox(originX, originY, this.#linkArea)), this.#ownFilters(x, y));
           };
         }
       } else {
@@ -1758,19 +1798,9 @@ export class BlissElement {
       };
     }
 
-    // Content-empty groups and empty-parts glyphs are excluded from bounds
-    // like they are from the width getter. A group of nothing but spaces is
-    // excluded here too, though the width getter keeps it: it separates
-    // words and draws nothing, and the point at its own origin would hold an
-    // automatic crop open on whichever edge it sits. A ZSA draws nothing
-    // either, but it is content placed to hold a crop open, so it counts.
     // An element left with no layout children collapses to a point at its
     // origin instead of Math.min/max over nothing (Infinity).
-    const layoutChildren = this.#level === 0
-      ? this.#children.filter(child => !child.#isEmptyGroup && !child.#holdsOnlySpaces)
-      : this.#level === 1
-        ? this.#children.filter(child => !child.#isEmptyGlyph)
-        : this.#children;
+    const layoutChildren = this.#layoutChildren;
     if (layoutChildren.length === 0) {
       return {
         minX: absX,
@@ -1799,6 +1829,52 @@ export class BlissElement {
       width: maxX - minX,
       height: maxY - minY
     };
+  }
+
+  /**
+   * The children an element's bounds are made of. Content-empty groups and
+   * empty-parts glyphs are excluded like they are from the width getter. A
+   * group of nothing but spaces is excluded here too, though the width getter
+   * keeps it: it separates words and draws nothing, and the point at its own
+   * origin would hold an automatic crop open on whichever edge it sits. A ZSA
+   * draws nothing either, but it is content placed to hold a crop open, so it
+   * counts.
+   */
+  get #layoutChildren() {
+    if (this.#level === 0) return this.#children.filter(child => !child.#isEmptyGroup && !child.#holdsOnlySpaces);
+    if (this.#level === 1) return this.#children.filter(child => !child.#isEmptyGlyph);
+    return this.#children;
+  }
+
+  /**
+   * What this element draws, as { minX, minY, maxX, maxY }, from the origin of
+   * the frame it sits in as #calculateBounds takes it: the same boxes, each
+   * leaf's widened by half its own line width, so the box holds the lines and
+   * not only their geometry. Exact for round caps and joins, every line the
+   * library draws; short of a dot's own width, which a filter region covers
+   * through the viewBox. Undefined where the element has no layout children,
+   * as it draws nothing.
+   */
+  #drawnBox(offsetX, offsetY) {
+    if (this.#leafHeight !== undefined && this.#leafWidth !== undefined) {
+      return grownBy(this.#calculateBounds(offsetX, offsetY), (this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) / 2);
+    }
+    const absX = offsetX + this.#relativeToParentX;
+    const absY = offsetY + this.#relativeToParentY;
+    const boxes = this.#layoutChildren.map(child => child.#drawnBox(absX, absY)).filter(Boolean);
+    return boxes.length > 0 ? unionOf(boxes) : undefined;
+  }
+
+  /**
+   * translateFilters for this element's own attributes: each <filter> covers
+   * the picture and what this element draws, and a thin element gets the
+   * shape that keeps it drawn, measured in the frame at (x, y), as
+   * getSvgContent takes it. The picture's numbering is the one the builder
+   * shares while it renders; outside a render nothing is translated.
+   */
+  #ownFilters(x, y) {
+    return (entries) => translateFilters(entries,
+      () => ({ drawn: this.#drawnBox(x, y), geometry: this.#calculateBounds(x, y) }), this.#sharedOptions.filters);
   }
 
   toString() {
@@ -1909,9 +1985,10 @@ export class BlissElement {
         pathOptions
       );
 
-      if (halo) return this.#haloWrap(pathData, halo);
+      if (halo) return this.#haloWrap(pathData, halo, x, y);
       return BlissElement.#wrapWithAnchorAndGroup(pathData, this.#blissObj.options, this.#blissObj.authoredOptions,
-        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#LINK_AREAS))));
+        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#LINK_AREAS))),
+        this.#ownFilters(x, y));
     };
   }
 
@@ -1996,9 +2073,10 @@ export class BlissElement {
         ? childContents.map(c => c.startsWith('<') ? c : `<path d="${c}"/>`).join('')
         : childContents.join('');
 
-      if (halo) return this.#haloWrap(content, halo);
+      if (halo) return this.#haloWrap(content, halo, x, y);
       return BlissElement.#wrapWithAnchorAndGroup(content, this.#blissObj.options, this.#blissObj.authoredOptions,
-        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#LINK_AREAS))));
+        () => this.#linkHit(x, y, () => BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#LINK_AREAS))),
+        this.#ownFilters(x, y));
     };
   }
 }
