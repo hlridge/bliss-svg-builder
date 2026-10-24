@@ -15,12 +15,14 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   reaches added).
  * - The copies of an element's effects: around a box with its own filter
  *   (written on the element and as a global key), around a child's copy,
- *   around an ink area whose lines hold a filtered part; an ink area's own
- *   filter; a character's copy in its word's ink area.
+ *   the widest of what a copy holds past a plain box before it, around an
+ *   ink area whose lines hold a filtered part; an ink area's own filter; a
+ *   character's copy in its word's ink area.
  * - The content group over an element background's filter; the grid group
  *   over its filtered lines.
- * - A link's area: a word's padded rect, `link-area=ink`, a part's rect; a
- *   thin linked element's invisible shape judged by its lines alone.
+ * - A link's area: a word's padded rect, `link-area=ink`, a part's rect, a
+ *   one-shape part's padded rect; a thin linked element's invisible shape
+ *   judged by its lines alone.
  * - An absurd reach: at most 8 units past the picture, the spread along the
  *   line kept whole inside it.
  *
@@ -80,6 +82,14 @@ describe('BlissSVGBuilder native filter regions', () => {
         .toEqual([[-6, -6, 21, 32], [-6, -6, 21, 32], [-5.75, -5.75, 29.5, 31.5], [-5.75, -5.75, 20, 31.5]]);
     });
 
+    it('widens a word\'s copy by the widest of what it holds, not the first', () => {
+      // pins the largest spread among what the copy holds: B313's plain box
+      // first, B291's shadowed copy second; read from the first alone, the
+      // word's copy would end the shadow (x 14 to 24) at x=20, inside the line
+      expect(regionsOf(build('[filter=grayscale(1)]|[background=yellow]B313/[background=yellow;filter=drop-shadow(5px 5px 0 red)]B291//B313').svgCode))
+        .toEqual([[-6, -6, 31, 32], [3, -6, 22, 32], [-5.75, -5.75, 30, 31.5], [3.75, -5.75, 20.5, 31.5]]);
+    });
+
     it('widens the copy around an ink area by the filters its lines hold', () => {
       // the area's lines carry the part's shadow: copy, the part's copy in
       // the area, the character's lines, the part's lines
@@ -121,6 +131,9 @@ describe('BlissSVGBuilder native filter regions', () => {
         [9.75, -3.75, 20.5, 27.5]],
       // B81's rect reaches 0.25 past its lines: the cut moves from -1.25 to -1.5
       ['a part\'s rect', 'B313;[href=#a;filter=blur(1px)]>B81', [-1.5, -3.75, 11, 27.5]],
+      // C8 is one shape, drawn without a part of its own: the rect spans x 12
+      // to 32; cut to the circle's lines, the region would span 13.75 to 30.25
+      ['a one-shape part\'s padded rect', 'B313//B313;[href=#a;link-padding=6;filter=blur(1px)]>C8:2,8//B313', [8, -3.75, 28, 28.75]],
     ])('covers where the link answers a click: %s', (_case, input, region) => {
       // Firefox and WebKit answer a click only inside the filter region, so a
       // region cut to the ink would stop the link answering in its padding
