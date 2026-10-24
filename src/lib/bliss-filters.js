@@ -79,6 +79,13 @@ export const splitDeclarations = (style) =>
 // `!important` closing a declaration's value, in any case and spacing.
 const IMPORTANT = /! *important *$/i;
 
+// A `filter` declaration's value as readFilterValue reads it, `!important`
+// read past, and whether it had one.
+const declaredFilter = ({ text, read, colon }) => {
+  const important = IMPORTANT.exec(read.slice(colon + 1));
+  return { filter: readFilterValue(text.slice(colon + 1, important ? colon + 1 + important.index : undefined)), important };
+};
+
 /**
  * The style with each `filter` declaration that translates pointed at its
  * native filter in place: the property as written, then `:url(#id)`, then
@@ -86,12 +93,11 @@ const IMPORTANT = /! *important *$/i;
  * declaration, in order, with what readFilterValue read, and returns the id.
  * Every other declaration is left byte for byte.
  */
-export const rewriteStyle = (style, allocate) => declarationsOf(style).map(({ property, text, read, colon }) => {
-  if (property !== 'filter') return text;
-  const important = IMPORTANT.exec(read.slice(colon + 1));
-  const filter = readFilterValue(text.slice(colon + 1, important ? colon + 1 + important.index : undefined));
-  if (filter.kind !== 'translated') return text;
-  return `${text.slice(0, colon + 1)}url(#${allocate(filter)})${important ? '!important' : ''}`;
+export const rewriteStyle = (style, allocate) => declarationsOf(style).map((declaration) => {
+  if (declaration.property !== 'filter') return declaration.text;
+  const { filter, important } = declaredFilter(declaration);
+  if (filter.kind !== 'translated') return declaration.text;
+  return `${declaration.text.slice(0, declaration.colon + 1)}url(#${allocate(filter)})${important ? '!important' : ''}`;
 }).join(';');
 
 // A CSS number, then a unit (letters) or a percent sign, or nothing.
@@ -343,6 +349,18 @@ export const readFilterValue = (text) => {
 };
 
 /**
+ * How far one element's filters can draw past what they filter, in grid
+ * units: the largest reach among its `filter` attribute and its style's
+ * `filter` declarations ([name, value] pairs, escaped) that translate; 0
+ * where none does, as nothing is known of a value kept as written.
+ */
+export const filterReach = (entries) => Math.max(0, ...entries.flatMap(([name, value]) => {
+  if (name === 'filter') return [readFilterValue(value)];
+  if (name !== 'style') return [];
+  return declarationsOf(value).filter(({ property }) => property === 'filter').map(declaration => declaredFilter(declaration).filter);
+}).map(filter => (filter.kind === 'translated' ? filter.reach : 0)));
+
+/**
  * A <filter> holding `primitives`, in user space (the picture's own units)
  * over `region` ({ x, y, width, height }, written as given), interpolating in
  * sRGB as a CSS filter does.
@@ -350,18 +368,52 @@ export const readFilterValue = (text) => {
 export const filterMarkup = (id, primitives, { x, y, width, height }) => `<filter id="${id}" filterUnits="userSpaceOnUse"`
   + ` x="${x}" y="${y}" width="${width}" height="${height}" color-interpolation-filters="sRGB">${primitives.join('')}</filter>`;
 
+// How far a region grows past the picture and what it covers, at most. The
+// effect is drawn whole inside the picture, but past its edge, which only a
+// host's `overflow: visible` shows, no further than this: a 2-unit shadow
+// blurred by 2 reaches exactly 8, so an ordinary effect is drawn whole there
+// too, while an absurd one (blur(200px) reaches 600) costs about the picture
+// and not gigapixels.
+const OVERFLOW_LIMIT = 8;
+
+// How far past its drawn box an element may draw where the library cannot
+// see it: a dot's full width, a miter join.
+const REGION_MARGIN = 1;
+
+// The smallest box ({ minX, minY, maxX, maxY }) holding both, either of which
+// may be undefined (nothing there).
+const joined = (a, b) => (a && b ? {
+  minX: Math.min(a.minX, b.minX),
+  minY: Math.min(a.minY, b.minY),
+  maxX: Math.max(a.maxX, b.maxX),
+  maxY: Math.max(a.maxY, b.maxY),
+} : a ?? b);
+
 /**
- * The region a filter covers: the viewBox ({ x, y, width, height }) and the
- * drawn box ({ minX, minY, maxX, maxY }) together, grown by `reach` on every
- * side, rounded to 4 decimals. The viewBox keeps the effect whole wherever
- * the picture shows; the drawn box keeps ink outside the viewBox (a crop, a
- * host's `overflow: visible`) from being cut.
+ * The region a filter covers, rounded to 4 decimals: the viewBox ({ x, y,
+ * width, height }) and the drawn box ({ minX, minY, maxX, maxY }, undefined
+ * where nothing is drawn) together, grown on every side by the effect's
+ * spread, which is its `reach` plus the `outset` (how far the filters inside
+ * the element already carry what it draws past the drawn box), but by no
+ * more than OVERFLOW_LIMIT; and along the line (x) reaching no further than
+ * the spread and REGION_MARGIN past the drawn box. The viewBox keeps the
+ * effect whole wherever the picture shows, and the drawn box keeps ink
+ * outside it (a crop, a host's `overflow: visible`) from being cut. The cut
+ * keeps one word's region from spanning a whole sentence, which a rasterizer
+ * such as resvg pays for pixel by pixel, filter by filter; the picture's
+ * height is fixed by the Bliss line, so across the line it stays whole.
  */
-export const filterRegion = (viewBox, drawn, reach) => {
-  const minX = Math.min(viewBox.x, drawn.minX) - reach;
-  const minY = Math.min(viewBox.y, drawn.minY) - reach;
-  const maxX = Math.max(viewBox.x + viewBox.width, drawn.maxX) + reach;
-  const maxY = Math.max(viewBox.y + viewBox.height, drawn.maxY) + reach;
+export const filterRegion = (viewBox, drawn, reach, outset = 0) => {
+  const spread = reach + outset;
+  const growth = Math.min(spread, OVERFLOW_LIMIT);
+  const covered = joined({ minX: viewBox.x, minY: viewBox.y, maxX: viewBox.x + viewBox.width, maxY: viewBox.y + viewBox.height }, drawn);
+  const line = drawn
+    ? { minX: drawn.minX - spread - REGION_MARGIN, maxX: drawn.maxX + spread + REGION_MARGIN }
+    : { minX: -Infinity, maxX: Infinity };
+  const minX = Math.max(covered.minX - growth, line.minX);
+  const minY = covered.minY - growth;
+  const maxX = Math.min(covered.maxX + growth, line.maxX);
+  const maxY = covered.maxY + growth;
   return {
     x: roundForMarkup(minX),
     y: roundForMarkup(minY),
@@ -412,24 +464,25 @@ export const pictureHash = (text) => {
 const ID_PREFIX = 'bliss-filter-';
 const PENDING_ID = `${ID_PREFIX}<hash>-`;
 
-// The drawn box of an element that draws nothing, which adds nothing to a
-// region: the region is then the viewBox's alone.
-const NOTHING_DRAWN = Object.freeze({ minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
-
 /**
  * One element's attributes with each CSS filter among them that translates
  * pointed at a native <filter>: a `filter` attribute, and each `filter`
  * declaration of a `style` (rewriteStyle). `entries` are the attributes as
  * [name, value] pairs, escaped, in the order they are written; `site()`
- * returns what the element draws, `{ drawn, geometry }`, asked only where a
- * filter translates: `drawn` its box with its lines ({ minX, minY, maxX,
- * maxY }, undefined where it draws nothing), `geometry` the box of its
- * geometry alone, given only by an element that can hold the thin-element
- * shape (thinShape); `context` is the picture's `{ viewBox, next }`,
- * `next()` numbering the filters. With no context, as for a tree rendered
- * outside a picture, nothing is translated. Returns `{ entries, defs, shape
- * }`: the entries with each translated filter rewritten to `url(#id)`, the
- * <filter> markup for each, in order, and the thin-element shape or ''.
+ * returns what the element draws, `{ drawn, geometry, hit, outset }`, asked
+ * only where a filter translates: `drawn` its box with its lines ({ minX,
+ * minY, maxX, maxY }, undefined where it draws nothing); `geometry` the box
+ * of its geometry alone, given only by an element that can hold the
+ * thin-element shape (thinShape); `hit` where its link answers a click, given
+ * only by a link, which the region covers as it covers `drawn`, as a browser
+ * answers a click on a filtered element only inside the region; `outset` how
+ * far the filters inside the element carry what it draws past `drawn`
+ * (filterRegion), 0 where not given. `context` is the picture's `{ viewBox,
+ * next }`, `next()` numbering the filters. With no context, as for a tree
+ * rendered outside a picture, nothing is translated. Returns `{ entries,
+ * defs, shape }`: the entries with each translated filter rewritten to
+ * `url(#id)`, the <filter> markup for each, in order, and the thin-element
+ * shape or '', judged by what the element draws, never by its link.
  */
 export const translateFilters = (entries, site, context) => {
   if (!context) return { entries, defs: [], shape: '' };
@@ -438,7 +491,7 @@ export const translateFilters = (entries, site, context) => {
   const allocate = ({ primitives, reach }) => {
     place ??= site();
     const id = `${PENDING_ID}${context.next()}`;
-    defs.push(filterMarkup(id, primitives, filterRegion(context.viewBox, place.drawn ?? NOTHING_DRAWN, reach)));
+    defs.push(filterMarkup(id, primitives, filterRegion(context.viewBox, joined(place.drawn, place.hit), reach, place.outset)));
     return id;
   };
   const translated = entries.map(([name, value]) => {

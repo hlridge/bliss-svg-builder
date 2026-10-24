@@ -45,8 +45,11 @@ const B313 = '<path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/>
 const B313_AT_10 = '<path d="M10,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/>';
 const B291_AT_10 = '<path d="M10,8h8M10,16h8M10,8v8M18,8v8"/>';
 const BLUR_1 = '<feGaussianBlur stdDeviation="1"/>';
-// viewBox -0.75 -0.75 19.5 21.5, grown by blur(1px)'s reach of 3
-const WORD_BLUR = [-3.75, -3.75, 25.5, 27.5];
+// viewBox -0.75 -0.75 19.5 21.5, grown by blur(1px)'s reach of 3, and cut
+// along x 4 past what the filtered element draws: B313 from -0.25 to 8.25,
+// the second B313 from 9.75 to 18.25
+const FIRST_BLUR = [-3.75, -3.75, 16, 27.5];
+const SECOND_BLUR = [5.75, -3.75, 16, 27.5];
 const DEFINED = { BLURRED: { codeString: 'B313', defaultOptions: { filter: 'blur(1px)' } } };
 
 describe('BlissSVGBuilder native filter ids', () => {
@@ -63,7 +66,7 @@ describe('BlissSVGBuilder native filter ids', () => {
       const transient = build('B313/B291');
       transient.glyph(0).setTransientOptions({ filter: 'blur(1px)' });
 
-      expect(contentOf(dsl.svgCode)).toBe(`<g filter="url(#${idIn(dsl.svgCode, 1)})">${filterDef(idIn(dsl.svgCode, 1), WORD_BLUR, BLUR_1)}${B313}</g>${B291_AT_10}`);
+      expect(contentOf(dsl.svgCode)).toBe(`<g filter="url(#${idIn(dsl.svgCode, 1)})">${filterDef(idIn(dsl.svgCode, 1), FIRST_BLUR, BLUR_1)}${B313}</g>${B291_AT_10}`);
       for (const builder of [composition, handle, transient]) {
         expect(builder.svgCode).toBe(dsl.svgCode);
       }
@@ -73,8 +76,8 @@ describe('BlissSVGBuilder native filter ids', () => {
       BlissSVGBuilder.define(DEFINED);
       const svg = build('BLURRED/BLURRED').svgCode;
 
-      expect(contentOf(svg)).toBe(`<g filter="url(#${idIn(svg, 1)})">${filterDef(idIn(svg, 1), WORD_BLUR, BLUR_1)}${B313}</g>`
-        + `<g filter="url(#${idIn(svg, 2)})">${filterDef(idIn(svg, 2), WORD_BLUR, BLUR_1)}${B313_AT_10}</g>`);
+      expect(contentOf(svg)).toBe(`<g filter="url(#${idIn(svg, 1)})">${filterDef(idIn(svg, 1), FIRST_BLUR, BLUR_1)}${B313}</g>`
+        + `<g filter="url(#${idIn(svg, 2)})">${filterDef(idIn(svg, 2), SECOND_BLUR, BLUR_1)}${B313_AT_10}</g>`);
       expect(svg).toBe(build('[filter=blur(1px)]>B313/[filter=blur(1px)]>B313').svgCode);
     });
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterMarkup, filterRegion, pictureHash, readFilterValue, thinShape } from '../src/lib/bliss-filters.js';
+import { filterMarkup, filterReach, filterRegion, pictureHash, readFilterValue, thinShape } from '../src/lib/bliss-filters.js';
 
 /**
  * Pins what the filter module writes: the native primitive each CSS filter
@@ -13,10 +13,13 @@ import { filterMarkup, filterRegion, pictureHash, readFilterValue, thinShape } f
  *   here; the clamps CSS applies (grayscale, sepia, invert, opacity at 1).
  * - Chaining: primitives in written order, each reach added.
  * - The reach: a shadow's larger offset plus three times its blur, three
- *   times a blur, nothing for a colour function.
+ *   times a blur, nothing for a colour function; an element's, the largest
+ *   among its `filter` attribute and its style's `filter` declarations.
  * - The `<filter>` markup, in user space and sRGB, its numbers as given.
- * - The region: the viewBox and the drawn box together, grown by the reach,
- *   rounded to 4 decimals.
+ * - The region: the viewBox and the drawn box together, grown by the spread
+ *   (the reach plus the outset) but by no more than 8 units, cut along x to
+ *   the drawn box plus the spread and 1 unit, never cut along y; the viewBox
+ *   alone, grown, where nothing is drawn; rounded to 4 decimals.
  * - The thin-element shape: 1 unit centred on the drawn box in each dimension
  *   under 1 unit, the geometry's own extent in the other, none from 1 unit up.
  * - The hash: FNV-1a 32 over UTF-16 code units, as 8 lowercase hex digits.
@@ -44,6 +47,9 @@ const SEPIA_1 = matrix('0.393 0.769 0.189 0 0 0.349 0.686 0.168 0 0 0.272 0.534 
 // B313's viewBox, and its drawn box: geometry 0..8 x 8..16 widened by half its 0.5 line
 const B313_VIEWBOX = { x: -0.75, y: -0.75, width: 9.5, height: 21.5 };
 const B313_DRAWN = { minX: -0.25, minY: 7.75, maxX: 8.25, maxY: 16.25 };
+// A long line's viewBox, and one word drawn in its middle
+const LINE = { x: 0, y: 0, width: 100, height: 20 };
+const WORD = { minX: 40, minY: 5, maxX: 50, maxY: 15 };
 const ghost = (x, y, width, height) => `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="none" stroke="none"/>`;
 
 describe('bliss-filters primitives', () => {
@@ -99,6 +105,19 @@ describe('bliss-filters primitives', () => {
     ])('reaches %s by %s grid units', (value, reach) => {
       expect(readFilterValue(value).reach).toBe(reach);
     });
+
+    it.each([
+      ['a filter attribute', [['filter', 'blur(1px)']], 3],
+      ['a style\'s filter declaration among others', [['style', 'color:red;filter:drop-shadow(2px 1px red)']], 2],
+      ['an important style declaration', [['style', 'filter:blur(1px) !important']], 3],
+      ['an attribute and a style, the larger last', [['filter', 'blur(1px)'], ['style', 'filter:blur(2px)']], 6],
+      ['two declarations, the larger first', [['style', 'filter:blur(2px);filter:blur(1px)']], 6],
+      ['a value kept as written', [['filter', 'blur(1em)'], ['style', 'filter:var(--f)']], 0],
+      ['a filter value under another name', [['mask', 'blur(1px)'], ['style', 'mask:blur(2px)']], 0],
+      ['no entries', [], 0],
+    ])('reads an element\'s reach from %s', (_case, entries, reach) => {
+      expect(filterReach(entries)).toBe(reach);
+    });
   });
 
   describe('when a filter element is written', () => {
@@ -114,14 +133,31 @@ describe('bliss-filters primitives', () => {
   describe('when the region is computed', () => {
     it.each([
       ['the design example, drawn inside the viewBox', B313_VIEWBOX, B313_DRAWN, 1, { x: -1.75, y: -1.75, width: 11.5, height: 23.5 }],
-      ['ink left of a cropped viewBox', { x: 5.25, y: -0.75, width: 13.5, height: 21.5 }, B313_DRAWN, 3,
-        { x: -3.25, y: -3.75, width: 25, height: 27.5 }],
+      ['ink left of a cropped viewBox, cut past the ink', { x: 5.25, y: -0.75, width: 13.5, height: 21.5 }, B313_DRAWN, 3,
+        { x: -3.25, y: -3.75, width: 15.5, height: 27.5 }],
       ['ink past the viewBox on every side', { x: 0, y: 0, width: 4, height: 4 }, { minX: -1, minY: -2, maxX: 6, maxY: 7 }, 0,
         { x: -1, y: -2, width: 7, height: 9 }],
       ['float noise in the sums', { x: 0.3, y: 0, width: 1, height: 1 }, { minX: 0.3, minY: 0, maxX: 1.3, maxY: 1 }, 0.1,
         { x: 0.2, y: -0.1, width: 1.2, height: 1.2 }],
+      // pins the cut along x only, 1 unit past the reach: the line's height stays whole
+      ['a word in a long line, cut along it', LINE, WORD, 2, { x: 37, y: -2, width: 16, height: 24 }],
+      ['the viewBox alone where nothing is drawn, uncut', LINE, undefined, 2, { x: -2, y: -2, width: 104, height: 24 }],
     ])('covers %s', (_case, viewBox, drawn, reach, region) => {
       expect(filterRegion(viewBox, drawn, reach)).toEqual(region);
+    });
+
+    it('widens the region by the outset as by the reach, along and across the line', () => {
+      // pins the growth by reach + outset: by the reach alone y would stay at -2
+      expect(filterRegion(LINE, WORD, 2, 4)).toEqual({ x: 33, y: -6, width: 24, height: 32 });
+    });
+
+    it.each([
+      ['a spread of exactly 8', [LINE, WORD, 8], { x: 31, y: -8, width: 28, height: 36 }],
+      ['a spread of 9, cut along the line at the whole spread', [LINE, WORD, 2, 7], { x: 30, y: -8, width: 30, height: 36 }],
+      ['an absurd reach, past the line\'s ends', [LINE, WORD, 600], { x: -8, y: -8, width: 116, height: 36 }],
+      ['an absurd reach where nothing is drawn', [LINE, undefined, 600], { x: -8, y: -8, width: 116, height: 36 }],
+    ])('grows no more than 8 units past the picture and the ink, for %s', (_case, args, region) => {
+      expect(filterRegion(...args)).toEqual(region);
     });
   });
 

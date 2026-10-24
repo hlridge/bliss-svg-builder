@@ -21,7 +21,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   background as a box (the filter its preceding sibling) and as an ink
  *   area (its first child, its region from the lines widened by the area).
  * - What a zone or the grid draws outside the viewBox (a crop, a negative
- *   margin), each grid line by its own width and the grid by its widest.
+ *   margin), each grid line by its own width and the grid by its widest; a
+ *   group's region widened by what its own filtered shapes spread.
  * - A drop-shadow colour copied into its filter escaped, as the markup
  *   carries it.
  * - Numbering: the composition first, then the layers in document order,
@@ -188,13 +189,14 @@ describe('BlissSVGBuilder native filter layers', () => {
     });
 
     it('covers a zone, and the background group holding it, where a crop leaves it outside the viewBox', () => {
-      // viewBox -0.75 9.25 9.5 11.5; the middle zone is drawn from y=8
+      // viewBox -0.75 9.25 9.5 11.5; the middle zone is drawn from y=8. The
+      // group spreads its own 3 plus the zone's, as its blur spreads the zone's
       const svg = build('[crop-top=10;background-mid=yellow;background--filter=blur(1px);background-zone--mid--filter=blur(1px)]||B313').svgCode;
       const [group, zone] = [1, 2].map(n => idIn(svg, n));
 
       expect(svg).toContain([
         `  <g class="bliss-background" filter="url(#${group})">`,
-        `    ${filterDef(group, [-3.75, 5, 15.5, 18.75], BLUR_1)}`,
+        `    ${filterDef(group, [-6.75, 2, 21.5, 24.75], BLUR_1)}`,
         `    ${filterDef(zone, [-3.75, 5, 15.5, 18.75], BLUR_1)}`,
         `    <rect class="bliss-background-zone bliss-background-zone--mid" x="-0.75" y="8" width="9.5" height="8"`
           + ` stroke="none" fill="yellow" filter="url(#${zone})"/>`,
@@ -202,13 +204,14 @@ describe('BlissSVGBuilder native filter layers', () => {
     });
 
     it('covers the grid by its widest line, and each grid line by its own width, outside the viewBox', () => {
-      // viewBox 1 1 6 18; the lines run 0..8 x 0..20, the sky line 2 wide, the minor lines 0.166
+      // viewBox 1 1 6 18; the lines run 0..8 x 0..20, the sky line 2 wide, the
+      // minor lines 0.166; the grid spreads its own 3 plus the minor lines'
       const svg = build('[grid;margin=-1;grid-sky-stroke-width=2;grid--filter=blur(1px);grid-line--minor--filter=blur(1px)]||B313').svgCode;
       const [grid, minor] = [1, 2].map(n => idIn(svg, n));
 
       expect(svg).toContain([
         `  <g class="bliss-grid" shape-rendering="crispEdges" filter="url(#${grid})">`,
-        `    ${filterDef(grid, [-4, -4, 16, 28], BLUR_1)}`,
+        `    ${filterDef(grid, [-7, -7, 22, 34], BLUR_1)}`,
         `    ${filterDef(minor, [-3.083, -3.083, 14.166, 26.166], BLUR_1)}`,
         '    <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="0.166"',
       ].join('\n'));
@@ -232,7 +235,7 @@ describe('BlissSVGBuilder native filter layers', () => {
       ['a cropped ink area, its region from the lines widened by the area',
         '[crop-left=6;element-background--filter=blur(1px)]||[background-area=ink;background=yellow]B313/B291',
         (id) => `<g class="bliss-element-background bliss-element-background--ink" fill="none" stroke="yellow" stroke-width="1.3"`
-          + ` filter="url(#${id})">${filterDef(id, [-3.65, -3.75, 25.4, 27.5], BLUR_1)}${B313}</g>${B313_B291}`],
+          + ` filter="url(#${id})">${filterDef(id, [-3.65, -3.75, 16.3, 27.5], BLUR_1)}${B313}</g>${B313_B291}`],
     ])('translates an element background\'s filter on %s', (_case, input, markup) => {
       const svg = build(input).svgCode;
 
@@ -260,7 +263,9 @@ describe('BlissSVGBuilder native filter layers', () => {
 
   describe('when the composition and the layers both carry a filter', () => {
     it('numbers the composition first, then the layers in document order', () => {
-      // the grid is written before the content group but numbered after it
+      // the grid is written before the content group but numbered after it;
+      // the content group spreads its own 6 plus the character's 3, grown by
+      // 8 at most
       const builder = build('[filter=blur(2px);grid;grid--filter=grayscale(1)]||[filter=blur(1px)]B313');
       const svg = builder.svgCode;
       const [element, grid, content] = [1, 2, 3].map(n => idIn(svg, n));
@@ -268,7 +273,7 @@ describe('BlissSVGBuilder native filter layers', () => {
       expect(svg).toContain(`<g class="bliss-grid" shape-rendering="crispEdges" filter="url(#${grid})">\n`
         + `    ${filterDef(grid, [-0.75, -0.75, 9.5, 21.5], GRAYSCALE_1)}\n`);
       expect(svg).toContain(`${DEFAULT_CONTENT_TAG.replace(/>$/, ` filter="url(#${content})">`)}\n`
-        + `    ${filterDef(content, [-6.75, -6.75, 21.5, 33.5], '<feGaussianBlur stdDeviation="2"/>')}\n`
+        + `    ${filterDef(content, [-8.75, -8.75, 25.5, 37.5], '<feGaussianBlur stdDeviation="2"/>')}\n`
         + `    <g filter="url(#${element})">${filterDef(element, B313_BLUR, BLUR_1)}${B313}</g>\n`);
       expect(builder.svgContent).toBe(`<g filter="url(#${element})">${filterDef(element, B313_BLUR, BLUR_1)}${B313}</g>`);
     });
@@ -281,7 +286,7 @@ describe('BlissSVGBuilder native filter layers', () => {
 
       expect(svg.match(/<filter /g)).toHaveLength(3);
       expect(svg).toContain(`${DEFAULT_CONTENT_TAG.replace(/>$/, ` filter="url(#${content})">`)}\n`
-        + `    ${filterDef(content, [-6.75, -6.75, 31.5, 33.5], '<feGaussianBlur stdDeviation="2"/>')}\n`);
+        + `    ${filterDef(content, [-8.75, -8.75, 35.5, 37.5], '<feGaussianBlur stdDeviation="2"/>')}\n`);
     });
   });
 });

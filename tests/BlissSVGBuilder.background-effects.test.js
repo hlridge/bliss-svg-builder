@@ -187,12 +187,14 @@ describe('BlissSVGBuilder background effects', () => {
 
   describe('when effects are written at several levels', () => {
     it('nests the copies outermost first, as the lines nest their groups', () => {
+      // each filter's region is cut along x 4 past what it covers: the box
+      // from 2.5 to 5.5, B81's lines from 2.75 to 5.25
       const svg = build('[transform=rotate(10)]|[opacity=0.5]B313;[background=yellow;filter=blur(1px)]>B81').svgCode;
 
       expect(contentOf(svg)).toBe(
-        `<g transform="rotate(10)"><g opacity="0.5"><g filter="url(#${idIn(svg, 1)})">${filterDef(idIn(svg, 1), VIEWBOX_REGION)}`
+        `<g transform="rotate(10)"><g opacity="0.5"><g filter="url(#${idIn(svg, 1)})">${filterDef(idIn(svg, 1), [-1.5, -3.75, 11, 27.5])}`
         + `${box(2.5, 3.5, 3, 3, 'yellow')}</g></g></g>`
-        + `<g transform="rotate(10)"><g opacity="0.5">${B313}<g filter="url(#${idIn(svg, 2)})">${filterDef(idIn(svg, 2), VIEWBOX_REGION)}`
+        + `<g transform="rotate(10)"><g opacity="0.5">${B313}<g filter="url(#${idIn(svg, 2)})">${filterDef(idIn(svg, 2), [-1.25, -3.75, 10.5, 27.5])}`
         + '<path d="M3,6l1,-2M4,4l1,2"/></g></g></g>');
     });
 

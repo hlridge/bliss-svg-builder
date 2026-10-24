@@ -11,7 +11,7 @@ import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
-import { translateFilters, numberFilters, fillFilterIds } from "./bliss-filters.js";
+import { translateFilters, filterReach, numberFilters, fillFilterIds } from "./bliss-filters.js";
 
 // Pre-parsed error placeholder (REFSQUARE + question mark). Parsed once at module
 // load so BlissElement can clone it without importing BlissParser itself.
@@ -6377,6 +6377,9 @@ class BlissSVGBuilder {
       const { entries, defs, shape } = translateFilters(Object.entries(attrs), site, filters);
       return { attributes: formatEntries(entries), filterLines: [...defs, shape].filter(Boolean).map(line => `    ${line}`) };
     };
+    // How far a group's shapes draw past their own boxes: the largest reach
+    // among their filters, which the group's own filter spreads further.
+    const outsetOf = (shapes) => Math.max(0, ...shapes.map(({ attrs }) => filterReach(Object.entries(attrs))));
 
     const svgTitle = this.#processedOptions.svgTitle ?? "";
     const svgDesc = this.#processedOptions.svgDesc ?? "";
@@ -6439,13 +6442,14 @@ class BlissSVGBuilder {
     // written before its rects, so its filter is numbered first.
     let backgroundContent = '';
     if (backgroundRects.length > 0) {
+      const rects = backgroundRects.map(({ classes, computed, box }) => ({ attrs: layerAttributes(classes, computed, this.#authoredFor(classes)), box }));
       const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.background, {}, this.#authoredFor(ELEMENT_CLASSES.background)),
-        () => ({ drawn: unionOf(backgroundRects.map(({ box }) => box)) }));
+        () => ({ drawn: unionOf(rects.map(({ box }) => box)), outset: outsetOf(rects) }));
       backgroundContent = [
         `  <g ${group.attributes}>`,
         ...group.filterLines,
-        ...backgroundRects.flatMap(({ classes, computed, box }) => {
-          const rect = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => ({ drawn: box }));
+        ...rects.flatMap(({ attrs, box }) => {
+          const rect = layerMarkup(attrs, () => ({ drawn: box }));
           return [...rect.filterLines, `    <rect ${rect.attributes}/>`];
         }),
         '  </g>',
@@ -6526,10 +6530,11 @@ class BlissSVGBuilder {
       ].filter(Boolean);
 
       // The group is written before its lines, so its filter is numbered first.
+      const shapes = lines.map(({ classes, computed, box }) => ({ attrs: layerAttributes(classes, computed, this.#authoredFor(classes)), box }));
       const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.grid, { 'shape-rendering': 'crispEdges' },
-        this.#authoredFor(ELEMENT_CLASSES.grid)), () => ({ drawn: unionOf(lines.map(({ box }) => box)) }));
-      const gridLines = lines.flatMap(({ classes, computed, box }) => {
-        const line = layerMarkup(layerAttributes(classes, computed, this.#authoredFor(classes)), () => ({ drawn: box }));
+        this.#authoredFor(ELEMENT_CLASSES.grid)), () => ({ drawn: unionOf(shapes.map(({ box }) => box)), outset: outsetOf(shapes) }));
+      const gridLines = shapes.flatMap(({ attrs, box }) => {
+        const line = layerMarkup(attrs, () => ({ drawn: box }));
         return [...line.filterLines, `    <path ${line.attributes}/>`];
       }).join('\n');
 
@@ -6589,10 +6594,14 @@ class BlissSVGBuilder {
       : content;
     // Written last of the layers, so its filter is numbered after theirs. Its
     // region covers everything the composition draws, its lines and its
-    // element backgrounds, and a thin composition gets the shape that keeps
-    // it drawn, as an element's group does.
-    const contentLayer = layerMarkup(contentAttrs,
-      () => ({ drawn: this.composition.drawnArea, geometry: this.composition.effectiveBounds }));
+    // element backgrounds, and how far the filters inside it carry them, and
+    // a thin composition gets the shape that keeps it drawn, as an element's
+    // group does.
+    const contentLayer = layerMarkup(contentAttrs, () => ({
+      drawn: this.composition.drawnArea,
+      geometry: this.composition.effectiveBounds,
+      outset: this.composition.filterOutset,
+    }));
     const contentGroup = [
       `  <g ${contentLayer.attributes}>`,
       ...contentLayer.filterLines,
