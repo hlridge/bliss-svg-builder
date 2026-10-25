@@ -14,8 +14,9 @@ import { readFilterValue } from '../src/lib/bliss-filters.js';
  * - Every other value kept as written, never sorted into invalid or
  *   unsupported: `none`, a CSS-wide keyword, a list of `url()` alone, an
  *   empty value, what CSS refuses, and what the library cannot convert (a
- *   relative or percentage length, `calc()`, `var()` or `env()` anywhere, the
- *   shadow colour included, a `url()` beside a function, an unknown function,
+ *   relative or percentage length, `calc()` or another math function as any
+ *   length, a shadow's blur included, `var()` or `env()` anywhere, the shadow
+ *   colour included, a `url()` beside a function, an unknown function,
  *   `!important` written in the attribute).
  * - The colour rewrite: an `rgb()` or `hsl()` colour written in the comma form
  *   with a number alpha, every other colour copied as written (a word that is
@@ -118,6 +119,10 @@ describe('bliss-filters reader', () => {
       // as only CSS substitutes them
       'drop-shadow(1px 1px var(--c))', 'drop-shadow(1px 1px VAR(--c))', 'drop-shadow(1px 1px rgb(var(--r) 0 0))',
       'drop-shadow(1px 1px env(--c))',
+      // a math function is a length only CSS evaluates, never the shadow's
+      // colour, whichever length it stands for
+      'drop-shadow(1px 1px calc(2px))', 'drop-shadow(1px 1px CALC(2px))', 'drop-shadow(1px 1px max(2px, 1px))',
+      'drop-shadow(1px 1px clamp(1px, 2px, 3px))', 'drop-shadow(calc(1px) 1px 2px)',
       // a presentation attribute's grammar has no !important, so the
       // attribute draws nothing today; in a style it is read past instead
       'blur(1px) !important',
@@ -163,6 +168,8 @@ describe('bliss-filters reader', () => {
       // a word that is not a colour is copied unjudged: a typo draws black,
       // as invalid CSS carries no promise
       'foo', 'xrgb(0 0 0)', 'rgb(0 0 0)x',
+      // pins the parenthesis a math function needs: tan is a colour as a word
+      'tan',
     ])('copies %s as written', (color) => {
       expect(readFilterValue(`drop-shadow(1px 1px ${color})`).primitives).toEqual([shadow(1, 1, 0, color)]);
     });

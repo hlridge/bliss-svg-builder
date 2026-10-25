@@ -260,8 +260,9 @@ const floodColor = (color) => {
     : `${name}a(${parts.channels.join(',')},${roundForMarkup(Math.min(Math.max(alpha, 0), 1))})`;
 };
 
-// A token that begins as a number does: a length, never a color.
-const NUMERIC = /^[+-]?\.?\d/;
+// A token that begins as a number does, or as a call to one of CSS's math
+// functions: a length (or a number), never a color.
+const NUMERIC = /^(?:[+-]?\.?\d|(?:calc|min|max|clamp|round|mod|rem|sin|cos|tan|asin|acos|atan|atan2|pow|sqrt|hypot|log|exp|abs|sign)\()/i;
 
 // CSS's `drop-shadow( <color>? && <length>{2,3} )`: the color before or after
 // the lengths, the third length a blur that is not negative. An omitted color
