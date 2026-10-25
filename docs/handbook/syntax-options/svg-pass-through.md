@@ -254,7 +254,7 @@ The root `<svg>` carries the document's own attributes: the size and `viewBox`, 
 
 With a global `href`, the content group sits inside an `<a>` element, after a transparent rectangle that covers the picture (see [Links with href](#links-with-href)).
 
-The backgrounds of words, characters and parts come first inside the content group, before any line, so a global effect such as `opacity` or `transform` reaches them as part of the artwork.
+The backgrounds of words, characters and parts sit inside the content group, before any line, so a global effect such as `opacity` or `transform` reaches them as part of the artwork.
 
 The background is a group in every case, holding one rectangle that covers the picture, or one rectangle for each zone you set, so `background--` means the same thing whichever you asked for.
 
