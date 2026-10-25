@@ -37,9 +37,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.native-filter-layers.test.js`; the copy around a box
  *   and an ink area in the ordinary case, see
  *   `BlissSVGBuilder.background-effects.test.js`.
- * - How a browser draws the result (the browser check, C9 Task 7); how far a
- *   region reaches in a longer line, past the filters inside the element, or
- *   past a link's padding, see `BlissSVGBuilder.native-filter-regions.test.js`.
+ * - How the result draws: a blur or a shadow against its CSS form, see
+ *   `BlissSVGBuilder.native-filters.e2e.test.js` (browsers and resvg are
+ *   measured outside the suite); how far a region reaches in a longer line,
+ *   past the filters inside the element, or past a link's padding, see
+ *   `BlissSVGBuilder.native-filter-regions.test.js`.
  * - A copy too thin to draw filtered (an ink area at `background-padding=0`):
  *   no shape is pinned for a copy.
  *
