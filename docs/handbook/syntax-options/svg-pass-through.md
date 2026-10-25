@@ -37,7 +37,7 @@ Write one of these names either way and it is the same name, because casing and 
 
 The casing or hyphenation you choose is never reported. Nothing is lost by the choice either: the value applies exactly as you meant it, and your own `toString()` shows you which spelling it settled on. Some libraries do warn here, React among them when a DOM attribute looks misspelled, and this one deliberately does not. Write one name twice under two spellings and the last one you wrote is the one that applies, with the other reported as [`MULTIPLE_OPTION_SPELLINGS`](/reference/warning-codes#multiple-option-spellings).
 
-The SVG names this covers are the ones SVG defines for the elements the library draws: `<svg>`, `<g>`, `<path>`, `<rect>`, `<text>`, `<a>`, `<title>`, `<desc>` and `<style>`. A name from elsewhere in SVG has nothing in the picture to sit on, so it counts as one of your own and is emitted as typed: `[gradientUnits=userSpaceOnUse]||` emits `gradientUnits`, and `[gradient-units=userSpaceOnUse]||` emits `gradient-units`.
+The SVG names this covers are the ones SVG defines for the elements the library draws: `<svg>`, `<g>`, `<path>`, `<rect>`, `<text>`, `<a>`, `<title>`, `<desc>` and `<style>`, and the `<filter>` it draws a [CSS filter](#using-css-filter) with, along with the primitives inside it (`<feDropShadow>`, `<feGaussianBlur>`, `<feColorMatrix>`, `<feComponentTransfer>`, `<feFuncR>`, `<feFuncG>`, `<feFuncB>` and `<feFuncA>`). A name from elsewhere in SVG has nothing in the picture to sit on, so it counts as one of your own and is emitted as typed: `[gradientUnits=userSpaceOnUse]||` emits `gradientUnits`, and `[gradient-units=userSpaceOnUse]||` emits `gradient-units`.
 
 ## Targeting One Part of the Picture
 
@@ -142,25 +142,19 @@ The `style` attribute passes through like any other, so you can apply inline CSS
 
 ### Using CSS `filter`
 
-Which spelling you use decides what the lengths mean, and the difference is large enough to surprise you.
+A filter can be written as an option of its own (`[filter=blur(1px)]`) or inside a `style` (`[style=filter:blur(1px)]`). Where you write it decides how it is drawn and what its lengths mean, and the difference is large enough to surprise you.
 
-**Inside the picture** (a plain global `style`, or one on a word, character or part) the filter applies to a `<g>` within the SVG coordinate system. It behaves as part of the artwork: the effect stays locked to the symbol and scales with it.
+**Inside the picture** (a plain global `filter` or `style`, one on a word, character or part, or one behind any [target](#targeting-one-part-of-the-picture) but `root--`, such as `grid--filter`) the library draws the filter as a native SVG `<filter>`, so it looks the same in Firefox, Chrome, Edge and Safari, and in resvg and librsvg, which turn an SVG into a PNG. It behaves as part of the artwork: the effect stays locked to the symbol and scales with it.
 
 - **Filter lengths are in grid units, not screen pixels.** Inside the SVG a CSS length is read in the symbol's own coordinate system, the same units as the strokes, so `drop-shadow(2px 2px 2px ...)` really means `drop-shadow(2 2 2 ...)` in grid units. At this scale that is a lot: a stroke is only 0.5 units wide, and most symbols span just 4 to 8 units (some as little as 2), so a 2-unit offset and blur is several times the line width and about the size of a small symbol, nothing like the 2 pixels the `px` suffix suggests. Grid units are also what let the shadow scale with the symbol rather than stay a fixed screen size, so its size in pixels depends on how large the SVG is displayed. Think in grid units, where even `1px` (one grid unit) is already a prominent shadow.
 - **Multiple `drop-shadow()`s chain,** exactly as they do in any CSS filter list: each one is applied to the result of the previous.
 - **A tight viewBox clips an outward shadow.** Add margin to give it room.
 
-**On the whole image** (`root--style`) the filter applies to the root `<svg>`, which your page treats like any other element. In a browser the lengths are ordinary CSS pixels there, so `2px` really is 2 pixels, the effect covers the paper and grid as well as the artwork, and it is not clipped by the viewBox. It does not scale with the symbol. Not every renderer reads it that way: resvg, which draws SVG outside the browser, takes these lengths in grid units, as it does inside the picture.
+What is drawn this way is a value made of CSS's ten filter functions (`blur`, `brightness`, `contrast`, `drop-shadow`, `grayscale`, `hue-rotate`, `invert`, `opacity`, `saturate` and `sepia`), one or several in a row, with any length in `px` or another absolute unit such as `mm` or `pt`. Any other value is written exactly as you gave it. A `url()` that points at a filter of your own needs nothing more, but a value the library does not translate, such as `blur(1em)` or one using `var()` or `calc()`, stays CSS, which browsers draw unevenly inside an SVG: Safari ignores it on a group, and Chrome and Edge drop a shadow offset under one grid unit.
 
-Browsers render CSS filters on SVG groups inconsistently. This is a browser limitation, not specific to Bliss SVG Builder:
+`toString()` and `toJSON()` give the filter back as you wrote it, since the `<filter>` exists only in the drawn SVG. There it sits next to what it applies to, which points at it through the attribute you used: `filter="url(#…)"` or `style="filter:url(#…)"`. Its id is made from the whole picture, so different pictures on one page do not share one. Two identical pictures do share them, and if the first is hidden with `display: none`, Chrome and Edge drop the second one's filtered element, and Firefox its effect. Give each picture its own `id` (`[id=first]||…`) and their filters' ids differ too.
 
-- **Firefox** renders them faithfully.
-- **Chromium and Edge** drop offsets and blur radii below about 1 grid unit, so keep filter lengths at 1 grid unit or more (go a little above 1 for effects that must stay visible in these engines).
-- **Safari (WebKit)** does not apply a CSS `filter` to an SVG group at all, at any size.
-
-Because of that, a CSS `filter` set this way is not dependable in every browser today. For an effect that must look identical everywhere, prefer the pass-through properties that render consistently: `stroke-width`, `stroke-dasharray`, `transform`, `fill`, `opacity`, and `mix-blend-mode`.
-
-Reliable cross-browser filters are planned through a native SVG `<filter>`; follow [#34](https://github.com/hlridge/bliss-svg-builder/issues/34) for progress.
+**On the whole image** (`root--filter` or `root--style`) the filter is not translated: it goes on the root `<svg>` as you wrote it, and your page treats it like the CSS on any other element. In a browser the lengths are ordinary CSS pixels there, so `2px` really is 2 pixels, the effect covers the paper and grid as well as the artwork, and it is not clipped by the viewBox. It does not scale with the symbol. A PNG converter has no page to measure pixels on, so it reads these lengths its own way: resvg takes them in grid units, as it does inside the picture. For an effect that must look the same in an exported image, write it inside the picture, where a plain global `filter` already covers the whole symbol.
 
 ## ID Attribute
 
@@ -296,5 +290,5 @@ Two names on the root belong to the library and are reported rather than applied
 | `transform` | `rotate(15)` | SVG transform |
 | `class` | `my-class` | CSS class, added to the element's own name |
 | `id` | `my-symbol` | Element ID |
-| `style` | `filter:blur(1px)` | Inline CSS (lengths mean different things on the root and inside the picture, and Safari does not apply a `filter` to a group at all, see [Style Attribute](#style-attribute)) |
+| `style` | `filter:blur(1px)` | Inline CSS (a `filter` inside the picture is drawn as a native SVG filter, and its lengths mean something else on the root, see [Using CSS `filter`](#using-css-filter)) |
 | `preserveAspectRatio` | `xMidYMid` | How the picture fits its box (global only, since it belongs to the root) |
