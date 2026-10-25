@@ -9,6 +9,9 @@
  * - On an element: both channels (`filter`, `style`); a blur of 0.5, 1 and
  *   2 units; a shadow sharp and blurred, with a negative and a sub-unit
  *   offset, the default colour and a translucent one.
+ * - Translucency: a shadow's colour with an alpha in each spelling the
+ *   builder rewrites (`rgb()` and `hsl()` with `/`, a percentage), and
+ *   `opacity`, the one colour function node-canvas draws alike in CSS.
  * - Each level: a word, a character inside a word, a part, a word and its
  *   character both filtered, ink a crop leaves outside the viewBox.
  * - The picture's layers: the whole symbol, the grid, the background, one
@@ -19,11 +22,12 @@
  *   without the filter, so no row passes with neither form drawing it.
  *
  * Does NOT cover:
- * - The colour functions, a length in `mm`, a chain through a blur and a
- *   filtered thin line: node-canvas draws their CSS form itself wrongly, so
- *   no CSS form can judge them here. Their own references
+ * - The other colour functions, a length in `mm`, a chain through a blur, and
+ *   a line given no invisible shape (a grid line, a line drawn wide):
+ *   node-canvas draws their CSS form itself wrongly, so no CSS form can judge
+ *   them here. Their own references
  *   (`BlissSVGBuilder.visual-regression.e2e.cases.js`) pin how the markup
- *   draws.
+ *   draws, as they pin thin elements and the matrix's corners.
  * - The markup (primitives, regions, ids), see
  *   `BlissSVGBuilder.native-filters.test.js` and its siblings.
  * - Browsers and resvg: measured outside the suite.
@@ -65,6 +69,21 @@ describe('BlissSVGBuilder native filters', () => {
       ['[filter=drop-shadow(0.25px 0.25px 0 red)]B313', 'drop-shadow(0.25px 0.25px 0 red)', 1, 'B313'],
       ['[color=red;filter=drop-shadow(1px 1px)]B313', 'drop-shadow(1px 1px)', 1, '[color=red]B313'],
       ['[filter=drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]B313', 'drop-shadow(2px 2px 2px rgba(0,0,0,0.3))', 1, 'B313'],
+    ])('draws %s as the CSS filter %s draws', async (input, css, references, plain) => {
+      const result = await againstCssForm(input, css);
+
+      expect(result.references).toBe(references);
+      expect(result.comparison.diffPixels, `see ${result.comparison.paths.diff}`).toBe(0);
+      expect(result.native.equals(await drawn(plain))).toBe(false);
+    });
+  });
+
+  describe('when a shadow\'s colour or the element itself is made translucent', () => {
+    it.each([
+      ['[filter=drop-shadow(2px 2px 0 rgb(0 0 0 / 30%))]B313', 'drop-shadow(2px 2px 0 rgb(0 0 0 / 30%))', 1, 'B313'],
+      ['[filter=drop-shadow(2px 2px 0 rgba(0,0,0,30%))]B313', 'drop-shadow(2px 2px 0 rgba(0,0,0,30%))', 1, 'B313'],
+      ['[style=filter:drop-shadow(2px 2px 0 hsl(0 100% 50% / 0.3))]B313', 'drop-shadow(2px 2px 0 hsl(0 100% 50% / 0.3))', 1, 'B313'],
+      ['[color=chocolate;filter=opacity(0.5)]B313', 'opacity(0.5)', 1, '[color=chocolate]B313'],
     ])('draws %s as the CSS filter %s draws', async (input, css, references, plain) => {
       const result = await againstCssForm(input, css);
 
