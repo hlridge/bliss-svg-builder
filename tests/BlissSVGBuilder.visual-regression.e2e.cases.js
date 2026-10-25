@@ -589,6 +589,36 @@ const curatedCaseSpecs = [
   { code: '[background-padding=0.5;background=yellow]|B313/B291', file: 'opt-word-background-padding-0.5-background-yellow-B313_B291.svg' },
   { code: '[transform=rotate(10 9 12)]|B313;[background=yellow]>B81/B291', file: 'opt-word-transform-rotate-10-9-12-part-background-yellow-B313+B81_B291.svg' },
   { code: '[element-background--style=fill-opacity:0.5;background=yellow]B313', file: 'opt-char-element-background--style-fill-opacity-0.5-background-yellow-B313.svg' },
+  // native filters (GH #34), how the markup draws: what the CSS-form
+  // comparison in BlissSVGBuilder.native-filters.e2e.test.js cannot judge
+  // (each colour function but opacity, a length in mm, chains, a line given
+  // no invisible shape, nested and layered mixes), and corners it judges,
+  // drawn exactly (opacity, colours with alpha, thin elements, an ink copy
+  // past a crop). Named as the element backgrounds above, % written pct.
+  { code: '[color=chocolate;filter=brightness(0.5)]B313', file: 'opt-char-color-chocolate-filter-brightness-0.5-B313.svg' },
+  { code: '[color=chocolate;filter=contrast(2)]B313', file: 'opt-char-color-chocolate-filter-contrast-2-B313.svg' },
+  { code: '[color=chocolate;filter=grayscale(0.5)]B313', file: 'opt-char-color-chocolate-filter-grayscale-0.5-B313.svg' },
+  { code: '[color=chocolate;filter=sepia(0.5)]B313', file: 'opt-char-color-chocolate-filter-sepia-0.5-B313.svg' },
+  { code: '[color=chocolate;filter=saturate(3)]B313', file: 'opt-char-color-chocolate-filter-saturate-3-B313.svg' },
+  { code: '[color=chocolate;filter=hue-rotate(90deg)]B313', file: 'opt-char-color-chocolate-filter-hue-rotate-90deg-B313.svg' },
+  { code: '[color=chocolate;filter=invert(0.25)]B313', file: 'opt-char-color-chocolate-filter-invert-0.25-B313.svg' },
+  { code: '[color=chocolate;filter=opacity(0.5)]B313', file: 'opt-char-color-chocolate-filter-opacity-0.5-B313.svg' },
+  { code: '[filter=drop-shadow(0.5mm 0.5mm 0 blue)]B313', file: 'opt-char-filter-drop-shadow-0.5mm-0.5mm-0-blue-B313.svg' },
+  { code: '[filter=drop-shadow(1px 1px 0 blue) blur(1px)]B313', file: 'opt-char-filter-drop-shadow-1px-1px-0-blue-blur-1px-B313.svg' },
+  { code: '[color=chocolate;filter=grayscale(1) drop-shadow(1px 1px 0 blue)]B313', file: 'opt-char-color-chocolate-filter-grayscale-1-drop-shadow-1px-1px-0-blue-B313.svg' },
+  { code: '[filter=drop-shadow(2px 2px 0 rgb(0 0 0 / 30%))]B313', file: 'opt-char-filter-drop-shadow-2px-2px-0-rgb-0-0-0-30pct-B313.svg' },
+  { code: '[filter=drop-shadow(2px 2px 0 rgba(0,0,0,30%))]B313', file: 'opt-char-filter-drop-shadow-2px-2px-0-rgba-0-0-0-30pct-B313.svg' },
+  { code: '[style=filter:drop-shadow(2px 2px 0 hsl(0 100% 50% / 0.3))]B313', file: 'opt-char-style-filter-drop-shadow-2px-2px-0-hsl-0-100pct-50pct-0.3-B313.svg' },
+  { code: '[filter=drop-shadow(1px 1px 0 red)]HL8', file: 'opt-char-filter-drop-shadow-1px-1px-0-red-HL8.svg' },
+  { code: '[filter=blur(1px)]HL8', file: 'opt-char-filter-blur-1px-HL8.svg' },
+  { code: 'B313/[filter=drop-shadow(1px 1px 0 red)]VL8/B313', file: 'opt-char-filter-drop-shadow-1px-1px-0-red-B313_VL8_B313.svg' },
+  { code: 'B313/[filter=drop-shadow(1px 1px 0 red)]DOT/B313', file: 'opt-char-filter-drop-shadow-1px-1px-0-red-B313_DOT_B313.svg' },
+  { code: '[filter=drop-shadow(1px 1px 0 red)]|[stroke-width=2]VL8', file: 'opt-word-filter-drop-shadow-1px-1px-0-red-char-stroke-width-2-VL8.svg' },
+  { code: '[filter=drop-shadow(1px 1px 0 red)]||HL8', file: 'opt-filter-drop-shadow-1px-1px-0-red-HL8.svg' },
+  { code: '[grid;grid-line--sky--filter=drop-shadow(1px 1px 0 red)]||B313', file: 'opt-grid-grid-line--sky--filter-drop-shadow-1px-1px-0-red-B313.svg' },
+  { code: '[filter=blur(1px)]|[filter=blur(2px)]B313;[filter=grayscale(1)]>B81', file: 'opt-word-filter-blur-1px-char-filter-blur-2px-part-filter-grayscale-1-B313+B81.svg' },
+  { code: '[filter=blur(2px);grid;grid--filter=grayscale(1)]||[filter=blur(1px)]B313', file: 'opt-filter-blur-2px-grid-grid--filter-grayscale-1-char-filter-blur-1px-B313.svg' },
+  { code: '[crop-left=6]||[filter=drop-shadow(1px 1px 0 blue);background-area=ink;background=yellow]B313/B291', file: 'opt-crop-left-6-char-filter-drop-shadow-1px-1px-0-blue-background-area-ink-background-yellow-B313_B291.svg' },
 ];
 
 // filename DERIVED from code + curatedDefs so it is byte-identical to the

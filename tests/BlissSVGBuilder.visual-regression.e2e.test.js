@@ -18,9 +18,13 @@
  * - R13-R16 curated-corpus rendering: head markers (^), word-level ;; overlay,
  *   atypical/baseless indicators, dot-sizing options, strip-semantic, kerning
  *   decimals, custom glyph/indicator defs, and malformed-input fail-render;
- *   later additions to the same list: indicator-group centering, and element
+ *   later additions to the same list: indicator-group centering, element
  *   backgrounds (a word's, a character's and a part's box, ink areas, a
- *   padding, an effect reaching a background, a key styling one).
+ *   padding, an effect reaching a background, a key styling one), and
+ *   native filters (each colour function, a length in mm, chains, colours
+ *   with alpha, thin elements, nested and layered filters, an ink copy past
+ *   a crop; how a blur or a shadow compares with its CSS form, see
+ *   `BlissSVGBuilder.native-filters.e2e.test.js`).
  *   Filenames are DERIVED from the code via `tests/utils/case-filename.js`
  *   (an option case keeps a curated `opt-…` name); defs are registered in
  *   `beforeAll`. See the `curatedTests`/`curatedDefs` exports.

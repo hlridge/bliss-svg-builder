@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" data-generator="bliss-svg-builder" width="57" height="129" viewBox="-0.75 -0.75 9.5 21.5" class="bliss-root">
+  <g class="bliss-content" fill="none" stroke="#000000" stroke-linejoin="round" stroke-linecap="round" stroke-width="0.5">
+    <g style="filter:url(#bliss-filter-22736e0e-1)"><filter id="bliss-filter-22736e0e-1" filterUnits="userSpaceOnUse" x="-2.75" y="-2.75" width="13.5" height="25.5" color-interpolation-filters="sRGB"><feDropShadow dx="2" dy="2" stdDeviation="0" flood-color="hsla(0,100%,50%,0.3)"/></filter><path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/></g>
+  </g>
+</svg>
