@@ -228,9 +228,9 @@ describe('BlissSVGBuilder alias indicator carry', () => {
       // bare-alias inlining would otherwise collapse the alias away, and the
       // nested expansion would never see it. The stored verbatim reference
       // resolves at parse time through the alias. Parity pin only: the
-      // #parseCodeStringToParts effective-metadata call is a recorded
-      // near-equivalent (sub-part flags have no observable consumer today;
-      // see mutation-testing.md, Phase 2.3 addendum)
+      // object route's effective-metadata call was a recorded near-equivalent
+      // (sub-part flags have no observable consumer; mutation-testing.md,
+      // Phase 2.3 addendum) before both routes shared one part reader
       BlissSVGBuilder.define({ [trackCode('OBJWRAP1')]: { codeString: 'B291;OBJLATER1' } });
       defineActionAlias('OBJLATER1');
       BlissSVGBuilder.define({ [trackCode('OBJWRAP2')]: { codeString: 'B291;B81' } });

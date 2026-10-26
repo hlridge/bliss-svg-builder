@@ -274,8 +274,8 @@ describe('BlissSVGBuilder round-trip identity', () => {
       // R15 Task 2 follow-up: a custom glyph whose codeString begins with ';'
       // (an empty base). Used as a nested ;-part, default toJSON strips the
       // sub-parts to {codeName}, so reconstruction re-expands the codeString
-      // through the second split site (#parseCodeStringToParts), which must
-      // also drop the empty leading segment. Otherwise the round-trip injects a
+      // through the part reader, which must drop the empty leading segment
+      // there too. Otherwise the round-trip injects a
       // failed empty part: spurious UNKNOWN_CODE + divergent render.
       customCodes.push('MY_BASELESS');
       // R15 D-S1a: an all-indicator glyph is a compound indicator (isIndicator).

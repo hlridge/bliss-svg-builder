@@ -13,7 +13,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Decorated beside an outlined letter: spaced as the letter is, not as a
  *   Bliss character.
  * - The API routes (addGlyph, insertGlyph, addPart, replaceGlyph,
- *   replacePart, addGroup), each drawing as the letter passed the same way.
+ *   replacePart, addGroup), each drawing as the letter passed the same way,
+ *   and merge() taking in a builder that holds the letter or the glyph.
  * - Every save (default and preserve, string and JSON) reloading each of
  *   these to the same drawing; the `XTXT_` spelling, which drew all along.
  *
@@ -126,6 +127,17 @@ describe('BlissSVGBuilder text-letter glyphs', () => {
       expect(builder.svgCode).toBe(twin.svgCode);
       expect(builder.warnings).toEqual([]);
       expect(reloadsOf(builder)).toEqual(EVERY_SAVE);
+    });
+  });
+
+  describe('when merge() takes in a builder holding a letter drawn as text', () => {
+    it.each(['Xλ', 'B291;Xλ', 'TL_LAMBDA', 'B291;TL_LAMBDA'])('draws %s merged after B313 as the string spelling does', (input) => {
+      const target = new BlissSVGBuilder('B313');
+      target.merge(new BlissSVGBuilder(input));
+      // pins merge's reading of the part codes it takes in: without it the
+      // letter drew nothing (UNKNOWN_CODE), a mutant no other row killed
+      expect(target.svgCode).toBe(svgOf(`B313//${input}`));
+      expect(target.warnings).toEqual([]);
     });
   });
 });

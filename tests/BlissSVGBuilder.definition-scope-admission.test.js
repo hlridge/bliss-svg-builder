@@ -31,8 +31,8 @@
  *   definition error, see `BlissParser.global-option-scope.test.js`, and a
  *   position, kerning or `key` too, see
  *   `BlissSVGBuilder.definition-use-site-options.test.js`.
- * - The other ways the two readers of a code string differ (a bare `>` or a
- *   second bracket in a slot), tracked in the backlog.
+ * - A code string's other slot rules (a bare `>` or a second bracket in a
+ *   slot) on a reload, see `BlissSVGBuilder.code-string-slot-rules.test.js`.
  * - That no route skips the scope, see
  *   `BlissSVGBuilder.option-admission-drift.test.js`.
  */

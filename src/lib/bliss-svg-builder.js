@@ -940,8 +940,10 @@ class BlissSVGBuilder {
     // For object input (from toJSON), re-expand any parts that were stripped.
     // A definition's code string is read as the DSL reads it, so a key misplaced
     // in one of its brackets is reported down the same channel, for the same
-    // reason: it is dropped, and the rebuilt tree keeps no trace of it.
+    // reason: it is dropped, and the rebuilt tree keeps no trace of it. The
+    // part codes the caller wrote are read first (#normalizeAuthoredPartCodes).
     if (typeof input !== 'string') {
+      BlissSVGBuilder.#normalizeAuthoredPartCodes(blissObj.groups);
       BlissParser.expandParts(blissObj, (warning) => (blissObj._parseWarnings ??= []).push(warning));
     }
 
@@ -2635,6 +2637,7 @@ class BlissSVGBuilder {
     // whose code was unknown when `other` was built and has been defined
     // since. A key misplaced in that definition's code string is reported like
     // any other this merge causes.
+    BlissSVGBuilder.#normalizeAuthoredPartCodes(otherGroups);
     BlissParser.expandParts({ groups: otherGroups }, warn);
     BlissSVGBuilder.#normalizeGlyphCodes(otherGroups);
     // Parity with the constructor's object-ingest: a partless glyph node
@@ -2978,8 +2981,9 @@ class BlissSVGBuilder {
    * Reverse toJSON() normalization for object input:
    *  - Glyph level: codeName → glyphCode rename, after a custom glyph that
    *    deep output names by another code gets its own name back.
-   *  - Glyphs and parts: surface text-fallback form 'X<chars>' → internal
-   *    routing key 'XTXT_<chars>' so BlissElement / parser routing works.
+   *  - Glyphs: surface text-fallback form 'X<chars>' → internal routing key
+   *    'XTXT_<chars>' so BlissElement / parser routing works (parts are read
+   *    before the expansion, see #normalizeAuthoredPartCodes).
    * @param {Object[]} groups - Array of raw group objects
    */
   static #normalizeGlyphCodes(groups) {
@@ -2999,8 +3003,23 @@ class BlissSVGBuilder {
         // directly and they round-trip external-glyph navigation/spacing, so
         // restore them from the resolved code the same way the parser does.
         BlissSVGBuilder.#reapplyGlyphMetadata(glyph);
-        if (glyph.parts) BlissSVGBuilder.#normalizePartCodes(glyph.parts);
         BlissSVGBuilder.#buildNamedDefinition(glyph, readings);
+      }
+    }
+  }
+
+  // The part codes a composition object was given, surface text-fallback form
+  // 'X<chars>' → internal routing key 'XTXT_<chars>'. Read before the
+  // expansion, which reads a definition's code string into parts as the DSL
+  // does, already in the internal form: read again, a run of outlined letters
+  // the code string holds (a word, which fails as a part) became a text glyph
+  // that draws.
+  static #normalizeAuthoredPartCodes(groups) {
+    if (!groups) return;
+    for (const group of groups) {
+      if (!group.glyphs) continue;
+      for (const glyph of group.glyphs) {
+        if (glyph.parts) BlissSVGBuilder.#normalizePartCodes(glyph.parts);
       }
     }
   }

@@ -2133,135 +2133,7 @@ export class BlissParser {
 
         resolveKerning(glyphObj, markerKerning, bracketKerning, parseWarnings);
 
-        const parseParts = (partsString, depth = 0) => {
-          if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
-          const parts = [];
-
-          // Split on ; (top-level input is placeholder-tokenized here;
-          // definition-sourced strings carry RAW brackets). An empty segment
-          // is inert (a leading ';' yields an indicator-only glyph, a
-          // trailing ';' is normalized away) but still counts as a SEPARATOR:
-          // the peel gate uses the raw index, so a bracket after ANY ';' sits
-          // in a part slot even when the base is empty (';[opts]B86' — review
-          // fix, 2026-07-17). #flagCompositePart keeps the filtered index
-          // (position among real parts). Word-level ';;' is resolved upstream
-          // and never reaches here.
-          const segments = partsString.split(';');
-          let partIndex = 0;
-          for (const [rawIndex, rawPartString] of segments.entries()) {
-            if (rawPartString === '') continue;
-            let twoPartPartString = rawPartString;
-            // Slot 0 is the character's own option position (its bracket was
-            // already stripped at the glyph level); a `>`-less bracket in a
-            // LATER slot is a misplaced character option: peel one warning
-            // per bracket, drop it, and parse the remaining code normally.
-            if (rawIndex > 0) {
-              // The same empty-option-region tolerance expandSegment applies to
-              // slot 0. Without it a bare `>` in a LATER slot failed the whole
-              // character, taking the other parts down with it. Slot 0 is not
-              // stripped again here: it already was, so `>>B291` still fails.
-              // An empty region over an empty slot (`S8;>`) is still an empty
-              // slot, and an empty slot is inert, exactly like `S8;`.
-              twoPartPartString = twoPartPartString.replace(/^>/, '');
-              if (twoPartPartString === '') continue;
-              let peeled;
-              while ((peeled = twoPartPartString.match(PART_SLOT_CHAR_OPTION_PATTERN)) !== null) {
-                parseWarnings.push({
-                  code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
-                  message: `Character option (${restorePlaceholders(peeled[1])}) ignored on "${restorePlaceholders(peeled[3])}": a ; part slot takes part options. Use ${restorePlaceholders(peeled[1])}>${restorePlaceholders(peeled[3])} to style the part.`,
-                  source: restorePlaceholders(rawPartString),
-                });
-                twoPartPartString = peeled[3];
-              }
-            }
-            // One PART bracket per slot, same rule and same handling as the
-            // character scope above and the two option-region scopes: the first
-            // applies, every later one warns and drops. Every slot, slot 0
-            // included, since a part bracket is legal there too
-            // (`[color=red]>B291`). Without this a doubled part bracket was
-            // reported as an unknown code and destroyed the whole character.
-            let partBracketsSeen = 0;
-            let head = '';
-            let partMatch;
-            while ((partMatch = twoPartPartString.match(/^(\[[^\[\]]*\])>(.*)$/)) !== null) {
-              partBracketsSeen++;
-              if (partBracketsSeen === 1) {
-                head = `${partMatch[1]}>`;
-              } else {
-                const dropped = restorePlaceholders(partMatch[1]);
-                parseWarnings.push({
-                  code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
-                  message: `Multiple option brackets on one part: "${dropped}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b]>.`,
-                  source: dropped,
-                });
-              }
-              twoPartPartString = partMatch[2];
-            }
-            twoPartPartString = head + twoPartPartString;
-            const part = this.parsePartString(twoPartPartString, restorePlaceholders, warn, { level: 'part', notation: 'bracket' });
-            if (part.options && !nonEmpty(part.options)) delete part.options;
-            // The options of the bare alias this character was expanded from,
-            // on each of its parts: under a part bracket the alias's code
-            // string writes there, and over what the part's own code brings
-            // (merged in below), as a link of the chain further in.
-            if (depth === 0 && partOptions) part.options = { ...partOptions, ...part.options };
-
-            // A `;`-part slot sits inside a glyph, so the glyph-boundary
-            // anchored expansion pass above never sees it: without this, a
-            // fallback letter written as a part failed as an unknown code
-            // although the same glyph is reachable as `XTXT_λ`, and a run that
-            // collapses to one glyph was refused as a word although it is one
-            // character. Ask the shared grammar for the one-glyph answer only;
-            // a real word still fails here, which is what keeps a run from
-            // splitting one glyph across many.
-            // The written-token pass reads a routing key as the letters it names
-            // (see readTextFallbackKey); this slot has to read it the same way or
-            // the two disagree about what one code means. A multi-letter one is
-            // then a word here and fails below exactly as `B291;Xhello` does,
-            // instead of rendering silently and reloading as that failure.
-            if (part.codeName !== undefined) part.codeName = slotCodeOf(part.codeName);
-
-            const { definition, position } = part.codeName?.startsWith('XTXT_')
-              ? { definition: textFallbackDefinitionOf(part.codeName) }
-              : BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
-            // The code the definition draws, behind the bracket that leads its
-            // code string, which is the definition's own options and so this
-            // part's.
-            const { codeString, options: ownOptions } = BlissParser.#readPartDefinition(part.codeName, definition, warn);
-
-            if (codeString) {
-              if (codeString.includes('/')) {
-                // Word codeString at part level — cannot be expanded here.
-                // Keep original codeName; post-parse decomposition resolves it.
-              } else if (codeString.includes(';') || codeString.includes(':')
-                  || PART_OPTION_CODESTRING.test(codeString)
-                  || blissElementDefinitions[codeString]?.codeString ) {
-                part.parts = parseParts(codeString, depth + 1);
-                // Keep part.codeName to preserve identifier alongside expansion
-              } else {
-                BlissParser.#renameToDrawnCode(part, codeString, definition);
-              }
-            }
-
-            // Detect unexpanded multi-char X-codes (word text used as ; part)
-            if (WORD_AS_PART_PATTERN.test(part.codeName)) {
-              part.error = `Multi-character text "${part.codeName.slice(1)}" is a word and cannot be composed with ;`;
-              part.errorCode = 'WORD_AS_PART';
-            }
-
-            BlissParser.#applyDefinitionMetadata(part, definition, ownOptions);
-            BlissParser.#applyEffectiveMetadata(part, definition);
-            BlissParser.#flagCompositePart(part, partIndex);
-            partIndex++;
-
-            extractPositionFromOptions(part, parseWarnings);
-            BlissParser.#placeByLinks(part, position, warn);
-            parts.push(part);
-          }
-          return parts;
-        };
-
-        glyphObj.parts = parseParts(glyphCodeString);
+        glyphObj.parts = BlissParser.#parseParts(glyphCodeString, { warn, restore: restorePlaceholders, partOptions });
 
         // Land a character-level rename recording on the parsed sole part,
         // where the Phase 2.3b preserve-restore already operates; a space
@@ -2395,7 +2267,8 @@ export class BlissParser {
    * - the part draws several parts (#isComposition).
    * Must run AFTER #applyDefinitionMetadata stamps part.isIndicator. The element
    * layer then fails the whole character to render with a COMPOSITE_AS_PART
-   * warning. Shared by parseParts (DSL input) and expandParts (object input).
+   * warning. Run by #parseParts on every part it reads, and by expandParts
+   * on a composition object's own parts.
    */
   static #flagCompositePart(part, index) {
     if (index > 0 && BlissParser.#isComposition(part)) {
@@ -2622,8 +2495,8 @@ export class BlissParser {
 
   /**
    * Copy definition metadata (its own options, indicator, anchor offsets)
-   * onto a part object. Shared by parseParts, #expandPartRecursive, and
-   * #parseCodeStringToParts to keep the logic in one place. `options` are the
+   * onto a part object. Shared by #parseParts and #expandPartRecursive to
+   * keep the logic in one place. `options` are the
    * definition's own, as #readDefinition reads them where its code string is
    * read.
    */
@@ -2699,7 +2572,7 @@ export class BlissParser {
       if (codeString.includes(';') || codeString.includes(':')
           || PART_OPTION_CODESTRING.test(codeString)
           || blissElementDefinitions[codeString]?.codeString) {
-        part.parts = BlissParser.#parseCodeStringToParts(codeString, warn);
+        part.parts = BlissParser.#parseParts(codeString, { warn });
       } else {
         BlissParser.#renameToDrawnCode(part, codeString, definition);
       }
@@ -2711,45 +2584,143 @@ export class BlissParser {
   }
 
   /**
-   * Parse a codeString like "HL8;HL8:0,8;VL8;VL8:8,0" into an array
-   * of part objects, recursively expanding nested definitions.
+   * Read a code string's `;` part slots into parts: the one part reader. The
+   * DSL reads a character's code string through it, and a composition object
+   * the code string of each definition it names, so both read a code string
+   * alike. A definition named in a slot has its code string read here again,
+   * a level deeper. `warn` takes what a slot reports; `restore` puts back
+   * the brackets the DSL tokenized (a definition's code string carries its
+   * brackets as written); `partOptions` are the options of the bare alias
+   * the DSL expanded the character from, which each of its parts takes.
    */
-  static #parseCodeStringToParts(codeString, warn, depth = 0) {
+  static #parseParts(partsString, { warn, restore = (text) => text, partOptions }, depth = 0) {
     if (depth > MAX_RECURSION_DEPTH) throw new Error('Maximum recursion depth exceeded');
-    // Drop empty segments, mirroring parseParts: a definition codeString with a
-    // leading ';' (an empty base) must expand to an indicator-only glyph here too,
-    // so a custom baseless glyph round-trips identically when re-expanded from a
-    // toJSON-stripped nested part instead of injecting a failed empty part.
-    const segments = codeString.split(';').filter(s => s !== '');
     const parts = [];
 
-    for (const segment of segments) {
-      // Every bracket here sits on a part, at any depth, as in parseParts.
-      const part = BlissParser.parsePartString(segment, undefined, warn, { level: 'part', notation: 'bracket' });
-      // A bracket the stage emptied stores no `{}`, as in parseParts.
-      if (part.options && Object.keys(part.options).length === 0) delete part.options;
-
-      const { definition, position } = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
-      const { codeString: innerCodeString, options } = BlissParser.#readPartDefinition(part.codeName, definition, warn);
-
-      if (innerCodeString) {
-        if (innerCodeString.includes('/')) {
-          // Word codeString — skip expansion at part level
-        } else if (innerCodeString.includes(';') || innerCodeString.includes(':')
-            || PART_OPTION_CODESTRING.test(innerCodeString)
-            || blissElementDefinitions[innerCodeString]?.codeString) {
-          part.parts = BlissParser.#parseCodeStringToParts(innerCodeString, warn, depth + 1);
+    // Split on ; (top-level input is placeholder-tokenized here;
+    // definition-sourced strings carry RAW brackets). An empty segment
+    // is inert (a leading ';' yields an indicator-only glyph, a
+    // trailing ';' is normalized away) but still counts as a SEPARATOR:
+    // the peel gate uses the raw index, so a bracket after ANY ';' sits
+    // in a part slot even when the base is empty (';[opts]B86'; review
+    // fix, 2026-07-17). #flagCompositePart keeps the filtered index
+    // (position among real parts). Word-level ';;' is resolved upstream
+    // and never reaches here.
+    const segments = partsString.split(';');
+    let partIndex = 0;
+    for (const [rawIndex, rawPartString] of segments.entries()) {
+      if (rawPartString === '') continue;
+      let twoPartPartString = rawPartString;
+      // Slot 0 is the character's own option position (its bracket was
+      // already read, at the glyph level or as a definition's own); a
+      // `>`-less bracket in a LATER slot is a misplaced character option:
+      // peel one warning per bracket, drop it, and parse the remaining code
+      // normally.
+      if (rawIndex > 0) {
+        // The same empty-option-region tolerance expandSegment applies to
+        // slot 0. Without it a bare `>` in a LATER slot failed the whole
+        // character, taking the other parts down with it. Slot 0 is not
+        // stripped again here: it already was, so `>>B291` still fails.
+        // An empty region over an empty slot (`S8;>`) is still an empty
+        // slot, and an empty slot is inert, exactly like `S8;`.
+        twoPartPartString = twoPartPartString.replace(/^>/, '');
+        if (twoPartPartString === '') continue;
+        let peeled;
+        while ((peeled = twoPartPartString.match(PART_SLOT_CHAR_OPTION_PATTERN)) !== null) {
+          warn({
+            code: WARNING_CODES.MISPLACED_CHARACTER_OPTION,
+            message: `Character option (${restore(peeled[1])}) ignored on "${restore(peeled[3])}": a ; part slot takes part options. Use ${restore(peeled[1])}>${restore(peeled[3])} to style the part.`,
+            source: restore(rawPartString),
+          });
+          twoPartPartString = peeled[3];
+        }
+      }
+      // One PART bracket per slot, same rule and same handling as the
+      // character scope above and the two option-region scopes: the first
+      // applies, every later one warns and drops. Every slot, slot 0
+      // included, since a part bracket is legal there too
+      // (`[color=red]>B291`). Without this a doubled part bracket was
+      // reported as an unknown code and destroyed the whole character.
+      let partBracketsSeen = 0;
+      let head = '';
+      let partMatch;
+      while ((partMatch = twoPartPartString.match(/^(\[[^\[\]]*\])>(.*)$/)) !== null) {
+        partBracketsSeen++;
+        if (partBracketsSeen === 1) {
+          head = `${partMatch[1]}>`;
         } else {
-          BlissParser.#renameToDrawnCode(part, innerCodeString, definition);
+          const dropped = restore(partMatch[1]);
+          warn({
+            code: WARNING_CODES.MULTIPLE_OPTION_BRACKETS,
+            message: `Multiple option brackets on one part: "${dropped}" is ignored. Only the first is applied; combine options in one bracket, e.g. [a;b]>.`,
+            source: dropped,
+          });
+        }
+        twoPartPartString = partMatch[2];
+      }
+      twoPartPartString = head + twoPartPartString;
+      const part = BlissParser.parsePartString(twoPartPartString, restore, warn, { level: 'part', notation: 'bracket' });
+      if (part.options && Object.keys(part.options).length === 0) delete part.options;
+      // The options of the bare alias this character was expanded from,
+      // on each of its parts: under a part bracket the alias's code
+      // string writes there, and over what the part's own code brings
+      // (merged in below), as a link of the chain further in.
+      if (depth === 0 && partOptions) part.options = { ...partOptions, ...part.options };
+
+      // A `;`-part slot sits inside a glyph, so the glyph-boundary
+      // anchored expansion pass (processXCodes) never sees it: without this, a
+      // fallback letter written as a part failed as an unknown code
+      // although the same glyph is reachable as `XTXT_λ`, and a run that
+      // collapses to one glyph was refused as a word although it is one
+      // character. Ask the shared grammar for the one-glyph answer only;
+      // a real word still fails here, which is what keeps a run from
+      // splitting one glyph across many.
+      // The written-token pass reads a routing key as the letters it names
+      // (see readTextFallbackKey); this slot has to read it the same way or
+      // the two disagree about what one code means. A multi-letter one is
+      // then a word here and fails below exactly as `B291;Xhello` does,
+      // instead of rendering silently and reloading as that failure.
+      if (part.codeName !== undefined) part.codeName = slotCodeOf(part.codeName);
+
+      const { definition, position } = part.codeName?.startsWith('XTXT_')
+        ? { definition: textFallbackDefinitionOf(part.codeName) }
+        : BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
+      // The code the definition draws, behind the bracket that leads its
+      // code string, which is the definition's own options and so this
+      // part's.
+      const { codeString, options: ownOptions } = BlissParser.#readPartDefinition(part.codeName, definition, warn);
+
+      if (codeString) {
+        if (codeString.includes('/')) {
+          // Word codeString at part level: cannot be expanded here.
+          // Keep original codeName; post-parse decomposition resolves it.
+        } else if (codeString.includes(';') || codeString.includes(':')
+            || PART_OPTION_CODESTRING.test(codeString)
+            || blissElementDefinitions[codeString]?.codeString ) {
+          part.parts = BlissParser.#parseParts(codeString, { warn, restore }, depth + 1);
+          // Keep part.codeName to preserve identifier alongside expansion
+        } else {
+          BlissParser.#renameToDrawnCode(part, codeString, definition);
         }
       }
 
-      BlissParser.#applyDefinitionMetadata(part, definition, options);
+      // Detect unexpanded multi-char X-codes (word text used as ; part)
+      if (WORD_AS_PART_PATTERN.test(part.codeName)) {
+        part.error = `Multi-character text "${part.codeName.slice(1)}" is a word and cannot be composed with ;`;
+        part.errorCode = 'WORD_AS_PART';
+      }
+
+      BlissParser.#applyDefinitionMetadata(part, definition, ownOptions);
       BlissParser.#applyEffectiveMetadata(part, definition);
+      BlissParser.#flagCompositePart(part, partIndex);
+      partIndex++;
+
+      const reports = [];
+      extractPositionFromOptions(part, reports);
+      for (const report of reports) warn(report);
       BlissParser.#placeByLinks(part, position, warn);
       parts.push(part);
     }
-
     return parts;
   }
 
