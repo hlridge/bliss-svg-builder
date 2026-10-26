@@ -1687,6 +1687,17 @@ class BlissSVGBuilder {
   // #normalizeFailedWordInvariant, so its glyphs are skipped. Runs FIRST among
   // the rebuild normalizers so a doomed glyph raises exactly one drop warning,
   // not also a space-part or indicator warning.
+  //
+  // The token counts at any depth: a definition the character names reads its
+  // code string into nested parts (a typed glyph written alone is one part
+  // named after it), and a malformed token there fails the character exactly
+  // as one written in its place does.
+  static #malformedPartsOf(parts) {
+    return parts.flatMap((part) => (part.error && !part.codeName && !(part.parts?.length > 0)
+      ? [part]
+      : Array.isArray(part.parts) ? BlissSVGBuilder.#malformedPartsOf(part.parts) : []));
+  }
+
   #normalizeMalformedPartInvariant() {
     for (const group of this.#rawBlissObj.groups ?? []) {
       if (group.errorCode) continue;
@@ -1698,7 +1709,7 @@ class BlissSVGBuilder {
         if (glyph.isIndicator === true) continue;
         const parts = glyph.parts;
         if (!Array.isArray(parts)) continue;
-        const errorParts = parts.filter(p => p.error && !p.codeName && !(p.parts?.length > 0));
+        const errorParts = BlissSVGBuilder.#malformedPartsOf(parts);
         if (errorParts.length === 0) continue;
         for (const p of errorParts) {
           // Mirror BlissElement's leaf-fail warning so the visibility survives

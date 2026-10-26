@@ -10,7 +10,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * Covers:
  * - A character bracket in a later part, one or two, and behind an empty
  *   option region: dropped and reported (MISPLACED_CHARACTER_OPTION).
- * - An empty option region leading a later part (`B291;>B313`), read past.
+ * - An empty option region leading a later part (`B291;>B313`), read past;
+ *   a doubled one (`B291;>>B313`) reported as the string reports it.
  * - A second part bracket on a part, in the first slot or a later one
  *   (MULTIPLE_OPTION_BRACKETS).
  * - An empty first part, which leaves a bracket after it in a later slot.
@@ -57,6 +58,7 @@ const DEFINITIONS = {
   RS_TEXT_LETTER: { type: 'glyph', codeString: 'B291;Xλ' },
   RS_KEY: { type: 'glyph', codeString: 'B291;XTXT_λ' },
   RS_PLACED: { type: 'glyph', codeString: 'B291;[x=2]>B313' },
+  RS_DOUBLED_REGION: { type: 'glyph', codeString: 'B291;>>B313' },
 };
 
 beforeAll(() => {
@@ -175,6 +177,15 @@ describe('BlissSVGBuilder code string slot rules', () => {
       expect(fromObject.svgCode).toBe(written.svgCode);
       expect(reportsOf(fromObject)).toEqual([['MISPLACED_CHARACTER_OPTION', '[color=red]B313']]);
       expect(reportsOf(fromObject)).toEqual(reportsOf(written));
+    });
+
+    it('reads a later part led by a doubled empty option region as the string naming it does', () => {
+      // regression: the object route read the slot raw and reported `>>B313`
+      const fromObject = new BlissSVGBuilder({ groups: [{ glyphs: [{ parts: [{ codeName: 'B313' }, { codeName: 'RS_DOUBLED_REGION' }] }] }] });
+      const written = new BlissSVGBuilder('B313;RS_DOUBLED_REGION');
+      expect(reportsOf(fromObject)).toEqual([['UNKNOWN_CODE', '>B313']]);
+      expect(reportsOf(fromObject)).toEqual(reportsOf(written));
+      expect(fromObject.svgCode).toBe(written.svgCode);
     });
 
     it('reads a definition made after the merged builder was built as the string naming it does', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
@@ -24,6 +24,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   dropped trailing word reserves no phantom extent).
  * - Round-trip stability: the dropped forms serialize to a string that
  *   re-parses to the same (drop-free) state with no new warning.
+ * - A malformed part inside a definition the character names (a typed glyph
+ *   or shape, alone, as a part, in a word) drops the whole character exactly
+ *   as its code string written in place does; an unknown code there is kept.
  * - Retention control: an unknown code (`ZZ9`) is unchanged (kept + warned) at
  *   both the part and word level.
  *
@@ -41,7 +44,15 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * @contract: malformed-retention-drop
  */
 
+const MALFORMED_DEFINITIONS = {
+  MR_DOUBLED: { type: 'glyph', codeString: 'B291;>>B313' },
+  MR_BANG: { type: 'glyph', codeString: 'B291;!B81' },
+  MR_SHAPE: { type: 'shape', codeString: 'HL8;!VL8' },
+  MR_UNKNOWN: { type: 'glyph', codeString: 'B291;ZZ9' },
+};
+
 const codesOf = (b) => b.warnings.map((w) => w.code);
+const reportsOf = (b) => b.warnings.map(({ code, source }) => [code, source]);
 const allParts = (b) => b.toJSON().groups.flatMap((g) => g.glyphs ?? []).flatMap((gl) => gl.parts ?? []);
 const vbWidth = (b) => Number(b.svgCode.match(/viewBox="\S+ \S+ (\S+) \S+"/)[1]);
 
@@ -98,6 +109,44 @@ describe('BlissSVGBuilder malformed retention', () => {
       expect(str).not.toContain('B208');
       expect(str).not.toContain('!');
       expect(codesOf(b)).toEqual(['UNKNOWN_CODE']);
+    });
+  });
+
+  describe('when a definition the character names holds a malformed part', () => {
+    // note: a typed definition written alone is stored as one part named after
+    // it, so the malformed part sits a level below the character's own parts
+    beforeAll(() => {
+      const { errors } = BlissSVGBuilder.define(MALFORMED_DEFINITIONS);
+      expect(errors).toEqual([]);
+    });
+    afterAll(() => Object.keys(MALFORMED_DEFINITIONS).forEach((code) => BlissSVGBuilder.removeDefinition(code)));
+
+    it.each([
+      ['MR_DOUBLED', 'B291;>>B313'],
+      ['MR_BANG', 'B291;!B81'],
+      ['MR_SHAPE', 'HL8;!VL8'],
+      ['B313;MR_DOUBLED', 'B313;B291;>>B313'],
+      ['B313;MR_SHAPE', 'B313;HL8;!VL8'],
+      ['B313/MR_DOUBLED', 'B313/B291;>>B313'],
+      ['MR_BANG/B313', 'B291;!B81/B313'],
+      ['B313//MR_DOUBLED', 'B313//B291;>>B313'],
+    ])('drops %s whole, as %s written in place is dropped', (input, twin) => {
+      const named = new BlissSVGBuilder(input);
+      const written = new BlissSVGBuilder(twin);
+      expect(codesOf(named)).toEqual(['UNKNOWN_CODE']);
+      expect(reportsOf(named)).toEqual(reportsOf(written));
+      expect(named.svgCode).toBe(written.svgCode);
+      expect(named.toString()).toBe(written.toString());
+      expect(named.toString({ preserve: true })).toBe(written.toString({ preserve: true }));
+      expect(named.toJSON()).toEqual(written.toJSON());
+      expect(named.toJSON({ preserve: true })).toEqual(written.toJSON({ preserve: true }));
+    });
+
+    it('keeps a character whose definition holds an unknown code, as content', () => {
+      const b = new BlissSVGBuilder('B313/MR_UNKNOWN');
+      expect(codesOf(b)).toEqual(['UNKNOWN_CODE']);
+      expect(b.toString()).toBe('B313/B291;ZZ9');
+      expect(b.toString({ preserve: true })).toBe('B313/MR_UNKNOWN');
     });
   });
 

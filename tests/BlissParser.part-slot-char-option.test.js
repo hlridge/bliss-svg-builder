@@ -36,7 +36,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   carries no options at every scope, so the code stays plain content
  *   (`||CODE`, `|CODE`, `>CODE`), including in a later part slot
  *   (`S8;>C8` renders both parts) and over an empty slot (`S8;>` is inert);
- *   a doubled separator (`>>CODE`) is still refused. More than one bracket
+ *   a doubled separator (`>>CODE`) is still refused, in the first slot or a
+ *   later one. More than one bracket
  *   at ONE scope warns `MULTIPLE_OPTION_BRACKETS`, applies the first and
  *   renders, at every scope and for every code class including word aliases.
  *   The legal different-scope adjacency (`[char][part]>CODE`,
@@ -330,6 +331,14 @@ describe('BlissParser part-slot character options', () => {
       expect(codes('>>B291')).toContain('UNKNOWN_CODE');
     });
 
+    it('refuses a doubled bare separator in a later part slot too, failing the whole character', () => {
+      // note: the later slot reads past one empty option region, as the first
+      // does; the second `>` stays on the code, which then reads as no code
+      const b = build('B291;>>B313');
+      expect(b.warnings.map(w => [w.code, w.source])).toEqual([['UNKNOWN_CODE', '>B313']]);
+      expect(b.toString()).toBe('');
+    });
+
     it('gives a letter run behind a bare separator the same treatment as the other scopes', () => {
       // A letter run is expanded before the option regions are read, and the
       // pass only recognized a BRACKETED prefix, so a bare `>` blocked it: the
@@ -612,7 +621,9 @@ describe('BlissParser part-slot character options', () => {
     it('fails _DUP_QUOTED visibly rather than applying a bracket silently', () => {
       const b = build('S8;_DUP_QUOTED');
       expect(b.warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
-      expect(b.toString()).toBe('S8');
+      // regression: saved "S8", which reloaded as an S8 the character never
+      // drew; the part fails the whole character, so nothing is saved
+      expect(b.toString()).toBe('');
     });
 
     it('reports the doubled part bracket of _DUP_NESTED and draws it as the definition without that bracket', () => {
