@@ -18,9 +18,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   word and stays dormant behind another character, as a bare alias of the
  *   same code string does.
  * - A marker before the code string's first indicator: warned once, as the
- *   same code string written in place.
+ *   same code string written in place; as a part, dormant like any marker.
  * - As a part, nested in another glyph, and a bare alias of a marked code in
  *   a part slot: drawn as the code it names, with no warning.
+ * - A part bracket after the code string's first part, kept where the marker
+ *   is left out.
  * - Layout and anchor data read through the marker under a decoration: a
  *   letter's spacing, a digit's kerning, a full stop's word space, an anchor.
  * - A `^` inside an option value, which is not a head marker.
@@ -59,6 +61,7 @@ const FIXTURES = {
   HM_STOP: { type: 'glyph', codeString: 'B4^' },
   HM_ANCHORED: { type: 'glyph', codeString: 'B119^' },
   HM_CARET_VALUE: { type: 'glyph', codeString: '[title=a^;color=red]B291' },
+  HM_PART_BRACKET: { type: 'glyph', codeString: 'B291;[color=red]>B313^' },
 };
 
 beforeAll(() => {
@@ -176,6 +179,9 @@ describe('BlissSVGBuilder definition head marker', () => {
       ['B313;HM_RED', 'B313;UN_RED'],
       ['HM_NESTED', 'B313;B291'],
       ['B313;ALIAS_HM', 'B313;B291'],
+      // note: the misplaced marker is dormant here, as a well-placed one is;
+      // it is reported where a word is read (above)
+      ['B313;HM_EARLY', 'B313;B291;B313'],
     ])('draws %s as %s, with no warning', (input, twin) => {
       expect(svgOf(input)).toBe(svgOf(twin));
       expect(warningCodesOf(input)).toEqual([]);
@@ -188,6 +194,17 @@ describe('BlissSVGBuilder definition head marker', () => {
       ['B313;ALIAS_HM', 'B313;B291'],
     ])('saves %s as %s, with no marker on the part', (input, saved) => {
       expect(new BlissSVGBuilder(input).toString()).toBe(saved);
+    });
+  });
+
+  describe('when the code string holds a part bracket after its first part', () => {
+    it.each([
+      ['HM_PART_BRACKET', 'B291;[color=red]>B313^'],
+      ['B313;HM_PART_BRACKET', 'B313;B291;[color=red]>B313'],
+    ])('keeps the bracket where the marker is left out: draws %s as %s', (input, twin) => {
+      expect(svgOf(input)).toBe(svgOf(twin));
+      expect(warningCodesOf(input)).toEqual([]);
+      expect(reloadsOf(input)).toEqual(EVERY_SAVE);
     });
   });
 
