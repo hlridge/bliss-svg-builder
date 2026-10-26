@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, processXCodes, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
+import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, layoutDefinitionOf, processXCodes, slotCodeOf, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
 import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
@@ -3141,20 +3141,23 @@ class BlissSVGBuilder {
   // char / kerningRules / shrinksPrecedingWordSpace) from a glyph's resolved
   // glyphCode. toJSON() omits these (they are pure derived data, not authored
   // composition), so object input must restore them like the parser does on
-  // string input: a registered code copies them from its definition; a
-  // text-fallback 'XTXT_<chars>' derives them (a single char is that rendered
-  // glyph, multi-char is '' since it is text, not one glyph). A composite (no
+  // string input: a registered code takes its identity from its definition
+  // and its layout data as the parser reads them (layoutDefinitionOf), so a
+  // name drawing one character is spaced as that character; a text-fallback
+  // 'XTXT_<chars>' derives them (a single char is that rendered glyph,
+  // multi-char is '' since it is text, not one glyph). A composite (no
   // glyphCode) carries no glyph-level identity.
   static #reapplyGlyphMetadata(glyph) {
     const code = glyph.glyphCode;
     if (!code) return;
-    const def = blissElementDefinitions[code];
+    const def = Object.hasOwn(blissElementDefinitions, code) ? blissElementDefinitions[code] : undefined;
     if (def) {
       if (def.isBlissGlyph) glyph.isBlissGlyph = true;
-      if (def.isExternalGlyph) glyph.isExternalGlyph = true;
-      if (typeof def.char === 'string') glyph.char = def.char;
-      if (def.kerningRules) glyph.kerningRules = def.kerningRules;
-      if (def.shrinksPrecedingWordSpace === true) glyph.shrinksPrecedingWordSpace = true;
+      const layout = layoutDefinitionOf(code, blissElementDefinitions);
+      if (layout.isExternalGlyph) glyph.isExternalGlyph = true;
+      if (typeof layout.char === 'string') glyph.char = layout.char;
+      if (layout.kerningRules) glyph.kerningRules = layout.kerningRules;
+      if (layout.shrinksPrecedingWordSpace === true) glyph.shrinksPrecedingWordSpace = true;
     } else if (code.startsWith('XTXT_')) {
       const chars = code.slice(5);
       glyph.isExternalGlyph = true;
@@ -5183,16 +5186,20 @@ class BlissSVGBuilder {
     return peelCharacterBrackets(codeString).body;
   }
 
-  // Check if a codeString references only allowed types
+  // Check if a codeString references only allowed types. Each code is judged
+  // as a part slot reads it (slotCodeOf): a letter without an outline, in any
+  // spelling, draws as a text-fallback glyph and is an external glyph, as an
+  // outlined letter is, though no definition is registered under it.
   static #validateReferences(code, codeString, allowedTypes) {
     const refs = BlissSVGBuilder.#extractReferencedCodes(codeString);
     for (const ref of refs) {
       if (ref === code) {
         return `"${code}": circular reference (references itself)`;
       }
-      const def = blissElementDefinitions[ref];
-      if (!def) continue; // Unknown codes will fail at parse time
-      const type = BlissSVGBuilder.#detectType(def);
+      const read = slotCodeOf(ref);
+      const def = blissElementDefinitions[read];
+      const type = read.startsWith('XTXT_') ? 'externalGlyph' : def && BlissSVGBuilder.#detectType(def);
+      if (!type) continue; // Unknown codes will fail at parse time
       if (!allowedTypes.includes(type)) {
         return `"${code}": cannot reference ${type} "${ref}". Allowed types: ${allowedTypes.join(', ')}`;
       }
@@ -5515,8 +5522,9 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word ("${definition.codeString}" is shorthand for "${glyphRunWord}"). Define a word as a bare alias (omit type:"glyph").`);
     }
 
-    // Glyphs can reference other glyphs and shapes, but not external glyphs or bare aliases
-    const refError = BlissSVGBuilder.#validateReferences(code, definition.codeString, ['glyph', 'shape']);
+    // Glyphs can reference other glyphs, shapes and letters (external glyphs),
+    // but not bare aliases
+    const refError = BlissSVGBuilder.#validateReferences(code, definition.codeString, ['glyph', 'shape', 'externalGlyph']);
     if (refError) throw new Error(`define(${refError})`);
     if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
       throw new Error(`define("${code}"): circular reference detected`);
@@ -6079,7 +6087,7 @@ class BlissSVGBuilder {
       if (patchRunWord) {
         throw new Error(`patchDefinition("${code}"): a ${type} definition cannot be a multi-character word ("${newCodeString}" is shorthand for "${patchRunWord}"). Define a word as a bare alias (omit type:"${type}").`);
       }
-      const allowedRefTypes = type === 'glyph' ? ['glyph', 'shape']
+      const allowedRefTypes = type === 'glyph' ? ['glyph', 'shape', 'externalGlyph']
         : type === 'shape' ? ['shape']
         : ['glyph', 'shape', 'bare', 'externalGlyph'];
       const refError = BlissSVGBuilder.#validateReferences(code, newCodeString, allowedRefTypes);

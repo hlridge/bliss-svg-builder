@@ -20,8 +20,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The other way round: object input whose character does not pull in the
  *   word space while the code the save writes for it does (a character with
  *   no code of its own drawing a full stop, a glyph named by a definition
- *   drawing one, also as read from a `preserve` JSON), saved with the ordinary
- *   space written out, and a written QSP there saved as `//`.
+ *   drawing one), saved with the ordinary space written out, and a written
+ *   QSP there saved as `//`.
+ * - A glyph named by a definition drawing a full stop, read back from a
+ *   `preserve` JSON, pulling in the word space as its code does: the space
+ *   inserted before it saves as `//`.
  * - Groups written side by side after a space, read as the one word a reload
  *   reads them as.
  * - Controls saving `//` as before: a definition drawing a full stop, one
@@ -154,12 +157,17 @@ describe('BlissSVGBuilder written word space', () => {
       expect(new BlissSVGBuilder(builder.toString({ preserve: true })).svgCode).toBe(builder.svgCode);
     });
 
-    it('saves a glyph named WW_STOP read from a preserve JSON, given a word before it, as B291/TSP/B4', () => {
-      // note: read from JSON, the glyph keeps no word-space flag (backlog,
-      // post-1.1.0), so the space inserted before it is the ordinary one
+  });
+
+  describe('when a glyph named by a definition drawing a full stop is read back from a preserve JSON', () => {
+    it('saves a glyph named WW_STOP read from a preserve JSON, given a word before it, as B291//B4', () => {
+      // note: read back from a preserve JSON, the glyph takes the word-space
+      // flag from its code, B4, as the DSL read does, so the space inserted
+      // before it is the quarter one
       const builder = new BlissSVGBuilder(new BlissSVGBuilder('WW_STOP').toJSON({ preserve: true })).insertGroup(0, 'B291');
-      expect(drawsAs(builder, 'B291/TSP/B4')).toBe(true);
-      expect(builder.toString()).toBe('B291/TSP/B4');
+      expect(drawsAs(builder, 'B291//B4')).toBe(true);
+      expect(builder.toString()).toBe('B291//B4');
+      expect(builder.toString({ preserve: true })).toBe('B291//WW_STOP');
       expect(reloadsAsDrawn(builder)).toEqual({ string: true, json: true });
     });
   });

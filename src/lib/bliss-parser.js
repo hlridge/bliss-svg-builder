@@ -160,9 +160,11 @@ const readTextFallbackKey = (code) => {
 // a slot, so a letter with no outline is made its text-fallback glyph here,
 // as that pass makes one written alone, and a routing key is read as the
 // letters it names when they all have outlines (readTextFallbackKey). Asked
-// of the code written in a slot and of the code an alias there names, so the
-// alias draws what the code written in its place draws.
-const slotCodeOf = (code) => {
+// of the code written in a slot, of the code an alias there names and of the
+// one code a definition draws, so each draws what the code written in its
+// place draws. Exported so define() judges a code a definition holds as it
+// is read.
+export const slotCodeOf = (code) => {
   const keyAsLetters = readTextFallbackKey(code);
   if (keyAsLetters !== null) return keyAsLetters;
   return classifyXCode(code) === 'glyph' ? `${X_TEXT_FALLBACK_PREFIX}${code.slice(1)}` : code;
@@ -468,10 +470,23 @@ export function classifyXCode(code) {
   return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
 
+// A head marker in a code string: a `^` ending a character, at the end or
+// before a `;` part. An option bracket is matched whole and kept, by the
+// grammar every bracket reader shares, so a caret inside a value
+// (`[title=a^;color=red]`, quoted or not) is never taken for one.
+const HEAD_MARKER_PATTERN = new RegExp(String.raw`(\[` + OPTION_BRACKET_CONTENT + String.raw`\])|\^(?=;|$)`, 'g');
+
+// A definition's code string without its head marker. The marker designates
+// the definition as its word's head, which the expansion reads where a word
+// is read (through #readDefinition), and draws nothing: where the code string
+// is read as a part, or for the parts it draws, it is left out.
+const withoutHeadMarker = (codeString) => codeString.replace(HEAD_MARKER_PATTERN, (match, bracket) => bracket ?? '');
+
 // A code string as a part slot reads it: behind its option brackets (a leading
-// character bracket is a definition's own options, see ownBracketOf).
+// character bracket is a definition's own options, see ownBracketOf) and
+// without its head marker.
 function slotBodyOf(codeString) {
-  let rest = peelCharacterBrackets(codeString).body;
+  let rest = withoutHeadMarker(peelCharacterBrackets(codeString).body);
   let bracket;
   while ((bracket = rest.match(LEADING_PART_BRACKET_PATTERN)) !== null) rest = rest.slice(bracket[0].length);
   return rest;
@@ -529,12 +544,13 @@ export function pullsInWordSpace(glyph) {
 // is removed. A built-in carries its own; a code without an outline draws as
 // its text-fallback glyph; a defined name that stands for one character takes
 // what it does not set itself from the character its code string is made of,
-// as its expansion does. A name whose code string fuses two base parts is
-// drawn inside one part, where the layout cannot see them, so it lends only
-// what it sets itself. Only as far as a decorated use can read the name: a
-// code string it fails on (a letter without an outline) lends that failed
-// character nothing.
-function layoutDefinitionOf(code, definitions, depth = 0) {
+// as its expansion does, reading that character's code as a part slot reads
+// it (slotCodeOf), so a letter without an outline lends what its text-fallback
+// glyph carries. A name whose code string fuses two base parts is drawn inside
+// one part, where the layout cannot see them, so it lends only what it sets
+// itself. Exported so a glyph read from a composition object takes the data
+// its string spelling takes.
+export function layoutDefinitionOf(code, definitions, depth = 0) {
   if (code.startsWith('XTXT_')) return createTextFallbackGlyph(code.slice(5));
   const definition = Object.hasOwn(definitions, code) ? definitions[code] : undefined;
   if (typeof definition?.codeString !== 'string' || builtInCodes.has(code) || depth >= MAX_RECURSION_DEPTH) {
@@ -542,7 +558,7 @@ function layoutDefinitionOf(code, definitions, depth = 0) {
   }
   if (definition.codeString.includes('/')) return definition;
   if (basePartCountOf(definition.codeString, definitions) > 1) return definition;
-  const inner = layoutDefinitionOf(firstBaseCode(definition.codeString), definitions, depth + 1);
+  const inner = layoutDefinitionOf(slotCodeOf(firstBaseCode(definition.codeString)), definitions, depth + 1);
   if (!inner) return definition;
   return {
     isExternalGlyph: definition.isExternalGlyph ?? inner.isExternalGlyph,
@@ -736,6 +752,14 @@ export class BlissParser {
     }
     const options = { ...defaultOptions, ...BlissParser.#parseOptions(own.bracket, warn, { level: 'part', notation: 'bracket' }) };
     return { codeString: own.body, options: Object.keys(options).length > 0 ? options : undefined };
+  }
+
+  // A definition read where its code string is a part's: as #readDefinition
+  // reads it, without the head marker, which designates the head of a word
+  // and draws nothing in a part (see withoutHeadMarker).
+  static #readPartDefinition(code, definition, warn) {
+    const { codeString, options } = BlissParser.#readDefinition(code, definition, warn);
+    return { codeString: typeof codeString === 'string' ? withoutHeadMarker(codeString) : codeString, options };
   }
 
   // Both callers read a bracket that sits on a part, and both pass that scope
@@ -2203,7 +2227,7 @@ export class BlissParser {
             // The code the definition draws, behind the bracket that leads its
             // code string, which is the definition's own options and so this
             // part's.
-            const { codeString, options: ownOptions } = BlissParser.#readDefinition(part.codeName, definition, warn);
+            const { codeString, options: ownOptions } = BlissParser.#readPartDefinition(part.codeName, definition, warn);
 
             if (codeString) {
               if (codeString.includes('/')) {
@@ -2432,9 +2456,11 @@ export class BlissParser {
 
   /**
    * Rename a part to the one code its definition draws, when that code has no
-   * code string to hold as a part of its own (a primitive, or a shape drawn by
-   * its own function). The written name is recorded so a `preserve` save can
-   * restore it (Phase 2.3b); default output keeps the code drawn.
+   * code string to hold as a part of its own (a primitive, a letter, or a
+   * shape drawn by its own function), read as a part slot reads a code
+   * (slotCodeOf), so a letter without an outline draws as its text-fallback
+   * glyph. The written name is recorded so a `preserve` save can restore it
+   * (Phase 2.3b); default output keeps the code drawn.
    *
    * A typed glyph or shape holds what it draws, so the drawn code's own
    * options are this part's too, and win over the definition's own where both
@@ -2443,13 +2469,14 @@ export class BlissParser {
    * code's options under the alias's own.
    */
   static #renameToDrawnCode(part, code, definition) {
+    const drawnCode = slotCodeOf(code);
     // A name recorded further out (a bare alias read through to this
     // definition) is the one written, and stays.
     part._aliasCodeName ??= part.codeName;
-    part.codeName = code;
+    part.codeName = drawnCode;
     if (BlissParser.#isBareAlias(definition)) return;
-    const drawn = blissElementDefinitions[code];
-    const drawnOptions = drawn && BlissParser.#readDefinition(code, drawn).options;
+    const drawn = blissElementDefinitions[drawnCode];
+    const drawnOptions = drawn && BlissParser.#readDefinition(drawnCode, drawn).options;
     if (drawnOptions) part.options = { ...drawnOptions, ...part.options };
   }
 
@@ -2664,7 +2691,7 @@ export class BlissParser {
     const { definition, position } = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName], warn);
 
     // Read as parseParts reads it: behind the definition's own bracket.
-    const { codeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
+    const { codeString, options } = BlissParser.#readPartDefinition(part.codeName, definition, warn);
     if (codeString) {
       // Skip word-level codeStrings (contain /) — handled by word-as-part decomposition
       if (codeString.includes('/')) return;
@@ -2703,7 +2730,7 @@ export class BlissParser {
       if (part.options && Object.keys(part.options).length === 0) delete part.options;
 
       const { definition, position } = BlissParser.#readThroughRenames(part, blissElementDefinitions[part.codeName] || {}, warn);
-      const { codeString: innerCodeString, options } = BlissParser.#readDefinition(part.codeName, definition, warn);
+      const { codeString: innerCodeString, options } = BlissParser.#readPartDefinition(part.codeName, definition, warn);
 
       if (innerCodeString) {
         if (innerCodeString.includes('/')) {

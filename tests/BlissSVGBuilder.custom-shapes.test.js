@@ -15,6 +15,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Preserve option for toString on a composite shape.
  * - define() validation: a `type: 'shape'` codeString may only reference other shapes
  *   (built-in primitives or custom shapes); not B-code glyphs, custom glyphs, or external glyphs.
+ * - A letter in any spelling refused by define() and patchDefinition() alike, as `Xa`
+ *   is: one drawn as text, its `XTXT_` key, under a bracket, a coordinate or a head
+ *   marker, as a part; a run of outlined letters refused as a word.
  * - define() circular reference detection on shapes (self, chain A->B->A).
  *
  * Does NOT cover:
@@ -171,6 +174,43 @@ describe('BlissSVGBuilder custom shapes', () => {
         [code]: { type: 'shape', codeString: 'MYSHAPE:0,0;MYSHAPE:4,4' }
       });
       expect(result.defined).toContain(code);
+    });
+  });
+
+  describe('when a shape holds other spellings of letters', () => {
+    // note: an `X` code with no outline is a letter drawn as text; it was
+    // accepted because the reference check skipped codes it did not know
+    const LETTER_SPELLINGS = [
+      ['Xλ', 'Xλ'],
+      ['Xaλ', 'Xaλ'],
+      ['XTXT_λ', 'XTXT_λ'],
+      ['XTXT_aλ', 'XTXT_aλ'],
+      ['[color=red]Xλ', 'Xλ'],
+      ['HL8;Xλ:2,0', 'Xλ'],
+      ['HL8;XTXT_λ:2,0', 'XTXT_λ'],
+      ['Xλ^', 'Xλ'],
+    ];
+
+    it.each(LETTER_SPELLINGS)('define() refuses %s as it refuses Xa, naming %s', (codeString, letter) => {
+      const result = BlissSVGBuilder.define({ [track('LETTER_SHAPE')]: { type: 'shape', codeString } });
+      expect(result.defined).toEqual([]);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain(`cannot reference externalGlyph "${letter}"`);
+    });
+
+    it.each(LETTER_SPELLINGS)('patchDefinition() refuses %s as it refuses Xa, naming %s', (codeString, letter) => {
+      defineAndTrack({ PATCHED_SHAPE: { type: 'shape', codeString: 'HL8' } });
+      const before = new BlissSVGBuilder('PATCHED_SHAPE').svgCode;
+      expect(() => BlissSVGBuilder.patchDefinition('PATCHED_SHAPE', { codeString }))
+        .toThrow(`cannot reference externalGlyph "${letter}"`);
+      expect(new BlissSVGBuilder('PATCHED_SHAPE').svgCode).toBe(before);
+    });
+
+    it.each(['Xab', 'XTXT_ab'])('refuses %s, a run of outlined letters, as a word', (codeString) => {
+      const result = BlissSVGBuilder.define({ [track('LETTER_SHAPE')]: { type: 'shape', codeString } });
+      expect(result.defined).toEqual([]);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('a shape definition cannot be a multi-character word');
     });
   });
 

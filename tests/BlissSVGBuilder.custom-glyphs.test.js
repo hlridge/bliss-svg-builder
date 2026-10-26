@@ -12,7 +12,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Portable toString: B-code-backed, shape-based, positioned, and nested glyphs.
  * - Preserve option for toString and toJSON (opt-in retention of custom name).
  * - define() validation: a `type: 'glyph'` codeString may reference B-code glyphs,
- *   shapes (built-in or custom), or other custom glyphs; not external glyphs or typeless aliases.
+ *   shapes (built-in or custom), other custom glyphs, or external glyphs (letters, see
+ *   `BlissSVGBuilder.letter-glyphs.test.js`); not typeless aliases.
  * - define() circular reference detection (self, chain A->B->A, indirect A->B->C->A).
  * - Round-trip via portable toString reproduces the SVG without the original definition.
  *
@@ -280,12 +281,14 @@ describe('BlissSVGBuilder custom glyphs', () => {
   });
 
   describe('when define() validates glyph references', () => {
-    it('rejects a glyph referencing an external glyph', () => {
+    it('accepts a glyph referencing an external glyph, a letter', () => {
+      const code = track('LETTERGLYPH');
       const result = BlissSVGBuilder.define({
-        'BADGLYPH': { type: 'glyph', codeString: 'Xa:0,8' }
+        [code]: { type: 'glyph', codeString: 'Xa:0,8' }
       });
-      expect(result.errors.length).toBeGreaterThan(0);
-      expect(result.defined).not.toContain('BADGLYPH');
+      expect(result.errors).toEqual([]);
+      expect(result.defined).toContain(code);
+      expect(new BlissSVGBuilder(code).svgCode).toBe(new BlissSVGBuilder('Xa:0,8').svgCode);
     });
 
     it('accepts a glyph referencing a B-code glyph', () => {
