@@ -266,11 +266,12 @@ The next two codes, `MISPLACED_KERNING_OPTION` and `MISPLACED_LAYER_OPTION`, fol
 
 ### `MISPLACED_KERNING_OPTION`
 
-The mirror image of the one above: a kerning option (`relative-kerning`, `absolute-kerning`, in either the kebab or camel spelling) written at part, word, or global scope. Kerning is the gap **before a character**, so those scopes have nothing for it to do; the key is dropped and the content renders unchanged.
+The mirror image of the one above: a kerning option (`relative-kerning`, `absolute-kerning`, in either the kebab or camel spelling) written at part, word, or global scope. Kerning is the gap **before a character**, so those scopes have nothing for it to do; the key is dropped and the content renders unchanged. An `RK:`/`AK:` marker with no character after it, at the end of the input, is reported here too, quoting the marker: it has no gap to set, so it is dropped. (A marker before a space is the space's, reported by [`MISPLACED_SPACE_DECORATION`](#misplaced-space-decoration).)
 
 ```
 [relative-kerning=3]>B291   →  renders B291, kerning dropped
 [absolute-kerning=4]||B291  →  renders B291, kerning dropped
+B291/AK:4                   →  renders B291, the marker dropped: no character follows it
 B99/[relative-kerning=3]B291 →  valid: character scope is where kerning lives
 ```
 
