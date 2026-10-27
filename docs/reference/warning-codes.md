@@ -333,15 +333,19 @@ Nothing is dropped. The value is emitted where you asked for it, so `toString()`
 
 ### `MISPLACED_SPACE_DECORATION`
 
-A coordinate (`:x,y`) or a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`) on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
+A coordinate (`:x,y`), a scope-valid option (`[opts]`, `[opts]>`, or `[opts]|`) or a kerning value on a space (`TSP` or `QSP`). A space is a pure word-separator with no ink to position or style, so the decoration is dropped and the space keeps its identity and width.
 
 ```
 QSP:1,2                →  renders a plain quarter-space, coordinate dropped
 [x=1]>QSP              →  the same: a part's position is its coordinate, however it is written
 [color=red]|TSP        →  renders a plain space, option dropped
+B313/AK:10//B291       →  renders B313//B291, the marker dropped
+B313/[relative-kerning=3]QSP →  renders B313/QSP, kerning dropped
 ```
 
-A global-only option key on a space (`[grid]|QSP`) is reported by `MISPLACED_GLOBAL_OPTION` instead: its scope, not the space, is the mismatch. The space still keeps its identity either way. For a positionable or styleable blank, use `ZSA` instead: it is inkless content, so it keeps its coordinate and options.
+Kerning is the gap before a character, and a space is not one, so an `RK:`/`AK:` marker whose next element is a space is reported here, as is a kerning option written on one. Each is quoted as written, once: the marker (`AK:10`), or the whole bracket it sits in (`[relative-kerning=3;color=red]`).
+
+A global-only option key on a space (`[grid]|QSP`) is reported by `MISPLACED_GLOBAL_OPTION` instead: its scope, not the space, is the mismatch. Kerning written at word or part scope (`[relative-kerning=3]|TSP`) is reported by `MISPLACED_KERNING_OPTION` for the same reason. The space still keeps its identity either way. For a positionable or styleable blank, use `ZSA` instead: it is inkless content, so it keeps its coordinate and options, and takes kerning like a character.
 
 ### `MISPLACED_INDICATOR_PART`
 

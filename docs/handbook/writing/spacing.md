@@ -121,6 +121,8 @@ Combine different kerning approaches in one composition:
 
 Kerning codes affect the space **before** the next character, not after the previous one.
 
+So the next element has to be a character. A space takes no kerning: a marker before one (`B313/AK:10//B291`) or a kerning option written on one (`B313/[relative-kerning=3]QSP`) is dropped with a [`MISPLACED_SPACE_DECORATION`](/reference/warning-codes#misplaced-space-decoration) warning, and the picture is drawn as if it had never been written. The gap between words is set by `word-space`.
+
 A character takes **one** kerning value, however you write it. Set it more than once and the last value written wins, with an option beating an `RK:`/`AK:` marker; each value that loses is reported with a [`MULTIPLE_KERNING_VALUES`](/reference/warning-codes) warning rather than disappearing. So `B99/AK:4/RK:3/B291` kerns by `RK:3` and says that `AK:4` was ignored.
 
 Note: When automatic kerning is added in a future version, existing `RK` adjustments will adapt naturally since they are relative to whatever the base spacing is. `AK` values will remain unchanged since they set absolute distances.
