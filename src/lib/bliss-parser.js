@@ -1982,6 +1982,14 @@ export class BlissParser {
       // marker displaces an earlier one rather than both riding along to a
       // silent tie-break at layout time.
       let pendingKerning;
+      // Kerning is the gap before a character, so a marker whose next element
+      // is a space has nothing to set. It is reported as the space's
+      // decoration, the code every other decoration on a space reports.
+      const dropKerningBeforeSpace = (marker) => parseWarnings.push({
+        code: WARNING_CODES.MISPLACED_SPACE_DECORATION,
+        message: `Kerning is the gap before a character, and a space is not one, so "${marker.source}" was dropped.`,
+        source: marker.source,
+      });
 
       for (let { part, shrinksPrecedingWordSpace, isIndicator, isExternalGlyph, char, kerningRules, glyphCode, isBlissGlyph, isHeadGlyph, partOptions, _aliasCodeName, _aliasPosition, _wordBreak, _wordIndicators, _wordError } of expandedGlyphParts) {
         // Lift a word-level fail-render flag onto its enclosing group (mirrors
@@ -2019,6 +2027,10 @@ export class BlissParser {
           if (group.glyphs.length > 0) {
             extractPositionFromOptions(group, parseWarnings, 1);
             parsedGroups.push(group);
+          }
+          if (pendingKerning) {
+            dropKerningBeforeSpace(pendingKerning);
+            pendingKerning = undefined;
           }
           parsedGroups.push({ glyphs: [{ parts: [{ codeName: 'SP', _fromSP: true }] }], _isSpaceGroup: true, _spaceIndex: parsedGroups.length });
           group = { glyphs: [] };
@@ -2081,13 +2093,8 @@ export class BlissParser {
           continue;
         }
 
-        // A bracket option on this character can still displace it;
-        // resolveKerning settles that once the bracket is parsed.
         const markerKerning = pendingKerning;
-        if (markerKerning) {
-          (glyphObj.options ??= {})[markerKerning.key] = markerKerning.value;
-          pendingKerning = undefined;
-        }
+        pendingKerning = undefined;
 
         let glyphCodeString = part;
         // The [^\[\]] class keeps the char-option match to ONE bracket token.
@@ -2104,9 +2111,9 @@ export class BlissParser {
         // legal neighbour, which is what tells `[a][b]` from `[a][b]>`.
         let charBracketsSeen = 0;
         let charMatch;
-        // Kerning written in the character bracket, captured here rather than
-        // read back off the merged options, which hold the marker's value too:
-        // only what the bracket itself carries outranks a marker.
+        // Kerning written in the character bracket, in the order and spelling
+        // it was written: only what the bracket itself carries outranks a
+        // marker.
         let bracketKerning = [];
         while ((charMatch = glyphCodeString.match(/^(\[[^\[\]]*\])(?!>)(.*)/)) !== null) {
           charBracketsSeen++;
@@ -2114,12 +2121,10 @@ export class BlissParser {
             const parsedOptions = nonEmpty(
               this.#parseOptions(restorePlaceholders(charMatch[1]), warn, { level: 'character', notation: 'bracket' }));
             bracketKerning = kerningOptionEntries(parsedOptions);
-            // Merge only when something remains: a bracket fully emptied by the
+            // Kept only when something remains: a bracket fully emptied by the
             // gate (or written empty) must not leave an options: {} artifact on
             // the glyph -- the gated form's toJSON matches the bare form's.
-            if (glyphObj.options || parsedOptions) {
-              glyphObj.options = { ...glyphObj.options, ...parsedOptions };
-            }
+            if (parsedOptions) glyphObj.options = { ...parsedOptions };
           } else {
             const dropped = restorePlaceholders(charMatch[1]);
             parseWarnings.push({
@@ -2131,9 +2136,27 @@ export class BlissParser {
           glyphCodeString = charMatch[2];
         }
 
-        resolveKerning(glyphObj, markerKerning, bracketKerning, parseWarnings);
-
-        glyphObj.parts = BlissParser.#parseParts(glyphCodeString, { warn, restore: restorePlaceholders, partOptions });
+        // Whether this character is a space is known only once its parts are
+        // read, and its kerning is settled before the parts report anything,
+        // so the reports keep the order they were written in: the parts are
+        // read here and their warnings held back until the kerning is done.
+        const partWarnings = [];
+        glyphObj.parts = BlissParser.#parseParts(glyphCodeString, {
+          warn: (warning) => partWarnings.push(warning), restore: restorePlaceholders, partOptions });
+        const isSpace = glyphObj.parts.length === 1 && isSpaceGlyph(glyphObj.parts[0].codeName);
+        if (isSpace) {
+          // A space takes no kerning. The marker is reported on its own, and
+          // kerning in the bracket is left as written: the space rule drops
+          // the bracket whole and quotes it once, as it does any option on a
+          // space, without judging its values.
+          if (markerKerning) dropKerningBeforeSpace(markerKerning);
+        } else {
+          // A bracket option on this character can still displace the marker;
+          // resolveKerning settles that.
+          if (markerKerning) (glyphObj.options ??= {})[markerKerning.key] = markerKerning.value;
+          resolveKerning(glyphObj, markerKerning, bracketKerning, parseWarnings);
+        }
+        partWarnings.forEach(warn);
 
         // Land a character-level rename recording on the parsed sole part,
         // where the Phase 2.3b preserve-restore already operates; a space
@@ -2144,8 +2167,7 @@ export class BlissParser {
         // written name only for a clean instance of the definition. A letter
         // drawn as text has a glyph code too, but it names the one part
         // itself, so that part carries the recording.
-        if (_aliasCodeName
-            && !(glyphObj.parts.length === 1 && isSpaceGlyph(glyphObj.parts[0].codeName))) {
+        if (_aliasCodeName && !isSpace) {
           if (glyphObj.parts.length === 1
               && (!glyphObj.glyphCode || builtInCodes.has(glyphObj.glyphCode)
                 || glyphObj.glyphCode.startsWith(X_TEXT_FALLBACK_PREFIX))) {
@@ -2160,6 +2182,9 @@ export class BlissParser {
       }
 
       extractPositionFromOptions(group, parseWarnings, 1);
+      // A marker still waiting when its word ends stands before a space, when
+      // anything follows at all: word groups and space groups alternate.
+      if (pendingKerning && gi < groupedCodes.length - 1) dropKerningBeforeSpace(pendingKerning);
       parsedGroups.push(group);
     }
 

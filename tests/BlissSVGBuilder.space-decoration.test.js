@@ -7,8 +7,8 @@ import { BlissSVGBuilder } from '../src/index';
  * (`[opts]` at any scope) on a space is dropped with a MISPLACED_SPACE_DECORATION
  * warning; the space keeps its identity (a QSP stays a quarter-space, a TSP the
  * default `//`) so render / toString / toJSON no longer diverge. ZSA is content
- * and keeps its coordinate and options untouched. Kerning on a space glyph is
- * preserved (the RK/AK-around-spaces question is separate and backlogged).
+ * and keeps its coordinate and options untouched. Kerning on a space is
+ * dropped the same way.
  *
  * Covers:
  * - Standalone QSP/TSP with a coordinate: dropped + warned, identity kept, and
@@ -27,13 +27,18 @@ import { BlissSVGBuilder } from '../src/index';
  * - Coordinate and option together: two warnings, both dropped.
  * - Multiple decorated spaces, and an inline decorated space (the rule applies
  *   to every space, not only a standalone one).
- * - Object-input and mutation (`addGroup`) parity with the DSL surface.
+ * - Object-input and mutation (`addGroup`) parity with the DSL surface; a
+ *   `key` in a space's options names it and is spared.
  * - Controls: plain QSP / `//` unchanged and unwarned; ZSA keeps its
- *   coordinate/option (content); kerning survives the coordinate strip.
+ *   coordinate/option (content).
+ * - A kerning marker and a coordinate on one space: both dropped, one report
+ *   each.
  *
  * Does NOT cover:
  * - ZSA classification/counting, see `BlissSVGBuilder.space-classifier.test.js`.
- * - The word-space / RK-AK-after-space sizing question (backlog).
+ * - Kerning on a space by every route, see
+ *   `BlissSVGBuilder.space-kerning.test.js`.
+ * - A way to size one space, which kerning does not give (backlog).
  * - A space-LED multi-part glyph (`{parts:[TSP, B291]}`), never a space node;
  *   see `BlissSVGBuilder.space-invariant.test.js`.
  */
@@ -220,6 +225,18 @@ describe('BlissSVGBuilder space decoration', () => {
         .toEqual([{ code: SPACE_DECORATION, source: ':0' }]);
     });
 
+    it('keeps a key given in a space glyph\'s options as its identity, unreported', () => {
+      // pins the one option the strip spares: `key` names the element, it
+      // does not decorate it
+      const b = new BlissSVGBuilder({ groups: [
+        { glyphs: [{ parts: [{ codeName: 'B291' }] }] },
+        { glyphs: [{ parts: [{ codeName: 'TSP' }], options: { key: 'gap' } }] },
+        { glyphs: [{ parts: [{ codeName: 'C8' }] }] },
+      ] });
+      expect(b.toString()).toBe('B291//C8');
+      expect(b.warnings).toEqual([]);
+    });
+
     it('drops a coordinate supplied through addGroup', () => {
       // pins the mutation path warns and drops the coordinate too; asserted via
       // render parity to avoid coupling to raw-API adjacency serialization (a
@@ -267,17 +284,18 @@ describe('BlissSVGBuilder space decoration', () => {
   });
 
   describe('when a space glyph carries kerning', () => {
-    it('spares the kerning while dropping the coordinate', () => {
-      // pins that the strip spares GLYPH_INTERNAL_KEYS (relative/absolute
-      // kerning) and drops only the coordinate. Asserted on toJSON: whether a
-      // space-glyph's kerning survives toString is the separate RK/AK-around-
-      // spaces question (backlog), untouched here.
+    it('drops the kerning along with the coordinate, one report each', () => {
+      // Kerning is the gap before a character, so a space takes none. This row
+      // spared the kerning while that question was open; the kerning routes
+      // are pinned in BlissSVGBuilder.space-kerning.test.js.
       const b = new BlissSVGBuilder('RK:0.5/QSP:1,2');
       const glyph = b.toJSON().groups[0].glyphs[0];
-      expect(glyph.options?.relativeKerning).toBe(0.5);
+      expect(glyph.options?.relativeKerning).toBeUndefined();
       expect(glyph.parts[0].x).toBeUndefined();
-      expect(b.warnings.map(w => ({ code: w.code, source: w.source })))
-        .toEqual([{ code: SPACE_DECORATION, source: ':1,2' }]);
+      expect(b.warnings.map(w => ({ code: w.code, source: w.source }))).toEqual([
+        { code: SPACE_DECORATION, source: 'RK:0.5' },
+        { code: SPACE_DECORATION, source: ':1,2' },
+      ]);
     });
   });
 });

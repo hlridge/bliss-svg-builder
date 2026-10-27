@@ -29,8 +29,9 @@
  *   `BlissSVGBuilder.space-crop.test.js`.
  * - Content-empty groups in the extent without a trailing space, see
  *   `BlissSVGBuilder.empty-content-extent.test.js`.
- * - A decoration or kerning value written on a space, see
- *   `BlissSVGBuilder.space-decoration.test.js`.
+ * - A decoration written on a space, see
+ *   `BlissSVGBuilder.space-decoration.test.js`; kerning on one, see
+ *   `BlissSVGBuilder.space-kerning.test.js`.
  */
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';

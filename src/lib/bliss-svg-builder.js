@@ -1250,8 +1250,9 @@ class BlissSVGBuilder {
     // keeps its identity. ZSA is content (a positionable inkless shape) and is
     // exempt: the strip targets only #isSpaceGlyphNode (= {TSP, QSP}). A stripped
     // glyph joins movedSpaceGlyphs so the _differsFromDefault re-flag below keeps
-    // a bared QSP serializing as `QSP`, not the default `//`. Kerning
-    // (GLYPH_INTERNAL_KEYS) and the runtime key are spared.
+    // a bared QSP serializing as `QSP`, not the default `//`. Kerning written as
+    // an option is dropped here like any other (a marker never reaches a space:
+    // the parser reports it); only the runtime key is spared.
     const warnSpaceDrop = (kind, source) => this.#mutationWarnings.push({
       code: WARNING_CODES.MISPLACED_SPACE_DECORATION,
       message: `A space cannot carry ${kind === 'coordinate' ? 'a coordinate' : 'an option'}, so "${source}" was dropped.`,
@@ -3265,22 +3266,23 @@ class BlissSVGBuilder {
     return group.glyphs?.length > 0 && group.glyphs.every(g => BlissSVGBuilder.#isNonHeadMarkerNode(g));
   }
 
-  // Option keys a space glyph keeps when its decorations are stripped: the
-  // runtime key (identity, re-assigned each rebuild) and kerning (RK/AK, which
-  // adjusts spacing between glyphs, a separate backlogged space-sizing concern).
-  static #SPACE_KEPT_OPTION_KEYS = new Set(['key', 'relativeKerning', 'absoluteKerning']);
-
   /**
-   * Removes every non-internal option (a styling decoration) from a space's
-   * options object and returns the `k=v` entries that were dropped, as the
-   * author wrote them. Kerning and the runtime key are spared. Mutates
-   * `options` in place; taking an emptied bag away is the caller's, since only
-   * the caller knows whether anything else is still to come out of it.
+   * Removes every option from a space's options object and returns the `k=v`
+   * entries that were dropped, as the author wrote them. Only the runtime key
+   * is spared: it is identity, re-assigned each rebuild, not a decoration.
+   * Kerning goes too, since it is the gap before a character; a value held
+   * under the numeric key the layout reads is quoted in the spelling a bracket
+   * carries. Mutates `options` in place; taking an emptied bag away is the
+   * caller's, since only the caller knows whether anything else is still to
+   * come out of it.
    */
   static #dropSpaceOptionEntries(options) {
     if (!options) return [];
-    const keys = Object.keys(options).filter(k => !BlissSVGBuilder.#SPACE_KEPT_OPTION_KEYS.has(k));
-    const entries = keys.map(k => (options[k] === true ? k : `${k}=${options[k]}`));
+    const keys = Object.keys(options).filter(k => k !== 'key');
+    const entries = keys.map((k) => {
+      const name = Object.hasOwn(KERNING_OPTION_KEYS, k) ? camelToKebab(k) : k;
+      return options[k] === true ? name : `${name}=${options[k]}`;
+    });
     for (const k of keys) delete options[k];
     return entries;
   }
