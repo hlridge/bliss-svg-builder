@@ -25,7 +25,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   is left out.
  * - Layout and anchor data read through the marker under a decoration: a
  *   letter's spacing, a digit's kerning, a full stop's word space, an anchor.
- * - A `^` inside an option value, which is not a head marker.
+ * - A `^` inside an option value, which is not a head marker, including one
+ *   before a `;` inside a part bracket: the pieces the bracket is split into
+ *   today are reported with the caret as written.
  *
  * Does NOT cover:
  * - A marker written where the code is used, see
@@ -35,7 +37,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - define() accepting a marked code string, see
  *   `BlissSVGBuilder.define-readable-code-string.test.js`.
  * - A caret before a `;` inside a part bracket of the code string
- *   (`B291;[title=a^;color=red]>B313`): unobservable while a definition's
+ *   (`B291;[title=a^;color=red]>B313`) kept in the value: a definition's
  *   part bracket is split at its `;` (backlog); the `it.todo` below is the
  *   tripwire.
  */
@@ -61,6 +63,7 @@ const FIXTURES = {
   HM_STOP: { type: 'glyph', codeString: 'B4^' },
   HM_ANCHORED: { type: 'glyph', codeString: 'B119^' },
   HM_CARET_VALUE: { type: 'glyph', codeString: '[title=a^;color=red]B291' },
+  HM_CARET_PART: { type: 'glyph', codeString: 'B291;[title=a^;color=red]>B313' },
   HM_PART_BRACKET: { type: 'glyph', codeString: 'B291;[color=red]>B313^' },
 };
 
@@ -235,9 +238,24 @@ describe('BlissSVGBuilder definition head marker', () => {
       expect(reloadsOf('HM_CARET_VALUE')).toEqual(EVERY_SAVE);
     });
 
-    // tripwire: the head-marker strip keeps a bracket whole, which no input
-    // reaches until a definition's part bracket is read whole (backlog, "A
-    // definition whose part bracket holds two keys is split at the bracket's `;`")
+    it('reports the pieces of a part bracket split at its `;` with the caret as written', () => {
+      // pins the head-marker strip keeping an option bracket whole: a strip
+      // that took this caret for a marker ran before the split, so the
+      // reported sources lost it, while every drawing and save stayed the
+      // same (mutant survived every row until 2026-10-27)
+      // note: the split is the backlog row "A definition whose part bracket
+      // holds two keys is split at the bracket's `;`"; once the bracket is
+      // read whole this row gives way to the it.todo below
+      const builder = new BlissSVGBuilder('B313;HM_CARET_PART');
+      expect(builder.warnings.map((w) => [w.code, w.source])).toEqual([
+        ['UNKNOWN_CODE', '[title=a^'],
+        ['UNKNOWN_CODE', 'color=red]>B313'],
+      ]);
+    });
+
+    // tripwire: the value keeps its caret once a definition's part bracket is
+    // read whole (backlog, "A definition whose part bracket holds two keys is
+    // split at the bracket's `;`")
     it.todo('keeps a caret before a `;` inside a part bracket of the code string in its value');
   });
 });
