@@ -68,6 +68,8 @@ describe('BlissSVGBuilder space kerning', () => {
     ])('drops the marker in %s, reads as %s, and reports %s', (input, plain, source) => {
       const builder = new BlissSVGBuilder(input);
       expect(builder.warnings.map(codeAndSource)).toEqual([{ code: SPACE_DECORATION, source }]);
+      expect(builder.warnings[0].message)
+        .toBe(`Kerning is the gap before a character, and a space is not one, so "${source}" was dropped.`);
       expect(builder.toString()).toBe(plain);
       expect(surfacesOf(builder)).toEqual(surfacesOf(new BlissSVGBuilder(plain)));
     });

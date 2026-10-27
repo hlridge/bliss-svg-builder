@@ -2182,9 +2182,20 @@ export class BlissParser {
       }
 
       extractPositionFromOptions(group, parseWarnings, 1);
-      // A marker still waiting when its word ends stands before a space, when
-      // anything follows at all: word groups and space groups alternate.
-      if (pendingKerning && gi < groupedCodes.length - 1) dropKerningBeforeSpace(pendingKerning);
+      // A marker still waiting when its word ends stands before a space when
+      // anything follows at all (word groups and space groups alternate), and
+      // before nothing at the end of the input, where no character takes it.
+      if (pendingKerning) {
+        if (gi < groupedCodes.length - 1) {
+          dropKerningBeforeSpace(pendingKerning);
+        } else {
+          parseWarnings.push({
+            code: WARNING_CODES.MISPLACED_KERNING_OPTION,
+            message: `Kerning is the gap before a character, and no character follows "${pendingKerning.source}", so it was dropped.`,
+            source: pendingKerning.source,
+          });
+        }
+      }
       parsedGroups.push(group);
     }
 

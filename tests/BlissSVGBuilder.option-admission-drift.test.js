@@ -34,7 +34,8 @@
  * - Every ingest route running the stage: the DSL bracket, a composition
  *   object's bags, the JavaScript channels, a definition's `defaultOptions`.
  * - The scope table defined once, beside the stage, its codes written nowhere
- *   else, and its judge private to the stage.
+ *   else but the parser's one report of a kerning marker no character follows
+ *   (a marker's place, not a key's scope), and its judge private to the stage.
  * - Every call carrying a bag toward the stage naming its scope, hop by hop, on
  *   the DSL, definition-expansion, composition-object, setter and handle
  *   routes; the one call that passes none, named with its reason.
@@ -198,7 +199,7 @@ describe('BlissSVGBuilder option admission drift', () => {
       expect(scopeCodesWritten(CONSTANTS)).toBe(3);
     });
 
-    it.each(['bliss-parser.js', 'bliss-svg-builder.js', 'element-handle.js'])(
+    it.each(['bliss-svg-builder.js', 'element-handle.js'])(
       'finds %s naming neither the table nor its judge, and writing none of its codes',
       (file) => {
         const text = libSource(file);
@@ -206,6 +207,15 @@ describe('BlissSVGBuilder option admission drift', () => {
         expect(scopeCodesWritten(text)).toBe(0);
       },
     );
+
+    it('finds bliss-parser.js naming neither the table nor its judge, and writing only the kerning code for a marker no character follows', () => {
+      // Where a marker stands is not a key's scope, so the stage has no part in
+      // it; the kerning code's rule (no character to be the gap before) covers it.
+      const text = libSource('bliss-parser.js');
+      expect(text).not.toMatch(/\b(?:SCOPE_BOUND_OPTIONS|scopeRefusal)\b/);
+      expect(scopeCodesWritten(text)).toBe(1);
+      expect(text).toMatch(/code: WARNING_CODES\.MISPLACED_KERNING_OPTION,\s+message: `Kerning is the gap before a character, and no character follows /);
+    });
 
     it('finds the judge asked by the stage alone, and exported by nothing', () => {
       expect(judgeCalls(CONSTANTS)).toBe(1);
@@ -290,7 +300,7 @@ describe('BlissSVGBuilder option admission drift', () => {
 
     it('finds a scope code written outside the table', () => {
       const drifted = `${libSource('bliss-parser.js')}\n  code: WARNING_CODES.MISPLACED_LAYER_OPTION,\n`;
-      expect(scopeCodesWritten(drifted)).toBe(1);
+      expect(scopeCodesWritten(drifted)).toBe(scopeCodesWritten(libSource('bliss-parser.js')) + 1);
     });
 
     it('reads a call written across several lines, trailing comma included', () => {
