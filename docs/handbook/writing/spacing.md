@@ -30,6 +30,12 @@ The `word-space` option controls the full gap. Each extra <code>/</code> (`///`,
 
 <Demo code="[grid]||B392/B666///B431//B4" title="/// adds 6 more before the second word" />
 
+A space at the start or the end of a composition counts in full: the picture ends where a next word would start, so with `margin=0` two pictures placed side by side line up as one sentence would. To trim the picture to the ink instead, use `crop=auto`:
+
+<Demo code="[grid]||B392/B666//" title="A space at the end keeps its full gap" />
+
+<Demo code="[grid;crop=auto]||B392/B666//" title="crop=auto trims to the ink" />
+
 Like `char-space`, `word-space` may benefit from adjustment when using a thicker `stroke-width`.
 
 | Option | Default | Range |
