@@ -324,7 +324,7 @@ export const customTests = [
   //Comparison: with and without digit kerning
   { filename: 'B9_B10_B11__B291_B291_B291.svg', code: 'B9/B10/B11//B291/B291/B291' },  // Digits vs non-digits spacing
 
-  //Space glyph edge cases - invisible SVGs (only margins, no visible content)
+  //Space glyph edge cases - invisible SVGs (no visible content; each space counts in full)
   { filename: 'space-only-empty.svg', code: '' },  // Empty string
   { filename: 'space-only-single-slash.svg', code: '/' },  // Single glyph separator
   { filename: 'space-only-double-slash.svg', code: '//' },  // Empty - word separator only
@@ -335,9 +335,9 @@ export const customTests = [
   { filename: 'space-only-QSP_QSP.svg', code: 'QSP/QSP' },  // Two QSP glyphs
   { filename: 'space-only-TSP__TSP.svg', code: 'TSP//TSP' },  // TSP in separate words
 
-  //Leading/trailing space glyphs (should produce same output as single H)
-  { filename: 'leading-space__H.svg', code: '//H' },  // Leading space - same as H
-  { filename: 'trailing-space-H__.svg', code: 'H//' },  // Trailing space - same as H
+  //Leading/trailing space glyphs (a space at either edge counts in full)
+  { filename: 'leading-space__H.svg', code: '//H' },  // Leading space counts in full
+  { filename: 'trailing-space-H__.svg', code: 'H//' },  // Trailing space counts in full
   { filename: 'both-spaces__H__.svg', code: '//H//' },  // Both leading and trailing
   { filename: 'multiple-leading___H.svg', code: '///H' },  // Multiple leading spaces
   { filename: 'multiple-trailing-H___.svg', code: 'H///' },  // Multiple trailing spaces

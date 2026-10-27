@@ -67,8 +67,8 @@ describe('BlissSVGBuilder empty-content serialization', () => {
     it('emits a trailing space-empty-space-empty run as one slash run', () => {
       const b = new BlissSVGBuilder({ groups: [word('B291'), space(), empty(), space(), empty()] });
       expect(b.toString()).toBe('B291///');
-      expect(viewBoxWidth(b)).toBe(17.5);
-      expect(reparsedWidth(b)).toBe(17.5);
+      expect(viewBoxWidth(b)).toBe(23.5);
+      expect(reparsedWidth(b)).toBe(23.5);
     });
 
     it('coalesces a three-space run split by two interior empties', () => {
@@ -113,8 +113,8 @@ describe('BlissSVGBuilder empty-content serialization', () => {
     it('keeps a trailing space-and-empty emission unchanged', () => {
       const b = new BlissSVGBuilder({ groups: [word('B291'), space(), empty()] });
       expect(b.toString()).toBe('B291//');
-      expect(viewBoxWidth(b)).toBe(11.5);
-      expect(reparsedWidth(b)).toBe(11.5);
+      expect(viewBoxWidth(b)).toBe(17.5);
+      expect(reparsedWidth(b)).toBe(17.5);
     });
 
     it('emits nothing for a document holding only empty groups', () => {

@@ -1479,13 +1479,23 @@ export class BlissElement {
       maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
         child.#relativeToParentX + child.#inkEndX));
     } else {
+      // A composition that ends in nothing but spaces ends where a word after
+      // them would start: at the end of their advance, which lies left of
+      // their own x when the word space is narrower than the character space.
+      // Their own frame does not count, since a space draws nothing. A space
+      // that keeps another part (an error placeholder) ends at that part's
+      // ink, as every word does. Only the root's words can hold spaces.
+      const lastChild = layoutChildren[layoutChildren.length - 1];
+      const trailingSpace = lastChild.#holdsOnlySpaces ? lastChild : null;
       maxRelativeXPlusWidth = Math.max(...layoutChildren.map(child =>
-        child.#relativeToParentX + child.width));
+        child.#relativeToParentX + (child === trailingSpace ? child.#advanceX : child.width)));
     }
 
     let width;
     if (this.#level === 0) {
-      width = maxRelativeXPlusWidth - minRelativeX + this.#childStartOffset;
+      // Never below 0: a composition of nothing but spaces whose advance is
+      // negative ends before it starts.
+      width = Math.max(0, maxRelativeXPlusWidth - minRelativeX + this.#childStartOffset);
     } else {
       // When minRelativeX > 0, the left boundary is still the element's origin (0),
       // not the leftmost child. Only subtract negative offsets (e.g., indicator overhang).
@@ -1576,6 +1586,11 @@ export class BlissElement {
 
       const firstGroup = groups[0];
       const lastGroup = groups[groups.length - 1];
+      if (lastGroup.#holdsOnlySpaces) {
+        // A final space ends the box at the end of its advance, as in `width`,
+        // and never below 0.
+        return Math.max(0, lastGroup.#relativeToParentX + lastGroup.#advanceX - firstGroup.#relativeToParentX);
+      }
       const lastGroupBaseWidth = lastGroup.baseGroupWidth;
       const baseWidth = lastGroup.#relativeToParentX + lastGroupBaseWidth - firstGroup.#relativeToParentX;
       return baseWidth;

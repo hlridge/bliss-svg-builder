@@ -42,13 +42,13 @@ describe('BlissSVGBuilder empty-content extent', () => {
   describe('when a document ends in empty groups', () => {
     it('excludes a trailing options-only empty word from the viewBox', () => {
       const b = new BlissSVGBuilder('B291//[color=red]|');
-      expect(viewBoxWidth(b)).toBe(11.5);
+      expect(viewBoxWidth(b)).toBe(17.5);
       expect(viewBoxWidth(b)).toBe(viewBoxWidth(new BlissSVGBuilder('B291//')));
     });
 
     it('excludes a trailing bare empty group from the viewBox', () => {
       const b = new BlissSVGBuilder({ groups: [word('B291'), space(), empty()] });
-      expect(viewBoxWidth(b)).toBe(11.5);
+      expect(viewBoxWidth(b)).toBe(17.5);
       expect(viewBoxWidth(b)).toBe(
         viewBoxWidth(new BlissSVGBuilder({ groups: [word('B291'), space()] }))
       );
@@ -58,7 +58,7 @@ describe('BlissSVGBuilder empty-content extent', () => {
       // pins the every-child-empty half of the classification: a zero-glyph
       // shortcut (glyphs.length === 0) would miss this group entirely.
       const b = new BlissSVGBuilder({ groups: [word('B291'), space(), { glyphs: [{ parts: [] }] }] });
-      expect(viewBoxWidth(b)).toBe(11.5);
+      expect(viewBoxWidth(b)).toBe(17.5);
       expect(viewBoxWidth(b)).toBe(
         viewBoxWidth(new BlissSVGBuilder({ groups: [word('B291'), space()] }))
       );
@@ -66,7 +66,7 @@ describe('BlissSVGBuilder empty-content extent', () => {
 
     it('excludes every empty group of a trailing space-and-empty run', () => {
       const b = new BlissSVGBuilder({ groups: [word('B291'), space(), empty(), space(), empty()] });
-      expect(viewBoxWidth(b)).toBe(17.5);
+      expect(viewBoxWidth(b)).toBe(23.5);
       expect(viewBoxWidth(b)).toBe(
         viewBoxWidth(new BlissSVGBuilder({ groups: [word('B291'), space(), space()] }))
       );
