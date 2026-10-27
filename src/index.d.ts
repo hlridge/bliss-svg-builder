@@ -737,6 +737,10 @@ export interface GlyphDefinition {
    * alias. A run that renders as one text element (`Xaλ`, where a letter has no
    * embedded outline) is a single character and is accepted.
    *
+   * It may combine characters, shapes and letters: a copy of B118,
+   * `Xa;Xb:3.2353933,0;Xc:6.4707865,0`, draws and spaces as `B118` does, and a
+   * glyph of one letter is spaced as that letter.
+   *
    * A character bracket at its start (`[color=red]B291`, no `>` after it)
    * gives the definition options of its own, exactly as `defaultOptions`
    * does, and wins where both set a key. It refuses the keys `defaultOptions`
@@ -803,7 +807,12 @@ export interface ShapeDefinition {
   /** `isIndicator` is glyph-only; forbidding it makes the union reject a typeless flagged literal at compile time (the runtime rejects it too). */
   isIndicator?: never;
   getPath?: (ctx: ShapeContext) => string;
-  /** A shape is a single character; the rules of {@link GlyphDefinition.codeString} apply, its leading bracket included. */
+  /**
+   * A shape is a single character made of shapes only: a character (`B291`)
+   * or a letter in any spelling (`Xa`, `Xλ`, `Xaλ`) is refused. Otherwise the
+   * rules of {@link GlyphDefinition.codeString} apply, its leading bracket
+   * included.
+   */
   codeString?: string;
   width?: number;
   height?: number;
