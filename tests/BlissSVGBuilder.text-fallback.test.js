@@ -522,6 +522,10 @@ describe('BlissSVGBuilder text fallback', () => {
       }
     });
 
+    // The pin above draws text that neither save brings back: XTXT_123 saves as X123, which
+    // reloads as an unknown code drawing nothing, through toString() and toJSON() alike.
+    it.todo('reads a payload the X notation cannot write as its written twin, so no save loses it');
+
     it('leaves a key holding any letter without an outline as one text element', () => {
       // the whole point of the key: XTXT_hαllo still needs it, and α is why
       expect(new BlissSVGBuilder('XTXT_hαllo').toJSON().groups[0].glyphs).toHaveLength(1);
