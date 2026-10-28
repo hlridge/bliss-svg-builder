@@ -523,8 +523,9 @@ describe('BlissSVGBuilder text fallback', () => {
     });
 
     // The pin above draws text that neither save brings back: XTXT_123 saves as X123, which
-    // reloads as an unknown code drawing nothing, through toString() and toJSON() alike.
-    it.todo('reads a payload the X notation cannot write as its written twin, so no save loses it');
+    // reloads as an unknown code drawing nothing, through toString() and toJSON() alike. The
+    // name is internal, so a written one should be an ordinary unknown code on every route.
+    it.todo('treats a written XTXT_ name as an unknown code, so no input reaches the internal one');
 
     it('leaves a key holding any letter without an outline as one text element', () => {
       // the whole point of the key: XTXT_hαllo still needs it, and α is why
