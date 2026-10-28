@@ -442,7 +442,7 @@ builder.group(0).splitAt(2);
 
 The handle stays on the first half (the original group). Access the second half via `builder.group(1)`. The first half retains the original options object. The second half receives a shallow copy with the same values.
 
-A word-level (`;;`) indicator overlay follows the head: it stays with whichever half keeps the head glyph, and the other half gets none.
+A word-level (`;;`) indicator overlay belongs to the word, so it stays with the first half, wherever the head was, and the second half gets none. A head marker (`^`) that lands in the second half is dropped. Splitting `B313/B1103^;;B86` at 1 gives `B313;;B86//B1103`, with the indicator now drawn on `B313`.
 
 ### Merging Words
 
