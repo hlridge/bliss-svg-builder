@@ -15,8 +15,8 @@
  * - An alias whose code string puts a marker before its `//` or before a space
  *   code, and an alias ending in a marker before a written `//`, each against
  *   its written form.
- * - The setters on a space glyph, a part replaced by a space under a kerned
- *   character, and object input.
+ * - The setters on a space glyph (each key spelling, a value given as text), a
+ *   part replaced by a space under a kerned character, and object input.
  * - The kerning report ahead of a part bracket's report, in the order written.
  * - Controls: kerning at word and part scope keeps MISPLACED_KERNING_OPTION; a
  *   marker after a space, before a ZSA, or before a composite led by a space
@@ -24,7 +24,8 @@
  *
  * Does NOT cover:
  * - A kerning marker with nothing after it (`B313/AK:10`): no space follows
- *   it, so it is not a space decoration (backlog: orphaned kerning markers).
+ *   it, so it is not a space decoration, see
+ *   `BlissSVGBuilder.trailing-kerning.test.js`.
  * - A coordinate or styling option on a space, see
  *   `BlissSVGBuilder.space-decoration.test.js`.
  * - Kerning grammar and kerning between characters, see
@@ -156,6 +157,10 @@ describe('BlissSVGBuilder space kerning', () => {
       [{ 'relative-kerning': 3 }, '[relative-kerning=3]'],
       [{ absoluteKerning: 3 }, '[absolute-kerning=3]'],
       [{ 'absolute-kerning': 3 }, '[absolute-kerning=3]'],
+      // a value given as text, a malformed one too, takes the space's report as
+      // the bracket spelling does, never MALFORMED_KERNING_VALUE
+      [{ relativeKerning: '3' }, '[relative-kerning=3]'],
+      [{ 'absolute-kerning': 'abc' }, '[absolute-kerning=abc]'],
     ])('drops %o set on a space glyph and reports %s', (options, source) => {
       const builder = new BlissSVGBuilder('B313//B291');
       builder.element(1).glyph(0).setOptions(options);
