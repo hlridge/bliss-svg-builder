@@ -19,8 +19,8 @@
  * Does NOT cover:
  * - A marker before a space, see `BlissSVGBuilder.space-kerning.test.js`.
  * - Kerning held by an empty character (`B313/AK:10/[]`,
- *   `B313/[relative-kerning=3]`), which is written out as a bare marker: open
- *   (backlog: kerning held by an empty character).
+ *   `B313/[relative-kerning=3]`), which stays on the slot and is saved as
+ *   `RK:3/[]`, see `BlissSVGBuilder.empty-character-kerning.test.js`.
  * - Kerning grammar, see `BlissParser.kerning.test.js`; bare markers between
  *   characters, see `BlissSVGBuilder.kerning-markers.test.js`.
  */

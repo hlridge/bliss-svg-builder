@@ -14,8 +14,8 @@
  * - the default judged as a reload judges it: the whole run against the word
  *   written after it (a space added beside another, an empty word inside the
  *   run, a written QSP whose next word was replaced), that word being the
- *   characters written, so an empty character written as nothing (or as a
- *   kerning marker alone) leaves the word and one written as a bracket stays
+ *   characters written, so an empty character written as nothing leaves the
+ *   word and one written as a bracket (or as `[]` after its kerning) stays
  * - bare empties never trigger a separator: trailing without a space, solo,
  *   and run-of-only-empties documents
  * - options-carrying empties emit their own [opts]| segment, split runs,
@@ -206,11 +206,12 @@ describe('BlissSVGBuilder empty-content serialization', () => {
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
-    it('spells the quarter space as `//` before a full stop given an empty character holding only kerning', () => {
-      // note: the kerning is written as a marker the full stop takes on reload
+    it('writes out the quarter space before a full stop given an empty character holding only kerning', () => {
+      // note: the character is written `[]` after its kerning marker, so a
+      // reload reads it as part of the word
       const b = new BlissSVGBuilder('B291//B4');
       b.group(1).insertGlyph(0, '', { relativeKerning: 2 });
-      expect(b.toString()).toBe('B291//RK:2/B4');
+      expect(b.toString()).toBe('B291/QSP/RK:2/[]/B4');
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 

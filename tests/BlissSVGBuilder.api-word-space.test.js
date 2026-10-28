@@ -20,7 +20,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   letter (Xa), a digit after a digit (B9).
  * - The word after the space read as a reload reads it: an empty character
  *   the string writes as nothing does not count, one written as a position
- *   or option bracket does.
+ *   or option bracket, or as `[]` after its kerning, does.
  * - An inserted space kept through a later edit of the word after it, as a
  *   space read from the DSL is.
  * - A middle insertGroup putting the new word right after the previous word
@@ -120,6 +120,9 @@ describe('BlissSVGBuilder API word space', () => {
       ['[color=red]/B4', 'B291//[color=red]/B4'],
       // pins the vertical position read as well as the horizontal one
       ['[y=2]/B4', 'B291//[y=2]/B4'],
+      // note: an empty character holding kerning is written `[]` after its
+      // marker, so the reload reads it as a character of the word
+      ['RK:2/[]/B4', 'B291//RK:2/[]/B4'],
     ])('counts an empty character written as a bracket: insertGroup(0, B291) on %s saves %s', (start, spelling) => {
       const builder = new BlissSVGBuilder(start).insertGroup(0, 'B291');
       expect(drawsAs(builder, spelling)).toBe(true);

@@ -28,7 +28,9 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
  *   a partial detach keeps it.
  * - Object input marking a bare empty glyph: the designation dies at rebuild
  *   (no serialized form); an options-carrying empty glyph keeps it (its
- *   `[opts]^` token re-emits).
+ *   `[opts]^` token re-emits), and so does one holding only a position
+ *   (`[x=3]^`). One holding only kerning (`RK:3/[]^`), see
+ *   `BlissSVGBuilder.empty-character-kerning.test.js`.
  * - Per-word emission for multi-word inputs.
  *
  * Does NOT cover:
@@ -219,6 +221,22 @@ describe('BlissSVGBuilder head-marker round-trip', () => {
 
       expect(b.toString()).toBe('B313/[color=red]^');
       expect(b.toJSON().groups[0].glyphs[1].isHeadGlyph).toBe(true);
+    });
+
+    it.each([
+      ['the DSL', () => new BlissSVGBuilder('B313/[x=3]^/B291')],
+      ['object input', () => new BlissSVGBuilder({ groups: [{ glyphs: [
+        { parts: [{ codeName: 'B313' }], codeName: 'B313' },
+        { parts: [], x: 3, isHeadGlyph: true },
+        { parts: [{ codeName: 'B291' }], codeName: 'B291' },
+      ] }] })],
+    ])('keeps the designation on an empty glyph holding only a position, from %s', (_, make) => {
+      // regression: the position is written as `[x=3]`, which carries the
+      // marker, yet the rebuild judged the glyph by its options alone
+      const b = make();
+      expect(b.toString()).toBe('B313/[x=3]^/B291');
+      expect(b.toJSON().groups[0].glyphs[1].isHeadGlyph).toBe(true);
+      expect(new BlissSVGBuilder(b.toString()).toJSON()).toEqual(b.toJSON());
     });
 
     it('deletes the designation when the options serialize to nothing', () => {

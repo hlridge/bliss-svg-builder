@@ -32,8 +32,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   without the flag, a built-in full stop.
  * - A word longer than a reload reads, saved without reading it back: judged
  *   as the builder stores it, every group written side by side, less the
- *   characters written as nothing of their own (an empty character, one
- *   holding only kerning).
+ *   characters written as nothing of their own (an empty character; one
+ *   holding only kerning is written `[]` and counts).
  *
  * Does NOT cover:
  * - The space an API edit inserts and where it goes, see
@@ -226,13 +226,13 @@ describe('BlissSVGBuilder written word space', () => {
       expect(() => new BlissSVGBuilder(saved)).toThrow(/maximum length/);
     });
 
-    it('leaves out an empty character holding only kerning: a stored QSP before full stops saves as //', () => {
-      // pins a character's own token, its last, as the one that counts;
-      // reading its kerning marker, written first, counted it
+    it('counts an empty character holding only kerning, written as []: a stored QSP before full stops is written out', () => {
+      // pins the character counted by its own token, `[]`, written after its
+      // kerning marker
       const builder = new BlissSVGBuilder({ groups: [word('B291'), space('QSP'), fullStops(3400)] });
       builder.group(1).insertGlyph(0, '', { relativeKerning: 2 });
       const saved = builder.toString();
-      expect(saved).toBe(`B291//RK:2/${Array(3400).fill('B4').join('/')}`);
+      expect(saved).toBe(`B291/QSP/RK:2/[]/${Array(3400).fill('B4').join('/')}`);
       expect(() => new BlissSVGBuilder(saved)).toThrow(/maximum length/);
     });
   });

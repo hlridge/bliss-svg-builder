@@ -32,31 +32,32 @@ const getHeadCode = (glyph) =>
 // that left it out would reload another picture.
 const writesOptionValue = (key, value) => value !== false || !BOOLEAN_OPTION_KEYS.has(key);
 
-// Mirrors toString()'s glyph emission for an empty-parts glyph: it re-emits
-// a token only when some option survives serialization. `key` is stripped by
-// toJSON, the kerning keys emit as RK/AK segments (which cannot carry a `^`),
-// and serializeOptions writes the rest by the same rule.
+// Kerning a glyph holds, which toString() writes as RK:/AK: markers ahead of
+// the glyph's own token.
+const glyphHoldsKerning = (glyph) =>
+  glyph.options?.relativeKerning !== undefined || glyph.options?.absoluteKerning !== undefined;
+
+// Mirrors toString()'s emission for a glyph with no parts and no code, which
+// is written as a token only where something of it survives serialization: a
+// bracket where it has a position (`[x=3]`) or an option serializeOptions
+// writes (`key` is stripped by toJSON, and the kerning keys are written as
+// markers), else `[]` after its kerning markers (`RK:3/[]`), the slot a
+// reload hands the kerning back to. A head marker is written on that token.
 const GLYPH_OPTION_KEYS_WITHOUT_TOKEN = new Set(['key', 'relativeKerning', 'absoluteKerning']);
-const glyphEmitsOptionsToken = (glyph) =>
-  Object.entries(glyph.options ?? {}).some(([k, v]) =>
-    writesOptionValue(k, v) && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
+const emptyGlyphWritesToken = (glyph) =>
+  glyph.x !== undefined || glyph.y !== undefined || glyphHoldsKerning(glyph)
+    || Object.entries(glyph.options ?? {}).some(([k, v]) =>
+      writesOptionValue(k, v) && !GLYPH_OPTION_KEYS_WITHOUT_TOKEN.has(k));
 
-// A head designation on a glyph the serializer omits has no written form: no
-// parts, no code, and no option that re-emits it as an options-only token. The
-// rebuild drops such a designation, and so does the view without options,
-// which empties glyphs on its own working copy and has to lose exactly what
-// the rebuild of a builder cleared in place loses.
-const designationIsUnwritten = (glyph) =>
-  glyph.isHeadGlyph === true && !glyph.parts?.length
-    && !glyph.glyphCode && !glyph.codeName && !glyphEmitsOptionsToken(glyph);
-
-// A glyph the serializer writes nothing for, so no reload reads it back: no
-// parts, no code, no position (which is written as an `[x=N]` bracket) and no
-// option that re-emits it as an options-only token. Kerning alone is written
-// as a marker the next glyph takes.
+// A glyph the serializer writes nothing for, so no reload reads it back.
 const glyphIsUnwritten = (glyph) =>
-  !glyph.parts?.length && !glyph.glyphCode && !glyph.codeName
-    && glyph.x === undefined && glyph.y === undefined && !glyphEmitsOptionsToken(glyph);
+  !glyph.parts?.length && !glyph.glyphCode && !glyph.codeName && !emptyGlyphWritesToken(glyph);
+
+// A head designation on a glyph the serializer writes nothing for has no
+// written form. The rebuild drops such a designation, and so does the view
+// without options, which empties glyphs on its own working copy and has to
+// lose exactly what the rebuild of a builder cleared in place loses.
+const designationIsUnwritten = (glyph) => glyph.isHeadGlyph === true && glyphIsUnwritten(glyph);
 
 // The written `Xword` shorthand expands to one glyph per letter at parse time
 // (`Xab` -> `Xa/Xb`), so serializing each glyph faithfully spells a word out
@@ -3593,7 +3594,10 @@ class BlissSVGBuilder {
       // the look a code the string can only name draws with sits on its part,
       // never on the character, so there is none here to leave out.
       const optPrefix = serializeOptionsWithPosition(glyph, GLYPH_INTERNAL_KEYS);
-      result.push(optPrefix + code);
+      // A character with no token of its own (an empty one) is written `[]`
+      // after its kerning markers, so a reload hands the kerning back to the
+      // slot rather than to the character after it.
+      result.push(optPrefix + code || (glyphHoldsKerning(glyph) ? '[]' : ''));
       return result;
     }
 
@@ -3724,8 +3728,8 @@ class BlissSVGBuilder {
       if (groupStr === '') continue; // bare content-empty: no segment, run stays open
       flushSpaceRun();
       pendingRun?.texts.push(groupStr);
-      // A character's own token is its last, after its kerning markers; one
-      // written as markers alone hands them to the next character on reload.
+      // A character's own token is its last, after any kerning markers; one
+      // written as nothing is no character to a reload.
       pendingRun?.word.push(...this.#rawBlissObj.groups[groupIndex].glyphs
         .filter((_, glyphIndex) => glyphArrays[glyphIndex].at(-1)));
       segments.push(groupStr);
