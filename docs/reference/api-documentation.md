@@ -251,7 +251,7 @@ builder.toString({ omitOptions: true });
 
 That hands back what was written without the styling somebody added, so your app can apply its own, or gives you the string without its global options.
 
-A part's position or a kerning value entered as an option keeps its own spelling, which sits outside a bracket: `[x=1]>C8` comes back as `C8:1`, and `B291/[relative-kerning=2]B313` as `B291/RK:2/B313`. The position of a character, a word or the whole composition has no spelling outside a bracket, so it goes, and ink that an option placed or spaced moves: `[char-space=4]||B291/B291` comes back as `B291/B291`, with the two characters closer together. Options written inside a word-level indicator go too (`B291;;[x=2;color=red]>B81` comes back as `B291;;B81:2`), and a character that holds nothing but options goes with them, a head marker on it included: `[color=red]^/B291;;B81` comes back as `B291;;B81`, so the indicator moves to `B291`.
+A part's position or a kerning value entered as an option keeps its own spelling, which sits outside a bracket: `[x=1]>C8` comes back as `C8:1`, and `B291/[relative-kerning=2]B313` as `B291/RK:2/B313`. The position of a character, a word or the whole composition has no spelling outside a bracket, so it goes, and ink that an option placed or spaced moves: `[char-space=4]||B291/B291` comes back as `B291/B291`, with the two characters closer together. Options written inside a word-level indicator go too (`B291;;[x=2;color=red]>B81` comes back as `B291;;B81:2`), and a character that holds nothing but options goes with them, a head marker on it included: `[color=red]^/B291;;B81` comes back as `B291;;B81`, so the indicator moves to `B291`. Kerning keeps such a character, written `[]` after its marker: `RK:2/[color=red]^/B291` comes back as `RK:2/[]^/B291`.
 
 The options a code brings by its definition are part of the code, not options in this sense, so they stay: `REFSQUARE` keeps its dotted line, and `REDGLYPH`, defined `{ type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } }`, comes back as `[color=red]>B291`, or as `REDGLYPH` with `preserve`.
 
@@ -292,7 +292,7 @@ new BlissSVGBuilder('MORE/B291;;B81').toString();
 // 'B937^/B291;;B81'
 ```
 
-A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `MISPLACED_HEAD_MARKER` warning and never reappears on export. Saving [without options](#saving-without-options) drops one too: a head marker on a character that holds nothing but options goes with that character.
+A `^` on a multi-character code (an alias or word) is not a valid head designation: it is dropped at parse time with a `MISPLACED_HEAD_MARKER` warning and never reappears on export. Saving [without options](#saving-without-options) drops one too: a head marker on a character that holds nothing but options goes with that character, unless the character holds kerning, which that save keeps.
 
 Use for: serializing back to DSL format, portable exchange, logging.
 
@@ -1635,7 +1635,7 @@ An omitted, empty, or whitespace-only `code` is not an error at group and glyph 
 - Empty slots render nothing, add no width, stay visible to navigation (`.groups`, `group(i)`, `stats.groupCount`), and round-trip through `toJSON()`. Fill them later: `group(i).addGlyph('B313')` fills an empty group, adding a part to an empty group wraps the part in a new character, and adding a part to an empty glyph fills that glyph.
 - Parts are the exception: a part is a reference to a shape, not a container, so an empty part cannot exist. `addPart('')` throws, and the message points to `addGlyph('')` for reserving an empty slot.
 
-One serialization asymmetry to know about: `toJSON()` always keeps empty slots, but a bare empty group or glyph has no DSL token, so it survives `toJSON()` round-trips and not `toString()` round-trips. An options-carrying empty serializes and round-trips on both surfaces: `[color=red]|` for an empty group, `[color=red]` for an empty glyph (saved [without options](#saving-without-options), it is a bare empty again). Either way, serialized spacing matches rendered spacing.
+One serialization asymmetry to know about: `toJSON()` always keeps empty slots, but a bare empty group or glyph has no DSL token, so it survives `toJSON()` round-trips and not `toString()` round-trips. An options-carrying empty serializes and round-trips on both surfaces: `[color=red]|` for an empty group, `[color=red]` for an empty glyph (saved [without options](#saving-without-options), it is a bare empty again). An empty glyph holding kerning is written as its kerning marker and `[]` (`B313/RK:3/[]`), with or without options, so the kerning stays with the slot until something fills it. Either way, serialized spacing matches rendered spacing.
 
 ### What does NOT throw: `define()` and content errors
 
