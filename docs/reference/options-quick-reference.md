@@ -152,6 +152,14 @@ One position per part and one kerning value per character, however you spell it.
 
 ---
 
+## Grid Shift
+
+| Option | Default | Type | Description |
+|--------|---------|------|-------------|
+| `grid-shift` | `0` | Number | Moves every grid line right and down by this many grid units, or left and up when negative. The symbol and the picture's size stay. See [Crisp Lines at Small Sizes](/handbook/appearance/grid-customization#crisp-lines-at-small-sizes) |
+
+---
+
 ## SVG Output
 
 | Option | Default | Type | Description |

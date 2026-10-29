@@ -101,7 +101,7 @@ export interface BlissOptions {
    * Moves every grid line by this many grid units on both axes: right and
    * down, or left and up when negative. The symbol, the background and the
    * picture's size stay where they are. A thin grid line that falls between
-   * two pixel rows is drawn blurred across both; moved onto one row, it is
+   * two pixel rows can be drawn blurred across both; moved onto one row, it is
    * drawn crisp.
    */
   gridShift?: number;

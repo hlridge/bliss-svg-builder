@@ -237,7 +237,7 @@ Canvas-wide options configure the whole SVG (its margins, grid, background zones
 | Family | Keys |
 |--------|------|
 | Margins & cropping | `margin`, `margin-top/-bottom/-left/-right`, `crop`, `crop-top/-bottom/-left/-right` |
-| Grid | `grid`, `grid-color`, `grid-major/-medium/-minor/-sky/-earth-color`, `grid-stroke-width` and the matching `grid-*-stroke-width` keys |
+| Grid | `grid`, `grid-color`, `grid-major/-medium/-minor/-sky/-earth-color`, `grid-stroke-width` and the matching `grid-*-stroke-width` keys, `grid-shift` |
 | Background zones | `background-top`, `background-mid`, `background-bottom` |
 | Layout & spacing | `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space` |
 | SVG document | `svg-title`, `svg-desc`, `svg-height` |

@@ -77,6 +77,24 @@ The full vertical space for any characters is always 20 grid units, but all vert
 
 <Demo code="[crop=compact;grid;grid-color=none;background-bottom=#ebebeb;background-top=#ebebeb]||B313;B81/B367/B355;B86" fullHeight title="If there is no room to crop anything, nothing will get cropped" />
 
+### Crisp Lines at Small Sizes
+
+A grid line shown 1 pixel wide looks crisp when it fills one row of pixels. When its centre falls on the edge between two rows, the browser can spread it over both at half strength, and it looks blurred beside the symbol's lines. `grid-shift` moves every grid line right and down by a number of grid units, or left and up when the number is negative, while the symbol, the background and the picture's size stay where they are. Moved by half a pixel, the line fills one row, and half a pixel off its true place is hard to notice.
+
+Whether a line falls between two rows depends on the size you show the picture at. Say a board shows each picture 66 pixels tall, with `margin=1` and grid lines a third of a unit wide. The picture is 22 grid units tall (20, plus 1 above and 1 below), so one unit is 3 pixels and a line is 1 pixel wide. Every line lies a whole number of units from the picture's top edge, so its centre lands on a pixel edge. Half a pixel is 0.5 ÷ 3 = 1/6 of a unit:
+
+<Demo code="[grid;margin=1;grid-stroke-width=0.3333;svg-height=66]||B313" title="66 pixels tall: each grid line falls between two rows of pixels" />
+
+<Demo code="[grid;margin=1;grid-stroke-width=0.3333;svg-height=66;grid-shift=0.1667]||B313" title="Moved by 1/6 unit: each line fills one row" />
+
+From JavaScript the value can be written as a fraction: `{ grid: true, gridShift: 1 / 6 }`.
+
+In general, the shift should carry each line's centre to the middle of a row, at the size the picture is finally shown. When one unit is a whole number of pixels, multiply the margin (less any crop) by that number to see where the centres sit. A whole number, like the 3 above, puts them on pixel edges, half a pixel from the middle (0.5 ÷ the pixels in one unit). A whole number and a half puts them in the middle already, so a 1-pixel line is crisp without a shift. Any other fraction needs the rest of the way to the half: the default `margin=0.75` at 3 pixels a unit gives 2.25, a quarter of a pixel short, so `grid-shift=0.0833` (1/12). When one unit is not a whole number of pixels, the lines fall at different places in their rows, and no one value suits them all.
+
+The default picture, shown at its own size, has its centres in the middle already (`margin=0.75` at 6 pixels a unit is 4.5), so the shift is not for it: half a pixel would move crisp lines onto pixel edges. On a high-density screen (two screen pixels to each pixel of the page), the board's lines above are 2 screen pixels wide and already crisp, and the shift moves them one whole screen pixel, so it does no harm.
+
+The lines drawn are the ones that would be drawn without the shift, so a moved line can reach into the margin, and with `margin=0` the outermost lines can be cut off at the picture's edge. With `crop=auto` the picture's edges follow the symbol, so no single value suits every symbol. If you already move the grid yourself, with a `transform` on the `bliss-grid` group or a [`grid--transform`](#using-a-class-as-a-target) key, the two moves add up: drop yours when you switch.
+
 ## Option Hierarchy
 
 Grid color and stroke-width options follow a hierarchy from general to specific. A bulk option sets the default; more specific options override it:
@@ -126,4 +144,4 @@ Attributes written on `grid--` land on the group, where `opacity` fades the grid
 
 ## Options Reference
 
-See [Options Quick Reference](/reference/options-quick-reference) for the complete list of grid color and stroke-width options with defaults and value ranges.
+See [Options Quick Reference](/reference/options-quick-reference) for the complete list of grid options (colors, stroke widths and `grid-shift`) with defaults and value ranges.
