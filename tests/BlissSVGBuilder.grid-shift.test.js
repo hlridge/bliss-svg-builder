@@ -194,9 +194,9 @@ describe('BlissSVGBuilder grid shift', () => {
       ['centred in a wider picture', 'grid;center;min-width=20'],
       ['cropped on every side', 'grid;crop=1.5'],
       // pins the crop window read at the unmoved positions: the sky line (y=8)
-      // and the first vertical (x=1) sit outside it, and moved by 0.25 they
-      // would sit inside
-      ['cropped between a line and its moved position', 'grid;crop-top=8.1;crop-left=1.1'],
+      // and the first vertical (x=1) sit outside it and the earth line (y=16)
+      // inside, and moved by 0.25 each would cross the edge
+      ['cropped between a line and its moved position', 'grid;crop-top=8.1;crop-left=1.1;crop-bottom=3.9'],
       ['drawn with no margin', 'grid;margin=0'],
     ])('draws the lines an unmoved grid draws %s, each moved by the value', (_geometry, options) => {
       const moved = new BlissSVGBuilder(`[${options};grid-shift=0.25]||B313`).svgCode;
