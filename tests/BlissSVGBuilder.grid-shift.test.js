@@ -10,7 +10,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Every grid coordinate moved by the value on both axes; an `h` run keeps
  *   its length; everything outside the grid lines byte-identical, with a
  *   paper and with zones.
- * - A negative value; 0 and the absent key byte-identical to the unmoved grid.
+ * - A negative value; 0 and the absent key byte-identical to the unmoved grid,
+ *   whose coordinates are written unrounded.
  * - Moved coordinates rounded to 4 decimals (`1/6` writes `8.1667`).
  * - Refused values (not a number, bare, empty, non-finite, a fraction as
  *   text), each with its code and source, the grid left unmoved.
@@ -93,11 +94,18 @@ describe('BlissSVGBuilder grid shift', () => {
     it.each([
       ['[grid;grid-shift=0]||B313', '[grid]||B313'],
       ['[grid;grid-shift=-0]||B313', '[grid]||B313'],
-      // pins "untouched at 0": unmoved coordinates are written unrounded, so a
-      // grid that always rounded would turn 0.33333 into 0.3333 here
       ['[grid;crop=0.33333;grid-shift=0]||B313', '[grid;crop=0.33333]||B313'],
     ])('renders %s byte-identically to %s', (input, control) => {
       expect(new BlissSVGBuilder(input).svgCode).toBe(new BlissSVGBuilder(control).svgCode);
+    });
+
+    it('writes an unmoved coordinate unrounded', () => {
+      // pins "untouched at 0": a grid that always rounded would write 0.3333
+      // here, and the crop row above cannot show it, because its control is
+      // drawn by the same code and rounded the same way
+      const paths = gridPathsOf(new BlissSVGBuilder('[grid;crop=0.33333;grid-shift=0]||B313').svgCode);
+
+      expect(paths[0]).toMatch(/^M0\.33333,1h7\.33334M/);
     });
   });
 
