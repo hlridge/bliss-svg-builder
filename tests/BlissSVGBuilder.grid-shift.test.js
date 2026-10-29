@@ -35,6 +35,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissParser.global-option-scope.test.js`.
  * - The value gate's wording, shared by every numeric option, see
  *   `BlissSVGBuilder.option-value-gate.test.js`.
+ * - How a builder option travels through `merge()`, `splitAt()`,
+ *   `clearAllOptions()`, the transient channel's removal and the
+ *   `omitOptions` saves, the same for every builder option, see
+ *   `BlissSVGBuilder.merge-split.test.js`, `clear-options`,
+ *   `option-removal-naming` and `omit-options` (each a
+ *   `BlissSVGBuilder.<name>.test.js`).
  * - The rendered pictures, see `BlissSVGBuilder.visual-regression.e2e.test.js`.
  */
 
