@@ -37,7 +37,7 @@ import { GLOBAL_ONLY_OPTION_KEYS } from '../src/lib/bliss-constants.js';
  * - Quoted option values with special characters, see
  *   `BlissSVGBuilder.option-value-quoting.test.js` (Chunk 11).
  *
- * The 35-key matrix exceeds the ~30-test soft cap as one it.each data table
+ * The 36-key matrix exceeds the ~30-test soft cap as one it.each data table
  * (the guide's sanctioned inline-table form); splitting it would separate the
  * set pin from the behavior it pins.
  */
@@ -52,6 +52,7 @@ describe('BlissParser global option scope', () => {
     'grid-minor-color', 'grid-sky-color', 'grid-earth-color',
     'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
     'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
+    'grid-shift',
     'background-top', 'background-mid', 'background-bottom',
     'center', 'min-width', 'char-space', 'word-space', 'external-glyph-space',
     'svg-title', 'svg-desc', 'svg-height', 'error-placeholder',

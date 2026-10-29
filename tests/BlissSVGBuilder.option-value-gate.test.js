@@ -69,10 +69,11 @@ const codes = (dsl) => render(dsl).warnings.map((w) => w.code);
  * values, so a row on it can fail. Extend this table, not the individual rows,
  * when a new numeric option arrives.
  *
- * The six grid stroke widths are deliberately absent: they need a companion
- * `grid` option to draw anything at all, so they cannot be written in the
- * `[key=value]||carrier` shape every helper here assumes. Their rows spell the
- * input out and carry their own plain-render comparison.
+ * The six grid stroke widths and the grid shift are deliberately absent: they
+ * need a companion `grid` option to draw anything at all, so they cannot be
+ * written in the `[key=value]||carrier` shape every helper here assumes. The
+ * widths' rows spell the input out and carry their own plain-render
+ * comparison; the shift's are in `BlissSVGBuilder.grid-shift.test.js`.
  */
 const CARRIER = {
   'char-space': 'B291/B291',
@@ -538,7 +539,7 @@ describe('BlissSVGBuilder option value gate', () => {
 
   describe('when transcribing the policy table', () => {
     it('holds exactly the numeric members of the curated vocabulary', () => {
-      // Membership, not just size. Without this a typo keeps the count at 28,
+      // Membership, not just size. Without this a typo keeps the count at 29,
       // keeps every row's shape, and silently ungates the key it misspells,
       // because the gate returns null for a key it cannot find.
       const NON_NUMERIC = new Set([
@@ -550,7 +551,7 @@ describe('BlissSVGBuilder option value gate', () => {
       ]);
       const expected = [...KNOWN_OPTION_KEYS].filter((k) => !NON_NUMERIC.has(k));
       expect([...NUMERIC_OPTION_POLICY.keys()].sort()).toEqual(expected.sort());
-      expect(NUMERIC_OPTION_POLICY.size).toBe(28);
+      expect(NUMERIC_OPTION_POLICY.size).toBe(29);
     });
 
     it('carries the exact kind and noun for every key', () => {
@@ -587,6 +588,7 @@ describe('BlissSVGBuilder option value gate', () => {
         'grid-minor-stroke-width': 'length/grid line width',
         'grid-sky-stroke-width': 'length/grid line width',
         'grid-earth-stroke-width': 'length/grid line width',
+        'grid-shift': 'offset/grid position',
         'background-padding': 'length/padding',
         'link-padding': 'length/padding',
         'svg-height': 'length/height',

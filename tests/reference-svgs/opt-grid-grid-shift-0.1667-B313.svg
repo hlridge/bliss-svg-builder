@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" data-generator="bliss-svg-builder" width="57" height="129" viewBox="-0.75 -0.75 9.5 21.5" class="bliss-root">
+  <style>
+    @supports (-webkit-hyphens: none) {
+      .bliss-grid-line { shape-rendering: geometricPrecision; }
+    }
+  </style>
+  <g class="bliss-grid" shape-rendering="crispEdges">
+    <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="0.166" stroke="#ebebeb" stroke-linecap="square" stroke-linejoin="miter" d="M0.1667,1.1667h8M0.1667,3.1667h8M0.1667,5.1667h8M0.1667,7.1667h8M0.1667,9.1667h8M0.1667,11.1667h8M0.1667,13.1667h8M0.1667,15.1667h8M0.1667,17.1667h8M0.1667,19.1667h8M1.1667,0.1667V20.1667M3.1667,0.1667V20.1667M5.1667,0.1667V20.1667M7.1667,0.1667V20.1667"/>
+    <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="0.166" stroke="#ebebeb" stroke-linecap="square" stroke-linejoin="miter" d="M0.1667,2.1667h8M0.1667,6.1667h8M0.1667,10.1667h8M0.1667,14.1667h8M0.1667,18.1667h8M2.1667,0.1667V20.1667M6.1667,0.1667V20.1667"/>
+    <path class="bliss-grid-line bliss-grid-line--major" stroke-width="0.166" stroke="#c7c7c7" stroke-linecap="square" stroke-linejoin="miter" d="M0.1667,0.1667h8M0.1667,4.1667h8M0.1667,12.1667h8M0.1667,20.1667h8M0.1667,0.1667V20.1667M4.1667,0.1667V20.1667M8.1667,0.1667V20.1667"/>
+    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="0.166" stroke="#858585" stroke-linecap="square" stroke-linejoin="miter" d="M0.1667,8.1667h8"/>
+    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="0.166" stroke="#858585" stroke-linecap="square" stroke-linejoin="miter" d="M0.1667,16.1667h8"/>
+  </g>
+  <g class="bliss-content" fill="none" stroke="#000000" stroke-linejoin="round" stroke-linecap="round" stroke-width="0.5">
+    <path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/>
+  </g>
+</svg>

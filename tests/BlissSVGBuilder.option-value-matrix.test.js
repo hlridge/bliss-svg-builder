@@ -70,12 +70,12 @@ import { SVG_ATTRIBUTE_NAMES, normalizeAttributeName } from '../src/lib/bliss-sv
  */
 
 // A composition each key demonstrably acts on, plus whatever else has to be
-// written for it to act at all. The six grid widths draw nothing without a
-// `grid`, so their carrier writes one; `min-width` is inert below the natural
-// width, so its legal pair is wider; a padding moves only a background or a
-// link, and a second bracket on the character is refused, so each padding's
-// carrier paints or links a part. All are asserted, not assumed, by the
-// carrier guard at the foot of this file.
+// written for it to act at all. The six grid widths and the grid shift draw
+// nothing without a `grid`, so their carrier writes one; `min-width` is inert
+// below the natural width, so its legal pair is wider; a padding moves only a
+// background or a link, and a second bracket on the character is refused, so
+// each padding's carrier paints or links a part. All are asserted, not
+// assumed, by the carrier guard at the foot of this file.
 const CARRIER = {
   'stroke-width': { code: 'B291' },
   'dot-width': { code: 'B4' },
@@ -91,6 +91,7 @@ const CARRIER = {
   'grid-minor-stroke-width': { code: 'B291', dsl: 'grid;', js: { grid: true } },
   'grid-sky-stroke-width': { code: 'B291', dsl: 'grid;', js: { grid: true } },
   'grid-earth-stroke-width': { code: 'B291', dsl: 'grid;', js: { grid: true } },
+  'grid-shift': { code: 'B291', dsl: 'grid;', js: { grid: true } },
   'background-padding': { code: 'B291;[background=yellow]>B81' },
   'link-padding': { code: 'B291;[href=#a]>B81' },
 };

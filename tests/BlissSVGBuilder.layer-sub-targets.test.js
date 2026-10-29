@@ -399,6 +399,7 @@ describe('BlissSVGBuilder sub-element targets', () => {
       ['grid-major-stroke-width',  'grid-line--major--stroke-width'],
       ['grid-sky-stroke-width',    'grid-line--sky--stroke-width'],
       ['grid-earth-stroke-width',  'grid-line--earth--stroke-width'],
+      ['grid-shift',               'grid-line--d'],
     ])('names %s when a raw key displaces it', (curated, rawKey) => {
       const builder = new BlissSVGBuilder(`[grid;${curated}=2;${rawKey}=3]||B291`);
       const warning = builder.warnings.find(w => w.code === 'MULTIPLE_ATTRIBUTE_VALUES');
@@ -407,7 +408,7 @@ describe('BlissSVGBuilder sub-element targets', () => {
       expect(warning.source).toBe(curated);
       // a bulk option sits in all five chains, so the source alone cannot see it
       // dropped from one of them: the element list is what changes there
-      if (curated === 'grid-color' || curated === 'grid-stroke-width') {
+      if (curated === 'grid-color' || curated === 'grid-stroke-width' || curated === 'grid-shift') {
         expect(warning.message).toContain(
           'on grid-line--minor, grid-line--medium, grid-line--major, grid-line--sky, grid-line--earth');
       }

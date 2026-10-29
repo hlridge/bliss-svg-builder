@@ -619,6 +619,10 @@ const curatedCaseSpecs = [
   { code: '[filter=blur(1px)]|[filter=blur(2px)]B313;[filter=grayscale(1)]>B81', file: 'opt-word-filter-blur-1px-char-filter-blur-2px-part-filter-grayscale-1-B313+B81.svg' },
   { code: '[filter=blur(2px);grid;grid--filter=grayscale(1)]||[filter=blur(1px)]B313', file: 'opt-filter-blur-2px-grid-grid--filter-grayscale-1-char-filter-blur-1px-B313.svg' },
   { code: '[crop-left=6]||[filter=drop-shadow(1px 1px 0 blue);background-area=ink;background=yellow]B313/B291', file: 'opt-crop-left-6-char-filter-drop-shadow-1px-1px-0-blue-background-area-ink-background-yellow-B313_B291.svg' },
+  // the grid moved by a sixth of a unit (half a pixel where a unit is 3
+  // pixels), down-right and then up-left; a minus sign is written minus
+  { code: '[grid;grid-shift=0.1667]||B313', file: 'opt-grid-grid-shift-0.1667-B313.svg' },
+  { code: '[grid;grid-shift=-0.1667]||B313', file: 'opt-grid-grid-shift-minus-0.1667-B313.svg' },
 ];
 
 // filename DERIVED from code + curatedDefs so it is byte-identical to the

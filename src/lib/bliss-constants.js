@@ -24,6 +24,7 @@ export const KNOWN_OPTION_KEYS = new Set([
   'grid-sky-color', 'grid-earth-color',
   'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
   'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
+  'grid-shift',
   'color', 'background', 'background-top', 'background-mid', 'background-bottom',
   'background-area', 'link-area', 'background-padding', 'link-padding',
   'text', 'svg-desc', 'svg-title', 'svg-height', 'error-placeholder',
@@ -89,15 +90,20 @@ export const BACKGROUND_AREA_ELEMENTS = Object.freeze({
  */
 export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
   gridMinor:  { stroke: ['grid-minor-color', 'grid-color'],
-                'stroke-width': ['grid-minor-stroke-width', 'grid-stroke-width'] },
+                'stroke-width': ['grid-minor-stroke-width', 'grid-stroke-width'],
+                d: ['grid-shift'] },
   gridMedium: { stroke: ['grid-medium-color', 'grid-color'],
-                'stroke-width': ['grid-medium-stroke-width', 'grid-stroke-width'] },
+                'stroke-width': ['grid-medium-stroke-width', 'grid-stroke-width'],
+                d: ['grid-shift'] },
   gridMajor:  { stroke: ['grid-major-color', 'grid-color'],
-                'stroke-width': ['grid-major-stroke-width', 'grid-stroke-width'] },
+                'stroke-width': ['grid-major-stroke-width', 'grid-stroke-width'],
+                d: ['grid-shift'] },
   gridSky:    { stroke: ['grid-sky-color', 'grid-major-color', 'grid-color'],
-                'stroke-width': ['grid-sky-stroke-width', 'grid-major-stroke-width', 'grid-stroke-width'] },
+                'stroke-width': ['grid-sky-stroke-width', 'grid-major-stroke-width', 'grid-stroke-width'],
+                d: ['grid-shift'] },
   gridEarth:  { stroke: ['grid-earth-color', 'grid-major-color', 'grid-color'],
-                'stroke-width': ['grid-earth-stroke-width', 'grid-major-stroke-width', 'grid-stroke-width'] },
+                'stroke-width': ['grid-earth-stroke-width', 'grid-major-stroke-width', 'grid-stroke-width'],
+                d: ['grid-shift'] },
   backgroundZone: { fill: ['background'] },
   zoneTop:    { fill: ['background-top', 'background'] },
   zoneMid:    { fill: ['background-mid', 'background'] },
@@ -774,6 +780,7 @@ export const GLOBAL_ONLY_OPTION_KEYS = new Set([
   'grid-minor-color', 'grid-sky-color', 'grid-earth-color',
   'grid-stroke-width', 'grid-major-stroke-width', 'grid-medium-stroke-width',
   'grid-minor-stroke-width', 'grid-sky-stroke-width', 'grid-earth-stroke-width',
+  'grid-shift',
   'background-top', 'background-mid', 'background-bottom',
   'center', 'min-width', 'char-space', 'word-space', 'external-glyph-space',
   'svg-title', 'svg-desc', 'svg-height', 'error-placeholder'
@@ -1085,7 +1092,7 @@ export const WARNING_CODES = Object.freeze({
  * an empty warnings array. Honour the value or refuse it; never substitute one
  * quietly.
  *
- * These 28 are exactly the numeric members of KNOWN_OPTION_KEYS. The two
+ * These 29 are exactly the numeric members of KNOWN_OPTION_KEYS. The two
  * numeric options NOT here are `relative-kerning` and `absolute-kerning`, which
  * are absent from that set as well (the parser promotes them rather than
  * dispatching on them) and carry their own gate, MALFORMED_KERNING_VALUE. They
@@ -1117,6 +1124,7 @@ export const NUMERIC_OPTION_POLICY = new Map([
   ['grid-minor-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
   ['grid-sky-stroke-width',    { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
   ['grid-earth-stroke-width',  { kind: 'length', noun: 'grid line width', fallback: '0.166, in #processOptions' }],
+  ['grid-shift',               { kind: 'offset', noun: 'grid position', fallback: '0, in #pictureMarkup' }],
   ['background-padding',       { kind: 'length', noun: 'padding',  fallback: 'whatever is inherited, else the area default in bliss-element.js' }],
   ['link-padding',             { kind: 'length', noun: 'padding',  fallback: 'whatever is inherited, else the area default in bliss-element.js' }],
   ['svg-height',              { kind: 'length', noun: 'height',   fallback: 'six times the viewBox height, in #svgCode' }],
@@ -1266,7 +1274,7 @@ export const judgeNumericOptionValue = (key, rawValue) => {
     };
   }
   // The key is quoted and leads rather than following an article, because an
-  // article cannot be chosen for 28 names at once: "a sdot-extra-width" and
+  // article cannot be chosen for 29 names at once: "a sdot-extra-width" and
   // "a external-glyph-space" are both wrong, and the rule that picks between
   // "a" and "an" is about sound, not spelling.
   if (!Number.isFinite(written)) {

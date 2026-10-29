@@ -611,6 +611,15 @@ class BlissSVGBuilder {
       processed.gridMinorStrokeWidth = minorWidth;
     }
 
+    // grid-shift: an OFFSET in grid units, so a negative one moves the grid
+    // left and up; only a non-finite value or something that is not a number
+    // at all is refused, and a refused one leaves the grid where it was.
+    if ('grid-shift' in rawOptions) {
+      const refusal = judgeNumericOptionValue('grid-shift', rawOptions['grid-shift']);
+      if (refusal) this.#warnings.push(refusal);
+      else processed.gridShift = Number(rawOptions['grid-shift']);
+    }
+
     // crop: Sets ALL 4 crop values (number or 'auto')
     if ('crop' in rawOptions) {
       const c = rawOptions['crop'];
@@ -6506,7 +6515,15 @@ class BlissSVGBuilder {
     const gridMinY = cropTop;
     const gridMaxY = height - cropBottom;
 
-    const hLine = (y) => `M${gridStartX},${y}h${gridLineWidth}`;
+    // `grid-shift` moves every line by one amount on both axes, after the crop
+    // window has chosen the lines where they sit unmoved. The coordinates move
+    // rather than the group, so a `grid--transform` the author writes acts on
+    // top instead of replacing a computed one. A moved coordinate is rounded
+    // like the viewBox; at 0 every coordinate is written exactly as before.
+    const gridShift = this.#processedOptions.gridShift ?? 0;
+    const shifted = (position) => (gridShift === 0 ? position : round(position + gridShift));
+
+    const hLine = (y) => `M${shifted(gridStartX)},${shifted(y)}h${gridLineWidth}`;
     const hLines = (ys) => ys.filter(y => y >= gridMinY && y <= gridMaxY).map(hLine).join('');
 
     let getVerticalLines = (type) => {
@@ -6528,7 +6545,7 @@ class BlissSVGBuilder {
           break;
       }
       for (const x of xs.filter(x => x >= cropLeft && x <= width - cropRight)) {
-        pathData += `M${gridOffsetX + x},${gridMinY}V${gridMaxY}`;
+        pathData += `M${shifted(gridOffsetX + x)},${shifted(gridMinY)}V${shifted(gridMaxY)}`;
       }
       return pathData;
     }
@@ -6553,15 +6570,16 @@ class BlissSVGBuilder {
       // The computed key order below is load-bearing: a reordered attribute is a
       // diff in every grid assertion in the suite. Every line runs within one
       // extent, from gridStartX across gridLineWidth and from gridMinY to
-      // gridMaxY, so its box is that extent widened by half its own width.
+      // gridMaxY, moved by the shift, so its box is that extent widened by
+      // half its own width.
       const gridLine = (classes, strokeWidth, stroke, d) => ({
         classes,
         computed: { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square', 'stroke-linejoin': 'miter', d },
         box: {
-          minX: gridStartX - strokeWidth / 2,
-          minY: gridMinY - strokeWidth / 2,
-          maxX: gridStartX + gridLineWidth + strokeWidth / 2,
-          maxY: gridMaxY + strokeWidth / 2,
+          minX: gridStartX + gridShift - strokeWidth / 2,
+          minY: gridMinY + gridShift - strokeWidth / 2,
+          maxX: gridStartX + gridShift + gridLineWidth + strokeWidth / 2,
+          maxY: gridMaxY + gridShift + strokeWidth / 2,
         },
       });
 
