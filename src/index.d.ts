@@ -1386,6 +1386,13 @@ export declare class BlissSVGBuilder {
    * byte-copy of the input; compare a round trip against `toString()` output,
    * not against stored text.
    *
+   * Words with no space between them, which the raw element methods can
+   * leave, are written as one word, since only a space makes two: it takes
+   * each option and the `;;` indicators from the first word that has them,
+   * the indicators staying on the character they were drawn on
+   * (`[color=red]|B313` then `B431;;B81` comes back as
+   * `[color=red]|B313/B431^;;B81`). `toJSON()` keeps the two words.
+   *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the
    * same concept as `applyIndicators(code, { flatten })`; the name is qualified

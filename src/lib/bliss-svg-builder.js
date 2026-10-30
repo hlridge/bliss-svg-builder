@@ -3692,21 +3692,17 @@ class BlissSVGBuilder {
     // contribute no units and never split a run.
     let spaceRun = null;
     // A reload reads a run against the word written after it, so the run is
-    // spelled against that word as the reload reads it: every group written
-    // before the next space group (groups with no space between them are one
-    // word to a reload), read back as written. The written word can read
-    // otherwise than the stored one: a definition that pulls in the word
-    // space on a drawing whose own code does not is written as that code, and
-    // a character the builder does not count as punctuation can be written as
-    // a code that is. A word longer than a reload reads is never read back,
-    // so it is judged as the builder stores its characters, less those written
-    // as nothing. The run's segment holds its slot until that word is
-    // complete, and each written word is read back once per save.
-    let pendingRun = null;
+    // spelled against that word as the reload reads it, read back as written.
+    // The written word can read otherwise than the stored one: a definition
+    // that pulls in the word space on a drawing whose own code does not is
+    // written as that code, and a character the builder does not count as
+    // punctuation can be written as a code that is. A word longer than a
+    // reload reads is never read back, so it is judged as the builder stores
+    // its `characters`, less those written as nothing. Each written word is
+    // read back once per save.
     const writtenDefaults = new Map();
-    const defaultSpaceBefore = ({ texts, word }) => {
-      const text = texts.join('/');
-      if (text.length > MAX_INPUT_LENGTH) return BlissSVGBuilder.#defaultSpaceBefore(word);
+    const defaultSpaceBefore = (text, characters) => {
+      if (text.length > MAX_INPUT_LENGTH) return BlissSVGBuilder.#defaultSpaceBefore(characters);
       if (!writtenDefaults.has(text)) writtenDefaults.set(text, BlissSVGBuilder.#defaultSpaceBeforeWritten(text));
       return writtenDefaults.get(text);
     };
@@ -3720,20 +3716,6 @@ class BlissSVGBuilder {
       // below place it without doubling a separator.
       return '/' + run.map((code) => (code === defaultCode ? '/' : `${code}/`)).join('');
     };
-    const closePendingRun = () => {
-      if (pendingRun) segments[pendingRun.slot] = spellRun(pendingRun.run, defaultSpaceBefore(pendingRun));
-      pendingRun = null;
-    };
-    const flushSpaceRun = () => {
-      if (!spaceRun) return;
-      // Defensive: only space groups open a run, and a space group always
-      // holds a glyph. Empties never open one (they only skip the flush).
-      if (spaceRun.length > 0) {
-        pendingRun = { run: spaceRun, slot: segments.length, texts: [], word: [] };
-        segments.push('');
-      }
-      spaceRun = null;
-    };
     // The character the builder draws a word's `;;` codes on, read as the
     // render reads it, from the stored word: this save's copy has given a
     // custom character's code up for the code it draws, which can rank
@@ -3742,36 +3724,62 @@ class BlissSVGBuilder {
     const drawnHead = (group, stored) => resolveOverlayHeadIndex(stored.glyphs.map((glyph, index) =>
       ({ ...glyph, isHeadGlyph: group.glyphs[index].isHeadGlyph })));
 
-    for (const [groupIndex, group] of (obj.groups || []).entries()) {
-      if (!group.glyphs) continue;
-      // A malformed word (parser group.errorCode) never reaches serialization:
-      // #normalizeFailedWordInvariant drops it from #rawBlissObj at rebuild
-      // (retention family, rows 31/80), so no errorSource replay survives here.
-      if (isSpaceGroup(group)) {
-        closePendingRun();
-        spaceRun ??= [];
-        spaceRun.push(...group.glyphs.map(g => g.parts[0].codeName));
-        continue;
-      }
+    // What one word writes: each character's segments (its own token last),
+    // the `;;` overlay it writes, the character that overlay is drawn on and
+    // the one its stored designation marks. `overlayTaken` says that a word
+    // written before it with no space between them keeps its overlay, so this
+    // word's is left out and its head written without it. A word that writes
+    // nothing (a bare empty one) is null: it makes no seam and leaves a space
+    // run open.
+    const writtenWord = (group, groupIndex, overlayTaken) => {
+      const stored = this.#rawBlissObj.groups[groupIndex];
+      const overlay = overlayTaken ? null : group.wordIndicators ?? null;
       // The word's `;;` codes are merged onto its head, so they are placed
       // with the head's parts. Only a custom code is spelled out, in a part or
       // among the `;;` codes, and only it or a part the string reads back as
       // plain ink is placed, so a word holding neither has nothing to place
       // and its head is not looked for.
-      const overlayHead = group.wordIndicators
-        && (BlissSVGBuilder.#namesCustomWordCode(group.wordIndicators.codes ?? [])
+      const overlayHead = overlay
+        && (BlissSVGBuilder.#namesCustomWordCode(overlay.codes ?? [])
           || group.glyphs.some((glyph) => BlissSVGBuilder.#namesCustomCode(glyph.parts ?? [])
             || (glyph.parts ?? []).some(losesIndicator)))
-        ? drawnHead(group, this.#rawBlissObj.groups[groupIndex])
+        ? drawnHead(group, stored)
         : -1;
       placedWordCodes = null;
       const glyphArrays = group.glyphs.map((glyph, glyphIndex) =>
-        serializeGlyph(glyph, glyphIndex === overlayHead ? group.wordIndicators : null));
-      // Assembled after any head marker is stamped on, so a marked letter fails
-      // the collapse grammar and keeps its run explicit.
-      const assembleGroup = () =>
-        collapseExternalLetterRuns(glyphArrays.flat().filter(Boolean)).join('/');
-      let groupStr = assembleGroup();
+        serializeGlyph(glyph, glyphIndex === overlayHead ? overlay : null));
+      const content = glyphArrays.flat().some(Boolean);
+      if (!content && !serializeOptionsWithPosition(group)) return null;
+      // R14: a word-level indicator overlay is written as trailing `;;` (kept
+      // by default; `flatten` collapses it onto the head as `;` instead), and
+      // only where the word writes a character for it to sit on.
+      const { codes = [], stripSemantic } = overlay ?? {};
+      return {
+        group,
+        glyphArrays,
+        overlay: content ? overlay : null,
+        overlayText: ';;' + (stripSemantic ? '!' : '') + (placedWordCodes ?? codes).join(';'),
+        overlayHead,
+        drawn: content && overlay ? drawnHead(group, stored) : -1,
+        designation: group.glyphs.findIndex((glyph) => glyph.isHeadGlyph === true),
+        // A character's own token is its last, after any kerning markers; one
+        // written as nothing is no character to a reload.
+        characters: stored.glyphs.filter((_, glyphIndex) => glyphArrays[glyphIndex].at(-1)),
+      };
+    };
+    // Assembled after any head marker is stamped on, so a marked letter fails
+    // the collapse grammar and keeps its run explicit.
+    const assemble = (glyphArrays) => collapseExternalLetterRuns(glyphArrays.flat().filter(Boolean)).join('/');
+    const markHead = (glyphArrays, head) => {
+      const segments = glyphArrays[head];
+      if (segments.at(-1)) segments[segments.length - 1] += '^';
+    };
+    const withOptions = (node, text) => {
+      const prefix = serializeOptionsWithPosition(node);
+      return prefix ? `${prefix}|${text}` : text;
+    };
+    const loneWordText = ({ group, glyphArrays, overlay, overlayText, overlayHead, designation }) => {
+      let text = assemble(glyphArrays);
       // Head-marker fidelity (rc.4): a stored designation ALWAYS re-emits as
       // `^` on the marked glyph's last segment, matching toJSON's isHeadGlyph,
       // so a string round-trip never loses the designation — even when the
@@ -3779,47 +3787,82 @@ class BlissSVGBuilder {
       // stored designation stay unmarked (the automatic pick is derived at
       // query time, never stored), unless the pick a reload makes from what is
       // written would carry the word's `;;` codes onto another character than
-      // the builder drew them on: there the builder's head is marked.
-      let headIndex = group.glyphs.findIndex(g => g.isHeadGlyph === true);
-      if (headIndex === -1 && group.wordIndicators && groupStr) {
-        headIndex = BlissSVGBuilder.#movedHead(overlayHead, group.glyphs, glyphArrays, groupStr);
+      // the builder drew them on: there the builder's head is marked. A word
+      // holding no custom code is written as stored, so its head stays.
+      let headIndex = designation;
+      if (headIndex === -1 && overlay
+        && group.glyphs.some((glyph) => BlissSVGBuilder.#namesCustomCode(glyph.parts ?? []))) {
+        headIndex = BlissSVGBuilder.#movedHead(overlayHead, glyphArrays, text);
       }
-      if (headIndex !== -1 && groupStr) {
-        const headSegments = glyphArrays[headIndex];
-        if (headSegments.length && headSegments[headSegments.length - 1]) {
-          headSegments[headSegments.length - 1] += '^';
-          groupStr = assembleGroup();
-        }
+      if (headIndex !== -1 && text) {
+        markHead(glyphArrays, headIndex);
+        text = assemble(glyphArrays);
       }
-      // R14: re-emit a word-level indicator overlay as trailing `;;` (kept by
-      // default; `flatten` collapses it onto the head as `;` instead).
-      if (group.wordIndicators && groupStr) {
-        const { codes: storedCodes = [], stripSemantic } = group.wordIndicators;
-        const codes = placedWordCodes ?? storedCodes;
-        groupStr += ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+      return withOptions(group, overlay ? text + overlayText : text);
+    };
+    // Words with no space between them are one word to a reload, so they are
+    // written as one. Each option comes from the first word that has it, a
+    // position included, and the `;;` overlay from the first word that draws
+    // one (a later one is left out, see writtenWord). The overlay stays on the
+    // character it was drawn on: a designation stored there is written, and
+    // so is a marker where the reload's pick from the word as written would
+    // differ. Any other designation is left out, since a head re-derived
+    // loses nothing and an overlay moved moves ink. Without an overlay the
+    // first designation stored is written.
+    const joinedWordText = (words) => {
+      const glyphArrays = words.flatMap((word) => word.glyphArrays.map((segments) => [...segments]));
+      const startOf = (word) => words.slice(0, words.indexOf(word))
+        .reduce((count, other) => count + other.glyphArrays.length, 0);
+      const keeper = words.find((word) => word.drawn !== -1);
+      const marking = words.find((word) => word.designation !== -1);
+      let head = -1;
+      if (keeper) {
+        const drawn = startOf(keeper) + keeper.drawn;
+        if (keeper.designation === keeper.drawn
+          || BlissSVGBuilder.#movedHead(drawn, glyphArrays, assemble(glyphArrays)) !== -1) head = drawn;
+      } else if (marking) {
+        head = startOf(marking) + marking.designation;
       }
-      // Prefix group-level options with [opts]| syntax
-      const groupOptPrefix = serializeOptionsWithPosition(group);
-      if (groupOptPrefix) groupStr = `${groupOptPrefix}|${groupStr}`;
-      if (groupStr === '') continue; // bare content-empty: no segment, run stays open
-      flushSpaceRun();
-      pendingRun?.texts.push(groupStr);
-      // A character's own token is its last, after any kerning markers; one
-      // written as nothing is no character to a reload.
-      pendingRun?.word.push(...this.#rawBlissObj.groups[groupIndex].glyphs
-        .filter((_, glyphIndex) => glyphArrays[glyphIndex].at(-1)));
-      segments.push(groupStr);
+      if (head !== -1) markHead(glyphArrays, head);
+      const node = { options: {} };
+      for (const { group } of words) {
+        node.x ??= group.x;
+        node.y ??= group.y;
+        for (const [key, value] of Object.entries(group.options ?? {})) node.options[key] ??= value;
+      }
+      return withOptions(node, assemble(glyphArrays) + (keeper?.overlayText ?? ''));
+    };
+    // The words written since the last space group.
+    let joined = [];
+    const writeJoined = () => {
+      if (joined.length === 0) return;
+      const text = joined.length === 1 ? loneWordText(joined[0]) : joinedWordText(joined);
+      if (spaceRun) segments.push(spellRun(spaceRun, defaultSpaceBefore(text, joined.flatMap((word) => word.characters))));
+      spaceRun = null;
+      segments.push(text);
+      joined = [];
+    };
+
+    for (const [groupIndex, group] of (obj.groups || []).entries()) {
+      if (!group.glyphs) continue;
+      // A malformed word (parser group.errorCode) never reaches serialization:
+      // #normalizeFailedWordInvariant drops it from #rawBlissObj at rebuild
+      // (retention family, rows 31/80), so no errorSource replay survives here.
+      if (isSpaceGroup(group)) {
+        writeJoined();
+        spaceRun ??= [];
+        spaceRun.push(...group.glyphs.map(g => g.parts[0].codeName));
+        continue;
+      }
+      const word = writtenWord(group, groupIndex, joined.some((other) => other.drawn !== -1));
+      if (word) joined.push(word);
     }
-    closePendingRun();
+    writeJoined();
     // A run with no word after it reads back as ordinary spaces.
     if (spaceRun) segments.push(spellRun(spaceRun, 'TSP'));
-    // Join: slash-only segments already include separators, others need /
-    let result = segments.reduce((acc, seg) => {
-      if (acc === '') return seg;
-      if (seg.startsWith('/')) return acc + seg;
-      if (acc.endsWith('/')) return acc + seg;
-      return acc + '/' + seg;
-    }, '');
+    // Each space run is written self-delimiting, and the words between two
+    // runs are one segment, so the segments join as they stand.
+    let result = segments.join('');
 
     // A space run is emitted self-delimiting, so at the very start or end of
     // the string its outer separator can have nothing left to separate. Next to
@@ -5001,16 +5044,14 @@ class BlissSVGBuilder {
     return bracket ? `${bracket}>${code}` : code;
   }
 
-  // `head`, the character of `glyphs` (a word with no designation written)
-  // that its `;;` codes are drawn on, where a reload of the word as written
-  // would carry them onto another one; else -1. `groupStr` is the word as
-  // written, its `;;` codes left off, and `glyphArrays[i]` what character i
-  // is written as, its code last. The head is picked by code, and a custom
-  // code is written as the code it draws, which can rank otherwise: a glyph
-  // defined as `B937` ("more") is a head, `B937` itself is skipped as one. A
-  // word holding no custom code is written as stored, so its head stays.
-  static #movedHead(head, glyphs, glyphArrays, groupStr) {
-    if (!glyphs.some((glyph) => BlissSVGBuilder.#namesCustomCode(glyph.parts ?? []))) return -1;
+  // `head`, the character of a word with no designation written that its
+  // `;;` codes are drawn on, where a reload of the word as written would
+  // carry them onto another one; else -1. `groupStr` is the word as written,
+  // its `;;` codes left off, and `glyphArrays[i]` what character i is written
+  // as, its code last. The head is picked by code, and a custom code is
+  // written as the code it draws, which can rank otherwise: a glyph defined
+  // as `B937` ("more") is a head, `B937` itself is skipped as one.
+  static #movedHead(head, glyphArrays, groupStr) {
     const { groups } = BlissParser.parse(groupStr);
     if (groups?.length !== 1) return -1;
     const writtenBefore = glyphArrays.slice(0, head).filter((segments) => segments.at(-1)).length;
