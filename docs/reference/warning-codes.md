@@ -61,12 +61,14 @@ color=red|B313         →  renders B313
 
 Correct form: `[color=red]|B313`.
 
-A word takes its options once, before its first `|`. A `|` later in the word is reported the same way and ignored together with any option bracket written right before it; the characters on both sides stay in the word:
+A word takes its options once, before its first `|`. A later `|`, or a `||` after the global options, written right after an option bracket at the start of a character marks that bracket as an option out of place (see [`MISPLACED_GROUP_OPTION`](#misplaced-group-option) and [`MISPLACED_GLOBAL_OPTION`](#misplaced-global-option)). Anywhere else, after a code, next to a `/` or at the end of the word, it is a syntax error: the whole word is dropped from render and from both `toString()` and `toJSON()`, and this warning, whose `source` is the word as written, is its only trace.
 
 ```
-[color=red]|B313/[color=blue]|B431   →  renders as [color=red]|B313/B431
-[color=red]|B313/B291|B431           →  renders as [color=red]|B313/B291/B431
+[color=red]|B313/B291|B431   →  renders nothing, source "[color=red]|B313/B291|B431"
+[color=red]||B313||B431      →  renders nothing, source "B313||B431"
 ```
+
+Correct form: one `|` per word, right after its options: `[color=red]|B313/B291/B431`.
 
 ### `MALFORMED_WORD_INDICATOR`
 
@@ -264,6 +266,12 @@ A word option (`[opts]|`) on a code that expands to multiple words. The option i
 
 Written multi-word content is different: in `[color=red]|B313//B431` the bracket binds the first word by syntax, which is valid.
 
+A word option written inside a word, as a bracket and `|` at the start of a character after the word's own options, is reported here too, with the bracket and its `|` as `source`. It is left out without its options being read, and the word renders:
+
+```
+[color=red]|B313/[color=blue]|B431   →  renders as [color=red]|B313/B431
+```
+
 ### `MISPLACED_GLOBAL_OPTION`
 
 A canvas-wide option key placed at word, character, or part scope. These keys configure the whole SVG, so they only take effect at global scope (`[opts]||`); anywhere else the key is dropped and the content renders unchanged.
@@ -271,6 +279,12 @@ A canvas-wide option key placed at word, character, or part scope. These keys co
 ```
 [margin=2]B313         →  renders B313, margin dropped
 [grid]|B313//B431      →  renders both words, grid dropped
+```
+
+A whole global option bracket written after the start of the input, as a bracket and `||` at the start of a later word or of a character inside one, is reported here too, with the bracket and its `||` as `source`. It is left out without its options being read, and the content renders:
+
+```
+[grid]||B313//[color=red]||B431   →  renders as [grid]||B313//B431
 ```
 
 The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background-top`, `background-mid`, `background-bottom`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
