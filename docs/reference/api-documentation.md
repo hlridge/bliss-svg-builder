@@ -497,7 +497,7 @@ builder.addPart('B81');
 
 The code must be exactly one part (one call per part). If the last group has no glyphs, the part is wrapped in a new glyph; on an empty builder the group is created too, with `opts` landing on the part itself. A part references a shape, so `code` is required: to reserve an empty slot, use `addGlyph('')`.
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty, parses to more than one part, or carries an artifact from above the part (a head marker `^`, a word indicator list `;;`, word options `[opts]|`, or document options `[opts]||`). A word code (`B313/B1103`) does not throw: it is kept as a failed part with a `WORD_AS_PART` warning, exactly like the DSL.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty, parses to more than one part, or carries an artifact from above the part (a head marker `^`, a word indicator list `;;`, word options `[opts]|`, document options `[opts]||`, or any other `|` outside an option bracket, as in `|B313` or `B313|B431`). A word code (`B313/B1103`) does not throw: it is kept as a failed part with a `WORD_AS_PART` warning, exactly like the DSL.
 
 ### `insertGroup(index, code?, opts?)`
 
@@ -959,7 +959,7 @@ builder.group(0).addPart('B81'); // appends to last glyph in group
 
 The code must be exactly one part. A part references a shape, so `code` is required: to reserve an empty slot, use `addGlyph('')`.
 
-**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty, parses to more than one part, or carries an artifact from above the part (`^`, `;;`, `[opts]|`, `[opts]||`; see [`addPart`](#addpart-code-opts)). A word code is kept as a failed part with a `WORD_AS_PART` warning instead of throwing.
+**Throws** a `TypeError` if `code` is provided and is not a string, and an `Error` if `code` is empty, parses to more than one part, or carries an artifact from above the part (`^`, `;;`, `[opts]|`, `[opts]||`, any other `|`; see [`addPart`](#addpart-code-opts)). A word code is kept as a failed part with a `WORD_AS_PART` warning instead of throwing.
 
 #### `.insertPart(index, code, opts?)`
 
@@ -1615,7 +1615,7 @@ builder.addGlyph('[color=red]||B313'); // Error: carries document-level options
 
 The fix is the same in every case: style the character itself (`[color=red]B313` or the `opts` parameter), apply indicators with `applyIndicators()` on the word, set document options on the builder input, or use `addGroup()` for word content (the artifact errors each name their own alternative; the multi-character and word-name errors report only the count).
 
-The part-level methods (`addPart`, `insertPart`, `replacePart`, `replace()` on a part handle) are stricter still: a part references a single shape, so besides multi-part codes they reject every artifact from above the part, including a head marker (`^`), a word indicator list (`;;`), word options, and document options. A whole word passed to `addPart` is the one exception: it is kept as a failed part with a `WORD_AS_PART` warning (visible, not silently dropped) rather than throwing.
+The part-level methods (`addPart`, `insertPart`, `replacePart`, `replace()` on a part handle) are stricter still: a part references a single shape, so besides multi-part codes they reject every artifact from above the part, including a head marker (`^`), a word indicator list (`;;`), word options, document options, and any other `|` outside an option bracket (`|B313`, `B313|B431`): `|` and `||` end the options of a word and of the input, which a part does not have. A whole word passed to `addPart` is the one exception: it is kept as a failed part with a `WORD_AS_PART` warning (visible, not silently dropped) rather than throwing.
 
 Defined word names count as words. To fuse one into an existing word, go through the group level:
 
