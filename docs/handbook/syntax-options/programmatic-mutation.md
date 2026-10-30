@@ -404,7 +404,7 @@ builder.insertElement(1, 'SP');
 // Append a raw group (no auto-space inserted)
 builder.addElement('B291');
 
-// Remove a space group (adjacent words are not merged)
+// Remove a space group (the words on either side stay two words; toString() writes them as one)
 builder.removeElement(1);
 
 // Replace a space with a different type

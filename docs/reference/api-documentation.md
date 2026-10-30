@@ -191,6 +191,8 @@ builder.toString();
 
 Serialized spacing always matches rendered spacing: adjacent space groups serialize as one coalesced run, and every space in that run is written on its own. A space that matches its position's default is a bare separator, so a run of N default spaces emits N+1 slashes; a space that differs (like `QSP` between words, where the default is `TSP`) keeps its name while the spaces around it stay compact. `H/TSP/QSP/TSP/H` therefore comes back as `H//QSP//H`. [Empty slots](#empty-slots-are-deliberate) contribute nothing. A bare empty group or glyph has no DSL token of its own, so it is omitted from the string (an options-carrying empty does have one: `[color=red]|` for a group, `[color=red]` for a glyph, unless the options are [left out](#saving-without-options)); use `toJSON()` when empty slots must survive a round-trip.
 
+Words with no space between them, which the [raw element methods](#raw-element-methods) can leave, are written as one word, since a space is what makes two. The word takes each option and the `;;` indicators from the first word that has them, and the indicators stay on the character they were drawn on: `[color=red]|B313` then `B431;;B81` is written `[color=red]|B313/B431^;;B81`. `toJSON()` keeps the two words.
+
 A word written with the `X` shorthand comes back in that shorthand. `Xhello` parses into one glyph per letter and serializes as `Xhello`, not as `Xh/Xe/Xl/Xl/Xo`. A letter that carries something of its own (an option, a coordinate, a head marker) is written out on its own, because the compact form has nowhere to put it, but the letters beside it still join up: `Xa/[color=red]>Xb` stays as written, while `Xa^/Xb/Xc` comes back as `Xa^/Xbc`. Both spellings render the same image and parse back to the same composition; the compact one is just the one you would have typed.
 
 The options a code brings by its definition are part of the code, so they are not written out where the name brings them. `REFSQUARE` and `ANCHORRING` draw a dotted line by definition, and `REFSQUARE` comes back as `REFSQUARE`, dotted line and all. A look you set yourself is written as usual (`[stroke-dasharray=4 4]>REFSQUARE`); to draw the square solid, write `[stroke-dasharray=none]>REFSQUARE`. A [custom definition's own options](/handbook/writing/custom-codes#a-definition-s-own-options) work the same way under `preserve`; where the default output spells the code out in built-in codes, they are written as a part bracket on what they style (`[color=red]>B291`).
@@ -616,7 +618,7 @@ Appends a raw group. No space group is inserted:
 ```js
 const builder = new BlissSVGBuilder('B313');
 builder.addElement('B431');
-// [B313, B431], no space between
+// [B313, B431], no space between; toString() writes them as one word, 'B313/B431'
 ```
 
 An omitted or empty `code` appends an [empty group](#empty-slots-are-deliberate) (here without the auto-space `addGroup` would add).
@@ -649,7 +651,7 @@ Removes the raw group at the given index (plain splice, no space cleanup). Negat
 ```js
 const builder = new BlissSVGBuilder('B313//B431');
 builder.removeElement(1); // remove space group
-// [B313, B431] — adjacent, no space
+// [B313, B431], no space between; toString() writes them as one word, 'B313/B431'
 ```
 
 #### `replaceElement(index, code?, opts?)`
