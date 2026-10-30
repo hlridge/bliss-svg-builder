@@ -35,7 +35,9 @@
  *   object's bags, the JavaScript channels, a definition's `defaultOptions`.
  * - The scope table defined once, beside the stage, its codes written nowhere
  *   else but the parser's one report of a kerning marker no character follows
- *   (a marker's place, not a key's scope), and its judge private to the stage.
+ *   (a marker's place, not a key's scope) and its one report of a global
+ *   option bracket written inside a word (a bracket's place; its keys are
+ *   never read), and its judge private to the stage.
  * - Every call carrying a bag toward the stage naming its scope, hop by hop, on
  *   the DSL, definition-expansion, composition-object, setter and handle
  *   routes; the one call that passes none, named with its reason.
@@ -208,13 +210,16 @@ describe('BlissSVGBuilder option admission drift', () => {
       },
     );
 
-    it('finds bliss-parser.js naming neither the table nor its judge, and writing only the kerning code for a marker no character follows', () => {
+    it('finds bliss-parser.js naming neither the table nor its judge, and writing only the kerning code for a marker no character follows and the global code for a global bracket inside a word', () => {
       // Where a marker stands is not a key's scope, so the stage has no part in
       // it; the kerning code's rule (no character to be the gap before) covers it.
+      // Nor is where a whole `[opts]||` bracket stands: it is left out unread,
+      // so no key in it is judged, and only a string can write one.
       const text = libSource('bliss-parser.js');
       expect(text).not.toMatch(/\b(?:SCOPE_BOUND_OPTIONS|scopeRefusal)\b/);
-      expect(scopeCodesWritten(text)).toBe(1);
+      expect(scopeCodesWritten(text)).toBe(2);
       expect(text).toMatch(/code: WARNING_CODES\.MISPLACED_KERNING_OPTION,\s+message: `Kerning is the gap before a character, and no character follows /);
+      expect(text).toMatch(/code: WARNING_CODES\.MISPLACED_GLOBAL_OPTION,\s+message: `Global options "\$\{dropped\}" ignored in the word /);
     });
 
     it('finds the judge asked by the stage alone, and exported by nothing', () => {

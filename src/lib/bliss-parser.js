@@ -637,6 +637,35 @@ export class BlissParser {
       && (restored.replace(QUOTED_SPANS_PATTERN, '').match(/\[/g) || []).length > 1;
   }
 
+  // Where a word's `|` and `||` stand, read from the word with its option
+  // brackets tokenized (a `|` inside one is never seen). A single `|` first in
+  // the word closes the word's options: `options` is the text before it,
+  // undefined when there is none. Any other `|` or `||` must follow option
+  // brackets that start a character, which are then a misplaced word option
+  // (`|`) or global option (`||`), left out of `content` and listed in
+  // `misplaced`. Anywhere else it is a syntax error that fails the word:
+  // null.
+  static #readWordSeparators(word) {
+    let options;
+    let content = '';
+    const misplaced = [];
+    let from = 0;
+    for (const [index, run] of [...word.matchAll(/\|+/g)].entries()) {
+      const before = word.slice(from, run.index);
+      from = run.index + run[0].length;
+      if (index === 0 && run[0] === '|') {
+        options = before;
+        continue;
+      }
+      const characterStart = before.lastIndexOf('/') + 1;
+      const brackets = before.slice(characterStart);
+      if (run[0].length > 2 || !/^(?:\[[^[\]]*\])+$/.test(brackets)) return null;
+      misplaced.push({ spelling: brackets + run[0], isGlobal: run[0].length === 2 });
+      content += before.slice(0, characterStart);
+    }
+    return { options, content: content + word.slice(from), misplaced };
+  }
+
   // `warn` is optional because the entry points are not uniform: `parse` keeps
   // a warnings array, and `parsePartString` is a public static that returns a
   // part object and has no warnings route of its own. The silent default
@@ -968,10 +997,21 @@ export class BlissParser {
         group.text = placeholderMap[textKey]?.content ?? textKey;
       }
 
-      let groupCodeString = twoPartGroupString;
-      const pipeIndex = twoPartGroupString.indexOf('|');
-      if (pipeIndex !== -1) {
-        const beforePipe = twoPartGroupString.slice(0, pipeIndex);
+      // The separators are read before anything else in the word, so a word
+      // that fails on one reports once, never its brackets or its codes. The
+      // builder drops a failed word from the drawing and both saves, and
+      // reports it then (as it does a malformed `;;`).
+      const separators = BlissParser.#readWordSeparators(twoPartGroupString);
+      if (separators === null) {
+        const word = restorePlaceholders(twoPartGroupString);
+        group.errorCode = WARNING_CODES.MALFORMED_GROUP_OPTIONS;
+        group.error = `Invalid separator in the word "${word}": | goes only after a word's options at its start, as [options]|, and || only after the global options at the start of the input, as [options]||. The word was dropped.`;
+        group.errorSource = word;
+        parsedGroups.push(group);
+        continue;
+      }
+      const { options: beforePipe, content: groupCodeString, misplaced } = separators;
+      if (beforePipe !== undefined) {
         if (beforePipe.match(/^\[.*\]$/)) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
           // #parseOptions keeps the first bracket, so a duplicate warns and drops.
@@ -991,24 +1031,23 @@ export class BlissParser {
             source: restoredBeforePipe
           });
         }
-        // A word has one options position, before its first `|`. A later `|`
-        // is reported and left out together with the option brackets written
-        // right before it, since word options have no place inside a word; the
-        // codes on either side stay, as characters of this word. Where that
-        // leaves two `/` together, the empty character between them reads as
-        // nothing.
-        const codeSegments = twoPartGroupString.slice(pipeIndex + 1).split('|');
-        for (let i = 0; i < codeSegments.length - 1; i++) {
-          const boundBrackets = codeSegments[i].match(/(?:\[[^[\]]*\])*$/)[0];
-          const dropped = restorePlaceholders(`${boundBrackets}|`);
-          parseWarnings.push({
-            code: WARNING_CODES.MALFORMED_GROUP_OPTIONS,
-            message: `Invalid group options syntax: "${dropped}" inside the word "${restorePlaceholders(twoPartGroupString)}" - word options go only at the start of a word, as [options]|. Ignoring.`,
+      }
+      // An option bracket written inside the word stands in the wrong place:
+      // it is reported and left out unread, and the word renders.
+      for (const { spelling, isGlobal } of misplaced) {
+        const dropped = restorePlaceholders(spelling);
+        const word = restorePlaceholders(twoPartGroupString);
+        parseWarnings.push(isGlobal
+          ? {
+            code: WARNING_CODES.MISPLACED_GLOBAL_OPTION,
+            message: `Global options "${dropped}" ignored in the word "${word}": global options go only at the start of the input, as [options]||.`,
+            source: dropped,
+          }
+          : {
+            code: WARNING_CODES.MISPLACED_GROUP_OPTION,
+            message: `Group options "${dropped}" ignored in the word "${word}": word options go only at the start of a word, as [options]|.`,
             source: dropped,
           });
-          codeSegments[i] = codeSegments[i].slice(0, codeSegments[i].length - boundBrackets.length);
-        }
-        groupCodeString = codeSegments.join('/');
       }
 
       function replaceWithDefinition(str, definitions) {
