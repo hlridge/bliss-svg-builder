@@ -114,6 +114,23 @@ B313/RK:x/B431         →  renders both characters, default spacing
 
 The same code covers a kerning option given something that is not a number, including a `null` or a list handed over from JavaScript.
 
+### `MALFORMED_ELEMENT`
+
+A composition object (the object `toJSON()` returns, handed back to the constructor) holds something of the wrong shape where a word, a character or a part belongs. An entry of a list that is not an object (a number, a string, `null`, a list) is left out, and a part takes its whole character with it, since the parts left could form a different character. A `glyphs` or `parts` that is not a list leaves out the word or character holding it, and a `groups` that is not a list leaves the composition with no words, keeping its options. The `source` is where it sits in the object.
+
+```js
+new BlissSVGBuilder({ groups: [5, { glyphs: [{ parts: [{ codeName: 'B313' }] }] }] })
+// renders B313, warns "groups[0]"
+
+new BlissSVGBuilder({ groups: [{ glyphs: [
+  { parts: [{ codeName: 'B313' }] },
+  { parts: [{ codeName: 'H' }, 'C8'] },
+] }] })
+// renders B313, warns "groups[0].glyphs[1].parts[1]"
+```
+
+A list that is missing, `null` or `undefined` is not reported: it is read as empty, so `{}` reads as an empty composition.
+
 ## Values Out of Range
 
 Every option follows one rule: the value you write is either used exactly as written or refused and reported. Nothing is quietly substituted. When a value is refused, nothing is written in its place, so the option falls back to what it would have been if you had never written it.
