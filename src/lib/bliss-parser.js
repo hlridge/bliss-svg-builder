@@ -968,9 +968,10 @@ export class BlissParser {
         group.text = placeholderMap[textKey]?.content ?? textKey;
       }
 
-      let groupCodeString;
-      if (twoPartGroupString.includes('|')) {
-        const [beforePipe, afterPipe] = twoPartGroupString.split("|", 2);
+      let groupCodeString = twoPartGroupString;
+      const pipeIndex = twoPartGroupString.indexOf('|');
+      if (pipeIndex !== -1) {
+        const beforePipe = twoPartGroupString.slice(0, pipeIndex);
         if (beforePipe.match(/^\[.*\]$/)) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
           // #parseOptions keeps the first bracket, so a duplicate warns and drops.
@@ -982,7 +983,6 @@ export class BlissParser {
             });
           }
           group.options = nonEmpty(this.#parseOptions(restoredBeforePipe, warn, { level: 'group', notation: 'bracket' }));
-          groupCodeString = afterPipe;
         } else if (beforePipe.length > 0) {
           const restoredBeforePipe = restorePlaceholders(beforePipe);
           parseWarnings.push({
@@ -990,12 +990,25 @@ export class BlissParser {
             message: `Invalid group options syntax: "${restoredBeforePipe}|" - expected [options]| format. Ignoring.`,
             source: restoredBeforePipe
           });
-          groupCodeString = afterPipe;
-        } else {
-          groupCodeString = afterPipe;
         }
-      } else {
-        groupCodeString = twoPartGroupString;
+        // A word has one options position, before its first `|`. A later `|`
+        // is reported and left out together with the option brackets written
+        // right before it, since word options have no place inside a word; the
+        // codes on either side stay, as characters of this word. Where that
+        // leaves two `/` together, the empty character between them reads as
+        // nothing.
+        const codeSegments = twoPartGroupString.slice(pipeIndex + 1).split('|');
+        for (let i = 0; i < codeSegments.length - 1; i++) {
+          const boundBrackets = codeSegments[i].match(/(?:\[[^[\]]*\])*$/)[0];
+          const dropped = restorePlaceholders(`${boundBrackets}|`);
+          parseWarnings.push({
+            code: WARNING_CODES.MALFORMED_GROUP_OPTIONS,
+            message: `Invalid group options syntax: "${dropped}" inside the word "${restorePlaceholders(twoPartGroupString)}" - word options go only at the start of a word, as [options]|. Ignoring.`,
+            source: dropped,
+          });
+          codeSegments[i] = codeSegments[i].slice(0, codeSegments[i].length - boundBrackets.length);
+        }
+        groupCodeString = codeSegments.join('/');
       }
 
       function replaceWithDefinition(str, definitions) {
