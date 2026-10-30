@@ -11,7 +11,8 @@
  *   codes (H//C8) throw with the produced count; the addGroup +
  *   mergeWithNext migration reproduces the retired word-fusion result
  * - word-level artifact args throw: word options ([opts]|CODE), word
- *   indicator lists (;;), and fail-flagged words (malformed ;;)
+ *   indicator lists (;;), and fail-flagged words (malformed ;;); a bare
+ *   empty "|" prefix stays plain accepted content
  * - document-level options ([opts]||CODE) throw on every surface; a bare
  *   empty "||" prefix stays plain accepted content
  * - '' / whitespace / omitted code creates {parts:[]}; on an empty builder
@@ -171,6 +172,15 @@ describe('ElementHandle glyph mutation args', () => {
       const before = stateOf(b);
       expect(() => b.group(0).addGlyph('[color=red]|')).toThrow('word-level options');
       expect(stateOf(b)).toBe(before);
+    });
+
+    it('accepts a bare empty word-options prefix as plain glyph content', () => {
+      // note: a glyph arg is read as a one-character word, which may start
+      // with "|"; the part family refuses the same code (no part follows a |)
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).addGlyph('|B208');
+      expect(b.toString()).toBe('B291/B208');
+      expect(b.warnings).toHaveLength(0);
     });
 
     it('rejects a fail-flagged word instead of silently extracting its kept glyph', () => {

@@ -6,6 +6,7 @@
 
 import { canonicalOptionKey, deleteOptionByName, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
+import { writesOptionSeparator } from "./bliss-parser.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
 // Shared arg guard for the mutation families: a code arg is a string or omitted.
@@ -434,23 +435,28 @@ export class ElementHandle {
       throw new Error(`Expected parts within a single group, but code "${code}" produced ${groupCount} groups`);
     }
     const rawGroup = rawParsed.groups[0];
-    if (!rawGroup.glyphs || rawGroup.glyphs.length === 0) {
-      throw new Error(`Expected a single part, but code "${code}" produced no glyphs`);
-    }
-    if (rawGroup.glyphs.length > 1) {
+    if (rawGroup.glyphs?.length > 1) {
       // Multi-glyph code is a word: words cannot be composed with ;
       return { codeName: code, error: `"${code}" is a word and cannot be composed with ;`, errorCode: 'WORD_AS_PART' };
     }
-    // A single-glyph arg must not smuggle artifacts from above the part
-    // level: the helper embedding below would silently launder them away
+    // An arg of one glyph or none must not smuggle artifacts from above the
+    // part level: the helper embedding below would silently launder them away
     // (document/word options, a word indicator list, a fail flag, or a head
     // marker all describe something a part cannot carry). Words take the
-    // WORD_AS_PART route above instead, artifacts and all.
+    // WORD_AS_PART route above instead, artifacts and all. Any `|` the option
+    // checks leave (an empty or malformed options slot, or one that fails the
+    // word) is refused before the glyph count, so the message names it.
     if (Object.keys(rawParsed.options ?? {}).length > 0) {
       throw new Error(`Code "${code}" carries document-level options ("[opts]||"). Set document options on the builder input, or style the part itself ("[opts]>CODE" or the opts parameter)`);
     }
     if (rawGroup.options) {
       throw new Error(`Code "${code}" carries word-level options ("[opts]|"). Style the part itself ("[opts]>CODE" or the opts parameter), or use addGroup() for word content`);
+    }
+    if (writesOptionSeparator(code)) {
+      throw new Error(`Code "${code}" holds a "|" outside an option bracket: "|" and "||" end word and document options, which a part cannot carry. Pass the part alone ("CODE" or "[opts]>CODE"), or use addGroup() for word content`);
+    }
+    if (!rawGroup.glyphs || rawGroup.glyphs.length === 0) {
+      throw new Error(`Expected a single part, but code "${code}" produced no glyphs`);
     }
     if (rawGroup.wordIndicators) {
       throw new Error(`Code "${code}" carries a word-level indicator list (";;"). Use applyIndicators() on the word, or addGroup() for word content`);
@@ -463,7 +469,9 @@ export class ElementHandle {
     }
     // Single glyph: helper-glyph embedding for proper part-level expansion.
     // Forward only THIS parse's warnings (the raw parse above ran the same
-    // gates; forwarding both would double-warn).
+    // gates; forwarding both would double-warn), except a text block's: its
+    // source is the whole input, which here holds the helper, so that one
+    // comes from the raw parse, which read the code as written.
     const parsed = this.#ctx.parse(`H;${code}`);
     const glyph = parsed.groups?.[0]?.glyphs?.[0];
     const parts = glyph?.parts?.length >= 2
@@ -472,7 +480,13 @@ export class ElementHandle {
     if (parts.length !== 1) {
       throw new Error(`Expected a single part, but code "${code}" produced ${parts.length} parts`);
     }
-    this.#forwardParseWarnings(parsed);
+    const isTextBlockWarning = (warning) => warning.code === WARNING_CODES.UNSUPPORTED_TEXT_BLOCKS;
+    this.#forwardParseWarnings({
+      _parseWarnings: [
+        ...(rawParsed._parseWarnings ?? []).filter(isTextBlockWarning),
+        ...(parsed._parseWarnings ?? []).filter((warning) => !isTextBlockWarning(warning)),
+      ],
+    });
     return parts[0];
   }
 

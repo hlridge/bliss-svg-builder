@@ -87,6 +87,14 @@ export const X_RUN_LETTERS = 'a-zA-ZÀ-ſͰ-ϿЀ-ӿ';
 // knows which of the words it writes a reload can read back at all.
 export const MAX_INPUT_LENGTH = 10_000;
 
+// Whether a code string writes a `|` outside its option brackets and text
+// blocks, read with the parser's own tokenizer: the separator that ends the
+// options of a word or of the input. The part methods refuse one, since a
+// part has neither.
+export function writesOptionSeparator(codeString) {
+  return codeString.replace(BRACKET_TOKEN_PATTERN, '').includes('|');
+}
+
 // A written X token runs from a glyph boundary to the next structural
 // character: another glyph boundary (`/`), a part boundary (`;`), a head
 // marker (`^`) or a coordinate suffix (`:`). Taking the token WHOLE is what

@@ -22,14 +22,16 @@
  *   options ([opts]||), word-level options ([opts]|), word indicator lists
  *   (;;), head markers (^), and fail-flagged args; a word arg with an
  *   overlay suffix stays on the WORD_AS_PART path (the word row wins)
- * - degenerate parses keep their messages (no glyphs, multiple groups)
+ * - degenerate parses keep their messages (no glyphs, multiple groups),
+ *   except a bare `|`, which names itself
  * - designed TypeErrors name the called method on every surface; a wrong-level
  *   gated target stays a silent no-op (a fail-flagged word is no longer a
  *   gated target: retention family rows 31/80 drop it at rebuild)
  * - R1 carrier fill: addPart/insertPart on a glyphless group creates a
  *   carrier glyph; a rejected arg leaves no scaffold behind
  * - empty-builder addPart applies options to the part itself
- * - accepted args forward parse warnings; rejected args leak none
+ * - accepted args forward parse warnings; rejected args leak none; a text
+ *   block's warning names the code as written
  *
  * Does NOT cover:
  * - glyph-family singular rules, see ElementHandle.glyph-mutation-args.test.js
@@ -40,6 +42,8 @@
  *   ElementHandle.failed-word-mutation.test.js
  * - cross-surface empty-content parity, see
  *   BlissSVGBuilder.empty-content-parity.test.js
+ * - a `|` outside an option bracket in a longer code, see
+ *   ElementHandle.part-arg-pipe.test.js
  *
  * @issue: #33
  */
@@ -281,11 +285,21 @@ describe('ElementHandle part mutation args', () => {
   });
 
   describe('when the code parses to no glyphs or multiple groups', () => {
-    it('throws the no-glyphs message for a bare word-boundary token', () => {
+    it('throws the | message for a bare word-boundary token', () => {
+      // a | outside an option bracket names itself before the no-glyphs
+      // check, see ElementHandle.part-arg-pipe.test.js
       const b = new BlissSVGBuilder('B291');
       const before = stateOf(b);
       expect(() => b.group(0).glyph(0).addPart('|'))
-        .toThrow('Expected a single part, but code "|" produced no glyphs');
+        .toThrow('Code "|" holds a "|" outside an option bracket');
+      expect(stateOf(b)).toBe(before);
+    });
+
+    it('throws the no-glyphs message for a bare kerning marker', () => {
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => b.group(0).glyph(0).addPart('RK:1'))
+        .toThrow('Expected a single part, but code "RK:1" produced no glyphs');
       expect(stateOf(b)).toBe(before);
     });
 
@@ -497,6 +511,13 @@ describe('ElementHandle part mutation args', () => {
       expect(() => b.group(0).glyph(0).replacePart(0, '[margin=2]>B81;B97'))
         .toThrow('Expected a single part, but code "[margin=2]>B81;B97" produced 2 parts');
       expect(b.warnings.some((w) => w.code === 'MISPLACED_GLOBAL_OPTION')).toBe(false);
+    });
+
+    it.each(EACH_SURFACE)('%s names the code as written in a text block\'s warning', (label, { invoke }) => {
+      // regression: the warning named the internal scaffold, "H;B313{x}"
+      const b = new BlissSVGBuilder('B291');
+      invoke(b, 'B313{x}');
+      expect(b.warnings.map((w) => [w.code, w.source])).toEqual([['UNSUPPORTED_TEXT_BLOCKS', 'B313{x}']]);
     });
   });
 });

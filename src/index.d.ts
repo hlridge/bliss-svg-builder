@@ -465,8 +465,9 @@ export declare class ElementHandle {
    *   composition takes one call per part; a word is kept as a failed part
    *   with a `WORD_AS_PART` warning instead of throwing), or carries an
    *   artifact from above the part: document options `[opts]||`, word
-   *   options `[opts]|`, a word indicator list `;;`, a head marker `^`, or
-   *   a code that fails to parse as a word.
+   *   options `[opts]|`, any other `|` outside an option bracket
+   *   (`|B313`, `B313|B431`), a word indicator list `;;`, a head marker
+   *   `^`, or a code that fails to parse as a word.
    */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;
 
@@ -1248,8 +1249,9 @@ export declare class BlissSVGBuilder {
    *   composition takes one call per part; a word is kept as a failed part
    *   with a `WORD_AS_PART` warning instead of throwing), or carries an
    *   artifact from above the part: document options `[opts]||`, word
-   *   options `[opts]|`, a word indicator list `;;`, a head marker `^`, or
-   *   a code that fails to parse as a word.
+   *   options `[opts]|`, any other `|` outside an option bracket
+   *   (`|B313`, `B313|B431`), a word indicator list `;;`, a head marker
+   *   `^`, or a code that fails to parse as a word.
    */
   addPart(code: string, opts?: BlissOptions | OptionLayers): this;
 
