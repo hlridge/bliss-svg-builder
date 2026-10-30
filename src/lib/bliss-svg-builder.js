@@ -230,10 +230,11 @@ const isRecord = (value) => Object.prototype.toString.call(value) === '[object O
  * reaches the caller's object. `structuredClone` made it until it met a value
  * no clone can carry (a function, a symbol, an object behind a Proxy) and threw
  * the platform's `DataCloneError`, which names no call and no key, before
- * anything had been judged. This reads the object as data instead, and is
- * `structuredClone`'s copy wherever that copy exists:
+ * anything had been judged. This reads the object as data instead:
  * - a plain object or a list is copied, read through a getter or a Proxy as
- *   JSON reads it, and a back-reference is kept as the clone kept it;
+ *   JSON reads it: one met twice is two copies, as JSON writes it twice, so
+ *   no element fills two places, and one inside itself is left out, since no
+ *   save could write it;
  * - a function or a symbol is handed on where a judge reads it, to be refused
  *   there, and anywhere else is left out as JSON leaves it out: gone from an
  *   object, `null` in a list;
@@ -244,39 +245,42 @@ const isRecord = (value) => Object.prototype.toString.call(value) === '[object O
  * The elements are read in the one shape `toJSON()` writes (`ELEMENT_LIST`). A
  * list that is `null` or `undefined` is read as missing, and a missing list of
  * words or characters as empty. A wrong shape is left out and handed to `warn`
- * by its path in the object: an entry that is not an element object goes, a
- * part taking its character with it, and so does the unit holding a list that
- * is not a list, except the composition, which is read with no words.
+ * by its path in the object: an entry that is not an element object, or is
+ * inside itself, goes, a part taking its character with it, and so does the
+ * unit holding a list that is not a list, except the composition, which is
+ * read with no words.
  */
 const readComposition = (input, warn) => {
-  const copies = new Map();
+  // The objects being read, from the composition down to the value in hand:
+  // one met again among them is inside itself.
+  const reading = new Set();
   const readData = (value) => {
     if (typeof value === 'bigint') return String(value);
     if (typeof value === 'function' || typeof value === 'symbol') return LEFT_OUT;
     if (value === null || typeof value !== 'object') return value;
-    if (copies.has(value)) return copies.get(value);
+    if (reading.has(value)) return LEFT_OUT;
     if (Array.isArray(value)) {
       const copy = [];
-      copies.set(value, copy);
+      reading.add(value);
       for (const item of value) {
         const read = readData(item);
         copy.push(read === LEFT_OUT ? null : read);
       }
+      reading.delete(value);
       return copy;
     }
     if (isRecord(value)) {
       const copy = {};
-      copies.set(value, copy);
+      reading.add(value);
       for (const key of Object.keys(value)) {
         const read = readData(value[key]);
         if (read !== LEFT_OUT) putOwn(copy, key, read);
       }
+      reading.delete(value);
       return copy;
     }
     try {
-      const copy = structuredClone(value);
-      copies.set(value, copy);
-      return copy;
+      return structuredClone(value);
     } catch {
       return LEFT_OUT;
     }
@@ -291,12 +295,14 @@ const readComposition = (input, warn) => {
   // which then gets LEFT_OUT for the list.
   const readEntries = (items, level, path) => {
     const read = [];
+    const leftOut = level === 'part' ? 'its character is left out' : 'it is left out';
     let whole = true;
     for (const [index, item] of items.entries()) {
       const itemPath = `${path}[${index}]`;
       let element = LEFT_OUT;
-      if (isRecord(item)) element = readElement(item, level, itemPath);
-      else refuse(itemPath, `is not ${ELEMENT_NOUN[level]}, so ${level === 'part' ? 'its character is' : 'it is'} left out`);
+      if (!isRecord(item)) refuse(itemPath, `is not ${ELEMENT_NOUN[level]}, so ${leftOut}`);
+      else if (reading.has(item)) refuse(itemPath, `is inside itself (a circular reference), so ${leftOut}`);
+      else element = readElement(item, level, itemPath);
       if (element !== LEFT_OUT) read.push(element);
       else if (level === 'part') whole = false;
     }
@@ -305,9 +311,8 @@ const readComposition = (input, warn) => {
   // An element read at its level: its own list as elements, every other field
   // as the data it holds. LEFT_OUT when a wrong shape takes it.
   const readElement = (element, level, path) => {
-    if (copies.has(element)) return copies.get(element);
     const copy = {};
-    copies.set(element, copy);
+    reading.add(element);
     const [list, childLevel] = ELEMENT_LIST[level];
     const listPath = path ? `${path}.${list}` : list;
     let whole = true;
@@ -333,10 +338,8 @@ const readComposition = (input, warn) => {
       }
       if (read !== LEFT_OUT) putOwn(copy, key, read);
     }
-    if (!whole) {
-      copies.delete(element);
-      return LEFT_OUT;
-    }
+    reading.delete(element);
+    if (!whole) return LEFT_OUT;
     // A missing list is an empty one, except where what it means waits on the
     // element's code: a part with none is drawn from its code, and a character
     // with none is read once its code is (#normalizePartlessGlyphs).

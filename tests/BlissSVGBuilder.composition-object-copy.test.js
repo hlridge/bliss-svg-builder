@@ -16,13 +16,15 @@
  * - An object behind a Proxy, whole or one element, read as the object it
  *   wraps.
  * - A bigint read as the text it spells, so `toJSON()` stays valid JSON.
- * - A date and a map in a field of the object's own, and a back-reference
- *   inside one, kept as the clone kept them.
+ * - A date and a map in a field of the object's own, kept as the clone kept
+ *   them.
  * - The caller's object left as it was.
  *
  * Does NOT cover:
  * - A function or a symbol as an entry of an element list, and every other
  *   wrong shape, see `BlissSVGBuilder.composition-object-shape.test.js`.
+ * - One object used twice, or inside itself, see
+ *   `BlissSVGBuilder.composition-object-references.test.js`.
  * - The element key's own values, see
  *   `BlissSVGBuilder.element-key-values.test.js`.
  * - A key spelled `__proto__`, see `BlissSVGBuilder.name-refusal-values.test.js`.
@@ -179,18 +181,6 @@ describe('BlissSVGBuilder composition object copy', () => {
       expect(saved.created.getTime()).toBe(0);
       expect(saved.tags.get('a')).toBe(1);
       expect(saved.created).not.toBe(meta.created);
-    });
-  });
-
-  describe('when the object holds a back-reference', () => {
-    it('keeps it, as the clone did', () => {
-      const meta = { name: 'board' };
-      meta.self = meta;
-      const builder = new BlissSVGBuilder(oneGlyph({ parts: [b291()] }, { meta }));
-      const { meta: saved } = builder.toJSON();
-      expect(builder.warnings).toEqual([]);
-      expect(saved.self).toBe(saved);
-      expect(saved).not.toBe(meta);
     });
   });
 

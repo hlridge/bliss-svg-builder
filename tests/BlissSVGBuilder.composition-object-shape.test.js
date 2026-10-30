@@ -24,8 +24,8 @@
  *   constructor's documented error.
  *
  * Does NOT cover:
- * - One object used twice, or inside itself: backlog row "One object used
- *   twice in a composition object becomes one shared element".
+ * - One object used twice, or inside itself, see
+ *   `BlissSVGBuilder.composition-object-references.test.js`.
  * - A function or a symbol in an options bag, as a position or as the key, and
  *   the copy itself, see `BlissSVGBuilder.composition-object-copy.test.js`.
  * - A field the library reads holding a value of the wrong type (`codeName:
