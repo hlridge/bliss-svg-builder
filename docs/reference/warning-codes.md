@@ -61,6 +61,13 @@ color=red|B313         →  renders B313
 
 Correct form: `[color=red]|B313`.
 
+A word takes its options once, before its first `|`. A `|` later in the word is reported the same way and ignored together with any option bracket written right before it; the characters on both sides stay in the word:
+
+```
+[color=red]|B313/[color=blue]|B431   →  renders as [color=red]|B313/B431
+[color=red]|B313/B291|B431           →  renders as [color=red]|B313/B291/B431
+```
+
 ### `MALFORMED_WORD_INDICATOR`
 
 A structurally invalid `;;`: it must be the trailing part of a word. The whole word is dropped from render and from both `toString()` and `toJSON()` (malformed syntax is not content; the warning is its only trace).
