@@ -904,6 +904,11 @@ export const WARNING_CODES = Object.freeze({
   MALFORMED_WORD_INDICATOR: 'MALFORMED_WORD_INDICATOR',
   MALFORMED_COORDINATES: 'MALFORMED_COORDINATES',
   MALFORMED_KERNING_VALUE: 'MALFORMED_KERNING_VALUE',
+  // a composition object's element in the wrong shape: an entry of a word,
+  // character or part list that is not an element object, or such a list that
+  // is not a list. The entry is left out (a part takes its whole character),
+  // or the unit holding the list; the source is its path in the object.
+  MALFORMED_ELEMENT: 'MALFORMED_ELEMENT',
   // a numeric option given something that is not a number at all. INVALID_ is
   // the reserved verb for exactly this: OUT_OF_RANGE_ answers for a well-formed
   // number the attribute cannot carry, and the two are different repairs.

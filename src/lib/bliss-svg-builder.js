@@ -188,8 +188,33 @@ const resolveOverlayHeadIndex = (glyphs) => {
 // reports it in its own words and stores nothing of it.
 const JUDGED_BAGS = new Set(['options', 'transientOptions']);
 const JUDGED_FIELDS = new Set(['x', 'y', 'key']);
-const ELEMENT_LISTS = new Set(['groups', 'glyphs', 'parts']);
 const LEFT_OUT = Symbol('left out');
+
+// The one shape `toJSON()` writes: each level's list of children and the level
+// they sit at. A part may hold parts of its own. A list written at another
+// level is a field of your own, so nothing that walks the tree reads it.
+const ELEMENT_LIST = Object.freeze({
+  global: ['groups', 'group'],
+  group: ['glyphs', 'character'],
+  character: ['parts', 'part'],
+  part: ['parts', 'part'],
+});
+
+// How a wrong shape is reported: what an entry of a level's list should be,
+// and what goes with a list that is not one. A wrong part takes its whole
+// character, as a malformed part does in the DSL, since the parts left could
+// form another character.
+const ELEMENT_NOUN = Object.freeze({
+  group: 'a word (an object with a "glyphs" list)',
+  character: 'a character (an object with a "parts" list)',
+  part: 'a part (an object with a "codeName")',
+});
+const LEFT_OUT_WITH_LIST = Object.freeze({
+  global: 'the composition is read with no words',
+  group: 'the word is left out',
+  character: 'the character is left out',
+  part: 'its character is left out',
+});
 
 // An own property whatever its key spells: assigning `__proto__` on an object
 // literal sets its prototype instead of storing the key.
@@ -215,8 +240,15 @@ const isRecord = (value) => Object.prototype.toString.call(value) === '[object O
  * - a bigint is read as the text it spells, since no JSON save can hold one;
  * - any other object is `structuredClone`'s copy of it, or left out when it
  *   holds a value no clone can carry.
+ *
+ * The elements are read in the one shape `toJSON()` writes (`ELEMENT_LIST`). A
+ * list that is `null` or `undefined` is read as missing, and a missing list of
+ * words or characters as empty. A wrong shape is left out and handed to `warn`
+ * by its path in the object: an entry that is not an element object goes, a
+ * part taking its character with it, and so does the unit holding a list that
+ * is not a list, except the composition, which is read with no words.
  */
-const readComposition = (input) => {
+const readComposition = (input, warn) => {
   const copies = new Map();
   const readData = (value) => {
     if (typeof value === 'bigint') return String(value);
@@ -252,32 +284,66 @@ const readComposition = (input) => {
   // Handed to its judge as written, a bigint as its text there too. Nothing is
   // copied: a judge stores only a value with a text form.
   const readJudged = (value) => (typeof value === 'bigint' ? String(value) : value);
-  const readElement = (element) => {
-    if (!isRecord(element)) return readData(element);
+  const refuse = (source, problem) =>
+    warn({ code: WARNING_CODES.MALFORMED_ELEMENT, message: `${source} ${problem}.`, source });
+  // A level's own list, each entry read as an element of the level below. A
+  // wrong entry is left out; a part left out takes the element holding it,
+  // which then gets LEFT_OUT for the list.
+  const readEntries = (items, level, path) => {
+    const read = [];
+    let whole = true;
+    for (const [index, item] of items.entries()) {
+      const itemPath = `${path}[${index}]`;
+      let element = LEFT_OUT;
+      if (isRecord(item)) element = readElement(item, level, itemPath);
+      else refuse(itemPath, `is not ${ELEMENT_NOUN[level]}, so ${level === 'part' ? 'its character is' : 'it is'} left out`);
+      if (element !== LEFT_OUT) read.push(element);
+      else if (level === 'part') whole = false;
+    }
+    return whole ? read : LEFT_OUT;
+  };
+  // An element read at its level: its own list as elements, every other field
+  // as the data it holds. LEFT_OUT when a wrong shape takes it.
+  const readElement = (element, level, path) => {
     if (copies.has(element)) return copies.get(element);
     const copy = {};
     copies.set(element, copy);
+    const [list, childLevel] = ELEMENT_LIST[level];
+    const listPath = path ? `${path}.${list}` : list;
+    let whole = true;
     for (const key of Object.keys(element)) {
       const value = element[key];
       let read;
-      if (JUDGED_BAGS.has(key) && isRecord(value)) {
+      if (key === list) {
+        if (value === null || value === undefined) continue;
+        if (Array.isArray(value)) {
+          read = readEntries(value, childLevel, listPath);
+        } else {
+          refuse(listPath, `is not a list, so ${LEFT_OUT_WITH_LIST[level]}`);
+          read = LEFT_OUT;
+        }
+        if (read === LEFT_OUT && level !== 'global') whole = false;
+      } else if (JUDGED_BAGS.has(key) && isRecord(value)) {
         read = {};
         for (const name of Object.keys(value)) putOwn(read, name, readJudged(value[name]));
       } else if (JUDGED_FIELDS.has(key)) {
         read = readJudged(value);
-      } else if (ELEMENT_LISTS.has(key) && Array.isArray(value)) {
-        read = value.map((item) => {
-          const child = readElement(item);
-          return child === LEFT_OUT ? null : child;
-        });
       } else {
         read = readData(value);
       }
       if (read !== LEFT_OUT) putOwn(copy, key, read);
     }
+    if (!whole) {
+      copies.delete(element);
+      return LEFT_OUT;
+    }
+    // A missing list is an empty one, except where what it means waits on the
+    // element's code: a part with none is drawn from its code, and a character
+    // with none is read once its code is (#normalizePartlessGlyphs).
+    if (level === 'global' || level === 'group') copy[list] ??= [];
     return copy;
   };
-  return readElement(input);
+  return readElement(input, 'global', '');
 };
 
 // Note: BlissSVGBuilder.LIB_VERSION is attached at the public entry point
@@ -785,8 +851,11 @@ class BlissSVGBuilder {
     return { processed, authored };
   }
 
-  // Recursively process options at all levels (groups, glyphs, parts)
-  #processAllOptions(obj, isTopLevel = false) {
+  // Recursively process options at all levels (groups, glyphs, parts), down
+  // each level's own list only: one written at another level is a field of
+  // your own, which nothing judges.
+  #processAllOptions(obj, level) {
+    const isTopLevel = level === 'global';
     // A transient option is an ordinary option that never serializes, so it
     // joins the node's options HERE, on the render clone, and is processed,
     // escaped and normalized by everything downstream exactly like one. The
@@ -869,21 +938,8 @@ class BlissSVGBuilder {
       // guards with `?? {}`, because the second case is ordinary.
       obj.authoredOptions = authored;
     }
-    if (obj.groups) {
-      for (const group of obj.groups) {
-        this.#processAllOptions(group, false);
-      }
-    }
-    if (obj.glyphs) {
-      for (const glyph of obj.glyphs) {
-        this.#processAllOptions(glyph, false);
-      }
-    }
-    if (obj.parts) {
-      for (const part of obj.parts) {
-        this.#processAllOptions(part, false);
-      }
-    }
+    const [children, childLevel] = ELEMENT_LIST[level];
+    for (const child of obj[children] ?? []) this.#processAllOptions(child, childLevel);
   }
 
   // Takes an element background's keys out of one element's authored options,
@@ -914,14 +970,18 @@ class BlissSVGBuilder {
     // Allow empty constructor for building from scratch
     if (input === undefined || input === '') {
       input = '';
-    } else if (typeof input !== 'string' && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+    } else if (typeof input !== 'string' && !isRecord(input)) {
       throw new Error('Input must be a DSL string or a plain object from toJSON()');
     }
 
-    // Accept both string (DSL) and object (from toJSON()) input
+    // Accept both string (DSL) and object (from toJSON()) input. A wrong shape
+    // the reader leaves out is reported down `_parseWarnings`, the channel
+    // that survives a rebuild, since the rebuilt tree keeps no trace of it.
+    const shapeWarnings = [];
     const blissObj = (typeof input === 'string')
       ? BlissParser.parse(input)
-      : readComposition(input);
+      : readComposition(input, (warning) => shapeWarnings.push(warning));
+    if (shapeWarnings.length > 0) (blissObj._parseWarnings ??= []).push(...shapeWarnings);
 
     // A composition object stores an options bag exactly as it was given, so
     // this is where it meets the admission stage. Done HERE, on the copy and
@@ -1094,7 +1154,8 @@ class BlissSVGBuilder {
   //
   // The level each bag is judged at comes from the array its node was found
   // in, the way a bracket's comes from where it was written. A part's own
-  // `parts` are parts too, at any depth.
+  // `parts` are parts too, at any depth. A list written at another level is a
+  // field of your own, which nothing judges, so only the level's own is walked.
   //
   // A key written beside an element is the same name as the key in its
   // options (that field is where an element's identity is kept), so it is
@@ -1111,9 +1172,8 @@ class BlissSVGBuilder {
       if (Object.hasOwn(admitted, 'key')) node.key = textOfValue(admitted.key);
       else delete node.key;
     }
-    for (const [children, childLevel] of [['groups', 'group'], ['glyphs', 'character'], ['parts', 'part']]) {
-      for (const child of node[children] ?? []) BlissSVGBuilder.#admitAuthoredBags(child, childLevel, warn);
-    }
+    const [children, childLevel] = ELEMENT_LIST[level];
+    for (const child of node[children] ?? []) BlissSVGBuilder.#admitAuthoredBags(child, childLevel, warn);
   }
 
   // One bag, admitted on its own so two bags each holding one spelling stay a
@@ -1593,7 +1653,7 @@ class BlissSVGBuilder {
       for (const key of keys) delete bag[key];
       this.#mutationWarnings.push({ code, message: message(keys), source: keys[0] });
     };
-    const visit = (node, onSpace) => {
+    const visit = (node, onSpace, level) => {
       const bag = node.transientOptions;
       if (bag && typeof bag === 'object') {
         const keys = Object.keys(bag);
@@ -1616,18 +1676,22 @@ class BlissSVGBuilder {
         }
         if (Object.keys(bag).length === 0) delete node.transientOptions;
       }
-      // The glyph-level space test is defensive: the space invariant runs just
+      // Only the level's own list is walked: one written at another level is a
+      // field of your own. What sits inside a space is on a space too. The
+      // glyph-level space test is defensive: the space invariant runs just
       // before this pass and splits a mixed word into pure-space groups, so
       // today every space is caught one level up. Keeping it makes "a space
       // carries no transient decoration" an invariant rather than an artifact
       // of that ordering (probe: temp/probe-c7-m5.mjs).
-      for (const glyph of node.glyphs ?? []) visit(glyph, onSpace || BlissSVGBuilder.#isSpaceGlyphNode(glyph));
-      for (const part of node.parts ?? []) visit(part, onSpace);
+      const [children, childLevel] = ELEMENT_LIST[level];
+      for (const child of node[children] ?? []) {
+        const isSpace = childLevel === 'group'
+          ? BlissSVGBuilder.#isRawSpaceGroup(child)
+          : childLevel === 'character' && BlissSVGBuilder.#isSpaceGlyphNode(child);
+        visit(child, onSpace || isSpace, childLevel);
+      }
     };
-    visit(this.#rawBlissObj, false);
-    for (const group of this.#rawBlissObj.groups ?? []) {
-      visit(group, BlissSVGBuilder.#isRawSpaceGroup(group));
-    }
+    visit(this.#rawBlissObj, false, 'global');
   }
 
   // Positioning family (GH #18): `x`, `y` and the two kerning values are the
@@ -1877,7 +1941,7 @@ class BlissSVGBuilder {
     // happened.
     const writtenOptions = new Set(writtenKeys);
 
-    this.#processAllOptions(blissObj, true);
+    this.#processAllOptions(blissObj, 'global');
 
     const { charSpace, wordSpace, externalGlyphSpace, errorPlaceholder, ...remainingOptions } = blissObj.options ?? {};
     this.#sharedOptions = {
@@ -1895,7 +1959,7 @@ class BlissSVGBuilder {
       // because the constant is shared by every builder and every rebuild.
       errorPlaceholderParts: (() => {
         const parts = structuredClone(ERROR_PLACEHOLDER_PARTS);
-        for (const part of parts) this.#processAllOptions(part, false);
+        for (const part of parts) this.#processAllOptions(part, 'part');
         return parts;
       })(),
       keys: new Set(),

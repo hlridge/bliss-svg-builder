@@ -21,6 +21,8 @@
  * - The caller's object left as it was.
  *
  * Does NOT cover:
+ * - A function or a symbol as an entry of an element list, and every other
+ *   wrong shape, see `BlissSVGBuilder.composition-object-shape.test.js`.
  * - The element key's own values, see
  *   `BlissSVGBuilder.element-key-values.test.js`.
  * - A key spelled `__proto__`, see `BlissSVGBuilder.name-refusal-values.test.js`.
