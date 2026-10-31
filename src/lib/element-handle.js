@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
-import { canonicalOptionKey, deleteOptionByName, WARNING_CODES } from "./bliss-constants.js";
+import { deleteOptionByName, removeElementOption, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
 import { writesOptionSeparator, writesWordIndicatorList } from "./bliss-parser.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
@@ -1536,33 +1536,17 @@ export class ElementHandle {
     const node = this.#nodeRef;
     if (!node) return this;
     assertKeyArgs('removeOptions', keys);
-    for (const key of keys) {
-      // A position is ONE value with two spellings, the `[x=N]` option and a
-      // part's `CODE:x,y` coordinate, and which one entered it is not
-      // observable afterwards. Naming an axis therefore takes the position off
-      // whichever spelling wrote it. Both land on the promoted numeric field,
-      // and that field is what the render and toJSON() read, so it is the thing
-      // that has to go; an option key beside it goes with the ordinary deletion
-      // below.
-      //
-      // This mirrors the clear that SETTING a position already does without
-      // consulting the bag, so the two directions agree. Gating on the bag
-      // instead made removal work only until the composition had been saved
-      // through the string serializer and reloaded, which spells a part
-      // position as a coordinate.
-      //
-      // The name is resolved before the axis test so `X` and `x` behave alike,
-      // and the test is what keeps this off every other field the node carries:
-      // without it, `removeOptions('codeName')` would delete the element's own
-      // identity.
-      //
-      // Scope is a separate question and is unchanged: the node is this
-      // handle's own, so clearing a character's x never reaches a coordinate on
-      // a part beneath it.
-      const resolved = canonicalOptionKey(key);
-      if (resolved === 'x' || resolved === 'y') delete node[resolved];
-      if (node.options) deleteOptionByName(node.options, key);
-    }
+    // Naming an axis takes the position off whichever spelling wrote it (see
+    // removeElementOption). This mirrors the clear that SETTING a position
+    // already does without consulting the bag, so the two directions agree.
+    // Gating on the bag instead made removal work only until the composition
+    // had been saved through the string serializer and reloaded, which spells
+    // a part position as a coordinate.
+    //
+    // Scope is a separate question and is unchanged: the node is this handle's
+    // own, so clearing a character's x never reaches a coordinate on a part
+    // beneath it.
+    for (const key of keys) removeElementOption(node, key);
     // The options a definition gives the part its code names (a built-in's
     // dotted line, a custom definition's own options) are part of what the
     // code is, so removing one of their keys from that part returns it to the

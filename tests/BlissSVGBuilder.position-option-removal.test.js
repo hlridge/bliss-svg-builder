@@ -44,6 +44,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissSVGBuilder.position-presence-serialization.test.js`.
  * - How a removal reads an option NAME, see
  *   `BlissSVGBuilder.option-removal-naming.test.js`.
+ * - The composition's own position, which the builder's `removeOptions` takes
+ *   off, see `BlissSVGBuilder.global-options-mutation.test.js`.
  * - The transient channel, which refuses a position outright with
  *   `MISPLACED_TRANSIENT_OPTION`, so it never promotes a field to clear.
  */

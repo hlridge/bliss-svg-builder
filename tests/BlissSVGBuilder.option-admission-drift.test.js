@@ -169,17 +169,21 @@ describe('BlissSVGBuilder option admission drift', () => {
       expect(nameResolutionsIn(CONSTANTS, 'admitOptions')).toBe(1);
     });
 
-    it('accounts for the whole module, so the other resolution is named too', () => {
+    it('accounts for the whole module, so the other resolutions are named too', () => {
       // `deleteOptionByName` resolves a name to REMOVE what is stored under it,
       // which is the opposite direction and judges no value.
-      expect(nameResolutions(CONSTANTS)).toBe(2);
+      // `removeElementOption` resolves one to decide whether it is the
+      // coordinate the same removal clears: also a removal, and legitimately
+      // its own.
+      expect(nameResolutions(CONSTANTS)).toBe(3);
       expect(nameResolutionsIn(CONSTANTS, 'deleteOptionByName')).toBe(1);
+      expect(nameResolutionsIn(CONSTANTS, 'removeElementOption')).toBe(1);
     });
 
-    it('leaves the handle removal path outside the stage', () => {
-      // `removeOptions` resolves a name to decide whether it is the coordinate
-      // the same call clears. Also a removal, and legitimately its own.
-      expect(nameResolutions(libSource('element-handle.js'))).toBe(1);
+    it('leaves the handle removal path to the shared removal', () => {
+      // An element's `removeOptions` and the builder's both remove through
+      // `removeElementOption`, so neither reads a name for itself.
+      expect(nameResolutions(libSource('element-handle.js'))).toBe(0);
     });
   });
 

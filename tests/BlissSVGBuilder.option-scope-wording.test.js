@@ -7,7 +7,7 @@
  * level it was written at and why it cannot act there, and is identical
  * whether the key arrived in a bracket, a composition object or a JavaScript
  * call. The second (the fix) is `Use [key=value]||` for a bracket, the
- * composition's top-level options for an object, the builder's options for a
+ * composition's top-level options for an object, `builder.setOptions()` for a
  * call, `builder.setTransientOptions()` for a transient call, and for kerning
  * off the DSL the character's options, with no `RK:`/`AK:` marker offered.
  *
@@ -88,7 +88,11 @@ describe('BlissSVGBuilder option scope wording', () => {
       ['a transient bag in a composition object', () => new BlissSVGBuilder(transientAtCharacter({ 'content--fill': 'red' })),
         "Layer option (content--fill=red) ignored at character level: it names a layer of the whole SVG. Put it in the composition's top-level transientOptions to apply it, or write the attribute without a layer prefix to put it on this element."],
       ['setOptions', () => afterMutating('B291', (b) => b.group(0).glyph(0).setOptions({ marginTop: 3 })),
-        "Global option (margin-top=3) ignored at character level: it configures the whole SVG. Pass it in the builder's options to apply it globally."],
+        'Global option (margin-top=3) ignored at character level: it configures the whole SVG. Pass it to builder.setOptions() to apply it globally.'],
+      ['the builder addGroup', () => afterMutating('B291', (b) => b.addGroup('B313', { marginTop: 3 })),
+        'Global option (margin-top=3) ignored at group level: it configures the whole SVG. Pass it to builder.setOptions() to apply it globally.'],
+      ['setOptions, for a layer key', () => afterMutating('B291', (b) => b.group(0).glyph(0).setOptions({ 'content--fill': 'red' })),
+        'Layer option (content--fill=red) ignored at character level: it names a layer of the whole SVG. Pass it to builder.setOptions() to apply it, or write the attribute without a layer prefix to put it on this element.'],
       ['setTransientOptions', () => afterMutating('B291', (b) => b.group(0).glyph(0).setTransientOptions({ marginTop: 3 })),
         'Global option (margin-top=3) ignored at character level: it configures the whole SVG. Pass it to builder.setTransientOptions() to apply it globally.'],
     ])('names the whole-SVG home in the notation of %s', (_route, build, message) => {
@@ -110,6 +114,7 @@ describe('BlissSVGBuilder option scope wording', () => {
 
     it.each([
       ['setOptions on a word', () => afterMutating('B291', (b) => b.group(0).setOptions({ relativeKerning: 3 })), 'group'],
+      ['the builder\'s setOptions', () => afterMutating('B291', (b) => b.setOptions({ relativeKerning: 3 })), 'global'],
       ['the document bag of a composition object', () => new BlissSVGBuilder(bagAt('composition', { relativeKerning: 3 })), 'global'],
     ])('sends kerning to the character with no code-string marker, through %s', (_route, build, level) => {
       expect(messages(build())).toEqual([

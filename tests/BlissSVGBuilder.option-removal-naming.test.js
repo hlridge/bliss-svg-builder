@@ -6,12 +6,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * the library or a standard owns is removed under either spelling, and a name
  * nobody owns is removed under exactly the spelling the caller wrote.
  *
- * The second half is the one that had teeth. All three removal sites used to
- * hyphenate every key on the way in, so asking for `dataBlissId` also deleted
- * `data-bliss-id`. Those are two different attributes by the naming contract,
- * they can be live at the same time, and their coexistence is deliberately
- * silent, so the deletion took an attribute the caller had not named and said
- * nothing about it.
+ * The second half is the one that had teeth. The first three removal sites
+ * used to hyphenate every key on the way in, so asking for `dataBlissId` also
+ * deleted `data-bliss-id`. Those are two different attributes by the naming
+ * contract, they can be live at the same time, and their coexistence is
+ * deliberately silent, so the deletion took an attribute the caller had not
+ * named and said nothing about it.
  *
  * A `<target>--name` key suspends conversion for the same reason and was wrong
  * in the same way. Kerning is the mirror case: character scope stores it under
@@ -19,10 +19,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * kebab one, so the kebab spelling used to be a silent no-op there.
  *
  * Covers:
- * - All three removal sites, which are three separate code paths: an element's
- *   `removeOptions`, an element's `removeTransientOptions`, and the whole-SVG
- *   `removeTransientOptions`. Fixing two of the three passes any test written
- *   against one of them.
+ * - All four removal sites, which are four separate code paths: an element's
+ *   `removeOptions`, an element's `removeTransientOptions`, the whole-SVG
+ *   `removeOptions` and the whole-SVG `removeTransientOptions`. Fixing three
+ *   of the four passes any test written against one of them.
  * - Both directions on a name nobody owns, since each spelling is the one the
  *   other must not reach.
  * - The precondition each of those rests on, asserted in the same test: both
@@ -88,6 +88,19 @@ describe('BlissSVGBuilder option removal naming', () => {
       expect(attr(builder.svgCode, 'data-bliss-id', '8')).toBe(true);
     });
 
+    it('leaves it live on the whole-SVG options', () => {
+      const builder = new BlissSVGBuilder('B291');
+      builder.setOptions({ dataBlissId: '7', 'data-bliss-id': '8' });
+      expect(attr(builder.svgCode, 'dataBlissId', '7')).toBe(true);
+      expect(attr(builder.svgCode, 'data-bliss-id', '8')).toBe(true);
+      expect(builder.warnings).toEqual([]);
+
+      builder.removeOptions('dataBlissId');
+
+      expect(attr(builder.svgCode, 'dataBlissId', '7')).toBe(false);
+      expect(attr(builder.svgCode, 'data-bliss-id', '8')).toBe(true);
+    });
+
     it('leaves it live on the whole-SVG transient bag', () => {
       const builder = new BlissSVGBuilder('B291');
       builder.setTransientOptions({ dataBlissId: '7', 'data-bliss-id': '8' });
@@ -141,6 +154,16 @@ describe('BlissSVGBuilder option removal naming', () => {
       expect(builder.svgCode).not.toContain('stroke-width="3"');
     });
 
+    it.each(['strokeWidth', 'stroke-width'])('removes it from the whole-SVG options by %s', (named) => {
+      const builder = new BlissSVGBuilder('B291');
+      builder.setOptions({ strokeWidth: 3 });
+      expect(builder.svgCode).toContain('stroke-width="3"');
+
+      builder.removeOptions(named);
+
+      expect(builder.svgCode).not.toContain('stroke-width="3"');
+    });
+
     it.each(['strokeWidth', 'stroke-width'])('removes it from the whole-SVG transient bag by %s', (named) => {
       const builder = new BlissSVGBuilder('B291');
       builder.setTransientOptions({ strokeWidth: 3 });
@@ -184,6 +207,15 @@ describe('BlissSVGBuilder option removal naming', () => {
       expect(builder.svgCode).toBe(untouched);
     });
 
+    it('leaves a whole SVG that has no options alone', () => {
+      const builder = new BlissSVGBuilder('B291');
+      const untouched = builder.svgCode;
+
+      builder.removeOptions('strokeWidth');
+
+      expect(builder.svgCode).toBe(untouched);
+    });
+
     it('leaves a whole SVG that has no transient options alone', () => {
       const builder = new BlissSVGBuilder('B291');
       const untouched = builder.svgCode;
@@ -211,6 +243,16 @@ describe('BlissSVGBuilder option removal naming', () => {
       expect(attr(builder.svgCode, 'viewBox', '0 0 5 5')).toBe(true);
 
       builder.glyph(0).removeOptions(named);
+
+      expect(attr(builder.svgCode, 'viewBox', '0 0 5 5')).toBe(false);
+    });
+
+    it.each(['viewBox', 'view-box', 'VIEWBOX'])('removes a whole-SVG option named as %s', (named) => {
+      const builder = new BlissSVGBuilder('B291');
+      builder.setOptions({ 'view-box': '0 0 5 5' });
+      expect(attr(builder.svgCode, 'viewBox', '0 0 5 5')).toBe(true);
+
+      builder.removeOptions(named);
 
       expect(attr(builder.svgCode, 'viewBox', '0 0 5 5')).toBe(false);
     });

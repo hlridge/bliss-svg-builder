@@ -643,11 +643,11 @@ export declare class ElementHandle {
    *
    * A key that cannot act at this element's level is dropped with the warning
    * the same key gets in a bracket there: a canvas-wide option such as `margin`
-   * (`MISPLACED_GLOBAL_OPTION`), kerning anywhere but a character
-   * (`MISPLACED_KERNING_OPTION`), a target-prefixed key such as `grid--opacity`
-   * (`MISPLACED_LAYER_OPTION`, or the refusal its name would get at global
-   * scope when it would get one there too). It is not stored, so it is never
-   * saved.
+   * (`MISPLACED_GLOBAL_OPTION`; it belongs on the builder's own `setOptions`),
+   * kerning anywhere but a character (`MISPLACED_KERNING_OPTION`), a
+   * target-prefixed key such as `grid--opacity` (`MISPLACED_LAYER_OPTION`, or
+   * the refusal its name would get at global scope when it would get one there
+   * too). It is not stored, so it is never saved.
    * @throws {TypeError} If `opts` is provided and is not an object.
    */
   setOptions(opts: BlissOptions | OptionLayers): this;
@@ -1447,13 +1447,39 @@ export declare class BlissSVGBuilder {
   toJSON(options?: { preserve?: boolean; deep?: boolean; flattenIndicators?: boolean; omitOptions?: boolean }): BlissJSON;
 
   /**
+   * Sets or merges the global options, the ones `toString()` writes in the
+   * `[...]||` bracket: `setOptions({ color: 'blue' })` on `[color=red]||B313`
+   * saves `[color=blue]||B313`. Accepts flat options (treated as overrides) or
+   * `{ defaults, overrides }`, as the constructor's options argument does, and
+   * judges each key as that argument does: kerning is refused with
+   * `MISPLACED_KERNING_OPTION`, since it belongs to a character, and `x`/`y`
+   * move the whole composition. Reports are added to `warnings`.
+   *
+   * @throws {TypeError} If `opts` is provided and is not an object.
+   */
+  setOptions(opts: BlissOptions | OptionLayers): this;
+
+  /**
+   * Removes global option keys. A name the library or a standard owns is
+   * removed in either spelling; a name of your own is removed under exactly
+   * the spelling you set it with. Naming `x` or `y` removes the composition's
+   * position, however it was written. Once the last key goes, the composition
+   * saves with no `[...]||` bracket.
+   *
+   * Naming no key at all asks for nothing and is not an error. Every key is
+   * read before any is removed, so a call that throws has changed nothing.
+   *
+   * @throws {TypeError} If any key is not a string.
+   */
+  removeOptions(...keys: string[]): this;
+
+  /**
    * Sets transient options on the whole SVG: values that reach the rendered
    * output and never reach `toString()` or `toJSON()`. Repeated calls merge.
    *
-   * There is no builder-level `setOptions` counterpart: global options arrive
-   * with the composition, and `clearAllOptions()` is the one call that takes
-   * them away again. This channel is the transient one, so changing it after
-   * construction is what it is for.
+   * `setOptions` is the saved counterpart, which changes the global options
+   * the composition keeps. A transient value wins over a saved one of the same
+   * key, and neither call changes what the other set.
    *
    * @throws {TypeError} If `opts` is provided and is not an object.
    */

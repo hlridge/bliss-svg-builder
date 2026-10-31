@@ -57,7 +57,8 @@ const INSTANCE_METHODS = [
   'snapshot', 'addGroup', 'addGlyph', 'addPart', 'insertGroup', 'removeGroup',
   'replaceGroup', 'merge', 'splitAt', 'addElement', 'insertElement',
   'removeElement', 'replaceElement', 'clear', 'clearAllOptions', 'toString',
-  'toJSON', 'setTransientOptions', 'removeTransientOptions',
+  'toJSON', 'setOptions', 'removeOptions', 'setTransientOptions',
+  'removeTransientOptions',
 ];
 
 const INSTANCE_GETTERS = [

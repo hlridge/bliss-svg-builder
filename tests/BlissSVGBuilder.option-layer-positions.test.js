@@ -15,7 +15,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - A default under the element's own position, at composition, word,
  *   character and part scope: the element's value stays and nothing is
  *   reported. Routes: the constructor (over a string and over a composition
- *   object), `setOptions`, `addGroup`, `insertGroup`, `replaceGroup`,
+ *   object), the builder's `setOptions`, an element's `setOptions`,
+ *   `addGroup`, `insertGroup`, `replaceGroup`,
  *   `addElement`, `insertElement`, `replaceElement`, `addGlyph`,
  *   `insertGlyph`, `replaceGlyph`, `replace`, `addPart`, `insertPart`,
  *   `replacePart`.
@@ -69,6 +70,7 @@ const COMPOSITION_ROUTES = [
   ['the constructor', (code, opts) => new BlissSVGBuilder(code, opts), (token) => token],
   ['the constructor over a composition object',
     (code, opts) => new BlissSVGBuilder(new BlissSVGBuilder(code).toJSON(), opts), (token) => token],
+  ['the builder\'s setOptions', (code, opts) => after(code, (b) => b.setOptions(opts)), (token) => token],
 ];
 
 const WORD_ROUTES = [
@@ -216,6 +218,7 @@ describe('BlissSVGBuilder option layer positions', () => {
   describe('when a default names an option other than a position', () => {
     it.each([
       ['the constructor', () => new BlissSVGBuilder('[color=red]||H', { defaults: { color: 'blue' } }), '[color=red]||H'],
+      ['the builder\'s setOptions', () => after('[color=red]||H', (b) => b.setOptions({ defaults: { color: 'blue' } })), '[color=red]||H'],
       ['addGroup', () => new BlissSVGBuilder('B313').addGroup('[color=red]|H', { defaults: { color: 'blue' } }), 'B313//[color=red]|H'],
       ['setOptions', () => after('[color=red]|H', (b) => b.group(0).setOptions({ defaults: { color: 'blue' } })), '[color=red]|H'],
     ])('lets the element\'s own colour beat a default through %s', (_route, build, expected) => {

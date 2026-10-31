@@ -591,6 +591,28 @@ export const deleteOptionByName = (bag, key) => {
 };
 
 /**
+ * Removes one option name from an element: from its options bag, read as
+ * `deleteOptionByName` reads it, and for an axis from the node's promoted
+ * `x`/`y` field too. The one removal both `removeOptions` methods make, the
+ * element's and the builder's, so the two cannot disagree about a position.
+ *
+ * A position is ONE value with two spellings, the `[x=N]` option and a part's
+ * `CODE:x,y` coordinate, and which one entered it is not observable afterwards.
+ * Both land on the promoted numeric field, and that field is what the render
+ * and `toJSON()` read, so it is the thing that has to go; an option key beside
+ * it goes with the ordinary deletion.
+ *
+ * The name is resolved before the axis test so `X` and `x` behave alike, and
+ * the test is what keeps this off every other field the node carries: without
+ * it, removing `codeName` would delete the element's own identity.
+ */
+export const removeElementOption = (node, key) => {
+  const resolved = canonicalOptionKey(key);
+  if (resolved === 'x' || resolved === 'y') delete node[resolved];
+  if (node.options) deleteOptionByName(node.options, key);
+};
+
+/**
  * Watches one options bag being filled and reports when two spellings of one
  * name land on the same key. Resolution is what makes the collision invisible:
  * before it, both spellings survived side by side and the reader could see
@@ -1787,7 +1809,7 @@ const SCOPE_BOUND_OPTIONS = [
 const documentHome = (written, { notation, transient = false }) => {
   if (notation === 'bracket') return `Use [${written}]||`;
   if (notation === 'object') return `Put it in the composition's top-level ${transient ? 'transientOptions' : 'options'}`;
-  return transient ? 'Pass it to builder.setTransientOptions()' : "Pass it in the builder's options";
+  return transient ? 'Pass it to builder.setTransientOptions()' : 'Pass it to builder.setOptions()';
 };
 
 /**

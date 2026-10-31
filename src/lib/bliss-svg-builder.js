@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_LETTERS, MAX_INPUT_LENGTH, classifyXCode, layoutDefinitionOf, processXCodes, slotCodeOf, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, removeElementOption, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -3003,17 +3003,58 @@ class BlissSVGBuilder {
   }
 
   /**
+   * Sets or merges the global options, the ones `toString()` writes in the
+   * `[...]||` bracket. Accepts flat options (treated as overrides) or
+   * `{ defaults, overrides }`, and judges each key as the constructor's options
+   * argument does, so a call stores what writing the same keys in that bracket
+   * would have stored.
+   *
+   * @param {Object} opts - Option keys and values, or `{ defaults, overrides }`
+   * @returns {this}
+   */
+  setOptions(opts) {
+    assertOptsArg('setOptions', opts);
+    BlissSVGBuilder.#layerOptions(
+      this.#rawBlissObj,
+      opts,
+      { level: 'global', notation: 'setter' },
+      (warning) => this.#mutationWarnings.push(warning),
+    );
+    this.#rebuild();
+    return this;
+  }
+
+  /**
+   * Removes global option keys. A name the library or a standard owns is
+   * removed under either spelling; a name of your own is removed under exactly
+   * the spelling you set it with. `x` and `y` take the composition's position
+   * off, however it was written.
+   *
+   * @param {...string} keys - Option keys to remove
+   * @returns {this}
+   */
+  removeOptions(...keys) {
+    assertKeyArgs('removeOptions', keys);
+    // The removal an element's `removeOptions` makes, on the root, whose
+    // position a bracket's `[x=5]||` and every rebuild hold on its own field.
+    // The bag stays when it empties, unlike an element's: a composition always
+    // exports one.
+    for (const key of keys) removeElementOption(this.#rawBlissObj, key);
+    this.#rebuild();
+    return this;
+  }
+
+  /**
    * Sets transient options on the whole SVG: values that reach the rendered
    * output and never reach `toString()` or `toJSON()`.
    *
-   * Repeated calls MERGE, like `setOptions` on an element. Use it for anything
-   * that describes this view rather than the composition — a display width, a
+   * Repeated calls MERGE, like `setOptions`. Use it for anything that
+   * describes this view rather than the composition: a display width, a
    * highlight, an annotation the app re-applies on each render.
    *
-   * There is no builder-level `setOptions` counterpart: global options arrive
-   * with the composition, and `clearAllOptions()` is the one call that takes
-   * them away again. This channel is the transient one, so changing it after
-   * construction is exactly what it is for.
+   * `setOptions` is the saved counterpart: it changes the global options the
+   * composition keeps. A transient value wins over a saved one of the same
+   * key, and neither call changes what the other set.
    *
    * @param {Object} opts - Option keys and values
    * @returns {this}
