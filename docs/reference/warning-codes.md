@@ -576,7 +576,7 @@ Every other root attribute is yours, including `width`, `height` and `viewBox`, 
 
 ### `DROPPED_WORD_INDICATOR`
 
-An operation had to discard a word-level indicator overlay. It fires when `mergeWithNext()` absorbs a word that carries a `;;` overlay (the merged word keeps only the first word's overlay, so the absorbed word's is dropped even when the first word has none); when a word's `splitAt()` cuts at or before the character the overlay is drawn on (kept, it would jump to another character); and when a structural mutation, or object input, leaves an overlay on a word that consists only of spaces (a space cannot carry a word indicator, so the overlay is dropped instead of being stored and silently eaten by the `//` serialization).
+An operation had to discard a word-level indicator overlay. It fires when `mergeWithNext()` absorbs a word that carries a `;;` overlay (the merged word keeps only the first word's overlay, so the absorbed word's is dropped even when the first word has none); when a word's `splitAt()`, or a space put inside the word (with `insertGlyph()`, by replacing a character with a space, or in object input), cuts it at or before the character the overlay is drawn on (kept, it would jump to another character); and when a structural mutation, or object input, leaves an overlay on a word that consists only of spaces (a space cannot carry a word indicator, so the overlay is dropped instead of being stored and silently eaten by the `//` serialization).
 
 ```js
 const builder = new BlissSVGBuilder('B313;;B81//B431;;B86');
