@@ -6,7 +6,7 @@
 
 import { canonicalOptionKey, deleteOptionByName, WARNING_CODES } from "./bliss-constants.js";
 import { builtInCodes, blissElementDefinitions } from "./bliss-element-definitions.js";
-import { writesOptionSeparator } from "./bliss-parser.js";
+import { writesOptionSeparator, writesWordIndicatorList } from "./bliss-parser.js";
 import { resolveIndicatorCodes, classifyIndicatorKind, filterToIndicators, partitionWordIndicators, resolveWordIndicatorOverlay, splitTopLevelSemicolons } from "./indicator-utils.js";
 
 // Shared arg guard for the mutation families: a code arg is a string or omitted.
@@ -407,7 +407,9 @@ export class ElementHandle {
     if (group.options) {
       throw new Error(`Code "${code}" carries word-level options ("[opts]|"). Style the glyph itself ("[opts]CODE" or the opts parameter), or use addGroup() for word content`);
     }
-    if (group.wordIndicators) {
+    // Read from the text, not the parse: the word reader takes a `;;` written
+    // first for two empty parts, and a definition can never hold one.
+    if (writesWordIndicatorList(code)) {
       throw new Error(`Code "${code}" carries a word-level indicator list (";;"). Use applyIndicators() on the word, or addGroup() for word content`);
     }
     const glyphs = group.glyphs ?? [];
@@ -458,11 +460,13 @@ export class ElementHandle {
     if (!rawGroup.glyphs || rawGroup.glyphs.length === 0) {
       throw new Error(`Expected a single part, but code "${code}" produced no glyphs`);
     }
-    if (rawGroup.wordIndicators) {
-      throw new Error(`Code "${code}" carries a word-level indicator list (";;"). Use applyIndicators() on the word, or addGroup() for word content`);
-    }
     if (rawGroup.errorCode !== undefined) {
       throw new Error(`Code "${code}" is not a single valid part (it fails as a word: ${rawGroup.errorCode}). Fix the code, or use addGroup() to work with whole words`);
+    }
+    // Read from the text, as in the glyph methods; after the fail-flag check,
+    // so a malformed list keeps its own message.
+    if (writesWordIndicatorList(code)) {
+      throw new Error(`Code "${code}" carries a word-level indicator list (";;"). Use applyIndicators() on the word, or addGroup() for word content`);
     }
     if (rawGroup.glyphs[0].isHeadGlyph) {
       throw new Error(`Code "${code}" carries a head marker ("^"). A head marker belongs on a character: pass it to the glyph methods ("CODE^"), or use addGroup() for word content`);

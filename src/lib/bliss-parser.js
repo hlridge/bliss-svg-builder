@@ -95,6 +95,14 @@ export function writesOptionSeparator(codeString) {
   return codeString.replace(BRACKET_TOKEN_PATTERN, '').includes('|');
 }
 
+// Whether a code string writes a `;;` outside its option brackets and text
+// blocks: the separator that opens a word's indicator list. The part and
+// character methods refuse one wherever it stands, including first in the
+// code, where the word reader takes it for two empty parts.
+export function writesWordIndicatorList(codeString) {
+  return codeString.replace(BRACKET_TOKEN_PATTERN, '').includes(';;');
+}
+
 // A written X token runs from a glyph boundary to the next structural
 // character: another glyph boundary (`/`), a part boundary (`;`), a head
 // marker (`^`) or a coordinate suffix (`:`). Taking the token WHOLE is what
