@@ -968,7 +968,6 @@ class BlissSVGBuilder {
 
   constructor(input, options = {}) {
     assertOptsArg('BlissSVGBuilder', options);
-    const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(options);
 
     // Allow empty constructor for building from scratch
     if (input === undefined || input === '') {
@@ -1069,17 +1068,22 @@ class BlissSVGBuilder {
       }
     }
 
-    // Merge: defaults (lowest) < string options (middle) < overrides (highest)
-    if (defaults || overrides) {
-      // Two bags with a defined precedence between them, so each is watched on
-      // its own: one option written once in `defaults` and once in `overrides`
-      // is a layering, not a collision.
-      const optionWarn = (warning) => (blissObj._parseWarnings ??= []).push(warning);
-      const scope = { level: 'global', notation: 'setter' };
-      const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn, scope) : {};
-      const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn, scope) : {};
-      blissObj.options = { ...rawDefaults, ...(blissObj.options ?? {}), ...rawOverrides };
-    }
+    // A composition always carries an options bag, empty or not, where the
+    // three inner levels carry one only once something is in it, so the root's
+    // is written here whatever the layers below add: a plain copy, which is
+    // what every reader downstream has always been handed.
+    blissObj.options = { ...(blissObj.options ?? {}) };
+
+    // Two bags with a defined precedence between them, so each is watched on
+    // its own: one option written once in `defaults` and once in `overrides`
+    // is a layering, not a collision. Their reports ride `_parseWarnings`, as
+    // the composition's own do.
+    BlissSVGBuilder.#layerOptions(
+      blissObj,
+      options,
+      { level: 'global', notation: 'setter' },
+      (warning) => (blissObj._parseWarnings ??= []).push(warning),
+    );
 
     // Flag word-as-part references (e.g. H;TW where TW = B291/B291) with
     // error so BlissElement emits a WORD_AS_PART warning instead of rendering.
@@ -1103,8 +1107,8 @@ class BlissSVGBuilder {
         return parsed;
       },
       toRaw: (obj, scope) => BlissSVGBuilder.#toRaw(obj, (warning) => this.#mutationWarnings.push(warning), scope),
-      clearStalePositioning: (node, ...incoming) =>
-        BlissSVGBuilder.#clearStalePositioning(node, ...incoming),
+      layerOptions: (node, opts, scope) =>
+        BlissSVGBuilder.#layerOptions(node, opts, scope, (warning) => this.#mutationWarnings.push(warning)),
       isRawSpaceGroup: (g) => BlissSVGBuilder.#isRawSpaceGroup(g),
       makeSpaceGroup: () => BlissSVGBuilder.#makeSpaceGroup(),
       removeGlyphGroup: (obj, gi) => this.#removeGlyphGroup(obj, gi),
@@ -1128,22 +1132,53 @@ class BlissSVGBuilder {
     return { defaults: undefined, overrides: opts };
   }
 
-  // Setting a position or a kerning value through the API REPLACES the one the
-  // element carries, so the channels it fills are cleared before the merge.
-  // Without this the element keeps what an earlier call promoted (`node.x`, or
-  // the other kerning key) and the promotion pass reads that leftover as a
-  // second authored value: re-setting `{x: 7}` would report the 5 it replaced
-  // as a competing coordinate that was never written, once per change.
-  // Two values written in ONE call still compete, and still warn, because both
-  // arrive in the same incoming object.
-  static #clearStalePositioning(node, ...incoming) {
-    const keys = incoming.flatMap(o => Object.keys(o ?? {}));
+  // The one merge for every JavaScript options layer: the constructor's
+  // options argument, the opts of the builder's group methods, and an
+  // element's `setOptions` and the opts of its adding and replacing methods.
+  // Defaults (lowest) < the element's own options < overrides (highest). An
+  // `opts` that resolves to no keys writes nothing, so no empty bag is stamped
+  // where none was, which would be toJSON noise.
+  //
+  // A position and a kerning value need more than the spread, because the
+  // element keeps them where the spread cannot see: a written `[x=5]` or
+  // `C8:2,3` is promoted onto the node's own `x`/`y` field, and a kerned
+  // character holds its value under the camelCase key while this channel
+  // writes the kebab one. So each is read as a whole channel:
+  //
+  // - An override REPLACES the element's own value, so the channel it fills is
+  //   cleared first. Otherwise the promotion pass reads the leftover as a
+  //   second authored value, and re-setting `{x: 7}` would report the 5 it
+  //   replaced as a competing coordinate that was never written.
+  // - A default fills only a channel the element leaves empty, and is dropped
+  //   in silence otherwise, the layering a default colour gets from the spread:
+  //   a position axis by axis, and kerning as one channel whichever key holds
+  //   it, since a character takes one kerning value. An override in the same
+  //   call fills the channel too.
+  //
+  // Two values written in ONE layer still compete, and still warn, because both
+  // arrive in the same object. Every key has been through the admission stage
+  // before this reads it, so a refused key never reaches a channel.
+  static #layerOptions(node, opts, scope, warn) {
+    const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
+    if (!defaults && !overrides) return;
+    const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, warn, scope) : {};
+    const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, warn, scope) : {};
+    // The bag's half of a position needs nothing here: it is stored under the
+    // same `x`/`y` key as both layers, so the spread already orders it.
     for (const axis of ['x', 'y']) {
-      if (keys.includes(axis)) delete node[axis];
+      if (node[axis] !== undefined) delete rawDefaults[axis];
+      if (Object.hasOwn(rawOverrides, axis)) delete node[axis];
     }
-    if (node.options && keys.some(key => Object.hasOwn(KERNING_OPTION_KEYS, key))) {
-      for (const key of Object.keys(KERNING_OPTION_KEYS)) delete node.options[key];
+    const isKerning = (key) => Object.hasOwn(KERNING_OPTION_KEYS, key);
+    const overrideKerns = Object.keys(rawOverrides).some(isKerning);
+    if (overrideKerns || Object.keys(node.options ?? {}).some(isKerning)) {
+      for (const key of Object.keys(rawDefaults).filter(isKerning)) delete rawDefaults[key];
     }
+    if (overrideKerns && node.options) {
+      for (const key of Object.keys(node.options).filter(isKerning)) delete node.options[key];
+    }
+    const merged = { ...rawDefaults, ...(node.options ?? {}), ...rawOverrides };
+    if (Object.keys(merged).length > 0) node.options = merged;
   }
 
   // Every options bag inside a composition object, admitted in place. The whole
@@ -2873,19 +2908,12 @@ class BlissSVGBuilder {
       newGroup = parsed.groups[0];
       parseWarnings = parsed._parseWarnings;
     }
-    if (opts) {
-      const { defaults, overrides } = BlissSVGBuilder.#resolveOpts(opts);
-      if (defaults || overrides) {
-        const optionWarn = (warning) => this.#mutationWarnings.push(warning);
-        const scope = { level: 'group', notation: 'setter' };
-        const rawDefaults = defaults ? BlissSVGBuilder.#toRaw(defaults, optionWarn, scope) : {};
-        const rawOverrides = overrides ? BlissSVGBuilder.#toRaw(overrides, optionWarn, scope) : {};
-        const merged = { ...rawDefaults, ...(newGroup.options ?? {}), ...rawOverrides };
-        // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
-        // options:{} onto the group, which would be toJSON noise.
-        if (Object.keys(merged).length > 0) newGroup.options = merged;
-      }
-    }
+    BlissSVGBuilder.#layerOptions(
+      newGroup,
+      opts,
+      { level: 'group', notation: 'setter' },
+      (warning) => this.#mutationWarnings.push(warning),
+    );
     if (parseWarnings?.length) this.#mutationWarnings.push(...parseWarnings);
     return newGroup;
   }

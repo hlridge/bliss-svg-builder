@@ -22,7 +22,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   object form, including a `grid: false` override disabling a grid set
  *   in the string.
  * - The second parameter is optional: undefined, null, empty objects, and
- *   absent are all accepted; null and undefined values inside
+ *   absent are all accepted, and a composition object exports the same
+ *   whichever of them is passed; null and undefined values inside
  *   defaults/overrides are skipped.
  *
  * Does NOT cover:
@@ -235,6 +236,17 @@ describe('BlissSVGBuilder object options', () => {
     it('accepts null as the second parameter', () => {
       const builder = new BlissSVGBuilder('H', null);
       expect(builder.svgCode).toContain('<svg');
+    });
+
+    it.each([
+      ['null', null],
+      ['an empty object', {}],
+      ['layers that are both undefined', { defaults: undefined, overrides: undefined }],
+    ])('exports a composition object built with %s as one built without it', (_label, opts) => {
+      // regression: null and undefined layers skipped the merge that wrote the
+      // composition's options bag, so the export lost its top-level `options`
+      const composition = () => ({ groups: [{ glyphs: [{ parts: [{ codeName: 'H' }] }] }] });
+      expect(new BlissSVGBuilder(composition(), opts).toJSON()).toEqual(new BlissSVGBuilder(composition()).toJSON());
     });
   });
 });

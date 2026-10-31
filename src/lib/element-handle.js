@@ -497,31 +497,13 @@ export class ElementHandle {
     return parts[0];
   }
 
-  // Apply defaults/overrides merge to a node's options.
-  // Accepts { defaults, overrides } or flat options (treated as overrides).
-  // `level` is the node's, which is not always this handle's: a word handle's
-  // addGlyph writes a character's options.
+  // Layers `opts` ({ defaults, overrides }, or flat options as the overrides)
+  // onto a node's options through the builder's one merge, the one its own
+  // options argument and group methods use. `level` is the node's, which is
+  // not always this handle's: a word handle's addGlyph writes a character's
+  // options.
   #applyDefaultsOverrides(node, opts, level) {
-    if (!opts) return;
-    let defaults, overrides;
-    if ('defaults' in opts || 'overrides' in opts) {
-      ({ defaults, overrides } = opts);
-    } else {
-      overrides = opts;
-    }
-    if (!defaults && !overrides) return;
-    const scope = { level, notation: 'setter' };
-    const rawDefaults = defaults ? this.#ctx.toRaw(defaults, scope) : {};
-    const rawOverrides = overrides ? this.#ctx.toRaw(overrides, scope) : {};
-    // A position or a kerning value set here REPLACES the one the element
-    // carries, so the channels this call fills are cleared before the merge:
-    // the leftovers are what an earlier call promoted, not a second value the
-    // caller wrote, and reading them as one would report a phantom conflict.
-    this.#ctx.clearStalePositioning(node, rawDefaults, rawOverrides);
-    const merged = { ...rawDefaults, ...(node.options ?? {}), ...rawOverrides };
-    // An empty opts (e.g. {}) resolves to no keys: don't stamp a bare
-    // options:{} onto the node, which would be toJSON noise.
-    if (Object.keys(merged).length > 0) node.options = merged;
+    this.#ctx.layerOptions(node, opts, { level, notation: 'setter' });
   }
 
   // --- Navigation ---
@@ -1632,12 +1614,12 @@ export class ElementHandle {
 
   // --- Mutation: transient options ---
 
-  // Deliberately NOT routed through #applyDefaultsOverrides. That helper calls
-  // clearStalePositioning, which wipes the element's NORMAL position and
-  // kerning channels whenever the incoming object names one of those keys —
-  // correct when the caller is writing that channel, destructive here, where
-  // those keys are refused anyway. A transient call must never be able to
-  // damage the document on its way to being rejected.
+  // Deliberately NOT routed through #applyDefaultsOverrides. That merge clears
+  // the element's NORMAL position and kerning channels whenever an override
+  // names one of those keys, which is correct when the caller is writing that
+  // channel and destructive here, where those keys are refused anyway. A
+  // transient call must never be able to damage the document on its way to
+  // being rejected.
   //
   // The refusal itself lives in one place on the authoring structure
   // (#normalizeTransientInvariant), so object input and these setters cannot
