@@ -5,19 +5,15 @@ import { BlissSVGBuilder } from '../src/index';
  * Pins the fate of a word-level indicator overlay (the `;;` channel,
  * `group.wordIndicators`) when a word's glyph list is restructured. The overlay
  * is a WORD property: glyph-list edits that keep the group intact re-anchor it
- * onto the current head automatically, while splitAt and mergeWithNext, which
- * create or destroy a group, route it by a first-wins rule.
+ * onto the current head automatically, while mergeWithNext, which destroys a
+ * group, routes it by a first-wins rule.
  *
  * Covers:
- * - splitAt: the first (left) part always keeps the overlay (word-scoped, not
- *   head-bound), with stripSemantic; `^` is kept iff its glyph lands in the
- *   first part, else it is dropped and the second part re-derives its head, so
- *   split -> merge round-trips the word-slot losslessly.
  * - mergeWithNext: the merged word keeps the first word's overlay; an absorbed
  *   word's overlay is dropped with a loud DROPPED_WORD_INDICATOR warning,
  *   whether or not the first word also carried one. The first word's `^` head
  *   marker is kept and the absorbed word's `^` is dropped silently (the merged
- *   word re-derives a single head), mirroring splitAt's first-wins rule.
+ *   word re-derives a single head).
  * - Glyph-list edits that keep the group (addGlyph, removeGlyph, replaceGlyph)
  *   and head base-part edits (addPart) leave the overlay floating onto the
  *   current head, with no per-op overlay handling needed.
@@ -33,6 +29,8 @@ import { BlissSVGBuilder } from '../src/index';
  * Does NOT cover:
  * - The applyIndicators / clearIndicators overlay API itself, see
  *   `ElementHandle.word-indicators.test.js`.
+ * - splitAt on a word (its overlay and head marker, and the split and merge
+ *   round trips), see `ElementHandle.split-word-state.test.js`.
  * - Builder-level merge / splitAt (whole-builder, group-boundary), see
  *   `BlissSVGBuilder.merge-split.test.js`.
  * - Overlay render / serialize internals, see
@@ -55,93 +53,6 @@ const headGlyph = (builder, groupIdx = 0) => {
 };
 
 describe('ElementHandle word indicators under structural mutation', () => {
-  describe('when splitting a word', () => {
-    // The overlay is a WORD property, not head-bound: the FIRST (left) part
-    // always keeps it, wherever the head sits. `^` is kept iff its glyph lands
-    // in the first part; a marked glyph moved to the second part loses its `^`
-    // and that part re-derives its head from defaults (glyph 0). This keeps
-    // split -> merge lossless for the word-slot and matches mergeWithNext (R15
-    // WS-2 word-slot model, supersedes the R14 "overlay follows the head").
-    it('keeps the overlay on the first part when the head stays there', () => {
-      const b = new BlissSVGBuilder('B313/B1103;;B86');
-      b.group(0).splitAt(1);
-      expect(b.toString()).toBe('B313;;B86//B1103');
-      // toJSON groups are [left, space, right]; the overlay rides the left word.
-      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
-      expect(overlay(b, 2)).toBeUndefined();
-    });
-
-    it('keeps the overlay on the first part even when the head moves right', () => {
-      const b = new BlissSVGBuilder('B313/B1103^;;B86');
-      b.group(0).splitAt(1);
-      expect(b.toString()).toBe('B313;;B86//B1103');
-      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
-      expect(overlay(b, 2)).toBeUndefined();
-    });
-
-    it('keeps the stripSemantic flag on the retained first-part overlay', () => {
-      const b = new BlissSVGBuilder('B303/B313^;;!B86');
-      b.group(0).splitAt(1);
-      expect(b.toString()).toBe('B303;;!B86//B313');
-      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: true });
-    });
-
-    it('drops a head marker that lands in the second part and re-derives its head', () => {
-      const b = new BlissSVGBuilder('B303/B313/B431^;;B86');
-      b.group(0).splitAt(1);
-      expect(b.toString()).toBe('B303;;B86//B313/B431');
-      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
-      expect(overlay(b, 2)).toBeUndefined();
-    });
-
-    it('keeps a head marker that stays in the first part', () => {
-      const b = new BlissSVGBuilder('B303/B313^/B431;;B86');
-      b.group(0).splitAt(2);
-      expect(b.toString()).toBe('B303/B313^;;B86//B431');
-      expect(overlay(b, 0)).toEqual({ codes: ['B86'], stripSemantic: false });
-    });
-  });
-
-  describe('when round-tripping a word-slot through split and merge', () => {
-    it('keeps the word-slot (split to first part, merge to first word)', () => {
-      // WS-2 canonical: the `^` head is in the second part after the split, so it
-      // is dropped, but the word-slot survives on the first part and the merge
-      // keeps the first word's overlay. Today the slot followed the head into the
-      // second part and the merge then dropped it (losing B97 with a warning).
-      const b = new BlissSVGBuilder('H/E^;;B97');
-      b.group(0).splitAt(1);
-      b.group(0).mergeWithNext();
-      expect(b.toString()).toBe('H/E;;B97');
-      expect(overlay(b, 0)).toEqual({ codes: ['B97'], stripSemantic: false });
-      expect(dropWarnings(b)).toHaveLength(0);
-    });
-
-    it('restores the word byte-identically when no head marker moves', () => {
-      // The strongest form of the guarantee: with no `^` to relocate, split then
-      // merge returns the exact input (serialize and render), so the word-slot
-      // is lossless, not merely surviving.
-      const b = new BlissSVGBuilder('B313/B1103;;B86');
-      const originalSvg = b.svgCode;
-      b.group(0).splitAt(1);
-      b.group(0).mergeWithNext();
-      expect(b.toString()).toBe('B313/B1103;;B86');
-      expect(b.svgCode).toBe(originalSvg);
-      expect(dropWarnings(b)).toHaveLength(0);
-    });
-
-    it('restores the word and its head marker when the marker stays in the first part', () => {
-      // The `^` glyph lands in the first part, so first-wins keeps it: the merge
-      // reconstructs the input byte-for-byte, marker included.
-      const b = new BlissSVGBuilder('B303/B313^/B431;;B86');
-      const originalSvg = b.svgCode;
-      b.group(0).splitAt(2);
-      b.group(0).mergeWithNext();
-      expect(b.toString()).toBe('B303/B313^/B431;;B86');
-      expect(b.svgCode).toBe(originalSvg);
-      expect(dropWarnings(b)).toHaveLength(0);
-    });
-  });
-
   describe('when merging two words that both carry an overlay', () => {
     it('keeps the first word overlay on the merged word', () => {
       const b = new BlissSVGBuilder('B313;;B86//B431;;B81');

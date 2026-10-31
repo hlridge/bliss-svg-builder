@@ -613,10 +613,12 @@ export declare class ElementHandle {
 
   /**
    * Splits this word group into two at the glyph boundary, inserting a space
-   * between. Only valid on group handles. A word-level (`;;`) indicator overlay
-   * is a word property: the first (left) part always keeps it. A `^` head
-   * marker is kept only if its glyph lands in the first part; otherwise the
-   * second part re-derives its head.
+   * between. Only valid on group handles. The first part keeps the word-level
+   * (`;;`) indicator overlay while the character it is drawn on stays there; a
+   * split at or before that character drops it and adds a
+   * `DROPPED_WORD_INDICATOR` warning to `warnings`. A `^` head marker is kept
+   * only if its glyph lands in the first part; otherwise the second part
+   * re-derives its head.
    * @throws {Error} On a group handle, if `glyphIndex` is out of range (must be
    *   1 to glyphs.length-1 inclusive). Returns `this` with no effect on non-group
    *   handles (no throw).
@@ -1389,11 +1391,11 @@ export declare class BlissSVGBuilder {
    * not against stored text.
    *
    * Words with no space between them, which the raw element methods can
-   * leave, are written as one word, since only a space makes two: it takes
-   * each option and the `;;` indicators from the first word that has them,
-   * the indicators staying on the character they were drawn on
+   * leave, are written as one word, since only a space makes two, the way
+   * `mergeWithNext()` leaves them: the first word's options, `;;` indicators
+   * and `^` hold for the whole word, and a later word's are left out
    * (`[color=red]|B313` then `B431;;B81` comes back as
-   * `[color=red]|B313/B431^;;B81`). `toJSON()` keeps the two words.
+   * `[color=red]|B313/B431`). `toJSON()` keeps the two words.
    *
    * `flattenIndicators` collapses word-level (`;;`) indicators onto the head
    * glyph as character-level `;`, reproducing the pre-overlay output. It is the

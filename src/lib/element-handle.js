@@ -57,6 +57,9 @@ const pathTo = (parts, node) => {
   return null;
 };
 
+// A word-level overlay as the string writes it, for a warning that drops it.
+const writtenOverlay = ({ codes = [], stripSemantic }) => ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+
 /**
  * A lightweight handle that references a node in `#rawBlissObj` by identity.
  * Survives `#rebuild()` because it holds a direct reference to the raw node,
@@ -1412,16 +1415,29 @@ export class ElementHandle {
     const rawIndex = groups.indexOf(this.#nodeRef);
     if (rawIndex < 0) return this;
 
+    // The word-level overlay stays with the first part only while the
+    // character it is drawn on does. A split at or before that character
+    // drops it, loudly, rather than drawing it on another character. An
+    // overlay with no character to sit on (-1) has none to lose, and stays.
+    const overlayHead = group.wordIndicators ? this.#ctx.overlayHeadIndex(group.glyphs) : -1;
+
     // Splice trailing glyphs from the original group (mutate in-place)
     const rightGlyphs = group.glyphs.splice(glyphIndex);
 
-    // The word-level overlay is a WORD property, not head-bound, so the first
-    // (left) part always keeps it; the left group already retains
-    // group.wordIndicators here, so there is nothing to move. The `^` head
-    // marker obeys first-wins on a structural split: a marked glyph that lands
-    // in the second part loses its marker (that part re-derives its head from
-    // glyph 0), while a marker that stays in the first part is kept. This keeps
-    // split -> merge lossless for the word-slot and matches mergeWithNext.
+    if (overlayHead >= glyphIndex) {
+      const dropped = writtenOverlay(group.wordIndicators);
+      delete group.wordIndicators;
+      this.#ctx.addMutationWarning({
+        code: WARNING_CODES.DROPPED_WORD_INDICATOR,
+        message: `splitAt(${glyphIndex}) dropped the word's word-level indicator overlay (${dropped}). The character it was drawn on went to the second word.`,
+        source: dropped,
+      });
+    }
+
+    // The `^` head marker obeys first-wins on a structural split: a marked
+    // glyph that lands in the second part loses its marker (that part
+    // re-derives its head), as mergeWithNext drops the absorbed word's, while
+    // a marker that stays in the first part is kept.
     for (const g of rightGlyphs) delete g.isHeadGlyph;
 
     // Build right-half group with copied options
@@ -1498,8 +1514,7 @@ export class ElementHandle {
     // group's overlay is dropped (one head governs the merged word, and it is
     // this group's). Data loss must be loud, so warn rather than drop silently.
     if (nextGroup.wordIndicators) {
-      const { codes = [], stripSemantic } = nextGroup.wordIndicators;
-      const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+      const dropped = writtenOverlay(nextGroup.wordIndicators);
       this.#ctx.addMutationWarning({
         code: WARNING_CODES.DROPPED_WORD_INDICATOR,
         message: `mergeWithNext() dropped the absorbed word's word-level indicator overlay (${dropped}). The merged word keeps only the first word's overlay.`,

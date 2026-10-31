@@ -1115,6 +1115,7 @@ class BlissSVGBuilder {
       clearOwnOptions: (node, level, character) => BlissSVGBuilder.#clearOwnOptions(node, level, character),
       ownLookAt: (node, level, character) => BlissSVGBuilder.#ownLookAt(node, level, character),
       drawnKey: (node) => BlissSVGBuilder.#drawnKey(node),
+      overlayHeadIndex: (glyphs) => resolveOverlayHeadIndex(glyphs),
     };
   }
 
@@ -3724,16 +3725,13 @@ class BlissSVGBuilder {
     const drawnHead = (group, stored) => resolveOverlayHeadIndex(stored.glyphs.map((glyph, index) =>
       ({ ...glyph, isHeadGlyph: group.glyphs[index].isHeadGlyph })));
 
-    // What one word writes: each character's segments (its own token last),
-    // the `;;` overlay it writes, the character that overlay is drawn on and
-    // the one its stored designation marks. `overlayTaken` says that a word
-    // written before it with no space between them keeps its overlay, so this
-    // word's is left out and its head written without it. A word that writes
-    // nothing (a bare empty one) is null: it makes no seam and leaves a space
-    // run open.
-    const writtenWord = (group, groupIndex, overlayTaken) => {
-      const stored = this.#rawBlissObj.groups[groupIndex];
-      const overlay = overlayTaken ? null : group.wordIndicators ?? null;
+    // What one word writes, from this save's copy of it and the stored word:
+    // each character's segments (its own token last), the `;;` overlay it
+    // writes, the character that overlay is drawn on and the one its stored
+    // designation marks. A word that writes nothing (a bare empty one) is
+    // null: it makes no seam and leaves a space run open.
+    const writtenWord = (group, stored) => {
+      const overlay = group.wordIndicators ?? null;
       // The word's `;;` codes are merged onto its head, so they are placed
       // with the head's parts. Only a custom code is spelled out, in a part or
       // among the `;;` codes, and only it or a part the string reads back as
@@ -3756,11 +3754,11 @@ class BlissSVGBuilder {
       const { codes = [], stripSemantic } = overlay ?? {};
       return {
         group,
+        stored,
         glyphArrays,
         overlay: content ? overlay : null,
         overlayText: ';;' + (stripSemantic ? '!' : '') + (placedWordCodes ?? codes).join(';'),
         overlayHead,
-        drawn: content && overlay ? drawnHead(group, stored) : -1,
         designation: group.glyphs.findIndex((glyph) => glyph.isHeadGlyph === true),
         // A character's own token is its last, after any kerning markers; one
         // written as nothing is no character to a reload.
@@ -3801,43 +3799,22 @@ class BlissSVGBuilder {
       return withOptions(group, overlay ? text + overlayText : text);
     };
     // Words with no space between them are one word to a reload, so they are
-    // written as one. Each option comes from the first word that has it, a
-    // position included, and the `;;` overlay from the first word that draws
-    // one (a later one is left out, see writtenWord). The overlay stays on the
-    // character it was drawn on: a designation stored there is written, and
-    // so is a marker where the reload's pick from the word as written would
-    // differ. Any other designation is left out, since a head re-derived
-    // loses nothing and an overlay moved moves ink. Without an overlay the
-    // first designation stored is written.
-    const joinedWordText = (words) => {
-      const glyphArrays = words.flatMap((word) => word.glyphArrays.map((segments) => [...segments]));
-      const startOf = (word) => words.slice(0, words.indexOf(word))
-        .reduce((count, other) => count + other.glyphArrays.length, 0);
-      const keeper = words.find((word) => word.drawn !== -1);
-      const marking = words.find((word) => word.designation !== -1);
-      let head = -1;
-      if (keeper) {
-        const drawn = startOf(keeper) + keeper.drawn;
-        if (keeper.designation === keeper.drawn
-          || BlissSVGBuilder.#movedHead(drawn, glyphArrays, assemble(glyphArrays)) !== -1) head = drawn;
-      } else if (marking) {
-        head = startOf(marking) + marking.designation;
-      }
-      if (head !== -1) markHead(glyphArrays, head);
-      const node = { options: {} };
-      for (const { group } of words) {
-        node.x ??= group.x;
-        node.y ??= group.y;
-        for (const [key, value] of Object.entries(group.options ?? {})) node.options[key] ??= value;
-      }
-      return withOptions(node, assemble(glyphArrays) + (keeper?.overlayText ?? ''));
-    };
+    // written as one, as mergeWithNext() leaves them: the first word's
+    // options, `;;` overlay and head mark over every word's characters. A
+    // later word's are left out, so the overlay is drawn on the joined word's
+    // head. A word that writes nothing is no word of it.
+    const joinedWord = ([first, ...later]) => writtenWord(
+      { ...first.group, glyphs: [...first.group.glyphs, ...later.flatMap(({ group }) =>
+        group.glyphs.map((glyph) => ({ ...glyph, isHeadGlyph: undefined })))] },
+      { glyphs: [first, ...later].flatMap(({ stored }) => stored.glyphs) },
+    );
     // The words written since the last space group.
     let joined = [];
     const writeJoined = () => {
       if (joined.length === 0) return;
-      const text = joined.length === 1 ? loneWordText(joined[0]) : joinedWordText(joined);
-      if (spaceRun) segments.push(spellRun(spaceRun, defaultSpaceBefore(text, joined.flatMap((word) => word.characters))));
+      const word = joined.length === 1 ? joined[0] : joinedWord(joined);
+      const text = loneWordText(word);
+      if (spaceRun) segments.push(spellRun(spaceRun, defaultSpaceBefore(text, word.characters)));
       spaceRun = null;
       segments.push(text);
       joined = [];
@@ -3854,7 +3831,7 @@ class BlissSVGBuilder {
         spaceRun.push(...group.glyphs.map(g => g.parts[0].codeName));
         continue;
       }
-      const word = writtenWord(group, groupIndex, joined.some((other) => other.drawn !== -1));
+      const word = writtenWord(group, this.#rawBlissObj.groups[groupIndex]);
       if (word) joined.push(word);
     }
     writeJoined();
