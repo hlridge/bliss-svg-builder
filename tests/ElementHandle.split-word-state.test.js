@@ -23,7 +23,8 @@
  * - The builder-level splitAt(groupIndex) between words, see
  *   `BlissSVGBuilder.merge-split.test.js`.
  * - A word split by a space glyph left inside it, see
- *   `BlissSVGBuilder.space-invariant.test.js`.
+ *   `BlissSVGBuilder.in-word-space-indicator.test.js` (the overlay, by this
+ *   rule) and `BlissSVGBuilder.space-invariant.test.js` (the split).
  */
 import { describe, it, expect } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';

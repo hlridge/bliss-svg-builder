@@ -24,9 +24,10 @@ import { BlissSVGBuilder } from '../src/index';
  *   group and inside a mixed word alike.
  * - Canonicalization (round-4 review F1, user decision 2026-07-03): an in-word
  *   bare space glyph always splits out into a real space group at rebuild
- *   (silent; first word run keeps the group node, overlay, and options —
- *   options are copied to later word runs, splitAt parity; later runs keep
- *   their own designations). Covers the DSL-authorable `B313/TSP;;B81` form
+ *   (first word run keeps the group node and options, and the overlay while
+ *   its character stays there; options are copied to later word runs,
+ *   splitAt parity; later runs keep their own designations). Covers the
+ *   DSL-authorable `B313/TSP;;B81` form
  *   too, and adjacent space groups merge so the structure matches its own
  *   reparse.
  * - No over-reach: a word that stays a word keeps its overlay; a designation
@@ -43,6 +44,9 @@ import { BlissSVGBuilder } from '../src/index';
  *   `ElementHandle.indicator-noop-warning.test.js`.
  * - Overlay routing across splitAt/mergeWithNext, see
  *   `ElementHandle.word-indicator-structure.test.js`.
+ * - An overlay whose character a space sends to a later word run (dropped
+ *   with a warning, splitAt's rule), see
+ *   `BlissSVGBuilder.in-word-space-indicator.test.js`.
  */
 
 const overlay = (builder, groupIdx = 0) =>
@@ -169,9 +173,9 @@ describe('BlissSVGBuilder space invariant', () => {
     // serialized form re-split into more groups than the live tree held:
     // 'TSP/B1103;;B81' reparsed as TWO groups with a different svg and no
     // warning. Canonicalize at rebuild instead (user decision 2026-07-03):
-    // in-word bare space glyphs split out into real space groups, silently
-    // (nothing is lost — glyph nodes move, overlay/options stay with the
-    // first word run, matching splitAt's first-wins).
+    // in-word bare space glyphs split out into real space groups (glyph
+    // nodes move, options stay with the first word run, and so does the
+    // overlay while its character is there, as splitAt keeps it).
     it('splits a leading space out, keeping the overlay on the word', () => {
       const b = new BlissSVGBuilder('B313/B1103;;B81');
       b.glyph(0).replacePart(0, 'TSP');

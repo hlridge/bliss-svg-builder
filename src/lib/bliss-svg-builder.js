@@ -1286,11 +1286,13 @@ class BlissSVGBuilder {
   //     rebuild. An EMPTY group keeps its overlay (the F3 pure-state-op
   //     contract; isNonHeadMarkerGroup is false).
   //  3. A bare space glyph never lives inside a word: the word is split at
-  //     its space runs into real space groups — canonicalization, SILENT
-  //     (nothing is lost: glyph nodes move; the first word run keeps the
-  //     group node, overlay, and options; later word runs get an options
-  //     copy, splitAt parity, and keep their own designations, which
-  //     round-trip per word). A fail-flagged group is exempt (terminal;
+  //     its space runs into real space groups, a canonicalization (glyph
+  //     nodes move; the first word run keeps the group node and options;
+  //     later word runs get an options copy, splitAt parity, and keep their
+  //     own designations, which round-trip per word). The overlay follows
+  //     splitAt's rule: kept on the first word run while the character it is
+  //     drawn on is there, else dropped LOUDLY (DROPPED_WORD_INDICATOR); every
+  //     other case is silent. A fail-flagged group is exempt (terminal;
   //     splitting it would duplicate its errorSource replay). A multi-part
   //     glyph merely LED by a space-code part (`ZSA;B291`) is not a space
   //     glyph and is never touched.
@@ -1392,6 +1394,28 @@ class BlissSVGBuilder {
         const last = runs[runs.length - 1];
         if (last && last.isSpace === isSpace) last.glyphs.push(glyph);
         else runs.push({ isSpace, glyphs: [glyph] });
+      }
+      // The word-level overlay stays with the first word run only while the
+      // character it is drawn on does, as a word's splitAt() keeps it: a
+      // space before that character drops it, loudly, rather than drawing it
+      // on another character. The character is found among the word's own
+      // characters, the spaces aside, so it is the one the word drew the
+      // overlay on before the space came in. An overlay with no character to
+      // sit on (-1) has none to lose, and stays.
+      if (group.wordIndicators) {
+        const characters = group.glyphs.filter(g => !BlissSVGBuilder.#isSpaceGlyphNode(g));
+        const headIndex = resolveOverlayHeadIndex(characters);
+        const keeperRun = runs.find(run => !run.isSpace);
+        if (headIndex !== -1 && !keeperRun.glyphs.includes(characters[headIndex])) {
+          const { codes = [], stripSemantic } = group.wordIndicators;
+          const dropped = ';;' + (stripSemantic ? '!' : '') + codes.join(';');
+          delete group.wordIndicators;
+          this.#mutationWarnings.push({
+            code: WARNING_CODES.DROPPED_WORD_INDICATOR,
+            message: `A space inside the word split it, which dropped the word's word-level indicator overlay (${dropped}). The character it was drawn on went to a later word.`,
+            source: dropped,
+          });
+        }
       }
       let keeperAssigned = false;
       const replacement = runs.map((run) => {
