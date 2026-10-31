@@ -191,7 +191,7 @@ builder.toString();
 
 Serialized spacing always matches rendered spacing: adjacent space groups serialize as one coalesced run, and every space in that run is written on its own. A space that matches its position's default is a bare separator, so a run of N default spaces emits N+1 slashes; a space that differs (like `QSP` between words, where the default is `TSP`) keeps its name while the spaces around it stay compact. `H/TSP/QSP/TSP/H` therefore comes back as `H//QSP//H`. [Empty slots](#empty-slots-are-deliberate) contribute nothing. A bare empty group or glyph has no DSL token of its own, so it is omitted from the string (an options-carrying empty does have one: `[color=red]|` for a group, `[color=red]` for a glyph, unless the options are [left out](#saving-without-options)); use `toJSON()` when empty slots must survive a round-trip.
 
-Words with no space between them, which the [raw element methods](#raw-element-methods) can leave, are written as one word, since a space is what makes two. The word takes each option and the `;;` indicators from the first word that has them, and the indicators stay on the character they were drawn on: `[color=red]|B313` then `B431;;B81` is written `[color=red]|B313/B431^;;B81`. `toJSON()` keeps the two words.
+Words with no space between them, which the [raw element methods](#raw-element-methods) can leave, are written as one word, since a space is what makes two, the way [`.mergeWithNext()`](#mergewithnext) leaves them: the first word's options, `;;` indicators and `^` hold for the whole word, and a later word's are left out. `[color=red]|B313` then `B431;;B81` is written `[color=red]|B313/B431`. `toJSON()` keeps the two words.
 
 A word written with the `X` shorthand comes back in that shorthand. `Xhello` parses into one glyph per letter and serializes as `Xhello`, not as `Xh/Xe/Xl/Xl/Xo`. A letter that carries something of its own (an option, a coordinate, a head marker) is written out on its own, because the compact form has nowhere to put it, but the letters beside it still join up: `Xa/[color=red]>Xb` stays as written, while `Xa^/Xb/Xc` comes back as `Xa^/Xbc`. Both spellings render the same image and parse back to the same composition; the compact one is just the one you would have typed.
 
@@ -1063,7 +1063,7 @@ builder.group(0).splitAt(2);
 // now: [B313/B1103] [SP] [B431]
 ```
 
-The first half keeps the original options object. The second half receives a shallow copy. Throws if `glyphIndex` is out of range (must be between 1 and `glyphs.length - 1` inclusive):
+The first half keeps the original options object. The second half receives a shallow copy. The word-level (`;;`) indicators stay with the first half while the character they are drawn on stays there; a split at or before that character drops them and adds a `DROPPED_WORD_INDICATOR` warning, so an indicator never jumps to another character (`B313/B431;;B81` split at 1 gives `B313;;B81//B431`, while `B313/B1103^;;B86` split at 1 gives `B313//B1103`). A `^` head marker that lands in the second half is dropped, and that half finds its own head. Throws if `glyphIndex` is out of range (must be between 1 and `glyphs.length - 1` inclusive):
 
 ```js
 builder.group(0).splitAt(0);  // Error: would produce empty left half
