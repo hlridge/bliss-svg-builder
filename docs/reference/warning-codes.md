@@ -138,7 +138,7 @@ new BlissSVGBuilder({ groups: [{ glyphs: [
 // renders B313, warns "groups[0].glyphs[1].parts[1]"
 ```
 
-A list that is missing, `null` or `undefined` is not reported: it is read as empty, so `{}` reads as an empty composition.
+A `groups` or `glyphs` list that is missing, `null` or `undefined` is not reported: it is read as empty, so `{}` reads as an empty composition.
 
 ## Values Out of Range
 

@@ -53,7 +53,7 @@ const rebuilt = new BlissSVGBuilder(snapshot);
 rebuilt.svgCode; // identical output
 ```
 
-An object you build by hand is read in the shape `toJSON()` writes: a composition `{ groups }`, a word `{ glyphs }`, a character `{ parts }`, a part `{ codeName }`. A list you leave out is read as empty, so `{ options: { color: 'red' } }` is an empty composition in red. Something of the wrong shape where a word, a character or a part belongs is left out and reported with [`MALFORMED_ELEMENT`](/reference/warning-codes#malformed-element).
+An object you build by hand is read in the shape `toJSON()` writes: a composition `{ groups }`, a word `{ glyphs }`, a character `{ parts }`, a part `{ codeName }`. A `groups` or `glyphs` list you leave out is read as empty, so `{ options: { color: 'red' } }` is an empty composition in red. Something of the wrong shape where a word, a character or a part belongs is left out and reported with [`MALFORMED_ELEMENT`](/reference/warning-codes#malformed-element).
 
 ## SVG Output
 
