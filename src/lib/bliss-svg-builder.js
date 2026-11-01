@@ -3006,8 +3006,8 @@ class BlissSVGBuilder {
    * Sets or merges the global options, the ones `toString()` writes in the
    * `[...]||` bracket. Accepts flat options (treated as overrides) or
    * `{ defaults, overrides }`, and judges each key as the constructor's options
-   * argument does, so a call stores what writing the same keys in that bracket
-   * would have stored.
+   * argument does, so a call stores what passing the same keys to the
+   * constructor would have stored.
    *
    * @param {Object} opts - Option keys and values, or `{ defaults, overrides }`
    * @returns {this}
