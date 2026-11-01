@@ -39,7 +39,7 @@ const PART_OPTION_CODESTRING = /^\[.*?\]>/;
 // would backtrack across `]…[` and capture a bracket pair as one blob, and a
 // bare `[^\]]`-class body would truncate at a quoted `]` in a RAW
 // definition-sourced part string (top-level input is placeholder-tokenized,
-// definition codeStrings are not; review fix, 2026-07-17). Group 1 is the
+// definition codeStrings are not). Group 1 is the
 // bracket, group 2 the grammar's internal atom, group 3 the remainder. The
 // non-empty remainder (.+) keeps a dangling bracket with no code on the
 // whole-character fail path.
@@ -47,7 +47,7 @@ const PART_SLOT_CHAR_OPTION_PATTERN = new RegExp(String.raw`^(\[` + OPTION_BRACK
 
 // Quote-aware bracket matchers built from the shared grammar (see
 // OPTION_BRACKET_CONTENT in bliss-constants.js for the rationale and the
-// linear-time guarantee; probe: probe-chunk11-option-value-quoting.mjs).
+// linear-time guarantee).
 // The tokenizer pre-pass and #parseOptions' own extraction must agree, or a
 // quoted `]` truncates at one layer even when the other accepts it.
 const BRACKET_TOKEN_PATTERN = new RegExp(String.raw`\{(.*)\}|\[(` + OPTION_BRACKET_CONTENT + String.raw`)\]`, 'g');
@@ -235,7 +235,7 @@ export function processXCodes(codeString) {
     // A run that collapses to one glyph keeps the prefix on that glyph, so the
     // option scopes the whole run; that deliberately differs from the written
     // sequence form, where a prefix binds one member and the member stands
-    // alone (review disposition, 2026-07-17).
+    // alone.
     return denotes === 'word'
       ? optionPrefix + [...body].map(char => `X${char}`).join('/')
       : `${optionPrefix}XTXT_${body}`;
@@ -645,9 +645,9 @@ export class BlissParser {
   // once quoted values are stripped with #parseOptions's own quote grammar.
   // The second condition was added to veto the then-quote-unaware pre-pass
   // (a quoted ']' split ONE user bracket into two tokenized ones); the
-  // pre-pass is quote-aware since Chunk 11, so both arms now agree on
-  // [k="]["]-class inputs and the veto is belt-and-suspenders (kept; the
-  // Phase 6 Stryker re-baseline adjudicates its reachability).
+  // pre-pass is quote-aware now, so both arms agree on
+  // [k="]["]-class inputs and the veto is belt-and-suspenders (kept; mutation
+  // testing decides whether it is still reachable).
   static #hasMultipleOptionBrackets(tokenized, restored) {
     return (tokenized.match(/\[/g) || []).length > 1
       && (restored.replace(QUOTED_SPANS_PATTERN, '').match(/\[/g) || []).length > 1;
@@ -887,8 +887,7 @@ export class BlissParser {
     // `{...}` blocks in one input collapse into a single match, which silently
     // merges the glyphs between them. We emit UNSUPPORTED_TEXT_BLOCKS below to
     // make that visible. Proper multi-block support requires a stateful
-    // tokenizer and ships with the {text} rendering feature
-    // (see .claude/backlog/text-overlay.md).
+    // tokenizer and ships with the {text} rendering feature.
     // [...] uses non-greedy match since it can appear multiple times.
     const originalInput = inputString;
     inputString = inputString.replace(BRACKET_TOKEN_PATTERN, (match, textContent, optionContent) => {
@@ -1084,8 +1083,8 @@ export class BlissParser {
 
         // A space carries neither a designation nor a word indicator: TSP/
         // QSP/ZSA groups serialize as bare word breaks ('//'), so a `^` or
-        // `;;` stored on one is eaten by toString and lost on reparse
-        // (round-2 external review F1). A DECORATED space token skips the
+        // `;;` stored on one is eaten by toString and lost on reparse.
+        // A DECORATED space token skips the
         // step-2 space branch (the token is not exactly SP/TSP/QSP) and lands
         // here; classify by the expanded part's resolved code.
         const isSpacePart = (p) => {
@@ -1215,8 +1214,8 @@ export class BlissParser {
         // (nested alias / `;;` overlay). errorSource is the whole group string
         // (`wordCode`) so toString re-emits it and parse(toString(x)) re-flags;
         // the flag is static + sticky and the splitAt/mergeWithNext guards key
-        // off group.errorCode. R2 corpus task 4, Decision 6 (applies uniformly to
-        // direct and nested aliases). See [[feedback_no_indicator_of_a_part]].
+        // off group.errorCode. The rule applies uniformly to direct and nested
+        // aliases.
         const failMultiWordIndicator = (parts) => {
           // Filtering the `_wordBreak` markers collapses the multi-word
           // expansion into one group; any head markers the words carried are
@@ -1237,7 +1236,7 @@ export class BlissParser {
         };
 
         // Detect ;; for word-level indicators on inline multi-character expressions.
-        // Pattern: baseCode;;indicators. R14: instead of baking the indicators
+        // Pattern: baseCode;;indicators. Instead of baking the indicators
         // onto the head glyph, store them as a reversible overlay on the group.
         // The base glyphs expand and crown as usual; the overlay is resolved onto
         // the head at decode time (render + serialize) via
@@ -1300,13 +1299,13 @@ export class BlissParser {
 
           // A ;; overlay binds to ONE word. Bound to a multi-word alias (the base
           // expands past a word break), it has no single head: fail the whole
-          // unit instead of overlaying only the first word. Decision 6 (uniform
+          // unit instead of overlaying only the first word (uniform
           // with the char-level multi-word-alias fail in expandSegment).
           if (expandedParts.some(part => part._wordBreak)) {
             return failMultiWordIndicator(expandedParts);
           }
 
-          // A space carries no word indicator (round-2 review F1): the overlay
+          // A space carries no word indicator: the overlay
           // would be stored, then eaten by the '//' serialization. Warn ONCE
           // for the whole overlay (strip included) and keep the plain space —
           // a misplaced decoration on valid content is dropped, not
@@ -1334,15 +1333,15 @@ export class BlissParser {
           // Restore each code's placeholders AFTER splitting: a part-level
           // option (`[color=red]>B81`) is placeholder-substituted early, so its
           // internal `;` is safe to split on here; restoring before the split
-          // would re-expose that `;` and break a multi-key option. (SIB-2.)
+          // would re-expose that `;` and break a multi-key option.
           const rawCodes = indicators.split(';').filter(Boolean).map((c) => restorePlaceholders(c));
 
-          // An overlay code may carry a part option ([opts]>B81, SIB-2). Its
+          // An overlay code may carry a part option ([opts]>B81). Its
           // bracket meets the same global-only key gate as any part bracket,
           // but the overlay stores code STRINGS verbatim (parsed only at
           // render-merge), so a gated key must be stripped from the stored
           // string itself or toString would re-serialize the warned no-op
-          // forever. Clean codes pass through untouched (SIB-2 fidelity); a
+          // forever. Clean codes pass through untouched; a
           // stripped prefix is rebuilt with the shared quote-aware key=value
           // emission (serializeOptionValue), so a kept quoted value survives
           // the rebuild.
@@ -1350,15 +1349,15 @@ export class BlissParser {
             // A CHARACTER-form prefix ([opts]CODE, no >) is inert in overlay
             // position for EVERY key -- the render-merge extracts parts only,
             // so the bracket styles nothing, yet it used to re-serialize
-            // forever with no warning anywhere (external review 2026-07-02
-            // F2). The whole bracket is misplaced (a word-indicator code has
+            // forever with no warning anywhere.
+            // The whole bracket is misplaced (a word-indicator code has
             // no character to bind to); [opts]> is the styled form. EVERY
             // leading char-form bracket strips in this ONE pass (one warning
             // each) BEFORE the part-form gate runs: the part-form regex would
             // otherwise backtrack across stacked brackets ([a][b]>CODE read
             // as one prefix whose #parseOptions sees only bracket one),
             // leaving later keys unreached or losing a valid later bracket
-            // with the misplaced first one (review-fix round 2, F2).
+            // with the misplaced first one.
             let current = code;
             let charPrefix;
             while ((charPrefix = current.match(OVERLAY_CHAR_OPTION_PATTERN)) !== null) {
@@ -1392,7 +1391,7 @@ export class BlissParser {
           // warns NON_INDICATOR_AS_WORD_INDICATOR, an unrecognized code warns
           // UNKNOWN_CODE, and either way the offender is DROPPED so it does not
           // re-serialize. The base still renders as written -- a bad decoration on
-          // valid content is dropped, not fail-rendered ([[feedback_error_granularity]]).
+          // valid content is dropped, not fail-rendered.
           // resolveWordIndicatorOverlay is the shared classify + store rule (the
           // DSL, API, and object surfaces all use it, so they agree); it returns
           // null when the codes were all dropped and there is no strip. (Strict
@@ -1450,7 +1449,7 @@ export class BlissParser {
           if (hasMarker) {
             if (parts.length === 1) {
               if (isSpacePart(parts[0])) {
-                // A space cannot be a word's head (round-2 review F1): warn +
+                // A space cannot be a word's head: warn +
                 // drop, never store a designation the space serialization
                 // ('//') cannot re-emit.
                 parseWarnings.push({
@@ -1528,7 +1527,7 @@ export class BlissParser {
             // written form (the old WORD_AS_PART fail serialized to a form that
             // re-parsed differently). A `;`-part behind a validly placed
             // `[opts]>` on a bare alias meets the same MISPLACED rule this
-            // early return used to bypass (F2): warn, drop the parts, keep the
+            // early return used to bypass: warn, drop the parts, keep the
             // option on the base; scoped to top level in parity with the `;`
             // gate below.
             const [gateBaseRaw, ...gateParts] = partContent.split(';');
@@ -1643,8 +1642,7 @@ export class BlissParser {
           // render the base as defined (the head keeps any baked indicator). A
           // glyph / literal / unknown code is a single character and dumb-appends
           // the part (base case / built-in path below). Use `;;` for a word-level
-          // indicator. See [[feedback_no_indicator_of_a_part]] (Strict Indicator
-          // Separation, supersedes R15 Task 3b promotion).
+          // indicator.
           const baseCodeDef = definitions[potentialBaseCode];
           const baseIsBareAlias = !!baseCodeDef && baseCodeDef.codeString !== undefined
             && !baseCodeDef.isBlissGlyph && !baseCodeDef.isShape
@@ -1770,7 +1768,7 @@ export class BlissParser {
                 }
               }
               // A char-level `;`-part on a multi-word (//) alias is MISPLACED
-              // (warned up front): render every word and drop the part. D1.
+              // (warned up front): render every word and drop the part.
               return allParts;
             }
 
@@ -1785,7 +1783,7 @@ export class BlissParser {
             const expandedParts = rawExpandedParts.map(expandedSubPart => {
                 // Word-break markers carry no glyph identity; pass them through
                 // untouched so definition props don't attach and the break
-                // survives into final word-chunk crowning (N6).
+                // survives into final word-chunk crowning.
                 if (expandedSubPart._wordBreak) return expandedSubPart;
                 // Apply properties from the definition, falling back to existing values
                 const isIndicator = definition.isIndicator ?? expandedSubPart.isIndicator;
@@ -1825,7 +1823,7 @@ export class BlissParser {
 
             // A char-level `;`-part on a nested alias that expands past a word
             // break is MISPLACED (warned up front): render the words, drop the
-            // part. D1.
+            // part.
 
             // Rule 2: a definition's codeString is its own word-string.
             // Resolve its written markers now (head resolution rule 4); the
@@ -1891,8 +1889,8 @@ export class BlissParser {
 
             // Prepend options to the first expanded part. A char-level option
             // is valid on a single character only: on an alias expanding to a
-            // multi-character word it is MISPLACED (B4; folds audit N-3 -- it
-            // used to land silently on the FIRST character). Warn + drop at
+            // multi-character word it is MISPLACED (it used to
+            // land silently on the FIRST character). Warn + drop at
             // top level; nested expansion keeps its prepend behavior.
             if (optionsPrefix && expandedParts.length > 0) {
               if (isTopLevel && isMultiGlyphWord) {
@@ -1915,7 +1913,7 @@ export class BlissParser {
             // at a definition with identity: a glyph, an indicator, a shape,
             // an external glyph, or a getPath primitive) dissolves its written
             // name into this expansion, which `preserve` could then never
-            // restore. Record it in the Phase 2.3b side channel, extended to
+            // restore. Record it in the rename-recording side channel, extended to
             // character level here. The outermost written name wins (this
             // overwrites an inner frame's recording); a chain ending on a bare
             // alias (multi-code shorthand or an unresolved forward ref)
@@ -2006,7 +2004,7 @@ export class BlissParser {
       // The malformed-;; fail path collapses its word breaks, so a
       // fail-rendered unit keeps its bracket (errorSource round-trips it).
       // Two separator kinds span words: a // word break AND an explicit space
-      // code between glyphs (external review 2026-07-02 F3: an in-alias TSP is
+      // code between glyphs (an in-alias TSP is
       // not a _wordBreak, but its serialized /TSP/ splits groups on reparse,
       // silently rebinding the bracket to the first word). A separator with
       // inked content on ONE side only (a trailing space or //) does NOT span
@@ -2020,8 +2018,8 @@ export class BlissParser {
           // space token (the top-level split matches the exact token), so a
           // composed (TSP;B81) or decorated space stays in-group and
           // separates nothing; kerning markers are neither ink nor a
-          // separator (they decorate the next glyph). (Review-fix round 2,
-          // F3: matching _scanCode over-classified both.)
+          // separator (they decorate the next glyph). (Matching
+          // _scanCode over-classified both.)
           const partCode = p._scanCode ?? (p.part ? p.part.split(';')[0].split(':')[0] : '');
           if (partCode === 'RK' || partCode === 'AK') continue;
           if (p._wordBreak || isSpaceCode(p.part)) {
@@ -2071,7 +2069,7 @@ export class BlissParser {
           group.error = _wordError.message;
           group.errorSource = _wordError.source;
         }
-        // R14/R15: lift a word-level indicator overlay onto its enclosing group.
+        // Lift a word-level indicator overlay onto its enclosing group.
         // The word-level ;; slot is a WORD property owned by the FIRST glyph:
         // the first glyph (group.glyphs still empty) claims it; a later glyph's
         // promoted overlay is dropped + DROPPED_WORD_INDICATOR (first-wins, so
@@ -2227,11 +2225,11 @@ export class BlissParser {
         partWarnings.forEach(warn);
 
         // Land a character-level rename recording on the parsed sole part,
-        // where the Phase 2.3b preserve-restore already operates; a space
+        // where the preserve restore already operates; a space
         // stays canonical (spaces take no custom identity). The recording
         // also rides the glyph itself: a multi-part anatomy or a custom
         // typed-glyph identity (glyphCode) has no part-level carrier, and
-        // the serializer consult (preserve-completeness chunk) restores the
+        // the serializer's written-name consult restores the
         // written name only for a clean instance of the definition. A letter
         // drawn as text has a glyph code too, but it names the one part
         // itself, so that part carries the recording.
@@ -2436,8 +2434,8 @@ export class BlissParser {
    * code string to hold as a part of its own (a primitive, a letter, or a
    * shape drawn by its own function), read as a part slot reads a code
    * (slotCodeOf), so a letter without an outline draws as its text-fallback
-   * glyph. The written name is recorded so a `preserve` save can restore it
-   * (Phase 2.3b); default output keeps the code drawn.
+   * glyph. The written name is recorded so a `preserve` save can restore it;
+   * default output keeps the code drawn.
    *
    * A typed glyph or shape holds what it draws, so the drawn code's own
    * options are this part's too, and win over the definition's own where both
@@ -2706,8 +2704,8 @@ export class BlissParser {
     // is inert (a leading ';' yields an indicator-only glyph, a
     // trailing ';' is normalized away) but still counts as a SEPARATOR:
     // the peel gate uses the raw index, so a bracket after ANY ';' sits
-    // in a part slot even when the base is empty (';[opts]B86'; review
-    // fix, 2026-07-17). #flagCompositePart keeps the filtered index
+    // in a part slot even when the base is empty (';[opts]B86').
+    // #flagCompositePart keeps the filtered index
     // (position among real parts). Word-level ';;' is resolved upstream
     // and never reaches here.
     const segments = partsString.split(';');

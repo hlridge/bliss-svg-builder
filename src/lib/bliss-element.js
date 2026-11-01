@@ -805,9 +805,9 @@ export class BlissElement {
   /**
    * True ink start within this element's own frame: 0 for a leaf (path data
    * draws from the origin); for a composite, the leftmost child ink edge.
-   * A displaced single-child composite keeps its baked offset (SIB-3), so its
+   * A displaced single-child composite keeps its baked offset, so its
    * ink begins right of x=0 while its reported width still spans from the
-   * origin — indicator centering reads this to skip the leading gap (XC-1).
+   * origin. Indicator centering reads this to skip the leading gap.
    */
   get #inkStartX() {
     if (!this.#children || this.#children.length === 0) return 0;
@@ -818,7 +818,7 @@ export class BlissElement {
    * True ink end within this element's own frame: the width for a leaf; for a
    * composite, the rightmost child ink edge. A negative-min composite reports
    * its width as a span SIZE (max - min), not a right-edge coordinate, so
-   * position + width overstates where the ink stops (XC-1 review F1).
+   * position + width overstates where the ink stops.
    */
   get #inkEndX() {
     if (!this.#children || this.#children.length === 0) return this.width;
@@ -836,7 +836,7 @@ export class BlissElement {
   #positionIndicatorGroup(glyphParts, indicatorParts) {
     if (indicatorParts.length === 0) return;
 
-    // Calculate base glyph metrics over the TRUE INK SPAN (XC-1): both edges
+    // Calculate base glyph metrics over the TRUE INK SPAN: both edges
     // add each part's internal ink offsets so a displaced composite base does
     // not count a leading gap (positive baked offset) as ink, and a negative
     // baked offset does not overstate the right edge (its reported width is a
@@ -889,7 +889,7 @@ export class BlissElement {
     //   x = glyphAnchorX - width/2 - anchorOffsetX
     // sitting its content center exactly on the glyph anchor.
     //
-    // (The pre-2026-07-08 rule centered the MIDPOINT of the first/last
+    // (The previous rule centered the MIDPOINT of the first/last
     // anchor points instead. Its (wN - w1)/4 width term sat any group whose
     // edge members differ in CONTENT width (width minus the outer 2|a| dot
     // allowance) off the anchor, order-dependently: B391;B81;B90 vs
@@ -1677,7 +1677,7 @@ export class BlissElement {
   }
 
   /**
-   * Classifies an indicator part for introspection (R14 Task 6).
+   * Classifies an indicator part for introspection.
    * `indicatorLevel` separates a word-level overlay indicator (tagged
    * `_indicatorOrigin: 'word'` when merged onto the head at decode) from a
    * character-level one; `indicatorKind` reads the definition's
@@ -2090,7 +2090,7 @@ export class BlissElement {
     // part, so a sibling stacked indicator overlaps it and the composite's width
     // (derived from its children) under-reports. Built-in compound indicators
     // bake explicit x on their parts (B98 = B97;B99:3,0), so the x === undefined
-    // guard leaves them untouched. R15 3b-5.
+    // guard leaves them untouched.
     // (#handleCompositeElement is only reached for a non-empty parts list, so
     // children is non-empty here and .every is never vacuous.)
     if (this.#children.every(c => c.isIndicator)) {
@@ -2106,10 +2106,10 @@ export class BlissElement {
     const isIndicatorAtLevel3 = this.#level === 3 && this.isIndicator;
 
     // Normalize: shift the child parts so the leftmost lands at x=0 and the
-    // stripped common min moves onto the composite as displacement (XC-2),
+    // stripped common min moves onto the composite as displacement,
     // either sign. This holds for a SINGLE child too (its own x IS the n=1
     // common min): the offset is not discarded, so a use-site coord still ADDS
-    // to it rather than replacing it (SIB-3's concern), while the composite's
+    // to it rather than replacing it, while the composite's
     // frame now equals its ink span. Keeping the offset on a lone child instead
     // (the former length > 1 gate) left a nonzero baked offset inside the
     // frame: a negative one made the frame a span wider than the ink (a phantom

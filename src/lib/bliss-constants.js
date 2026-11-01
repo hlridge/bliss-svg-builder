@@ -117,7 +117,7 @@ export const CURATED_ATTRIBUTE_SOURCES = Object.freeze({
  * the target that reaches the children where it can. The membership rule is
  * exactly "every name this container's own emitter stamps on its CHILDREN",
  * which is checkable by eye against the emitters and needs no table of SVG
- * semantics, the open-ended thing C8 refused to build for vector-effect. That
+ * semantics, the open-ended thing the library declined to build for vector-effect. That
  * is why `rx` and `opacity` are out (nothing stamps them, so we cannot say a
  * child's value takes effect instead) and why `shape-rendering` is out (the
  * grid group carries it itself, so a written one replaces it rather than being
@@ -780,7 +780,7 @@ export function generateKey() {
  * Builder-canvas option keys (kebab-case, as written in the DSL) that take
  * effect ONLY in the global `[opts]||` bracket. Written at group `[opts]|`,
  * character `[opts]`, or part `[opts]>` level they are inert, so the parser
- * warns MISPLACED_GLOBAL_OPTION and drops the key (audit N-2).
+ * warns MISPLACED_GLOBAL_OPTION and drops the key.
  *
  * Deliberately curated, NOT INTERNAL_OPTIONS verbatim:
  * - `text` is excluded: it is an unimplemented stub at EVERY level including
@@ -897,7 +897,7 @@ export const transientRefusalMessage = (keys) =>
  * emitted on `builder.warnings` references `WARNING_CODES.X` rather than an inline
  * literal, so the set is typo-proof and discoverable in one place.
  *
- * Verb convention (see `.claude/plans/2026-06-24-warning-code-vocabulary-design.md`):
+ * Verb convention:
  *   MALFORMED_   input did not parse in the required shape (a FORMAT failure)
  *   OUT_OF_RANGE_ a well-formed number outside what the attribute can carry (a
  *                VALUE failure; INVALID_ stays reserved for a value that is not

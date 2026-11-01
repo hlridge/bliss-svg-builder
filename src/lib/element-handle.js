@@ -573,7 +573,7 @@ export class ElementHandle {
   // renders as a single placeholder and toString replays its stored
   // errorSource verbatim, so a content mutation inside it would change the
   // live tree while the serialized form stays frozen (toJSON/toString
-  // divergence, round-2 external review F5). Every content mutator no-ops on
+  // divergence). Every content mutator no-ops on
   // it — SILENTLY, matching the shipped splitAt/mergeWithNext terminal arms —
   // whether it targets the group handle or a child glyph/part handle inside.
   // Recovery: replaceGroup, or removing the whole word (group detach/remove).
@@ -741,11 +741,11 @@ export class ElementHandle {
       glyph.parts.splice(partIndex, 1);
       // A glyph recomposed by part removal is no longer the single code it was
       // parsed from; drop its cached identity so an emptied glyph does not
-      // re-emit a phantom codeName from toString (mirrors insertPart). N16.
+      // re-emit a phantom codeName from toString (mirrors insertPart).
       this.#clearGlyphIdentity(glyph);
       // An EMPTIED glyph serializes to nothing, so a head designation on it
-      // would live only in toJSON while toString dropped it (round-2 external
-      // review F4): the designation dies visibly with its glyph's content.
+      // would live only in toJSON while toString dropped it: the designation
+      // dies visibly with its glyph's content.
       // detach is the only mutation that leaves an empty glyph in the tree
       // (remove/removePart cascade the whole glyph away).
       if (glyph.parts.length === 0) delete glyph.isHeadGlyph;
@@ -981,7 +981,7 @@ export class ElementHandle {
     this.#assertReachable();
     // A non-string, non-nullish code is a type error, not DSL content. Without
     // this guard it would tokenize to zero codes and silently store the
-    // render-significant empty overlay (external review F2).
+    // render-significant empty overlay.
     if (code !== undefined && code !== null && typeof code !== 'string') {
       throw new TypeError('applyIndicators() code must be a string (or omitted for the empty indicator set).');
     }
@@ -1032,12 +1032,12 @@ export class ElementHandle {
 
     // A space glyph is not a base for indicators. Under the i>0 rule its single
     // part would otherwise classify as a base, so carve it out and keep the
-    // no-op + warning (R15 Task 5).
+    // no-op + warning.
     if (this.#ctx.isRawSpaceGroup(this.#parentRef)) {
       if (!suppressNoop) {
         const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
         // `||` deliberately (not `??`): the empty apply's '' must fall back to
-        // the target code, never become an empty source (external review F4).
+        // the target code, never become an empty source.
         this.#warnIndicatorNoop(
           `${verb} had no effect: the target glyph '${targetCode}' is a space.`,
           code || targetCode,
@@ -1050,7 +1050,7 @@ export class ElementHandle {
     // an indicator), so scan for the first TRAILING indicator from index 1.
     // Mirrors mergeWordIndicatorsOntoHead, so a lone indicator or an empty glyph
     // carries a further indicator rather than no-opping (the atypical-base
-    // contract, R15 Task 5).
+    // contract).
     const firstIndicatorIndex = glyph.parts.findIndex((p, i) => i > 0 && p.isIndicator === true);
 
     let baseParts, indicatorParts;
@@ -1067,7 +1067,7 @@ export class ElementHandle {
     if (!isValidPattern) {
       if (!suppressNoop) {
         const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
-        // `||` deliberately (not `??`): see the space-glyph arm above (F4).
+        // `||` deliberately (not `??`): see the space-glyph arm above.
         this.#warnIndicatorNoop(
           `${verb} had no effect: the target glyph '${targetCode}' has a non-indicator part after an indicator part (an invalid indicator pattern).`,
           code || targetCode,
@@ -1099,8 +1099,7 @@ export class ElementHandle {
     // apply left with NOTHING attachable REFUSES: explicit failed content is
     // not deliberate emptiness (that spelling is applyIndicators('')), so the
     // existing indicators stay untouched and nothing strips as a side effect
-    // (parity with the group overlay's null-resolver refuse arm; round-2
-    // external review F2).
+    // (parity with the group overlay's null-resolver refuse arm).
     let attachableEntries = [];
     if (code !== null && requestedCodes.length > 0) {
       const { valid, rejected } = partitionWordIndicators(requestedCodes, definitions);
@@ -1149,7 +1148,7 @@ export class ElementHandle {
 
     const finalCodes = resolveIndicatorCodes(existingIndCodes, attachableEntries.map(e => e.code), { stripSemantic }, definitions);
 
-    // D4: a clear with no indicator parts had nothing to remove. (A clear that
+    // A clear with no indicator parts had nothing to remove. (A clear that
     // preserves a semantic root is a documented no-op and is intentionally not
     // warned. The apply-side "applied no indicator" arm is gone: the per-code
     // validation warnings above cover every rejected apply code.)
@@ -1191,7 +1190,7 @@ export class ElementHandle {
     return this;
   }
 
-  // D4: emit a mutation warning (one per no-op call) when an indicator
+  // Emit a mutation warning (one per no-op call) when an indicator
   // apply/clear had no effect. Uses the persistent mutation-warning channel
   // (survives #rebuild), not the parse `#warnings` (which resets each rebuild).
   #warnIndicatorNoop(message, source) {
@@ -1236,7 +1235,7 @@ export class ElementHandle {
 
   // Word-level indicator channel for a group handle. Sets/clears the reversible
   // `group.wordIndicators` overlay (the DSL `;;` form), leaving the base glyphs
-  // intact so a later clear restores them (N12). `flatten` opts out of the
+  // intact so a later clear restores them. `flatten` opts out of the
   // overlay and bakes onto the head as character-level parts instead (the
   // pre-overlay, character-level shape). `code` is null for clear, '' for the
   // deliberate empty apply (== the DSL's bare `;;`). Mirrors the parser overlay
@@ -1247,13 +1246,13 @@ export class ElementHandle {
     // Overlay clear/apply are pure state ops on the group node, so they must
     // keep working when every glyph was detached — a stale overlay on an
     // emptied word would otherwise be unreachable and resurrect on the next
-    // addGlyph (round-2 external review F3). Only flatten needs glyphs (below).
+    // addGlyph. Only flatten needs glyphs (below).
     if (!group) return this;
     // Terminal fail-flagged word: see #inFailFlaggedGroup.
     if (group.errorCode) return this;
     // A space group carries no word indicator: refuse + warn (parity with the
     // glyph-level space arm), never store an overlay the space's '//'
-    // serialization would eat (round-2 external review F1).
+    // serialization would eat.
     if (this.#ctx.isRawSpaceGroup(group)) {
       const verb = code === null ? 'clearIndicators()' : `applyIndicators('${code}')`;
       const targetCode = group.glyphs[0]?.parts?.[0]?.codeName || 'unknown';
@@ -1273,12 +1272,11 @@ export class ElementHandle {
       // has nothing to bake onto; the overlay stays for a non-flatten op).
       if (!group.glyphs?.length) return this;
       // Bake onto the head; drop any overlay so the indicator is not applied
-      // twice (once baked, once re-merged at render). N15: only drop the overlay
+      // twice (once baked, once re-merged at render). Only drop the overlay
       // when the bake actually lands. A clear always bakes (removal is the
       // effect), and so does the empty apply (same clear state effect, strip
       // honored); a code-carrying apply bakes only if it carries a recognized
-      // indicator, else the overlay is kept rather than silently destroyed
-      // (R15 Task 5).
+      // indicator, else the overlay is kept rather than silently destroyed.
       const head = this.headGlyph();
       const hadOverlay = group.wordIndicators !== undefined;
       const requestedCodes = code === null || code === '' ? [] : splitTopLevelSemicolons(code);
@@ -1293,7 +1291,7 @@ export class ElementHandle {
         // An apply is left unsuppressed so an unrecognized code still warns; but
         // stripSemantic is forwarded only when the bake applies, so a refused
         // non-indicator apply stays a pure no-op (it must not strip the head as
-        // a side effect while keeping the overlay — F2). The strip spelling is
+        // a side effect while keeping the overlay). The strip spelling is
         // applyIndicators('', { flatten: true, stripSemantic: true }).
         if (code === null) head.#applyOrClearIndicators(null, {}, hadOverlay);
         else head.applyIndicators(code, { stripSemantic: bakeApplies && stripSemantic });
@@ -1308,7 +1306,7 @@ export class ElementHandle {
       // Clear: the pure undo. Removing the overlay fully restores the base --
       // the head's own character-level indicators, replaced at render while
       // the overlay existed, become visible again. A clear that finds no
-      // overlay warns (D4 parity with the glyph-level clear-nothing arm).
+      // overlay warns (parity with the glyph-level clear-nothing arm).
       const hadOverlay = group.wordIndicators !== undefined;
       delete group.wordIndicators;
       if (!hadOverlay) {
@@ -1329,7 +1327,7 @@ export class ElementHandle {
       const overlay = resolveWordIndicatorOverlay(requestedCodes, stripSemantic, this.#ctx.getDefinitions(), ({ code: badCode, reason }) => {
         this.#ctx.addMutationWarning(reason === 'word-structure'
           ? {
-              // Round-2 external review F2: a `/` hidden behind a coordinate
+              // A `/` hidden behind a coordinate
               // suffix escaped the bare-code classifier, so the stored code
               // serialized to a string the DSL re-parses as word structure.
               code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
@@ -1359,7 +1357,7 @@ export class ElementHandle {
       // bare-`;;` arm — an empty apply IS the empty overlay, DSL parity). An
       // apply whose codes are all non-indicators (resolver null) asked for
       // nothing valid: warn and leave any existing overlay untouched rather
-      // than silently destroying it. Mirrors the flatten N15 rule.
+      // than silently destroying it. Mirrors the same rule in the flatten arm.
       if (overlay) {
         group.wordIndicators = overlay;
       }
@@ -1486,7 +1484,7 @@ export class ElementHandle {
     // Absorb the next word group's glyphs
     group.glyphs.push(...nextGroup.glyphs);
 
-    // R15 WS-3: `^` is word-scoped and first-wins, so the absorbed word's head
+    // `^` is word-scoped and first-wins, so the absorbed word's head
     // marker is dropped silently (a re-derived head is not data loss). Clear it
     // on the absorbed glyphs so the merged word keeps at most the first word's
     // `^`; mirrors splitAt's right-side clear and keeps merge ≡ `/`-compose.

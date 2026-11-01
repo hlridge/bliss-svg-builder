@@ -15,7 +15,7 @@ const CHAR_OPTION_PREFIX = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT 
 // Like CHAR_OPTION_PREFIX but requiring a non-empty remainder (group 3), the
 // strip form used by the overlay store gate: a baseless bracket (`[opts]`)
 // stays whole and classifies UNKNOWN_CODE instead of stripping to nothing
-// (mirrors the DSL gate's `(.+)` requirement, round-3 review F3).
+// (mirrors the DSL gate's `(.+)` requirement).
 const CHAR_OPTION_STRIP = new RegExp(String.raw`^(\[` + OPTION_BRACKET_CONTENT + String.raw`\])(?!>)(.+)$`);
 
 // A codeString that is one code as the DSL reads it: no character the DSL
@@ -39,7 +39,7 @@ export const SINGLE_CODE_TOKEN = /^[^/;:|^[\]>{}\s]+$/;
  * The chain stops at the first definition with identity (a flagged glyph, a
  * shape, an external glyph, an indicator) or whose codeString is not a single
  * clean token — so a multi-code composition NEVER resolves through (the
- * single-code-target guardrail, user ruling 2026-07-17), and a definition's
+ * single-code-target guardrail), and a definition's
  * own metadata is never bypassed. Unregistered targets end the chain at the
  * alias itself (classified like any recognized non-indicator).
  *
@@ -162,7 +162,7 @@ export function filterToIndicators(codes, definitions) {
  * `splitTopLevelSemicolons`). A `/` hidden behind a coordinate suffix
  * (`B81:1,2/ZZ9`) escapes `getBareCode` (which reads only up to the `:`), yet
  * the serialized form re-parses as word structure, so an indicator slot can
- * never hold such a code (round-2 external review F2).
+ * never hold such a code.
  */
 function hasTopLevelSlash(code) {
   let depth = 0;
@@ -253,8 +253,8 @@ export function partitionWordIndicators(codes, definitions) {
  * bracket styles nothing (`[opts]>` is the styled form). The DSL `;;` store
  * gate strips + warns these before storing; the API and object surfaces reach
  * this resolver with raw codes, so the same strip applies here for parity
- * (external review of ce80c1b, F2: the quote-aware bare-code lookup otherwise
- * silently stored the inert prefix). Every leading char-form bracket strips
+ * (without the strip, the quote-aware bare-code lookup would silently store
+ * the inert prefix). Every leading char-form bracket strips
  * (one `onCharOptionStrip` report each) BEFORE validation; the code itself is
  * kept and validated normally. The parser's codes arrive pre-stripped, so the
  * pass is a no-op on the DSL path (no double warning).
@@ -291,9 +291,9 @@ export function resolveWordIndicatorOverlay(rawCodes, stripSemantic, definitions
  * API receives raw strings, so it needs this bracket-aware split to tokenize a
  * multi-key-option indicator the same way (DSL/API parity). Inside a bracket, a
  * quoted span owns its characters — a `[`/`]`/`;` in a quoted option value
- * (`[data-t="a[b"]>B81;B86`) must not move the depth or split (external review
- * of ce80c1b, F1: a quoted `[` held the depth open across the real separator,
- * joining two indicators into one stored code). Escapes (`\"`) consume the next
+ * (`[data-t="a[b"]>B81;B86`) must not move the depth or split (otherwise a
+ * quoted `[` would hold the depth open across the real separator and join
+ * two indicators into one stored code). Escapes (`\"`) consume the next
  * character, matching the option parser's quote grammar. Trims and drops empty
  * segments, matching the prior naive `code.split(';').map(trim).filter(Boolean)`.
  */
@@ -421,7 +421,7 @@ export function classifyIndicatorKind(code, definitions) {
  * resolved indicator appended strictly after every base part. A resolved code
  * that matches an existing character-level `;` indicator part REUSES that part
  * (a shallow clone keeping its key and its 'character' origin) so navigation
- * round-trips it (N14-2); a genuinely overlay-added code is parsed fresh and
+ * round-trips it; a genuinely overlay-added code is parsed fresh and
  * tagged `_indicatorOrigin: 'word'`. The input glyph is not mutated. A head
  * whose parts hold a non-indicator after an indicator is returned unchanged.
  *
@@ -467,7 +467,7 @@ export function mergeWordIndicatorsOntoHead(headGlyph, overlay, definitions, par
     definitions
   );
 
-  // N14-2: reuse an existing character-level `;` indicator part when a resolved
+  // Reuse an existing character-level `;` indicator part when a resolved
   // code matches it, so the reordered part keeps its raw key (navigation and
   // getElementByKey round-trip it) and its true 'character' origin, instead of
   // re-parsing into a fresh keyless node tagged 'word'. A code with no existing
@@ -525,7 +525,7 @@ export function wordIndicatorNode(code, definitions, parse) {
     : undefined;
   // A single-code rename overlay (e.g. MYIND -> C2, BAREIND -> B81) loses
   // the written code at parse; record it so preserve-mode serialization
-  // restores it (Phase 2.3b). This stamp is load-bearing for the `;;`
+  // restores it. This stamp is load-bearing for the `;;`
   // surface: the standalone parse resolves the alias at glyph level, so the
   // parser's own single-ref rename recording never fires for this node
   // (unlike an object-input part, where it does). A code reading as several
@@ -540,7 +540,7 @@ export function wordIndicatorNode(code, definitions, parse) {
   // indicator (MYIND -> C2, isIndicator on the definition). Apply it here from
   // the effective definition so
   // `;` and `;;` place the indicator identically and the flatten+preserve
-  // round-trip is svg-stable (external review MAJOR-1). Built-in indicators
+  // round-trip is svg-stable. Built-in indicators
   // already carry the flag, so the guard makes this a no-op for them.
   if (node.isIndicator !== true) {
     const effective = resolveEffectiveDefinition(immediate, definitions);

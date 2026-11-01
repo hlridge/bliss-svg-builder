@@ -1038,7 +1038,7 @@ class BlissSVGBuilder {
         const overlay = resolveWordIndicatorOverlay(codes, stripSemantic, blissElementDefinitions, ({ code: badCode, reason }) => {
           (blissObj._parseWarnings ??= []).push(reason === 'word-structure'
             ? {
-                // Round-2 external review F2: a `/` hidden behind a coordinate
+                // A `/` hidden behind a coordinate
                 // suffix serialized to a string the DSL re-parses as word
                 // structure; the DSL/API surfaces reject it, so object input must too.
                 code: WARNING_CODES.MALFORMED_WORD_INDICATOR,
@@ -1298,7 +1298,7 @@ class BlissSVGBuilder {
     }
   }
 
-  // Space-invariant normalization (round-3/round-4 external review F1): a
+  // Space-invariant normalization: a
   // structural mutation (replaceGlyph/removeGlyph/replacePart/detach/
   // addGlyph-on-empty/insertGlyph), an alias expanding an in-word space, or
   // hand-authored object input can leave space state the DSL cannot express —
@@ -1313,12 +1313,12 @@ class BlissSVGBuilder {
   //     splitAt/mergeWithNext). Likewise a glyph serialization omits entirely
   //     (empty parts, no codeName, no options that would re-emit it as an
   //     options-only token): its designation has no serialized form, so it
-  //     dies with the glyph's content (the round-2 F4 contract, enforced here
+  //     dies with the glyph's content (the rule detach follows, enforced here
   //     for hand-authored object input).
   //  2. An all-non-head-marker word never carries a `;;` overlay (dropped
   //     LOUDLY, matching mergeWithNext's DROPPED_WORD_INDICATOR, since data
   //     loss must be visible). The deletion makes the sweep warn once, not per
-  //     rebuild. An EMPTY group keeps its overlay (the F3 pure-state-op
+  //     rebuild. An EMPTY group keeps its overlay (the pure-state-op
   //     contract; isNonHeadMarkerGroup is false).
   //  3. A bare space glyph never lives inside a word: the word is split at
   //     its space runs into real space groups, a canonicalization (glyph
@@ -1553,7 +1553,7 @@ class BlissSVGBuilder {
     return word.length > 0 && word.every(pullsInWordSpace) ? 'QSP' : 'TSP';
   }
 
-  // Space-as-part invariant (row 78, extended row 81): a space (TSP/QSP, and
+  // Space-as-part invariant: a space (TSP/QSP, and
   // the transient default-space SP that `//` expands to) is a word-level
   // separator, never a `;`-part — a space cannot stay a character inside a
   // word (#normalizeSpaceInvariant Pass 3 splits it out) and cannot carry a
@@ -1563,11 +1563,11 @@ class BlissSVGBuilder {
   // option on it dies with the part (a positionable inkless blank is ZSA's
   // job — ZSA is content and is exempt). SP is barred via a LOCAL check only:
   // it is never added to the {TSP,QSP} classifier (isSpaceGlyph), which drives
-  // space-run coalescing, navigation, and counting (feedback_zsa_is_content_not_space).
+  // space-run coalescing, navigation, and counting.
   // A single-part REAL-space glyph (TSP/QSP) IS the space itself and is
   // untouched; a lone transient SP (not a real space glyph, so a mutation can
   // strand it as a lone character part) instead drops to an empty glyph rather
-  // than re-emitting bare and reparsing as a word separator (row 81). A
+  // than re-emitting bare and reparsing as a word separator. A
   // fail-flagged word re-emits verbatim (replay fidelity) and an atomic
   // compound-indicator glyph's anatomy is definition-owned, so both are
   // skipped, mirroring #normalizeIndicatorInvariant. define() already rejects
@@ -1600,8 +1600,8 @@ class BlissSVGBuilder {
         let knownRemainder = false;
         for (let i = 0; i < parts.length; i++) {
           const p = parts[i];
-          // SP is barred here via a local check but never added to isSpaceGlyph
-          // (the {TSP,QSP} classifier), per feedback_zsa_is_content_not_space.
+          // SP is barred here via a local check but never added to isSpaceGlyph:
+          // that classifier holds exactly the two space glyphs, TSP and QSP.
           if (p.codeName === 'SP' || isSpaceGlyph(p.codeName)) {
             misplaced.push(i);
             continue;
@@ -1629,7 +1629,7 @@ class BlissSVGBuilder {
     }
   }
 
-  // Indicator-sequence invariant (row 67): an indicator part is only
+  // Indicator-sequence invariant: an indicator part is only
   // meaningful inside the maximal trailing indicator run of its glyph's part
   // list (the character's indicator row: BASE;INDICATOR). An indicator that
   // precedes default-positioned known content is a misplaced decoration:
@@ -1745,7 +1745,7 @@ class BlissSVGBuilder {
       // before this pass and splits a mixed word into pure-space groups, so
       // today every space is caught one level up. Keeping it makes "a space
       // carries no transient decoration" an invariant rather than an artifact
-      // of that ordering (probe: temp/probe-c7-m5.mjs).
+      // of that ordering.
       const [children, childLevel] = ELEMENT_LIST[level];
       for (const child of node[children] ?? []) {
         const isSpace = childLevel === 'group'
@@ -1809,7 +1809,7 @@ class BlissSVGBuilder {
     if (warnings.length) (raw._parseWarnings ??= []).push(...warnings);
   }
 
-  // Retention family (row 31): malformed SYNTAX is a parse-time warning, never
+  // Retention family: malformed SYNTAX is a parse-time warning, never
   // persisted. A malformed part token is a pure error node (an `{error}` node
   // with no codeName and no nested parts): `!` (Invalid format) or a code with
   // an unparseable `:x,y` suffix (MALFORMED_COORDINATES). Dropping only the bad
@@ -1868,7 +1868,7 @@ class BlissSVGBuilder {
     }
   }
 
-  // Retention family (row 80): a malformed word-level indicator (a doubled `;;`,
+  // Retention family: a malformed word-level indicator (a doubled `;;`,
   // or a `;;` bound to a multi-word alias) fails the WHOLE word at parse
   // (group.errorCode = MALFORMED_WORD_INDICATOR, group.errorSource = the raw
   // text). The failed word is not content: it is dropped from render and BOTH
@@ -1921,22 +1921,22 @@ class BlissSVGBuilder {
     // via its `H;<code>` scaffold, removePart) can move a part to/from the
     // leading slot, staling the parse-time flag. Serialization reads
     // #rawBlissObj, so the flag must be accurate there, not only on the clone:
-    // a genuinely-failed part re-emits by its written name (row 80) while a
+    // a genuinely-failed part re-emits by its written name while a
     // legal leading alias re-flattens. reflag only touches error/errorCode (no
     // expansion), so it is safe on the base-only structure; the clone inherits.
     BlissParser.reflagCompositeParts(this.#rawBlissObj);
     const blissObj = structuredClone(this.#rawBlissObj);
 
-    // R14 resolve site 1 (render): merge each group's word-level indicator
+    // At render time, merge each group's word-level indicator
     // overlay onto its head glyph, on the clone only so #rawBlissObj (and the
     // handles that reference it) stay base-only. The head is the explicitly
-    // marked glyph (isHeadGlyph), else the query-time fallback (R15 WS-4) so a
+    // marked glyph (isHeadGlyph), else the query-time fallback so a
     // structural mutation re-derives it instead of floating onto a stale stamp.
     for (const group of blissObj.groups ?? []) {
       if (group.wordIndicators && group.glyphs?.length) {
         const headIndex = resolveOverlayHeadIndex(group.glyphs);
         // Every glyph is empty: nothing can carry the rendered overlay. The
-        // stored overlay persists (F3 pure-state contract) but renders
+        // stored overlay persists (pure-state contract) but renders
         // nothing, exactly like the reparse of the serialized form.
         if (headIndex === -1) continue;
         const head = group.glyphs[headIndex];
@@ -1945,7 +1945,7 @@ class BlissSVGBuilder {
         // parts, so a skip-list character picked by priority would no longer
         // be skipped (`B1060/B578;;B99` would crown B1060, B99 drawn on B578).
         head.isHeadGlyph = true;
-        // The overlay stores code STRINGS (SIB-2); this render-merge parse is
+        // The overlay stores code STRINGS; this render-merge parse is
         // where a definition-baked misplacement (e.g. a global-only option
         // key inside an indicator definition) first becomes observable, so
         // its parse warnings must reach builder.warnings. #warnings was reset
@@ -3339,7 +3339,7 @@ class BlissSVGBuilder {
     //
     // The 'letters' answer keeps its current text routing rather than expanding
     // to a letter sequence: whether authored object data should accept DSL
-    // shorthand at all is an open question of its own (backlog, object-input
+    // shorthand at all is an open question of its own (object-input
     // validation), and settling it here would settle it by accident.
     return classifyXCode(code) === null ? code : 'XTXT_' + code.slice(1);
   }
@@ -3715,7 +3715,7 @@ class BlissSVGBuilder {
         if (!code) {
           // A built-in glyph can re-acquire identity while its parts still hold
           // detail the bare code would drop: a sole part with a relocation
-          // offset and/or a part-level option (N13, e.g. clearIndicators on
+          // offset and/or a part-level option (e.g. clearIndicators on
           // `[color=red]>B291:2,3;B86` restores codeName 'B291' but parts[0]
           // keeps x/y + options), or an applied indicator part beyond the bare
           // identity (a base-only custom glyph whose codeName collapsed to its
@@ -3733,7 +3733,7 @@ class BlissSVGBuilder {
         code = glyph.codeName || '';
       }
 
-      // Written-name consult (preserve-completeness chunk): whatever route
+      // Written-name consult: whatever route
       // computed `code`, a glyph that is a clean instance of a recorded
       // definition emits the written name. The recording rides the glyph
       // (parser stamp, kept in deep output); object input may carry the
@@ -3846,7 +3846,7 @@ class BlissSVGBuilder {
         serializeGlyph(glyph, glyphIndex === overlayHead ? overlay : null));
       const content = glyphArrays.flat().some(Boolean);
       if (!content && !serializeOptionsWithPosition(group)) return null;
-      // R14: a word-level indicator overlay is written as trailing `;;` (kept
+      // A word-level indicator overlay is written as trailing `;;` (kept
       // by default; `flatten` collapses it onto the head as `;` instead), and
       // only where the word writes a character for it to sit on.
       const { codes = [], stripSemantic } = overlay ?? {};
@@ -3876,7 +3876,7 @@ class BlissSVGBuilder {
     };
     const loneWordText = ({ group, glyphArrays, overlay, overlayText, overlayHead, designation }) => {
       let text = assemble(glyphArrays);
-      // Head-marker fidelity (rc.4): a stored designation ALWAYS re-emits as
+      // Head-marker fidelity: a stored designation ALWAYS re-emits as
       // `^` on the marked glyph's last segment, matching toJSON's isHeadGlyph,
       // so a string round-trip never loses the designation — even when the
       // automatic head pick would re-derive the same glyph. Words without a
@@ -3922,7 +3922,7 @@ class BlissSVGBuilder {
       if (!group.glyphs) continue;
       // A malformed word (parser group.errorCode) never reaches serialization:
       // #normalizeFailedWordInvariant drops it from #rawBlissObj at rebuild
-      // (retention family, rows 31/80), so no errorSource replay survives here.
+      // (retention family), so no errorSource replay survives here.
       if (isSpaceGroup(group)) {
         writeJoined();
         spaceRun ??= [];
@@ -4039,7 +4039,7 @@ class BlissSVGBuilder {
           // not composition data, never surfaced in serialized output.
           delete part._indicatorOrigin;
           // Single-code rename resolution records the user-written name
-          // (Phase 2.3b; extended to character level in Chunk 6): preserve
+          // (also at character level): preserve
           // restores it, so `B291;MYIND` keeps MYIND and a standalone alias
           // keeps its name instead of leaking the resolved target. A BASE
           // slot with `;`-siblings restores only a name that survives
@@ -4056,7 +4056,7 @@ class BlissSVGBuilder {
             // A decorated part (coordinates or options) restores only a PURE
             // rename chain: a decorated custom anatomy dissolved its own
             // state into this part, and the written name would re-emit it as
-            // instance decoration (preserve-completeness chunk; the glyph-
+            // instance decoration (the glyph-
             // level consult keeps such a name at the clean-glyph level).
             const decorated = (used.x ?? 0) !== 0 || (used.y ?? 0) !== 0 || part.options;
             // The name also has to leave nothing to bring back. A sole part
@@ -4128,7 +4128,7 @@ class BlissSVGBuilder {
         if (group.options) delete group.options.key;
         publishOptionSpellings(group);
 
-        // R14: flattenIndicators bakes the word-level overlay onto the head as
+        // flattenIndicators bakes the word-level overlay onto the head as
         // character-level parts and drops the field, reproducing the pre-overlay
         // (primitive) serialization. Default keeps the overlay (resolved at
         // render, re-emitted as `;;`), except where the default saves would
@@ -4235,7 +4235,7 @@ class BlissSVGBuilder {
             }
             // Parts already use codeName internally, no rename needed
 
-            // Glyph-level rename recording (preserve-completeness chunk):
+            // Glyph-level rename recording:
             // public preserve output restores the written name only for a
             // clean instance of the definition's anatomy. Deep output stays
             // raw (codeName = the typed target), the definition the string's
@@ -4355,8 +4355,8 @@ class BlissSVGBuilder {
   // the parser recognition ranges (Latin, Latin-1/Ext-A, Greek, Cyrillic).
   // Built from the parser's own letter ranges so the two cannot drift: written
   // input of this shape is always read as external text, never as a definition
-  // name, so such a definition would be unreachable (1.4 fence; Phase 2.3
-  // guard). A name that leaves the ranges (XRAY1) reaches its definition.
+  // name, so such a definition would be unreachable and define() refuses
+  // the name. A name that leaves the ranges (XRAY1) reaches its definition.
   static #X_NAMESPACE_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]+$`);
 
   // A multi-letter external-letter run is a word WITHOUT a `/` in it: XOH is
@@ -4421,8 +4421,7 @@ class BlissSVGBuilder {
     }
     if (!options.overwrite) {
       // Typed so define()'s catch classifies by code, not by message text: a
-      // definition NAMED "already exists" must land in errors, not skipped
-      // (review MINOR-5).
+      // definition NAMED "already exists" must land in errors, not skipped.
       const error = new Error(`define("${code}"): code already exists. Use { overwrite: true } to replace.`);
       error.code = 'ALREADY_EXISTS';
       throw error;
@@ -5173,7 +5172,7 @@ class BlissSVGBuilder {
     return !!def && BlissSVGBuilder.#detectType(def) === 'bare';
   }
 
-  // Preserve-completeness chunk: written-name consult for the glyph-level
+  // Written-name consult for the glyph-level
   // recording. Walks single-code links from `name`; the name is emittable
   // only when the chain passes a CUSTOM definition with identity (typed
   // shape/glyph/indicator; bare shorthand never qualifies) AND the glyph is a
@@ -5454,9 +5453,9 @@ class BlissSVGBuilder {
     return walk(BlissSVGBuilder.#extractReferencedCodes(codeString));
   }
 
-  // Deferred validation of forward references (Phase 2.3): define() accepts
+  // Deferred validation of forward references: define() accepts
   // a codeString that references a not-yet-defined code, so the
-  // indicator-bake guard (D-S1a) can be bypassed by definition ORDER — the
+  // indicator-bake guard can be bypassed by definition ORDER — the
   // glyph registers while its reference is unknown, and a later define/patch
   // makes that reference an indicator. This scan runs at that later moment,
   // the completing call: with `code` about to become `newEntry`, every
@@ -5501,7 +5500,7 @@ class BlissSVGBuilder {
   // An SP segment in a stored codeString can never resolve: SP has meaning
   // only at the top level, where punctuation context turns it into TSP/QSP.
   // `/SP/` is written sugar for `//`, so a definition using it normalizes to
-  // the `//` form silently (user ruling 2026-07-18). Quote-bearing
+  // the `//` form silently. Quote-bearing
   // codeStrings are left untouched: definition ingestion is quote-unaware
   // today (post-1.0.0 family), and a naive split could cut inside a quoted
   // option value.
@@ -5515,7 +5514,7 @@ class BlissSVGBuilder {
         // An interior SP sits between two real slashes, so one empty segment
         // reproduces `//`; an edge SP has only one neighboring slash, so it
         // needs a second empty segment or the space silently vanishes
-        // (`SP/B291` must store `//B291`, not `/B291`; review MAJOR-1).
+        // (`SP/B291` must store `//B291`, not `/B291`).
         if (i === 0 || i === segments.length - 1) normalized.push('');
       } else {
         normalized.push(segments[i]);
@@ -5554,7 +5553,7 @@ class BlissSVGBuilder {
       }
       // A shape is a single character; `/` and `//` are word separators, so a
       // `/`-bearing codeString is a word, not a shape. Define a word as a bare
-      // alias (omit type:"shape"). (Strict Indicator Separation, F4.)
+      // alias (omit type:"shape"). (Strict Indicator Separation.)
       if (definition.codeString.includes('/')) {
         throw new Error(`define("${code}"): a shape definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"shape").`);
       }
@@ -5589,8 +5588,7 @@ class BlissSVGBuilder {
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
       // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
       // guard must judge exactly what the registry keeps, or an accessor /
-      // Proxy could show one set of keys to validation and another to storage
-      // (round-4 review F1).
+      // Proxy could show one set of keys to validation and another to storage.
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
@@ -5666,7 +5664,7 @@ class BlissSVGBuilder {
       // Trim before matching: the serializer emits a padded key as
       // '[ margin=2]' and #parseOptions reads that as plain 'margin', so a
       // whitespace-padded spelling IS the global-only key at the next
-      // boundary (round-3 review F1).
+      // boundary.
       const normalized = key.trim();
       // A key must be a well-formed option name at all (camelCase names pass
       // the same test): anything else — '=', ';', brackets, inner spaces —
@@ -5734,7 +5732,7 @@ class BlissSVGBuilder {
 
     // A glyph is a single character; `/` and `//` are word separators, so a
     // `/`-bearing codeString is a word, not a glyph. Define a word as a bare
-    // alias (omit type:"glyph"). (Strict Indicator Separation, F4.)
+    // alias (omit type:"glyph"). (Strict Indicator Separation.)
     if (definition.codeString.includes('/')) {
       throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"glyph").`);
     }
@@ -5758,7 +5756,7 @@ class BlissSVGBuilder {
       throw new Error(`define("${code}"): circular reference detected`);
     }
 
-    // D-S1a: a glyph is a base character or a compound indicator, never a
+    // A glyph is a base character or a compound indicator, never a
     // base+indicator combo. Reject a glyph def (not flagged isIndicator) that
     // bakes in an indicator part; define such combos as bare aliases instead.
     if (definition.isIndicator !== true) {
@@ -5794,8 +5792,7 @@ class BlissSVGBuilder {
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
       // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
       // guard must judge exactly what the registry keeps, or an accessor /
-      // Proxy could show one set of keys to validation and another to storage
-      // (round-4 review F1).
+      // Proxy could show one set of keys to validation and another to storage.
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
@@ -5843,8 +5840,7 @@ class BlissSVGBuilder {
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
       // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
       // guard must judge exactly what the registry keeps, or an accessor /
-      // Proxy could show one set of keys to validation and another to storage
-      // (round-4 review F1).
+      // Proxy could show one set of keys to validation and another to storage.
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
@@ -5856,7 +5852,7 @@ class BlissSVGBuilder {
   }
 
   // Resolution VIEW of a codeString, for validation only — never stored
-  // (store-as-written, ratified 2026-07-22: definition content keeps
+  // (store-as-written: definition content keeps
   // bare-alias references verbatim and the parser resolves them late).
   // Replaces bare alias tokens with their resolved codeString, repeating
   // until no more aliases remain (up to depth 50), so a guard can judge
@@ -5872,7 +5868,7 @@ class BlissSVGBuilder {
       let changed = false;
       // \w+ (not letter-first): define() accepts digit-leading names (the
       // Blissary-ID pattern, e.g. '1219'), so aliases to them must resolve
-      // like any other single-code rename (review MINOR-4). The lookbehind/
+      // like any other single-code rename. The lookbehind/
       // lookahead boundaries keep coordinate and kerning values (after ':')
       // out of reach.
       resolved = resolved.replace(
@@ -6034,7 +6030,7 @@ class BlissSVGBuilder {
 
     BlissSVGBuilder.#assertReplaceable(code, options);
 
-    // Store-as-written (ratified 2026-07-22): bare-alias references in the
+    // Store-as-written: bare-alias references in the
     // codeString stay verbatim, so definition content is late-bound like a
     // native code (a redefine of a referenced code flows through to every
     // composition using it). Only /SP/ space segments normalize.
@@ -6053,8 +6049,7 @@ class BlissSVGBuilder {
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
       // Snapshot ONCE, validate the snapshot, store the SAME snapshot: the
       // guard must judge exactly what the registry keeps, or an accessor /
-      // Proxy could show one set of keys to validation and another to storage
-      // (round-4 review F1).
+      // Proxy could show one set of keys to validation and another to storage.
       const defaultOptionsSnapshot = { ...definition.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
         BlissSVGBuilder.#assertDefaultOptionsDescribeTheCharacter('define', code, defaultOptionsSnapshot);
@@ -6111,7 +6106,7 @@ class BlissSVGBuilder {
         // isIndicator declares a compound indicator glyph and is honored only
         // on a type:'glyph' definition. On a bare alias, shape, or external
         // glyph the flag was silently dropped, so the `;`-slot render and the
-        // `;;` gate disagreed with the stated intent (run-to-stable Phase 2.4c).
+        // `;;` gate disagreed with the stated intent.
         // Reject it and point to the documented form. Indicator-ness still
         // rides through an unflagged bare alias whose target is a real
         // indicator (e.g. { codeString: 'B81' }); only the flag on a non-glyph
@@ -6158,8 +6153,8 @@ class BlissSVGBuilder {
   // inherited names as already-exists in the DEFAULT path. That accident does
   // NOT hold under overwrite:true, where a non-literal "__proto__" key (e.g.
   // JSON.parse output) still reaches the registry assignment and reassigns
-  // the registry's prototype through the inherited setter; the define-side
-  // name-policy backlog item tracks closing that vector.
+  // the registry's prototype through the inherited setter; closing that
+  // vector belongs to a define-side name policy, not to this check.
   static #ownsDefinition(code) {
     return Object.prototype.hasOwnProperty.call(blissElementDefinitions, code);
   }
@@ -6341,7 +6336,7 @@ class BlissSVGBuilder {
       throw new Error(`patchDefinition("${code}"): a shape is drawn either by its getPath function or by its codeString, and this patch would leave it with both. To change how "${code}" is drawn, remove it and define it again.`);
     }
 
-    // D-S1a on the patch surface: a glyph (not flagged isIndicator) cannot
+    // On the patch surface, a glyph (not flagged isIndicator) cannot
     // bake an indicator, whichever property the patch changes — a codeString
     // gaining indicator anatomy, or an isIndicator un-flag on a compound
     // indicator that keeps its anatomy. The POST-patch state is judged, so
@@ -6370,7 +6365,7 @@ class BlissSVGBuilder {
       changes = { ...changes, codeString: stored };
     }
 
-    // Deferred validation at the completing patch (Phase 2.3): a patch that
+    // Deferred validation at the completing patch: a patch that
     // makes this definition an indicator — a glyph isIndicator flip, or a
     // bare codeString now resolving to an indicator — re-checks every custom
     // glyph referencing it, exactly like the completing define.
@@ -6384,10 +6379,10 @@ class BlissSVGBuilder {
 
     // Validate BEFORE the apply loop, like every other patch guard: a
     // rejected patch must leave the definition fully unchanged, not partially
-    // mutated depending on property order (round-3 review F2). The snapshot
+    // mutated depending on property order. The snapshot
     // taken here REPLACES the caller's object in `changes`, so the apply loop
     // stores exactly what was validated — an accessor / Proxy cannot show
-    // different keys to the two reads (round-4 review F1).
+    // different keys to the two reads.
     if (changes.defaultOptions && typeof changes.defaultOptions === 'object') {
       const defaultOptionsSnapshot = { ...changes.defaultOptions };
       if (Object.keys(defaultOptionsSnapshot).length > 0) {
