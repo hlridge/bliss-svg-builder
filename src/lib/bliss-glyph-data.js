@@ -3966,6 +3966,10 @@ const glyphData = {
   },
   B6444: {
     codeString: "B712;B894:2,0"
+  },
+  B6579: {
+    codeString: "P4E:0,14;B6003:2,0",
+    anchorOffsetX: -1
   }
 }
 
