@@ -2859,13 +2859,18 @@ class BlissSVGBuilder {
     // Rebuild the left half (this builder)
     this.#rebuild();
 
-    // Build the right half as a new builder
-    // Copy global options so both builders have the same styling
+    // Build the right half as a new builder with the same global options. The
+    // composition's position is one of them, and it is held on the root's own
+    // `x`/`y` field (where every rebuild puts a `[x=5]||`), not in the bag, so
+    // it is copied beside the bag.
     const rightObj = {
       groups: rightGroups,
     };
     if (this.#rawBlissObj.options) {
       rightObj.options = { ...this.#rawBlissObj.options };
+    }
+    for (const axis of ['x', 'y']) {
+      if (this.#rawBlissObj[axis] !== undefined) rightObj[axis] = this.#rawBlissObj[axis];
     }
 
     return new BlissSVGBuilder(rightObj);

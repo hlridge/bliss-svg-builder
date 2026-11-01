@@ -15,7 +15,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - splitAt: receiver shrinks to groups [0, n); returned builder gets the
  *   rest as an independent BlissSVGBuilder instance; trailing space on the
  *   left half and leading space on the right half are cleaned up; global
- *   options replicate to both halves; group-level options survive on both
+ *   options replicate to both halves, the composition's position among
+ *   them, however it was set; group-level options survive on both
  *   halves; multi-glyph groups split as opaque units.
  * - splitAt argument-validation: throws on index 0, negative index,
  *   index >= group count, and on single-group builders.
@@ -184,6 +185,24 @@ describe('BlissSVGBuilder merge and splitAt', () => {
 
       expect(a.toJSON().options?.color).toBe('red');
       expect(b.toJSON().options?.color).toBe('red');
+    });
+
+    // regression: the right half lost the composition's position, which the
+    // root keeps on its own x/y field rather than in its options bag
+    it.each([
+      ['an x', () => new BlissSVGBuilder('[x=5;color=red]||B313//B431'), '[x=5;color=red]||B313', '[x=5;color=red]||B431'],
+      ['a y', () => new BlissSVGBuilder('[y=4]||B313//B431'), '[y=4]||B313', '[y=4]||B431'],
+      ['an x of 0', () => new BlissSVGBuilder('[x=0]||B313//B431'), '[x=0]||B313', '[x=0]||B431'],
+      ['an x set with setOptions', () => new BlissSVGBuilder('B313//B431').setOptions({ x: 5 }), '[x=5]||B313', '[x=5]||B431'],
+      ['an x a composition object holds', () => new BlissSVGBuilder({ x: 5, groups: new BlissSVGBuilder('B313//B431').toJSON().groups }), '[x=5]||B313', '[x=5]||B431'],
+    ])('replicates the composition\'s position to both halves: %s', (_case, build, leftSaved, rightSaved) => {
+      const a = build();
+      const b = a.splitAt(1);
+
+      expect(a.toString()).toBe(leftSaved);
+      expect(b.toString()).toBe(rightSaved);
+      expect(b.toJSON()).toEqual(new BlissSVGBuilder(rightSaved).toJSON());
+      expect(b.svgCode).toBe(new BlissSVGBuilder(rightSaved).svgCode);
     });
 
     it('does not leave a trailing space group on the left half', () => {
