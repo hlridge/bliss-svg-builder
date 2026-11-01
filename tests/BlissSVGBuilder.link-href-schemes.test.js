@@ -17,8 +17,8 @@ import { BlissSVGBuilder } from '../src/index';
  *   `-` and `.`, up to the first colon, so a scheme that only starts or ends
  *   like an allowed one is refused, and a colon after anything else (`1x:y`,
  *   `a b:c`) is no scheme.
- * - Control characters inside or before a scheme ignored, so a split
- *   `javascript:` is still refused.
+ * - Control characters inside or before a scheme ignored, however many, so a
+ *   split `javascript:` is still refused.
  * - A character reference never spelling a scheme: the `&` stays escaped on
  *   every input route, so the browser reads `&#106;avascript:` as text.
  * - An `href` that holds no address building no link: a bare key, an empty or
@@ -116,6 +116,10 @@ describe('BlissSVGBuilder link href schemes', () => {
       ['a NUL', 'java\0script:alert(1)'],
       ['a DEL', 'java\x7fscript:alert(1)'],
       ['a control character before it', '\x01javascript:alert(1)'],
+      // pins the removal of every control character, not only the first: one left in place
+      // hides the scheme from the check, while a browser strips it and runs the script
+      ['two control characters before it', '\x01\x02javascript:alert(1)'],
+      ['two control characters inside it', 'java\t\nscript:alert(1)'],
     ])('still reads javascript: through %s and builds no link', (_what, href) => {
       expect(characterWithHref(href).svgCode).not.toContain('<a');
     });
