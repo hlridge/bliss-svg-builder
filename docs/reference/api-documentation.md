@@ -439,7 +439,7 @@ const glyphs = builder.query(el => el.isGlyph);
 
 ## Builder Mutation
 
-Methods on the builder instance for modifying content. All return `this` for chaining. Out-of-range indices are silently ignored (no error thrown, no mutation performed).
+Methods on the builder instance for modifying content. All return `this` for chaining. Out-of-range indices are silently ignored (no error thrown, no mutation performed), except by an insert: an index past either end inserts at that end.
 
 Every add/insert/replace method takes exactly one unit of its own level (one word group, one character, or one part) and throws when the code spans more, so content is never silently dropped. An omitted or empty `code` creates an empty slot at group and glyph level; parts always name a shape. See [One unit per mutation call](#one-unit-per-mutation-call) and [Empty slots are deliberate](#empty-slots-are-deliberate) for the full contract.
 
@@ -905,11 +905,11 @@ builder.group(0).advanceX; // how far to advance before the next group
 
 #### `.bounds`
 
-Absolute bounding box (`{ x, y, width, height }`):
+Absolute bounding box of the ink (`{ minX, maxX, minY, maxY, width, height }`):
 
 ```js
-const bounds = builder.group(0).glyph(0).bounds;
-// { x: 0, y: 0, width: 128, height: 256 }
+const bounds = new BlissSVGBuilder('B313').group(0).glyph(0).bounds;
+// { minX: 0, maxX: 8, minY: 8, maxY: 16, width: 8, height: 8 }
 ```
 
 #### `.measure()`
@@ -918,16 +918,16 @@ Returns all dimension properties at once in a frozen object. More efficient than
 
 ```js
 const m = builder.group(0).measure();
-// { x, y, width, height, bounds, advanceX, baseWidth }
+// { x, y, offsetX, offsetY, width, height, bounds, advanceX, baseWidth }
 
 // Useful for editor integration
 const cursor = { left: m.x + m.advanceX, top: m.y };
-const highlight = { left: m.bounds.x, width: m.bounds.width };
+const highlight = { left: m.bounds.minX, width: m.bounds.width };
 ```
 
 ### Structural Mutation
 
-All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed). Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
+All structural methods trigger a rebuild and return `this` for chaining (except `remove()` which returns `undefined`). Out-of-range indices are silently ignored (no error thrown, no mutation performed), except by an insert: an index past either end inserts at that end. Calling a method on the wrong handle level (e.g., `.addGlyph` on a part handle) also returns `this` with no effect.
 
 Content arguments follow the same contract as the builder methods: exactly one glyph or part per call, an omitted or empty `code` creates an empty glyph (parts always name a shape), and a non-string `code` throws a `TypeError`. See [One unit per mutation call](#one-unit-per-mutation-call).
 

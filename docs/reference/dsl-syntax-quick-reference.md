@@ -66,7 +66,7 @@ Many Bliss words carry a *semantic root* indicator: `B97` (thing) or `B6436` (ab
 
 Use `;;!` to strip the semantic root as well: the word then displays only the indicators you provide.
 
-There is no character-level strip form. `;` composes literally, so there is nothing for it to strip: `B431;!B81` is not valid syntax (the `!B81` token is unknown and dropped with a warning). To replace a glyph's own indicators programmatically, use `glyph.applyIndicators(code)` or `applyIndicators(code, { stripSemantic: true })`, see [Programmatic Mutation](/handbook/syntax-options/programmatic-mutation#indicator-operations).
+There is no character-level strip form. `;` composes literally, so there is nothing for it to strip: `B431;!B81` is not valid syntax (the `!B81` token is malformed, so the whole character is dropped with a warning). To replace a glyph's own indicators programmatically, use `glyph.applyIndicators(code)` or `applyIndicators(code, { stripSemantic: true })`, see [Programmatic Mutation](/handbook/syntax-options/programmatic-mutation#indicator-operations).
 
 ## Option Scope Separators
 

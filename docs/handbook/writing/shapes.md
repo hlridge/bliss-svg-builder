@@ -33,9 +33,9 @@ Shapes fall into several categories:
 | Arrows | `ARR8N`, `LARR8N` | Arrows and large arrows |
 | Crosses | `SC8`, `DC8` | Straight and diagonal crosses |
 | Dots | `DOT`, `SDOT` | Point markers (full size and small) |
-| Waves | `W8`, `HW4N` | Waves and half-waves (arcs) |
-| Squares | `SQ8`, `SQ4` | Solid squares |
-| Rectangles | `RE84`, `RE82` | Width × height rectangles |
+| Waves | `W8N`, `HW4N` | Waves and half-waves (arcs) |
+| Squares | `S8`, `S4` | Squares by size |
+| Rectangles | `R84`, `R42` | Width × height rectangles |
 
 See the [Shapes Gallery](/reference/shapes-gallery) for a complete visual reference.
 
