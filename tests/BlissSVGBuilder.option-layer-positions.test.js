@@ -20,6 +20,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `addElement`, `insertElement`, `replaceElement`, `addGlyph`,
  *   `insertGlyph`, `replaceGlyph`, `replace`, `addPart`, `insertPart`,
  *   `replacePart`.
+ * - A default under a held position of zero or below, at each scope: a
+ *   position is held when it is set at all, whatever its value.
  * - A default into an element with no position, through the same routes.
  * - An override over the element's own position, through the same routes,
  *   with no `MULTIPLE_POSITION_VALUES` for a conflict nobody wrote.
@@ -124,6 +126,23 @@ describe('BlissSVGBuilder option layer positions', () => {
         { defaults: { x: 3 } },
       );
       expectSavedAs(built, '[x=5]||H');
+    });
+  });
+
+  describe('when a default meets a position of zero or below', () => {
+    // pins presence as the held test: a check on the value's sign or truth
+    // would let the default in over a zero or a negative
+    it.each([
+      ['the composition', '0', () => after('[x=0]||H', (b) => b.setOptions({ defaults: { x: 1 } })), '[x=0]||H'],
+      ['the composition', '-2', () => after('[x=-2]||H', (b) => b.setOptions({ defaults: { x: 1 } })), '[x=-2]||H'],
+      ['a word', '0', () => after('[x=0]|H', (b) => b.group(0).setOptions({ defaults: { x: 1 } })), '[x=0]|H'],
+      ['a word', '-2', () => after('[x=-2]|H', (b) => b.group(0).setOptions({ defaults: { x: 1 } })), '[x=-2]|H'],
+      ['a character', '0', () => after('[x=0]H', (b) => b.glyph(0).setOptions({ defaults: { x: 1 } })), '[x=0]H'],
+      ['a character', '-2', () => after('[x=-2]H', (b) => b.glyph(0).setOptions({ defaults: { x: 1 } })), '[x=-2]H'],
+      ['a part', '0', () => after('B313;C8:0,3', (b) => b.glyph(0).part(1).setOptions({ defaults: { x: 1 } })), 'B313;C8:0,3'],
+      ['a part', '-1', () => after('B313;C8:-1,3', (b) => b.glyph(0).part(1).setOptions({ defaults: { x: 1 } })), 'B313;C8:-1,3'],
+    ])('keeps %s\'s own x of %s', (_scope, _value, build, expected) => {
+      expectSavedAs(build(), expected);
     });
   });
 
