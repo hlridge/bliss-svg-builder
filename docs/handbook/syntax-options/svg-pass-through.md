@@ -228,7 +228,7 @@ Pass-through attributes are sanitized:
 
 - **String values** are HTML-escaped to prevent injection
 - **Event handlers** (`onclick`, `onload`, etc.) are blocked entirely
-- **Dangerous URLs** (`javascript:`, `data:`, `vbscript:`) are rejected in `href`
+- **Links** are built only to relative addresses (`page.html`, `/about`, `#top`) and to `http:`, `https:`, `mailto:` and `tel:` addresses; an `href` with any other scheme, such as `javascript:`, `data:` or `vbscript:`, builds no link
 
 ## SVG Structure
 
