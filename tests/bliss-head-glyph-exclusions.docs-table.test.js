@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { blissHeadGlyphExclusions, deliberatelyNotExcluded } from '../src/lib/bliss-head-glyph-exclusions.js';
+import {
+  absoluteNeverHead,
+  blissHeadGlyphExclusions,
+  deliberatelyNotExcluded,
+  lowPriorityExclusions,
+} from '../src/lib/bliss-head-glyph-exclusions.js';
 import { exclusions, exclusionGroups } from '../docs/examples/head-glyph-exclusions.js';
 
 /**
@@ -12,6 +17,8 @@ import { exclusions, exclusionGroups } from '../docs/examples/head-glyph-exclusi
  *   excluded groups, and no excluded group lists a code the source does not.
  * - The codes deliberately left off the list appear in a group of their own,
  *   marked as not excluded.
+ * - The groups whose descriptions name the never-head and low-priority tiers
+ *   list exactly the codes the source puts in those tiers.
  * - Every code the table lists has a gloss and a reason, and the table holds
  *   no entry outside its groups.
  *
@@ -37,6 +44,14 @@ describe('bliss-head-glyph-exclusions docs table', () => {
     it('lists the codes deliberately left off the list in a group of their own', () => {
       expect(exclusionGroups.filter((group) => group.excluded === false)).toHaveLength(1);
       expect(codesOfGroups(false)).toEqual(deliberatelyNotExcluded);
+    });
+
+    it('lists the never-head and low-priority codes in the groups described as those tiers', () => {
+      const codesDescribed = (text) => exclusionGroups
+        .filter((group) => group.description?.includes(text))
+        .flatMap((group) => group.codes);
+      expect(codesDescribed('never head')).toEqual(absoluteNeverHead);
+      expect(codesDescribed('Low-priority')).toEqual(lowPriorityExclusions);
     });
 
     it('gives every listed code a gloss and a reason, and holds no entry outside its groups', () => {
