@@ -124,7 +124,8 @@ The following types of concepts are skipped from the start of the word when find
 | Category | What it includes | Why excluded |
 |----------|------------------|--------------|
 | **Structural markers** | combine marker | Technical, not semantic |
-| **Scalar operators** | intensity, more, most | Modify degree, not meaning |
+| **Pragmatic markers** | intensity, what (small question mark) | Pragmatic, not core meaning |
+| **Scalar operators** | more, most, less, least | Modify degree, not meaning |
 | **Identity operators** | not, opposite | Negate or invert the concept |
 | **Concept transformers** | similar to, looks like, sounds like | Compare or relate concepts |
 | **Relational operators** | on, in, from, to, before, after, through, etc. | Prepositions that relate concepts |
