@@ -43,7 +43,7 @@ export const absoluteNeverHead = [
  * when alone or together with other low-priority codes (no regular exclusions present).
  */
 export const lowPriorityExclusions = [
-  'B401', // imperative - when alone or with other B401s, can take indicator
+  'B401', // intensity - when alone or with other B401s, can take indicator
   'B699', // interrogative - when alone or with other B699s, can take indicator
 ];
 
@@ -67,7 +67,7 @@ export const blissHeadGlyphExclusions = [
   'B233', // combine marker
 
   // Pragmatic lexical markers (low-priority)
-  'B401', // imperative (a command) when used as a prefix, otherwise a specifier (intensity)
+  'B401', // intensity
   'B699', // interrogative when used as a prefix, otherwise a specifier
 
   // Scalar degree operators

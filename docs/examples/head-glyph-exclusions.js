@@ -5,7 +5,7 @@ export const exclusions = {
   B233: { name: 'combine marker', why: 'Technical, not semantic' },
 
   // Pragmatic lexical markers
-  B401: { name: 'intensity', why: 'Pragmatic marker (imperative), not core meaning' },
+  B401: { name: 'intensity', why: 'Pragmatic marker, not core meaning' },
   B699: { name: 'what, question mark (small)', why: 'Pragmatic marker (interrogative), not core meaning' },
 
   // Scalar degree operators
