@@ -25,6 +25,8 @@ new BlissSVGBuilder(input, { defaults, overrides })
 
 Both `defaults` and `overrides` are optional. Omitting the second parameter preserves full backward compatibility.
 
+A builder that already exists takes the same argument in its own [`setOptions()`](/handbook/syntax-options/programmatic-mutation#global-options), which changes the global options in place.
+
 ## Precedence
 
 Three layers, from lowest to highest priority:

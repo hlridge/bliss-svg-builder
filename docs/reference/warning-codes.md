@@ -296,7 +296,7 @@ const builder = new BlissSVGBuilder('B313');
 builder.glyph(0).setOptions({ marginTop: 3 });
 // MISPLACED_GLOBAL_OPTION, source 'margin-top=3':
 // "Global option (margin-top=3) ignored at character level: it configures
-//  the whole SVG. Pass it in the builder's options to apply it globally."
+//  the whole SVG. Pass it to builder.setOptions() to apply it globally."
 builder.toString();  // 'B313'
 ```
 

@@ -259,6 +259,25 @@ An option here is anything `toString()` writes inside a bracket. The part keeps 
 
 Clearing an element leaves what sits inside it alone, so a character's parts keep their own options, while a word's clear also reaches the options inside its word-level (`;;`) indicators. Neither call touches `key`s, transient options or the options a code brings by its definition. After `clearAllOptions()` the builder saves exactly what `toString({ omitOptions: true })` saved before: see [Saving without options](/reference/api-documentation#saving-without-options).
 
+### Global Options
+
+The builder has its own `setOptions` and `removeOptions` for the global options, the ones the string writes before `||`, so changing one does not mean building a new builder:
+
+```js
+const builder = new BlissSVGBuilder('[color=red]||B313');
+
+builder.setOptions({ color: 'blue', grid: true });
+builder.toString(); // '[color=blue;grid]||B313'
+
+builder.removeOptions('color');
+builder.toString(); // '[grid]||B313'
+
+builder.removeOptions('grid');
+builder.toString(); // 'B313'
+```
+
+`setOptions` takes what the constructor's [options argument](/handbook/syntax-options/programmatic-options) takes, `{ defaults, overrides }` included, and stores what that argument would. Repeated calls merge. `x` and `y` move the whole composition, and kerning, which belongs to a character, is refused with a warning. Full detail: [`setOptions(opts)` and `removeOptions(...keys)`](/reference/api-documentation#setoptions-opts-and-removeoptions-keys).
+
 ### Transient Options
 
 Sometimes a value belongs to what is on screen rather than to the composition itself: a highlight on the character the user has selected, the index an editor needs on each part to work out what was clicked, a display width so a one-symbol board is not drawn tiny. None of that should end up in the string the user copies, shares or saves.

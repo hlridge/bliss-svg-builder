@@ -259,7 +259,7 @@ A part's position or a kerning value entered as an option keeps its own spelling
 
 The options a code brings by its definition are part of the code, not options in this sense, so they stay: `REFSQUARE` keeps its dotted line, and `REDGLYPH`, defined `{ type: 'glyph', codeString: 'B291', defaultOptions: { color: 'red' } }`, comes back as `[color=red]>B291`, or as `REDGLYPH` with `preserve`.
 
-To take the options off the builder itself, call [`clearAllOptions()`](#clearalloptions): afterwards it saves what `toString({ omitOptions: true })` saved before. [`clearOptions()`](#clearoptions) takes them off one element. [`toJSON()`](#tojson-options) takes the same flag.
+To take the options off the builder itself, call [`clearAllOptions()`](#clearalloptions): afterwards it saves what `toString({ omitOptions: true })` saved before. [`clearOptions()`](#clearoptions) takes them off one element, and the builder's own [`removeOptions()`](#setoptions-opts-and-removeoptions-keys) takes off the global options you name. [`toJSON()`](#tojson-options) takes the same flag.
 
 ### Combining the serializer options
 
@@ -593,6 +593,29 @@ builder.clear();
 builder.toJSON().groups; // []
 ```
 
+### `setOptions(opts)` and `removeOptions(...keys)`
+
+Change the global options of a builder that already exists, the ones `toString()` writes in the `[...]||` bracket:
+
+```js
+const builder = new BlissSVGBuilder('[color=red]||B313');
+
+builder.setOptions({ color: 'blue', grid: true });
+builder.toString(); // '[color=blue;grid]||B313'
+
+builder.removeOptions('color');
+builder.toString(); // '[grid]||B313'
+
+builder.removeOptions('grid');
+builder.toString(); // 'B313'
+```
+
+`setOptions` takes what the constructor's options argument takes, flat options or `{ defaults, overrides }`, and stores what passing the same keys to the constructor would. Repeated calls merge, and the last value of a key wins. `x` and `y` move the whole composition. Kerning belongs to a character, so it is dropped with [`MISPLACED_KERNING_OPTION`](/reference/warning-codes#misplaced-kerning-option).
+
+`removeOptions` reads a name as an element's [`.removeOptions()`](#removeoptions-keys) does, and naming `x` or `y` removes the composition's position, however it was set. Once the last global option goes, the string has no `[...]||` prefix.
+
+A [transient](#transient-options) value of the same key still wins in the picture, and neither call changes what the other channel set.
+
 ### `clearAllOptions()`
 
 Removes every option at every scope, the global bracket included, and keeps the content:
@@ -603,7 +626,7 @@ builder.clearAllOptions();
 builder.toString(); // 'B291/B313'
 ```
 
-It removes exactly what [`omitOptions`](#saving-without-options) leaves out of a save, so afterwards the builder saves what `toString({ omitOptions: true })` saved before, with either serializer. The position of a character, a word or the whole composition goes with the other options; a part's coordinates and a character's kerning stay. It is also the one way to remove the global options, or the composition's own position, from a builder that already exists. `key`s and transient options are left alone, and so are the options a code brings by its definition (see [`removeOptions`](#removeoptions-keys)). For one element, use [`clearOptions()`](#clearoptions).
+It removes exactly what [`omitOptions`](#saving-without-options) leaves out of a save, so afterwards the builder saves what `toString({ omitOptions: true })` saved before, with either serializer. The position of a character, a word or the whole composition goes with the other options; a part's coordinates and a character's kerning stay. To remove only some of the global options, the composition's position among them, use the builder's own [`removeOptions()`](#setoptions-opts-and-removeoptions-keys). `key`s and transient options are left alone, and so are the options a code brings by its definition (see [`removeOptions`](#removeoptions-keys)). For one element, use [`clearOptions()`](#clearoptions).
 
 ### Raw Element Methods
 
