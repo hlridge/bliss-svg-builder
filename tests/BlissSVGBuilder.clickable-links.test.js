@@ -26,8 +26,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   stacked hrefs at multiple levels in one expression.
  * - Mixed clickable + non-clickable content: characters or words without
  *   `href` render as `<g>` siblings to anchor-wrapped ones.
- * - HTML injection rejection in `href` values and ampersand escaping in safe
- *   href values.
+ * - HTML injection in `href` values escaped (markup or a quote in a value with
+ *   no scheme links as escaped text) and ampersand escaping in safe href
+ *   values.
  * - Event-handler attribute blocking on `on*` bracket-option keys, including
  *   case-insensitive variants, while preserving legitimate sibling attributes.
  * - `href` protocol allowlist: `javascript:` / `data:` / `vbscript:` (including
@@ -45,6 +46,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   level does not throw and renders the path content directly.
  *
  * Does NOT cover:
+ * - Which `href` values build a link (relative references, the four schemes,
+ *   the scheme grammar, an `href` with no address), see
+ *   `BlissSVGBuilder.link-href-schemes.test.js`.
  * - Global-scope link attributes staying off the content wrapper
  *   `<g class="bliss-content">`, see
  *   `BlissSVGBuilder.global-link-attributes.test.js`.
@@ -249,19 +253,19 @@ describe('BlissSVGBuilder clickable links', () => {
   });
 
   describe('when href values contain HTML injection attempts', () => {
-    it('rejects href with HTML injection', () => {
+    it('escapes markup in an href, which links as text', () => {
       const builder = new BlissSVGBuilder('[href="<script>alert(1)</script>"]B291');
       const svg = builder.svgCode;
 
-      expect(svg).not.toContain('<a');
+      expect(svg).toContain('<a href="&lt;script&gt;alert(1)&lt;/script&gt;"');
       expect(svg).not.toContain('<script>');
     });
 
-    it('rejects href without valid protocol or path prefix', () => {
+    it('escapes a quote in an href, so it cannot close the attribute', () => {
       const builder = new BlissSVGBuilder('[href="test\\"value"]B291');
       const svg = builder.svgCode;
 
-      expect(svg).not.toContain('<a');
+      expect(svg).toContain('<a href="test&quot;value"');
     });
 
     it('escapes ampersands in href', () => {

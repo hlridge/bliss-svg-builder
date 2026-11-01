@@ -107,18 +107,33 @@ export class BlissElement {
   }
 
   /**
-   * Whether an `href` may build a link: a web, mail or phone address, a path,
-   * or a fragment. Anything else (`javascript:`, `data:`) builds none. Judged
-   * with control characters removed and the ends trimmed; the value written
-   * into the link is the one the author gave. Shared by every level's link and
-   * the global one the builder draws, so the two cannot disagree.
+   * Whether an `href` may build a link: an address with no scheme (a path, a
+   * query or a fragment, read relative to the document), or a web, mail or
+   * phone address. Any other scheme (`javascript:`, `data:`, `ftp:`) builds
+   * none: an allowlist stays safe as browsers learn new schemes. An `href`
+   * that holds no address builds none either: none written (the global link
+   * asks with `undefined`), a bare key (stored as `true`, which the author
+   * never wrote as an address) or a blank value.
    *
-   * @param {*} value - the href as stored (already escaped)
+   * The scheme is read by the URL grammar a browser uses (a letter, then
+   * letters, digits, `+`, `-` or `.`, up to a colon), after removing the ASCII
+   * control characters and trimming the ends. That removes more than a browser
+   * does, so a scheme the browser would find is never missed (`java\tscript:`
+   * is still `javascript:`); the value written into the link is the one the
+   * author gave. It is judged as stored, escaped, and the escaping is what
+   * keeps a character reference from spelling a scheme: `&#106;avascript:`
+   * reaches the browser as that text, a relative path. Shared by every level's
+   * link and the global one the builder draws, so the two cannot disagree.
+   *
+   * @param {*} value - the href as stored (already escaped), or undefined
    * @returns {boolean}
    */
   static isSafeHref(value) {
+    if (value == null || value === true) return false;
     const cleaned = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim();
-    return /^(https?:|mailto:|tel:|\/|#)/i.test(cleaned);
+    if (cleaned === '') return false;
+    const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(cleaned)?.[1];
+    return scheme === undefined || /^(https?|mailto|tel)$/i.test(scheme);
   }
 
   /**
