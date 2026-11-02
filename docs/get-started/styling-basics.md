@@ -22,6 +22,10 @@ And sometimes on colored background to indicate part of speech.
 
 <Demo code="[grid;background=rgb(251, 202, 196);grid-sky-color=red;grid-earth-color=red;grid-major-color=rgb(196, 158, 153);grid-medium-color=rgb(231, 186, 180);grid-minor-color=rgb(231, 186, 180)]||B206;B81/RK:-2/B516/B894;B97/B956" title="A Bliss word on a colored grid" />
 
+Each word can carry its own background, so a sentence shows every word's part of speech:
+
+<Demo code="[background=#cee9f6]|B513/B10//[background=#fbcac4]|B431;B81//[background=#f5eb82]|B414/B167//B4" title="I love Blissymbolics, one background per word" />
+
 ## Advanced Styling
 
 Style at any level - the entire composition, individual words, characters, or even shapes within characters. Use options, SVG attributes, or CSS.
