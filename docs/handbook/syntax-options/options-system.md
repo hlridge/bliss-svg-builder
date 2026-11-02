@@ -26,6 +26,8 @@ Boolean options use a bare key (no `=value`). The option is enabled when present
 
 <Demo code="[grid]||B313" title="Boolean option" />
 
+Every other option of the library needs its value. Written bare, as `[background]` or `[margin]`, it is ignored and reported with [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value), and the option keeps the value it would have had. An [SVG attribute you pass through](/handbook/syntax-options/svg-pass-through) is different: written bare, it gets the value `true`, so `[aria-hidden]` writes `aria-hidden="true"`.
+
 ## Option Values
 
 Option values are usually written bare:

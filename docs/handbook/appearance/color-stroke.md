@@ -2,7 +2,7 @@
 
 ## Color
 
-Set the stroke color with the `color` option (default: black, `#000000`). The option accepts any CSS color value: hex codes (`#dc2626`, `#f00`), named colors (`red`, `tomato`), `rgb()`, and `rgba()`.
+Set the stroke color with the `color` option (default: black, `#000000`). The option accepts any CSS color value: hex codes (`#dc2626`, `#f00`), named colors (`red`, `tomato`), `rgb()`, and `rgba()`. Written with no value, `[color]` is ignored and reported with [`INVALID_OPTION_VALUE`](/reference/warning-codes#invalid-option-value), and the color stays what it would have been.
 
 <Demo code="[color=#dc2626]||B313" title="Red stroke" />
 

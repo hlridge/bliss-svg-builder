@@ -154,15 +154,16 @@ A value the option cannot use: something that is not a number where a number is 
 [link-area=INK;href=#a]B291  →  warns, the link keeps its whole area
 [margin]||B291               →  warns, the default margin is used
 [margin=]||B291              →  warns, the default margin is used
+[background]||B291           →  warns, no background is drawn
 ```
 
-The last two are the cases worth knowing about: writing the key with no value at all is refused too. A bare `[margin]` used to set a margin of 1 and `[margin=]` a margin of 0, neither of which you asked for.
+The last three are the cases worth knowing about: writing the key with no value at all is refused too, on every option of the library that takes a number, a word, a color or a title. A bare `[margin]` used to set a margin of 1 and `[margin=]` a margin of 0, neither of which you asked for, and a bare `[background]` painted the background with the word `true`. An empty `[background=]` is not refused: it is a transparent background.
 
 The second kind only reaches the library from JavaScript, since a value written in a bracket is always text. An object, an array, a `null` or an `undefined` handed to an option that writes text used to be put into the picture as whatever JavaScript made of it: `{ color: null }` painted `stroke="null"`, and an object given to `svg-title` or `aria-label` arrived as `[object Object]`. Those are refused now, and the option falls back the same way a refused number does.
 
 You get the same warning however the value reaches the option: in a composition object, as the builder's second argument, through `setOptions()`, or in a definition's own default options. It is reported once and is not stored, so it is absent from `toString()` and `toJSON()`, and a composition saved and reloaded draws the same picture. If the key's name is refused as well, you are told about the name instead, with [`UNSAFE_ATTRIBUTE_NAME`](#unsafe-attribute-name), [`RESERVED_ATTRIBUTE_NAME`](#reserved-attribute-name) or [`UNKNOWN_LAYER`](#unknown-layer), and the key is not stored either.
 
-A value that *is* text but wrong for the option is kept instead, because you can read it and correct it. `[crop=nope]` is reported, ignored when drawing, saved with the composition, and reported again each time that composition is loaded.
+A value that *is* text but wrong for the option is kept instead, because you can read it and correct it. `[crop=nope]` and a bare `[background]` are each reported, ignored when drawing, saved with the composition, and reported again each time that composition is loaded.
 
 ### `OUT_OF_RANGE_OPTION_VALUE`
 
