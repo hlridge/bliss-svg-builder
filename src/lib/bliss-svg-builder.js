@@ -383,16 +383,19 @@ class BlissSVGBuilder {
   // diverges on nothing constructible today. It stays because a second caller
   // would not know that.
   //
-  // A value the AUTHOR wrote no longer reaches it: the admission stage refuses
-  // that value where the composition is built, on every entry point, so by the
-  // time an option is dispatched the bag holds nothing this could refuse. What
-  // is left is the bags that never passed ingest, which are the library's own
-  // module data: the built-in definitions' `defaultOptions` (a `define()` call
-  // is admitted, the built-in table is written straight into the registry) and
-  // the error-placeholder parts. Both reach an author's composition, so the
-  // backstop is kept and the two gates are held to one rule by sharing the
-  // predicate and the name test below. The name test is told whether the bag
-  // is the root's, the one place the library's stamp is a refused name.
+  // Two kinds of value reach it. One is a library option written as a bare key
+  // (`[background]`): readable text, so ingest keeps it for the author to
+  // correct, and it is refused here, where the option is dispatched, on every
+  // load, as a bare number option is by its own judge. The other is a value
+  // with no text form, which the admission stage refuses where the composition
+  // is built, on every entry point, so it can only arrive in a bag that never
+  // passed ingest: the library's own module data, the built-in definitions'
+  // `defaultOptions` (a `define()` call is admitted, the built-in table is
+  // written straight into the registry) and the error-placeholder parts. Both
+  // reach an author's composition, so the backstop is kept and the two gates
+  // are held to one rule by sharing the predicate and the name test below. The
+  // name test is told whether the bag is the root's, the one place the
+  // library's stamp is a refused name.
   #withoutRefusedTextValues(rawOptions, isRoot) {
     let kept = rawOptions;
     for (const [key, value] of Object.entries(rawOptions)) {

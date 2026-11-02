@@ -1345,6 +1345,18 @@ export const TEXT_OPTION_KEYS = new Set(
 );
 
 /**
+ * The text options whose value is a paint: the symbol's color, the background
+ * and its three zones, and the grid lines. Listed only so a refusal can say
+ * what one of them needs; a text option missing from it is refused all the
+ * same, asked for "a text value" instead of "a color".
+ */
+const COLOR_OPTION_KEYS = new Set([
+  'color', 'background', 'background-top', 'background-mid', 'background-bottom',
+  'grid-color', 'grid-major-color', 'grid-medium-color', 'grid-minor-color',
+  'grid-sky-color', 'grid-earth-color',
+]);
+
+/**
  * True for a key whose value the library will write into the document as text.
  * A name the library does not curate at all is one of these too: it is emitted
  * as the author typed it, so whatever it carries becomes attribute text.
@@ -1375,10 +1387,10 @@ export const isTextValuedOptionKey = (key) => (
  * the rule is "non-primitive, null or undefined" and leaning on that quirk
  * would hide a third of the rule behind a JavaScript wart.
  *
- * Shared by the two gates that must agree on it: this is the whole test
- * `judgeTextOptionValue` applies, and it is also what `admitOptions` asks
- * before judging anything, since a value that IS text is input whether or not
- * the option can use it.
+ * Shared by the two gates that must agree on it: this is the test
+ * `judgeTextOptionValue` applies to every value but a library option's bare
+ * key, and it is also what `admitOptions` asks before judging anything, since
+ * a value that IS text is input whether or not the option can use it.
  */
 const hasAuthoredTextForm = (value) => (
   value !== null && value !== undefined
@@ -1404,22 +1416,38 @@ const hasAuthoredTextForm = (value) => (
  * on the symbol and `{'aria-label': {}}` shipped `[object Object]` as an
  * accessible name.
  *
+ * A library option written as a bare key is refused too, in words of its own,
+ * as the numeric and keyword judges refuse one. The key arrives as `true`,
+ * which has a text form, so the type test alone honoured it: `[background]`
+ * painted `fill="true"` and `[svg-title]` named the picture "true". On a name
+ * the library does not curate, a bare key is the DSL's shorthand for `true`
+ * (`[data-selected]`) and is honoured. The keyword options are left to their
+ * own judge, whose refusal names the words the option takes.
+ *
  * Returns null when the value is honoured, so the caller assigns it; otherwise
  * the warning to report, and the caller assigns nothing.
  */
 export const judgeTextOptionValue = (key, rawValue) => {
   if (!isTextValuedOptionKey(key)) return null;
-  if (hasAuthoredTextForm(rawValue)) return null;
-  const shown = describeRefusedValue(rawValue);
+  const curated = KNOWN_OPTION_KEYS.has(key);
   // An option the library curates has a value of its own to fall back to; a
   // name it does not curate has none, so the honest thing to say about it is
   // that nothing is emitted under it at all.
-  const tail = KNOWN_OPTION_KEYS.has(key)
+  const tail = curated
     ? 'so it was ignored: the option keeps the value it would have had without it.'
     : 'so it was dropped and will not be emitted.';
+  if (rawValue === true && curated && !KEYWORD_OPTION_VALUES.has(key)) {
+    const needs = COLOR_OPTION_KEYS.has(key) ? 'a color' : 'a text value';
+    return {
+      code: WARNING_CODES.INVALID_OPTION_VALUE,
+      message: `"${key}" needs ${needs} and was written without one, ${tail}`,
+      source: key,
+    };
+  }
+  if (hasAuthoredTextForm(rawValue)) return null;
   return {
     code: WARNING_CODES.INVALID_OPTION_VALUE,
-    message: `"${key}" needs a text value and ${shown} is not one, ${tail}`,
+    message: `"${key}" needs a text value and ${describeRefusedValue(rawValue)} is not one, ${tail}`,
     source: `${key}=${textOfValue(rawValue)}`,
   };
 };

@@ -33,8 +33,8 @@ import {
  *   a symbol, which used to reach the document as their own source text.
  * - A sweep DERIVED from `TEXT_OPTION_KEYS` rather than listed, so a curated
  *   option added later is covered the day it lands.
- * - The values that stay honoured: a string, a number, a boolean and the empty
- *   string that means a transparent background.
+ * - The values that stay honoured: a string, a number, a boolean on a name of
+ *   your own and the empty string that means a transparent background.
  * - The three families the gate passes over, one control each: a numeric option
  *   keeps the numeric half's own refusal byte for byte, a boolean switch stays
  *   silent because absence is how it is turned off, and a kerning value the
@@ -51,6 +51,8 @@ import {
  * Does NOT cover:
  * - The numeric half of the same gate, see
  *   `BlissSVGBuilder.option-value-gate.test.js`.
+ * - A library text option written as a bare key, which arrives as `true` and
+ *   is refused, see `BlissSVGBuilder.bare-text-option.test.js`.
  * - What becomes of a refused value once it has been reported, and whether it
  *   survives a save, see `BlissSVGBuilder.refused-value-retention.test.js`.
  * - Which SPELLING of a name is resolved on the way in, see
