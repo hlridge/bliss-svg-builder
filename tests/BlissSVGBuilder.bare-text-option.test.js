@@ -174,6 +174,15 @@ describe('BlissSVGBuilder bare text option', () => {
       expect(b.svgCode).not.toContain(element);
       expect(b.svgCode).toBe(build('B313').svgCode);
     });
+
+    it('asks the undocumented text option for a text value too', () => {
+      // pins the noun for the stub, which draws nothing whatever it holds; a
+      // mutant adding 'text' to the color list survived every other row in a
+      // 2026-11 hand-mutant run
+      const b = build('[text]||B313');
+      expect(b.warnings).toEqual([{ code: 'INVALID_OPTION_VALUE', message: TEXT_REFUSAL('text'), source: 'text' }]);
+      expect(b.svgCode).toBe(build('B313').svgCode);
+    });
   });
 
   describe('when every curated text option is written bare', () => {
@@ -182,12 +191,15 @@ describe('BlissSVGBuilder bare text option', () => {
     // judge, whose refusal names the words the option takes.
     const BARE_REFUSED = [...TEXT_OPTION_KEYS].filter((key) => !KEYWORD_OPTION_VALUES.has(key));
 
-    it('holds every color and both titles listed above', () => {
-      expect(BARE_REFUSED).toEqual(expect.arrayContaining([
-        'color', 'background', 'background-top', 'background-mid', 'background-bottom',
-        'grid-color', 'grid-major-color', 'grid-medium-color', 'grid-minor-color',
-        'grid-sky-color', 'grid-earth-color', 'svg-title', 'svg-desc',
-      ]));
+    it('holds exactly the colors, the titles and the text stub pinned above', () => {
+      // An option added to the vocabulary fails this row until it is listed
+      // here and its refusal's wording is pinned above: asked for "a text
+      // value" when it needs a color, it would give the wrong advice in silence.
+      expect([...BARE_REFUSED].sort()).toEqual([
+        'background', 'background-bottom', 'background-mid', 'background-top', 'color',
+        'grid-color', 'grid-earth-color', 'grid-major-color', 'grid-medium-color',
+        'grid-minor-color', 'grid-sky-color', 'svg-desc', 'svg-title', 'text',
+      ]);
     });
 
     it.each(BARE_REFUSED)('refuses a bare %s on the whole picture, naming the key alone', (key) => {
