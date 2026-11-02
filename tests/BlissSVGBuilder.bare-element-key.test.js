@@ -203,10 +203,12 @@ describe('BlissSVGBuilder bare element key', () => {
 
     it.each([
       ['a number in its options', { options: { key: 5 } }, '5'],
+      ['a false in its options', { options: { key: false } }, 'false'],
       ['a text beside it', { key: 'k' }, 'k'],
     ])('names the part by %s, written on the first of the parts it draws', (_written, firstPart, name) => {
-      // regression: a number was carried as the number, so `handle.key`, typed
-      // as a string, was 5 and `getElementByKey('5')` found nothing
+      // regression: the value was carried as it was, so a number stayed the
+      // number (`handle.key`, typed as a string, was 5 and `getElementByKey('5')`
+      // found nothing) and a false was replaced by a generated key
       const builder = new BlissSVGBuilder(namingTyped(firstPart));
       expect(builder.glyph(0).part(0).key).toBe(name);
       expect(builder.getElementByKey(name)?.key).toBe(name);
