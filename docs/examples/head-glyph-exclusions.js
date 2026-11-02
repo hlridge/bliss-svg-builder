@@ -90,7 +90,7 @@ export const exclusions = {
   B1153: { name: 'three quarters', why: 'Quantity modifier' },
   'B559/B11': { name: 'several', why: 'Quantity modifier' },
   B9: { name: 'zero', why: 'Quantity modifier' },
-  B10: { name: 'one', why: 'Quantity modifier' },
+  B10: { name: 'one', why: 'Quantity modifier, but not skipped when B4 (period) follows: "1." reads as "first" (B10;B86/B4), so the period is not punctuation there.' },
   B11: { name: 'two', why: 'Quantity modifier' },
   B12: { name: 'three', why: 'Quantity modifier' },
   B13: { name: 'four', why: 'Quantity modifier' },

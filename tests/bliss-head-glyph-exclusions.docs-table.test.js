@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   absoluteNeverHead,
   blissHeadGlyphExclusions,
+  conditionalExceptions,
   deliberatelyNotExcluded,
   lowPriorityExclusions,
 } from '../src/lib/bliss-head-glyph-exclusions.js';
@@ -21,6 +22,8 @@ import { exclusions, exclusionGroups } from '../docs/examples/head-glyph-exclusi
  *   list exactly the codes the source puts in those tiers.
  * - Every code the table lists has a gloss and a reason, and the table holds
  *   no entry outside its groups.
+ * - A code that is not skipped when a given code follows it says so in its
+ *   reason, naming that code, and no other reason claims such a rule.
  *
  * Does NOT cover:
  * - Which head a word gets, see `BlissParser.head-glyph-exclusions.test.js`
@@ -58,6 +61,14 @@ describe('bliss-head-glyph-exclusions docs table', () => {
       const listed = exclusionGroups.flatMap((group) => group.codes);
       expect(listed.filter((code) => !exclusions[code]?.name || !exclusions[code]?.why)).toEqual([]);
       expect(Object.keys(exclusions).sort()).toEqual([...listed].sort());
+    });
+
+    it('states each conditional rule in its code\'s reason, and no other reason claims one', () => {
+      const unstated = conditionalExceptions
+        .filter(([code, followedBy]) => !exclusions[code]?.why.includes(`not skipped when ${followedBy}`));
+      expect(unstated).toEqual([]);
+      const claiming = Object.keys(exclusions).filter((code) => exclusions[code].why.includes('not skipped when'));
+      expect(claiming).toEqual(conditionalExceptions.map(([code]) => code));
     });
   });
 });
