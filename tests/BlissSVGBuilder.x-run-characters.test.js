@@ -71,11 +71,17 @@ describe('BlissSVGBuilder x-run characters', () => {
       expect(rebuilt.toJSON()).toEqual(run.toJSON());
     });
 
-    it('spaces an outlined letter and the run 0.8 apart, the external-glyph space', () => {
-      const pair = render('XM/XAnna-Karin');
-      expect(gapAfterFirstGlyph(pair)).toBeCloseTo(0.8, 6);
-      expect(pair.toString()).toBe('XM/XAnna-Karin');
-    });
+    // pins the run pass reading a run whose second character is the hyphen: a
+    // two-letter lookahead left XM-M to the part slot, which draws the same
+    // text but spaces it as a Bliss character, 2 apart
+    it.each(['XM/XAnna-Karin', 'XM/XM-M', 'XM-M/XM'])(
+      'spaces %s 0.8 apart, the external-glyph space',
+      (input) => {
+        const pair = render(input);
+        expect(gapAfterFirstGlyph(pair)).toBeCloseTo(0.8, 6);
+        expect(pair.toString()).toBe(input);
+      },
+    );
   });
 
   describe('when a hyphen does not stand between two letters', () => {
