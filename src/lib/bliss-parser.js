@@ -187,6 +187,17 @@ const readTextFallbackKey = (code) => {
   return classifyXCode(asWritten) === 'letters' ? asWritten : null;
 };
 
+// Where the X pass writes the routing key: where a character starts, which is
+// the start of the text, after a `/`, or after the bracket or the `>` of the
+// option region in front of the character.
+const ROUTING_KEY_AT_CHARACTER_START = new RegExp(String.raw`(^|[/\]>])${X_TEXT_FALLBACK_PREFIX}`, 'g');
+
+// Text the parser reports, with each routing key spelled as the X code it
+// stands for (`Xλ:abc`), so a warning quotes a letter drawn as text the way it
+// is written and never names the key, which is internal. A code that merely
+// contains the key's letters is left as it is.
+const withXCodesAsWritten = (text) => text.replace(ROUTING_KEY_AT_CHARACTER_START, '$1X');
+
 // The code a `;` part slot reads a code as. The glyph-boundary pass never sees
 // a slot, so a letter with no outline is made its text-fallback glyph here,
 // as that pass makes one written alone, and a routing key is read as the
@@ -933,10 +944,14 @@ export class BlissParser {
     // Remove all spaces in input string (but not in preserved content)
     inputString = inputString.replace(/\s/g, '');
 
-    // Helper function to restore placeholders in a string
+    // The text as written, which is what every warning quotes: each bracket
+    // the tokenizer set aside put back, and each letter drawn as text spelled
+    // as its X code rather than the routing key the X pass reads it under. The
+    // keys go first, while every bracket is still a placeholder, so the text
+    // of an option is never touched.
     const restorePlaceholders = (str) => {
       if (!str) return str; // Handle undefined/null/empty (matches #parseOptions behavior)
-      return str.replace(/(\{|\[)PLACEHOLDER_(\d+)(\}|\])/g, (match, open, num, close) => {
+      return withXCodesAsWritten(str).replace(/(\{|\[)PLACEHOLDER_(\d+)(\}|\])/g, (match, open, num, close) => {
         const placeholder = placeholderMap[`PLACEHOLDER_${num}`];
         if (placeholder) {
           const { content, openBracket, closeBracket } = placeholder;
