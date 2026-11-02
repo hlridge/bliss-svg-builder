@@ -944,11 +944,11 @@ export class BlissParser {
     // Remove all spaces in input string (but not in preserved content)
     inputString = inputString.replace(/\s/g, '');
 
-    // The text as written, which is what every warning quotes: each bracket
-    // the tokenizer set aside put back, and each letter drawn as text spelled
-    // as its X code rather than the routing key the X pass reads it under. The
-    // keys go first, while every bracket is still a placeholder, so the text
-    // of an option is never touched.
+    // The text as written, as a warning quotes it and the `;;` overlay keeps
+    // it: each bracket the tokenizer set aside put back, and each letter drawn
+    // as text spelled as its X code rather than the routing key the X pass
+    // reads it under. The keys go first, while every bracket is still a
+    // placeholder, so the text of an option is never touched.
     const restorePlaceholders = (str) => {
       if (!str) return str; // Handle undefined/null/empty (matches #parseOptions behavior)
       return withXCodesAsWritten(str).replace(/(\{|\[)PLACEHOLDER_(\d+)(\}|\])/g, (match, open, num, close) => {
