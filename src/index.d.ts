@@ -169,8 +169,9 @@ export interface BlissOptions {
   // on a handle (`setOptions({ key: 'subject' })`), in a composition object, or
   // in a DSL bracket at element scope. It is identity rather than appearance, so
   // it changes nothing about the picture and is not published by either
-  // serializer. A number or a boolean names the element by its text, and an
-  // empty key names nothing; written at document scope it names no element
+  // serializer. A number or `false` names the element by its text. An empty
+  // key names nothing, and neither does a key written bare (`[key]`, which is
+  // `true`), which is reported. Written at document scope it names no element
   // `getElementByKey()` can find.
   key?: string;
 

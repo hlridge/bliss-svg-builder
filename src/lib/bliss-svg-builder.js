@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_BODY, MAX_INPUT_LENGTH, classifyXCode, layoutDefinitionOf, processXCodes, slotCodeOf, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, removeElementOption, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, removeElementOption, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, bareElementKeyRefusal, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -883,8 +883,12 @@ class BlissSVGBuilder {
       // It names the element by its text: a composition object stores the
       // type it was written in, and `5` and `'5'` are one name. An empty text
       // names nothing, so the element keeps its own key, which survives a
-      // rebuild where a key generated here would not.
+      // rebuild where a key generated here would not. A key written bare
+      // names nothing either, and is reported: it stays in the composition,
+      // as a bare `[background]` does, so it is reported on every rebuild
+      // until a key is set over it or it is removed.
       if (obj.options.key !== undefined) {
+        if (obj.options.key === true) this.#warnings.push(bareElementKeyRefusal());
         obj.key = BlissSVGBuilder.#drawnKey(obj);
         delete obj.options.key;
       }
@@ -1202,7 +1206,9 @@ class BlissSVGBuilder {
   // A key written beside an element is the same name as the key in its
   // options (that field is where an element's identity is kept), so it is
   // judged the same way and kept as its text; refused, it is removed, and the
-  // element gets a key of its own.
+  // element gets a key of its own. Written bare (`true`), it names nothing, as
+  // in the options, and is refused here, once: this field is the element's
+  // key itself, where a bare key could not wait in a bag to be refused later.
   static #admitAuthoredBags(node, level, warn) {
     for (const [bag, transient] of [['options', false], ['transientOptions', true]]) {
       if (node[bag]) {
@@ -1211,6 +1217,10 @@ class BlissSVGBuilder {
     }
     if (Object.hasOwn(node, 'key')) {
       const admitted = BlissSVGBuilder.#admitAuthoredBag({ key: node.key }, warn, { level, notation: 'object' });
+      if (admitted.key === true) {
+        warn(bareElementKeyRefusal());
+        delete admitted.key;
+      }
       if (Object.hasOwn(admitted, 'key')) node.key = textOfValue(admitted.key);
       else delete node.key;
     }
@@ -2483,11 +2493,13 @@ class BlissSVGBuilder {
   }
 
   // The key an element is drawn with: the one written in its options, as its
-  // text, unless that text is empty; otherwise its own. The options pass names
-  // the element's snapshot by this rule, and a handle finds its snapshot by it.
+  // text, unless that text is empty or the key was written bare (stored as
+  // `true`), neither of which names anything; otherwise its own. The options
+  // pass names the element's snapshot by this rule, and a handle finds its
+  // snapshot by it.
   static #drawnKey(node) {
     const written = node.options?.key;
-    if (written === undefined) return node.key;
+    if (written === undefined || written === true) return node.key;
     const name = textOfValue(written);
     return name === '' ? node.key : name;
   }
@@ -3276,14 +3288,19 @@ class BlissSVGBuilder {
     // The part the definition is, and what it draws: the parts it holds, or
     // the one code a rename resolved it to. The parts it takes the place of
     // become that part, so it answers to the key the first of them was given.
+    // Each key goes where it was written, beside the part or in its options,
+    // so the part is named exactly as that first part would have been: by the
+    // rule every element is named by, which reads a key in the options as its
+    // text, over the one beside it, and refuses it written bare.
     const [own] = reading.parts;
     const contents = own.parts ?? [{ codeName: own.codeName }];
     const named = BlissSVGBuilder.#isPartNamed(parts[0], code);
     if (!named && !BlissSVGBuilder.#startsWithParts(parts, contents)) return;
     if (!named) {
       const part = structuredClone(own);
-      const key = parts.slice(0, contents.length).map((p) => p.key ?? p.options?.key).find((k) => k !== undefined);
-      if (key !== undefined) part.key = key;
+      const keyed = parts.slice(0, contents.length).find((p) => (p.key ?? p.options?.key) !== undefined);
+      if (keyed?.key !== undefined) part.key = keyed.key;
+      if (keyed?.options?.key !== undefined) part.options = { ...part.options, key: keyed.options.key };
       glyph.parts = [part, ...parts.slice(contents.length)];
     }
     if (definition.isShape) {

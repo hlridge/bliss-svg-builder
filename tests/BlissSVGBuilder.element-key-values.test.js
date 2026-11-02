@@ -4,8 +4,8 @@
  * other value names the element by its text, whichever way it was written.
  *
  * Covers:
- * - A number, a bigint, a boolean and a string naming the element by their
- *   text (`5` as `'5'`, `[key]` as `'true'`), written in a bracket, in a
+ * - A number, a bigint, `false` and a string naming the element by their
+ *   text (`5` as `'5'`, `false` as `'false'`), written in a bracket, in a
  *   composition object (in the options and beside the element), through
  *   `setOptions()` and through the options of an adding method, on a word, a
  *   character and a part.
@@ -22,6 +22,8 @@
  * - The key kept out of both saves, whatever it was written as.
  *
  * Does NOT cover:
+ * - A key written bare (`[key]`, the JavaScript `true`), which names nothing
+ *   and is refused, see `BlissSVGBuilder.bare-element-key.test.js`.
  * - A function or a symbol as the key in a composition object, which the
  *   constructor's copy hands to this judge, see
  *   `BlissSVGBuilder.composition-object-copy.test.js`.
@@ -56,12 +58,10 @@ describe('BlissSVGBuilder element key values', () => {
       ['a number in a composition object', () => new BlissSVGBuilder(oneGlyph(b291({ options: { key: 5 } }))).glyph(0), '5'],
       ['zero in a composition object', () => new BlissSVGBuilder(oneGlyph(b291({ options: { key: 0 } }))).glyph(0), '0'],
       ['a bigint in a composition object', () => new BlissSVGBuilder(oneGlyph(b291({ options: { key: 5n } }))).glyph(0), '5'],
-      ['true in a composition object', () => new BlissSVGBuilder(oneGlyph(b291({ options: { key: true } }))).glyph(0), 'true'],
       ['a number beside the element in a composition object', () => new BlissSVGBuilder(oneGlyph(b291({ key: 5 }))).glyph(0), '5'],
       ['a number through setOptions()', () => changed('B291', (b) => b.glyph(0).setOptions({ key: 5 })).glyph(0), '5'],
       ['false through setOptions()', () => changed('B291', (b) => b.glyph(0).setOptions({ key: false })).glyph(0), 'false'],
       ["a number through an adding method's options", () => changed('B291', (b) => b.group(0).addGlyph('B303', { key: 5 })).glyph(1), '5'],
-      ['a bare key in a bracket', () => new BlissSVGBuilder('[key]B291').glyph(0), 'true'],
       ['a number in a bracket', () => new BlissSVGBuilder('[key=5]B291').glyph(0), '5'],
       ['a number on a word in a composition object', () => new BlissSVGBuilder({ groups: [{ options: { key: 7 }, glyphs: [b291()] }] }).group(0), '7'],
       ['a number on a part in a composition object', () => new BlissSVGBuilder(oneGlyph({ parts: [{ codeName: 'B291', options: { key: 9 } }] })).glyph(0).part(0), '9'],
@@ -77,7 +77,7 @@ describe('BlissSVGBuilder element key values', () => {
 
     it('reports nothing for any of them', () => {
       expect(codes(new BlissSVGBuilder(oneGlyph(b291({ options: { key: 5 } }))))).toEqual([]);
-      expect(codes(changed('B291', (b) => b.glyph(0).setOptions({ key: true })))).toEqual([]);
+      expect(codes(changed('B291', (b) => b.glyph(0).setOptions({ key: false })))).toEqual([]);
     });
   });
 

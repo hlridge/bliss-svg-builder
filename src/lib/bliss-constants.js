@@ -1745,10 +1745,27 @@ const judgeElementKeyValue = (key, value) => {
   if (key !== 'key') return null;
   return {
     code: WARNING_CODES.INVALID_OPTION_VALUE,
-    message: `"key" needs a text value and ${describeRefusedValue(value)} is not one, so it was ignored: the element keeps the key it would have had without it.`,
+    message: `"key" needs a text value and ${describeRefusedValue(value)} is not one, ${ELEMENT_KEY_REFUSAL_TAIL}`,
     source: `key=${textOfValue(value)}`,
   };
 };
+
+const ELEMENT_KEY_REFUSAL_TAIL = 'so it was ignored: the element keeps the key it would have had without it.';
+
+/**
+ * The element key written bare, which arrives as `true`, in the words a bare
+ * library option is refused in. A key written with no value names nothing, as
+ * an empty one does, but unlike an empty one it was surely not meant, so it is
+ * reported. `true` has a text form, so the judge above never sees it: it is
+ * refused where the key is read, so a bracket's bare key and the JavaScript
+ * `true` are reported alike, and `[key=true]`, the text, still names the
+ * element "true".
+ */
+export const bareElementKeyRefusal = () => ({
+  code: WARNING_CODES.INVALID_OPTION_VALUE,
+  message: `"key" needs a text value and was written without one, ${ELEMENT_KEY_REFUSAL_TAIL}`,
+  source: 'key',
+});
 
 /**
  * Position and kerning under the same rule, reported the way their own gates
