@@ -11,14 +11,15 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `;;` word indicator.
  * - #38: external spacing between outlined letters, and a part-scope option
  *   surviving a `toJSON()` round trip.
- * - #39: an X run holding an unsupported character is taken whole.
+ * - #39: a hyphenated X run is taken whole, as one text glyph.
  * - #40: a bare `>` and a doubled option bracket at every scope.
  * - #41: automatic cropping across a space, in every automatic mode.
  * - #18: positioning and kerning through object options, against the DSL.
  * - #19: `toString()` writing the compact space-group and X-run forms.
  * - #29 and #34, whose issues carry no code: #29's case built from its words,
  *   #34's taken from the handbook.
- * - #26 (open for a later release): its "works" and "does not work" lists.
+ * - #26 (open for scripts other than Latin, Greek and Cyrillic): its "works"
+ *   and "does not work" lists, whose Latin rows now draw as text.
  *
  * Does NOT cover:
  * - Each feature's full contract, which lives with the feature: X runs in
@@ -83,7 +84,7 @@ describe('BlissSVGBuilder github issue examples', () => {
     });
   });
 
-  describe("when GH #39's X runs carry an unsupported character", () => {
+  describe("when GH #39's hyphenated X runs are written", () => {
     it('draws all five letters of Xhello and writes it back in its compact form', () => {
       const run = render('Xhello');
       expect(run.toString()).toBe('Xhello');
@@ -93,12 +94,13 @@ describe('BlissSVGBuilder github issue examples', () => {
     // regression: GH #39; 1.0.0 drew 'hell' and moved the 'o' into a failing
     // tail token, Xo-world.
     it.each(['Xhello-world', 'XM-M', 'XMM-M'])(
-      'takes %s whole: absorbs no letter, warns once naming the token, draws nothing',
+      'takes %s whole as one text glyph: absorbs no letter, warns nothing',
       (input) => {
         const run = render(input);
         expect(run.toString()).toBe(input);
-        expect(sources(run)).toEqual([['UNKNOWN_CODE', input]]);
-        expect(inkCount(run)).toBe(0);
+        expect(run.warnings).toEqual([]);
+        expect(inkCount(run)).toBe(1);
+        expect(run.svgCode).toContain(`>${input.slice(1)}</text>`);
       },
     );
   });
@@ -223,7 +225,7 @@ describe('BlissSVGBuilder github issue examples', () => {
     });
   });
 
-  describe("when GH #26's examples run as written (open, for a later release)", () => {
+  describe("when GH #26's examples run as written (still open for other scripts)", () => {
     it.each(['Xa', 'Xé', 'Xñ', 'Xå', 'Xα', 'Xё', 'Xhello', 'Xcafé'])('draws %s without a warning', (input) => {
       const result = render(input);
       expect(result.warnings).toEqual([]);
@@ -232,13 +234,20 @@ describe('BlissSVGBuilder github issue examples', () => {
 
     // regression: GH #39; 1.0.0 drew 'p' for Xpiǎ and 'ann' for Xanne-marie,
     // absorbing the letter before the unsupported character.
-    it.each(['Xǎ', 'Xǔ', 'Xḿ', 'X漢', 'Xあ', 'Xpiǎ', 'Xanne-marie'])(
-      'draws nothing for %s and warns UNKNOWN_CODE naming the whole token',
+    it.each(['Xǎ', 'Xǔ', 'Xḿ', 'Xpiǎ', 'Xanne-marie'])(
+      'draws %s whole as one text glyph without a warning',
       (input) => {
         const result = render(input);
-        expect(inkCount(result)).toBe(0);
-        expect(sources(result)).toEqual([['UNKNOWN_CODE', input]]);
+        expect(result.warnings).toEqual([]);
+        expect(inkCount(result)).toBe(1);
+        expect(result.svgCode).toContain(`>${input.slice(1)}</text>`);
       },
     );
+
+    it.each(['X漢', 'Xあ'])('draws nothing for %s and warns UNKNOWN_CODE naming the whole token', (input) => {
+      const result = render(input);
+      expect(inkCount(result)).toBe(0);
+      expect(sources(result)).toEqual([['UNKNOWN_CODE', input]]);
+    });
   });
 });

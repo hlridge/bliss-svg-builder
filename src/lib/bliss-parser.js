@@ -19,9 +19,28 @@ import { KERNING_OPTION_KEYS, MAX_RECURSION_DEPTH, NUMBER_TEXT, OPTION_BRACKET_C
 // equivalent spellings take different semantic paths (a y-only ':,2' used to
 // bypass the misplacement gates while ':0,2' met them).
 export const COORD_SUFFIX_PATTERN = new RegExp(String.raw`:(?:${NUMBER_TEXT})?(?:,(?:${NUMBER_TEXT})?)?$`);
+
+// The letters an external-character run is written in, by Unicode block:
+// Basic Latin, Latin-1 Supplement and Latin Extended-A, Latin Extended-B, IPA
+// Extensions, Greek, Cyrillic, Latin Extended Additional. A letter with no
+// built-in outline draws as text. Scripts whose text the text glyph cannot
+// measure or lay out (CJK, right-to-left, joining) are left out.
+const X_RUN_LETTERS = 'a-zA-ZÀ-ſƀ-ɏɐ-ʯͰ-ϿЀ-ӿḀ-ỿ';
+// The body of a written run: letters, with a hyphen-minus allowed only between
+// two of them (`Anna-Karin`). No outline holds a hyphen, so a run with one
+// always draws as one text glyph. Exported so the define() namespace guard
+// tests the SAME grammar the tokenizer below reads: a name of this shape is
+// always read as external text, so it could never be reached as a definition.
+export const X_RUN_BODY = `[${X_RUN_LETTERS}]+(?:-[${X_RUN_LETTERS}]+)*`;
+// One character of a code name: a run letter, a digit, `-`, `.` or `_`. A
+// code is named in the same letters a run is written in, so a definition
+// named in any of them is reachable.
+const CODE_NAME_CHARACTER = String.raw`[${X_RUN_LETTERS}0-9\-._]`;
 // A part as parsePartString reads it: a code, then that suffix with each axis
 // captured (groups: code, x, y).
-const PART_STRING_PATTERN = new RegExp(String.raw`^([a-zA-Z0-9À-ſͰ-ϿЀ-ӿ\-._]+)(?::(${NUMBER_TEXT})?(?:,(${NUMBER_TEXT})?)?)?$`);
+const PART_STRING_PATTERN = new RegExp(String.raw`^(${CODE_NAME_CHARACTER}+)(?::(${NUMBER_TEXT})?(?:,(${NUMBER_TEXT})?)?)?$`);
+// A code name followed by `:`, the marker that says a coordinate follows.
+const CODE_THEN_COORDINATE_PATTERN = new RegExp(String.raw`^${CODE_NAME_CHARACTER}+:`);
 // A kerning marker, RK or AK, with its value read by the same grammar (groups:
 // type, value).
 const KERNING_MARKER_PATTERN = new RegExp(String.raw`^(RK|AK)(?::(${NUMBER_TEXT}))?$`);
@@ -77,12 +96,6 @@ const stripReferenceDecoration = (s) => s
   .replace(/\^+$/, '')
   .replace(COORD_SUFFIX_PATTERN, '');
 
-// The external-character letter ranges: Latin, Latin-1/Extended-A, Greek and
-// Cyrillic. Exported so the define() namespace guard tests the SAME ranges the
-// tokenizer below reads; a name this pattern accepts is always read as
-// external text, so it could never be reached as a definition.
-export const X_RUN_LETTERS = 'a-zA-ZÀ-ſͰ-ϿЀ-ӿ';
-
 // The longest input string the parser reads. Exported so the string save
 // knows which of the words it writes a reload can read back at all.
 export const MAX_INPUT_LENGTH = 10_000;
@@ -106,35 +119,37 @@ export function writesWordIndicatorList(codeString) {
 // A written X token runs from a glyph boundary to the next structural
 // character: another glyph boundary (`/`), a part boundary (`;`), a head
 // marker (`^`) or a coordinate suffix (`:`). Taking the token WHOLE is what
-// stops a character outside the letter ranges from ending the match early and
+// stops a character outside the run grammar from ending the match early and
 // leaving its tail to glue onto the last expanded letter, which destroyed the
-// letter before it (`Xhello-world` rendered `hell`). An option bracket at the
-// boundary is part of the token, not a place for a run to hide from routing
-// (run-to-stable 2.2). A BARE `>` is an option region carrying nothing, and it
-// belongs to the prefix for the same reason: without it a run written behind
-// one was never expanded and then failed as a whole word, while `||`, `|` and
-// even an empty `[]>` all rendered it.
+// letter before it. An option bracket at the boundary is part of the token,
+// not a place for a run to hide from routing. A BARE `>` is an option region
+// carrying nothing, and it belongs to the prefix for the same reason: without
+// it a run written behind one was never expanded and then failed as a whole
+// word, while `||`, `|` and even an empty `[]>` all rendered it.
 const X_TOKEN_PATTERN = new RegExp(String.raw`(?<=^|\/)(\[[^\[\]]*\]>?|>)?X([^/;^:]+)`, 'g');
-const X_RUN_BODY_PATTERN = new RegExp(`^[${X_RUN_LETTERS}]{2,}$`);
+// A run of two characters at least: one letter alone is the sequence pass's
+// to read (see processXCodes).
+const X_RUN_BODY_PATTERN = new RegExp(`^(?=.{2})${X_RUN_BODY}$`);
 // An unexpanded multi-letter run reaching a `;`-part slot: the run is a word,
 // and a word cannot be composed onto a character. Anchored at both ends so a
 // code that merely CONTAINS X+letters (MAXWELL) or ends in a non-letter
 // (Xhello9) is not mis-flagged. Built from the shared ranges for the same
 // reason as the pattern above: three copies of this class had drifted apart.
+// Letters only: a run holding a hyphen is one glyph, never a word.
 const WORD_AS_PART_PATTERN = new RegExp(`^X[${X_RUN_LETTERS}]{2,}$`);
 // One X letter, optionally behind an option bracket and optionally carrying a
 // trailing decoration, as written in a `/`-separated sequence.
 const X_LETTER_TOKEN_PATTERN = new RegExp(String.raw`^(\[[^\[\]]*\]>?)?X([${X_RUN_LETTERS}])([;^:].*)?$`);
-// A bare X code that is nothing but letters, with no decoration of any kind.
-const X_BARE_LETTERS_PATTERN = new RegExp(`^X([${X_RUN_LETTERS}]+)$`);
+// A bare X code that is nothing but a run body, with no decoration of any kind.
+const X_BARE_RUN_PATTERN = new RegExp(`^X(${X_RUN_BODY})$`);
 const X_TEXT_FALLBACK_PREFIX = 'XTXT_';
 
 // What a written X token DENOTES, which is the one question every X site asks:
 //   'word'  - every letter has a built-in outline, so the run is shorthand for
 //             a `/`-separated sequence of glyphs.
-//   'glyph' - some letter has no outline, so the WHOLE run becomes one
-//             text-fallback glyph; letters of one run never split across two
-//             rendering mechanisms.
+//   'glyph' - some character has no outline (a hyphen never has one), so the
+//             WHOLE run becomes one text-fallback glyph; letters of one run
+//             never split across two rendering mechanisms.
 //   null    - not a multi-letter run: one letter (the sequence pass below
 //             decides those), or something that is not a letter at all (a
 //             digit, punctuation, the internal `XTXT_` routing key). Leave the
@@ -472,16 +487,16 @@ export function resolveKerning(glyphObj, marker, bracketEntries, parseWarnings) 
 // What a bare X code denotes, for the sites that meet one already stripped of
 // its options and decoration (a `;`-part slot, object input). The same question
 // processXCodes asks of a written token, asked of a finished code:
-//   'glyph'   - some letter has no built-in outline, so the whole code is ONE
-//               text-fallback glyph.
+//   'glyph'   - some character has no built-in outline (a hyphen never has
+//               one), so the whole code is ONE text-fallback glyph.
 //   'letters' - every letter has an outline, so the code stands for that many
 //               outlined letters: one character if there is one letter, a word
 //               if there are more.
-//   null      - not X-plus-letters at all (`Xab9`, `X-`, `XTXT_hi`, `B291`), so
-//               it denotes nothing here and has to resolve, or fail, as the
+//   null      - not an X run at all (`Xab9`, `X-`, `XTXT_hi`, `B291`), so it
+//               denotes nothing here and has to resolve, or fail, as the
 //               single code it is.
 export function classifyXCode(code) {
-  const match = typeof code === 'string' ? code.match(X_BARE_LETTERS_PATTERN) : null;
+  const match = typeof code === 'string' ? code.match(X_BARE_RUN_PATTERN) : null;
   if (!match) return null;
   return allLettersOutlined(match[1]) ? 'letters' : 'glyph';
 }
@@ -855,7 +870,7 @@ export class BlissParser {
         // is reported before semantics, so an unknown code with a bad suffix
         // (ZZ:abc) is MALFORMED_COORDINATES too. The `:` (not `,`) is the
         // trigger: it is the marker that says "a coordinate follows".
-        if (/^[a-zA-Z0-9À-ſͰ-ϿЀ-ӿ\-._]+:/.test(codeString)) {
+        if (CODE_THEN_COORDINATE_PATTERN.test(codeString)) {
           part.errorCode = WARNING_CODES.MALFORMED_COORDINATES;
         }
       }

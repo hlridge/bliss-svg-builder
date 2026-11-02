@@ -62,11 +62,11 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   `BlissParser.definition-expansion.test.js`.
  * - Single-character X-codes (`Xh` etc.) outside the Xword
  *   expansion path, see `BlissParser.internal-mechanics.test.js`.
- * - WHICH characters an X-run should accept (the hyphen/apostrophe
- *   char-set question) — that is issue #26, pinned as it.todo in
- *   `BlissSVGBuilder.text-fallback.test.js`. The run-integrity
- *   tripwires below are about the failure MODE at whatever boundary
- *   #26 settles on, and are independent of it.
+ * - WHICH characters an X-run accepts (the Latin blocks, a hyphen
+ *   between two letters), see `BlissSVGBuilder.x-run-characters.test.js`;
+ *   other scripts are issue #26. The run-integrity tripwires below are
+ *   about the failure MODE at whatever boundary the grammar draws, and
+ *   are independent of it.
  */
 // The glyph codes a builder's input actually parsed into, one array per word.
 const glyphCodesByWord = (builder) =>
@@ -279,9 +279,10 @@ describe('BlissParser X-codes', () => {
   // the untouched tail glued onto the LAST expanded code, destroying the letter
   // before it (`Xhello-world` rendered `hell` and failed on `Xo-world`). The
   // token is now taken as written, up to the next `/`, `;`, `^` or `:`, and an
-  // out-of-range character makes the WHOLE token an unknown code. WHICH
-  // characters an X-run should accept is a separate question, issue #26; this
-  // describe pins the failure mode at whatever boundary that settles on.
+  // out-of-range character makes the WHOLE token an unknown code. A hyphen
+  // between two letters has since joined the run grammar (`Xhello-world` is
+  // one text glyph, see `BlissSVGBuilder.x-run-characters.test.js`), so the
+  // rows below write a full stop, which is still outside it.
   describe('when an X-run carries a character outside the accepted ranges', () => {
     it('holds the run together when an in-range character merely lacks path data', () => {
       // contrast case, correct today: Greek alpha IS inside the recognised
@@ -291,59 +292,60 @@ describe('BlissParser X-codes', () => {
     });
 
     it.each([
-      ['XM-M'],
-      ['XMM-M'],
-      ['XAnna-Karin'],
-      ['Xhello-world'],
+      ['XM.M'],
+      ['XMM.M'],
+      ['XAnna1'],
+      ['Xhello.world'],
     ])('warns rather than silently accepting %s', (input) => {
       expect(new BlissSVGBuilder(input).warnings.map(w => w.code)).toContain('UNKNOWN_CODE');
     });
 
     it.each([
-      ['XM-M'],
-      ['XMM-M'],
-      ['XAnna-Karin'],
+      ['XM.M'],
+      ['XMM.M'],
+      ['XAnna1'],
     ])('serializes %s to a form that reparses to the same render', (input) => {
       const b = new BlissSVGBuilder(input);
       expect(new BlissSVGBuilder(b.toString()).svgCode).toBe(b.svgCode);
     });
 
     it('absorbs no outlined letter into a failing tail token', () => {
-      const glyphs = BlissParser.parse('Xhello-world').groups[0].glyphs;
-      expect(glyphs.map(g => g.parts[0].codeName)).toEqual(['Xhello-world']);
+      const glyphs = BlissParser.parse('Xhello.world').groups[0].glyphs;
+      expect(glyphs.map(g => g.parts[0].codeName)).toEqual(['Xhello.world']);
     });
 
     it('reports the token as written, not a sub-token starting mid-run', () => {
-      expect(new BlissSVGBuilder('Xhello-world').warnings).toContainEqual(
-        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Xhello-world' })
+      expect(new BlissSVGBuilder('Xhello.world').warnings).toContainEqual(
+        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Xhello.world' })
       );
     });
 
     it('treats one and two letters before the unsupported character alike', () => {
-      // the `{2,}` quantifier used to decide the outcome class on its own: XM-M
-      // stayed one token, XMM-M split into an outlined M plus a failing XM-M
-      const one = new BlissSVGBuilder('XM-M');
-      const two = new BlissSVGBuilder('XMM-M');
-      expect(one.toString()).toBe('XM-M');
-      expect(two.toString()).toBe('XMM-M');
-      expect(two.warnings.map(w => w.source)).toEqual(['XMM-M']);
+      // the `{2,}` quantifier used to decide the outcome class on its own: one
+      // letter before the unsupported character stayed one token, two split
+      // into an outlined letter plus a failing tail token
+      const one = new BlissSVGBuilder('XM.M');
+      const two = new BlissSVGBuilder('XMM.M');
+      expect(one.toString()).toBe('XM.M');
+      expect(two.toString()).toBe('XMM.M');
+      expect(two.warnings.map(w => w.source)).toEqual(['XMM.M']);
     });
 
     it('holds a run together when the unsupported character is itself a letter', () => {
-      // ǎ (U+01CE) sits just above Latin Extended-A, so it never enters the run;
-      // the ordinary `i` before it used to be consumed by the failing tail
-      const builder = new BlissSVGBuilder('Xpiǎ');
+      // 漢 is a letter outside every accepted block, so it never enters the
+      // run; the ordinary `i` before it used to be consumed by the failing tail
+      const builder = new BlissSVGBuilder('Xpi漢');
       expect(builder.toString()).toBe('');
       expect(builder.warnings).toContainEqual(
-        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Xpiǎ' })
+        expect.objectContaining({ code: 'UNKNOWN_CODE', source: 'Xpi漢' })
       );
     });
 
     it('reports the token as written when it carries a head marker', () => {
       // the head marker ends the token; without that the `^` would be read as
       // part of the run and every marked word would fail
-      expect(new BlissSVGBuilder('B291/Xhello-world^').warnings.map(w => w.source))
-        .toEqual(['Xhello-world']);
+      expect(new BlissSVGBuilder('B291/Xhello.world^').warnings.map(w => w.source))
+        .toEqual(['Xhello.world']);
     });
   });
 

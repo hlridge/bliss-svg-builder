@@ -24,10 +24,12 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - Hardcoded diacritic letters (é/ñ/ü/ç/å/Å) render as <path>, never
  *   <text>; kerning is intact (monotonically increasing x-coordinates
  *   across the glyphs of Xcafé).
- * - Out-of-range X-prefix inputs (Xǎ, Xǔ, Xḿ; mid-word Xpiǎ; cross-word
- *   Xhello//Xpiǎ) are surfaced as UNKNOWN_CODE warnings rather than
- *   silently dropped, naming the whole written token and taking no
- *   outlined letter down with them.
+ * - Letters of the wider Latin blocks with no hardcoded data (Xǎ, Xǔ, Xḿ;
+ *   mid-word Xpiǎ; cross-word Xhello//Xpiǎ) render as one <text> element
+ *   each, beside the paths of an outlined word.
+ * - A word holding a character outside the set (Xhello//Xpi漢) is surfaced
+ *   as an UNKNOWN_CODE warning rather than silently dropped, naming the
+ *   whole written token and taking no outlined word down with it.
  * - Round-trip of partial-fallback inputs through `toJSON` preserves
  *   the rendered SVG byte-identically.
  * - Option-bracket routing (run-to-stable Phase 2.2): a character-level
@@ -50,11 +52,9 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  * - External glyph rendering for non-text X-codes (the canonical Xa
  *   single-char form is touched here as a regression check; the broader
  *   external-glyph contract lives in `BlissSVGBuilder.external-glyphs.test.js`).
- * - Wider X-prefix character coverage: the desired XTXT-fallback contract
- *   for characters outside the parser's accepted ranges (Latin Extended-B+,
- *   CJK, etc.) is captured as it.todo placeholders in the
- *   `when a base+diacritic combination lies outside the supported
- *   X-prefix character set` describe; tracked at issue #26.
+ * - Which characters an X run accepts (the Latin blocks and their edges, a
+ *   hyphen between two letters), see `BlissSVGBuilder.x-run-characters.test.js`;
+ *   other scripts (CJK and the rest) are tracked at issue #26.
  * - Expanding the hardcoded path-data set to cover more diacritic
  *   variants (a separate, future task; not currently prioritized).
  */
@@ -234,68 +234,73 @@ describe('BlissSVGBuilder text fallback', () => {
     });
   });
 
-  // The X-prefix DSL today accepts only ASCII letters, Latin Extended-A,
-  // Greek, and Cyrillic. A token carrying anything else is rejected WHOLE and
-  // surfaced as an UNKNOWN_CODE warning (not silently dropped, and never split
-  // at the character class); the active tests below pin that warning contract.
-  // Wider character support (so the parser
-  // falls through to the XTXT <text> path instead of rejecting) is
-  // tracked at https://github.com/hlridge/bliss-svg-builder/issues/26;
-  // the it.todo lines pin the desired future contract.
-  describe('when a base+diacritic combination lies outside the supported X-prefix character set', () => {
-    it.each([
-      ['Xǎ'],
-      ['Xǔ'],
-      ['Xḿ'],
-    ])('emits an UNKNOWN_CODE warning for %s', (input) => {
-      const builder = new BlissSVGBuilder(input);
-      expect(builder.warnings).toContainEqual(expect.objectContaining({
-        code: 'UNKNOWN_CODE',
-        source: input,
-      }));
-    });
-
-    // regression: see issue #39. The source used to be `Xiǎ`, a token starting
-    // mid-run: the run was truncated at the character class and the tail
-    // spliced onto the last expanded code, so the ordinary outlined letter `i`
-    // was consumed by the failing token and Xpiǎ rendered `p` alone. The whole
-    // written token is now judged as one unit.
-    it('emits an UNKNOWN_CODE warning naming the whole of Xpiǎ (mid-word)', () => {
-      const builder = new BlissSVGBuilder('Xpiǎ');
-      expect(builder.warnings).toContainEqual(expect.objectContaining({
-        code: 'UNKNOWN_CODE',
-        source: 'Xpiǎ',
-      }));
-    });
-
-    it('emits an UNKNOWN_CODE warning naming the whole failing word in Xhello//Xpiǎ (cross-word)', () => {
-      const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
-      expect(builder.warnings).toContainEqual(expect.objectContaining({
-        code: 'UNKNOWN_CODE',
-        source: 'Xpiǎ',
-      }));
-    });
-
-    it('keeps the outlined word of Xhello//Xpiǎ intact when the other word fails', () => {
-      // the token does not lex, so the whole word drops and only its word break
-      // survives, the same shape a trailing `B291//` already serializes to
-      const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
-      expect(builder.toJSON().groups[0].glyphs).toHaveLength(5);
-      expect(builder.toString()).toBe('Xhello//');
-      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
-    });
-
+  // The X-prefix DSL accepts the letters of Basic Latin, Latin-1, Latin
+  // Extended-A and -B, IPA Extensions, Latin Extended Additional, Greek and
+  // Cyrillic; a letter there with no hardcoded outline falls back to the
+  // <text> path. Which characters exactly, block edges included, is pinned in
+  // `BlissSVGBuilder.x-run-characters.test.js`; other scripts (CJK and the
+  // rest) are tracked at https://github.com/hlridge/bliss-svg-builder/issues/26.
+  describe('when a base+diacritic letter of the wider Latin blocks lacks hardcoded data', () => {
+    // regression: see issue #39. A run holding ǎ used to be truncated at the
+    // character class and its tail spliced onto the last expanded code, so the
+    // ordinary outlined letter `i` was consumed by the failing token and Xpiǎ
+    // rendered `p` alone. The whole written token is one text glyph now.
     it('round-trips Xpiǎ through toJSON with byte-identical SVG output', () => {
       const original = new BlissSVGBuilder('Xpiǎ');
       const roundTripped = new BlissSVGBuilder(original.toJSON());
       expect(roundTripped.svgCode).toBe(original.svgCode);
     });
 
-    it.todo('renders Xǎ as a single text element since the base char lacks hardcoded data (a with caron, Pinyin)');
-    it.todo('renders Xǔ as a single text element since the base char lacks hardcoded data (u with caron, Pinyin)');
-    it.todo('renders Xḿ as a single text element since the base char lacks hardcoded data (m with acute)');
-    it.todo('renders Xpiǎ as a single text element when one mid-word char lacks hardcoded data');
-    it.todo('renders Xhello//Xpiǎ as paths for the hardcoded word and a single text element for the fallback word');
+    it.each([
+      ['Xǎ', 'a with caron, Pinyin'],
+      ['Xǔ', 'u with caron, Pinyin'],
+      ['Xḿ', 'm with acute'],
+    ])('renders %s as a single text element since the letter lacks hardcoded data (%s)', (input) => {
+      const builder = new BlissSVGBuilder(input);
+      expect(builder.warnings).toEqual([]);
+      expect((builder.svgCode.match(/<text/g) ?? []).length).toBe(1);
+      expect(builder.svgCode).toContain(`>${input.slice(1)}</text>`);
+      expect(externalGlyphPaths(builder.svgCode)).toHaveLength(0);
+    });
+
+    it('renders Xpiǎ as a single text element when one mid-word char lacks hardcoded data', () => {
+      const builder = new BlissSVGBuilder('Xpiǎ');
+      expect(builder.warnings).toEqual([]);
+      expect(builder.svgCode).toContain('>piǎ</text>');
+      expect(externalGlyphPaths(builder.svgCode)).toHaveLength(0);
+      expect(builder.toString()).toBe('Xpiǎ');
+    });
+
+    it('renders Xhello//Xpiǎ as paths for the hardcoded word and a single text element for the fallback word', () => {
+      const builder = new BlissSVGBuilder('Xhello//Xpiǎ');
+      expect(builder.warnings).toEqual([]);
+      expect(externalGlyphPaths(builder.svgCode)).toHaveLength(5);
+      expect((builder.svgCode.match(/<text/g) ?? []).length).toBe(1);
+      expect(builder.toString()).toBe('Xhello//Xpiǎ');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+    });
+  });
+
+  // A token carrying a character outside the accepted set is rejected WHOLE
+  // and surfaced as an UNKNOWN_CODE warning: not silently dropped, and never
+  // split at the character class.
+  describe('when a word holds a character outside the X-prefix character set', () => {
+    it('emits an UNKNOWN_CODE warning naming the whole failing word in Xhello//Xpi漢 (cross-word)', () => {
+      const builder = new BlissSVGBuilder('Xhello//Xpi漢');
+      expect(builder.warnings).toContainEqual(expect.objectContaining({
+        code: 'UNKNOWN_CODE',
+        source: 'Xpi漢',
+      }));
+    });
+
+    it('keeps the outlined word of Xhello//Xpi漢 intact when the other word fails', () => {
+      // the token does not lex, so the whole word drops and only its word break
+      // survives, the same shape a trailing `B291//` already serializes to
+      const builder = new BlissSVGBuilder('Xhello//Xpi漢');
+      expect(builder.toJSON().groups[0].glyphs).toHaveLength(5);
+      expect(builder.toString()).toBe('Xhello//');
+      expect(new BlissSVGBuilder(builder.toString()).svgCode).toBe(builder.svgCode);
+    });
   });
 
   // Phase 2.2 acceptance criterion (1.4 review MAJOR-1): an option bracket
@@ -398,7 +403,7 @@ describe('BlissSVGBuilder text fallback', () => {
   // A `toJSON()` re-ingest used to convert ANY unregistered `X…` code to the
   // internal text-fallback form, with no check that it was a legal X token. So
   // a code the DSL rejects came back as accepted content and the warning
-  // vanished: `Xhello-world` warns and renders nothing when parsed, but through
+  // vanished: `Xhello.world` warns and renders nothing when parsed, but through
   // JSON it rendered the text with no warning at all. The object path now asks
   // the same grammar the DSL asks.
   describe('when a rejected X code arrives through object input', () => {
@@ -407,10 +412,11 @@ describe('BlissSVGBuilder text fallback', () => {
     });
 
     it('reports the same warning the direct parse reports', () => {
-      // `Xa-Xb` is the one that pins the pattern's LEADING anchor: without it,
+      // `Xa.Xb` is the one that pins the pattern's LEADING anchor: without it,
       // the trailing `Xb` alone would match and the whole token would route to
-      // text on the object path while the DSL rejects it.
-      for (const code of ['Xhello-world', 'X9', 'Xab9', 'X-', 'XRAY1', 'Xa-Xb']) {
+      // text on the object path while the DSL rejects it. (`Xa-Xb` did this
+      // until a hyphen between two letters joined the run grammar.)
+      for (const code of ['Xhello.world', 'X9', 'Xab9', 'X-', 'XRAY1', 'Xa.Xb']) {
         const direct = new BlissSVGBuilder(code);
         expect(direct.warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
         expect(authored(code).warnings.map(w => w.code)).toEqual(['UNKNOWN_CODE']);
@@ -418,7 +424,7 @@ describe('BlissSVGBuilder text fallback', () => {
     });
 
     it('renders byte-identically to the direct parse after a toJSON round-trip', () => {
-      for (const code of ['Xhello-world', 'X9', 'X-']) {
+      for (const code of ['Xhello.world', 'X9', 'X-']) {
         const direct = new BlissSVGBuilder(code);
         expect(new BlissSVGBuilder(direct.toJSON()).svgCode).toBe(direct.svgCode);
       }
