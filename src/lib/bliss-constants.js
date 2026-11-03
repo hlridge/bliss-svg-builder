@@ -1258,6 +1258,19 @@ export const writtenNumber = (value) => {
 };
 
 /**
+ * A written `stroke-width` read as a width in user units (writtenNumber), or
+ * undefined where it reads as no number at or above 0. A renderer resolves
+ * such a value alone (`5px` as pixels, a word or a negative one as the
+ * inherited width), so a box the library sizes around the line keeps the
+ * width the library computed. Shared by every box a written width sizes, so
+ * the readings cannot drift.
+ */
+export const writtenWidth = (value) => {
+  const width = writtenNumber(value);
+  return Number.isFinite(width) && width >= 0 ? width : undefined;
+};
+
+/**
  * True when an option was written without a value. Blank rather than absent: a
  * bare key arrives as `true`, an empty value as '', a quoted blank as
  * whitespace, and an omitted one as null or undefined. Shared by the two

@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, INK_AREA_MARGIN, DEFAULT_STROKE_WIDTH, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, INK_AREA_MARGIN, DEFAULT_STROKE_WIDTH, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES, writtenWidth } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -416,20 +416,25 @@ export class BlissElement {
    * This element's lines as an ink area draws them: rendered again in the
    * halo mode getSvgContent takes, in `paint`, each line widened by twice the
    * area's `padding` and each letter filled in `paint` and outlined by as much.
-   * Returns the lines, and the width a group strokes them at (the element's
-   * computed width, widened alike); null where it draws no line, as ZSA does.
-   * Built from the widths the library computes: of the element's own
-   * attributes only its effects reach its ink area, on the copy the layer
+   * Returns the lines; the width a group strokes them at (the element's
+   * computed width, widened alike); and that group as #lineWidth reads it,
+   * its width `written` where an author's key writes one that reads as a
+   * width (writtenWidth), else the computed one. Null where it draws no line,
+   * as ZSA does. Built from the widths the library computes: of the element's
+   * own attributes only its effects reach its ink area, on the copy the layer
    * puts around it (#backgroundLayer), and its descendants' effects reach
    * their lines inside it (#haloWrap).
    */
-  #inkArea(x, y, paint, padding) {
+  #inkArea(x, y, paint, padding, written) {
     const outline = 2 * padding;
-    const lines = this.getSvgContent(x, y, { paint, outline, element: this });
+    const width = (this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) + outline;
+    const frame = { top: this, width: written ?? width, extra: outline };
+    const lines = this.getSvgContent(x, y, { paint, outline, element: this, frame });
     if (lines === '') return null;
     return {
       lines: lines.startsWith('<') ? lines : `<path d="${lines}"/>`,
-      width: roundForMarkup((this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) + outline),
+      width: roundForMarkup(width),
+      frame,
     };
   }
 
@@ -442,10 +447,10 @@ export class BlissElement {
    * area's group instead, and its own effects on the copy around the area
    * (#backgroundLayer). Content with no line stays empty, so an area around
    * no line draws nothing, whatever group its element writes. A filter in
-   * the copy is drawn as its own native one, covering the lines as the area
-   * widens them and what the copies inside it draw past them. `x` and `y` are
-   * the origin of the frame this element sits in, as getSvgContent takes
-   * them.
+   * the copy is drawn as its own native one, covering the lines at the widths
+   * the area draws them (`halo.frame`, #inkArea) and what the copies inside
+   * it draw past them. `x` and `y` are the origin of the frame this element
+   * sits in, as getSvgContent takes them.
    */
   #haloWrap(content, halo, x, y) {
     if (halo.element === this || content === '') return content;
@@ -454,7 +459,7 @@ export class BlissElement {
       ? [['stroke-width', roundForMarkup(options.strokeWidth + halo.outline)]]
       : [];
     const { entries, defs } = translateFilters([...width, ...this.#effectEntries],
-      () => ({ drawn: grownBy(this.#drawnBox(x, y), halo.outline / 2), outset: this.#filterOutset }), this.#sharedOptions.filters);
+      () => ({ drawn: this.#drawnBox(x, y, halo.frame), outset: this.#filterOutset }), this.#sharedOptions.filters);
     if (entries.length === 0) return content;
     const lines = content.startsWith('<') ? content : `<path d="${content}"/>`;
     return `<g ${formatEntries(entries)}>${defs.join('')}${lines}</g>`;
@@ -496,26 +501,44 @@ export class BlissElement {
    * from the origin of the frame it sits in, by the `background-area` it
    * inherits: `{ area: 'box', box }` or `{ area: 'ink', lines, width }`
    * (#inkArea), each with `drawn`, the box it covers ({ minX, minY, maxX,
-   * maxY }); null where it draws none. A word's or a character's box is
-   * its paint area across the band, a part's its ink box plus its padding:
-   * the shapes a link's area takes. An ink area draws nothing where there is no
-   * line. A word or a character with no paint area draws nothing: a word of no
-   * characters, a character that draws nothing, and the root, which is never
-   * given one, as its background is the picture's own, drawn by the builder.
+   * maxY }), at the widths it is drawn with once the keys that reach it
+   * (`levels`, #backgroundKeyLevels) are written on it; null where it draws
+   * none. A word's or a character's box is its paint area across the band, a
+   * part's its ink box plus its padding: the shapes a link's area takes. An
+   * ink area draws nothing where there is no line. A word or a character with
+   * no paint area draws nothing: a word of no characters, a character that
+   * draws nothing, and the root, which is never given one, as its background
+   * is the picture's own, drawn by the builder.
    */
-  #backgroundDrawing(x, y) {
+  #backgroundDrawing(x, y, levels) {
     if (this.#background === '') return null;
     if (this.#level <= 2 && !this.#paintArea) return null;
     if (this.#getInheritedOption('backgroundArea') === 'ink') {
       const padding = this.#areaPadding(BlissElement.#PAINT_AREAS);
-      const ink = this.#inkArea(x, y, this.#background, padding);
-      // the area strokes every line `padding` wider on each side than the line
-      return ink && { area: 'ink', ...ink, drawn: grownBy(this.#drawnBox(x, y), padding) };
+      const written = writtenWidth(this.#authoredBackground('ink', levels)['stroke-width']);
+      const ink = this.#inkArea(x, y, this.#background, padding, written);
+      return ink && { area: 'ink', lines: ink.lines, width: ink.width, drawn: this.#drawnBox(x, y, ink.frame) };
     }
     const box = this.#level <= 2
       ? BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea)
       : BlissElement.#inkHitBox(this.#calculateBounds(x, y), this.#areaPadding(BlissElement.#PAINT_AREAS));
-    return { area: 'box', box, drawn: { minX: box.x, minY: box.y, maxX: box.x + box.width, maxY: box.y + box.height } };
+    // The rect is drawn with no stroke (#backgroundMarkup). One a key writes
+    // is drawn at the width a key writes on the rect, else at the content
+    // group's: the effect copies around the rect write no width.
+    const { stroke, 'stroke-width': width } = this.#authoredBackground('box', levels);
+    const outline = stroke !== undefined && stroke !== 'none' ? writtenWidth(width) ?? this.#contentFrame.width : 0;
+    return { area: 'box', box, drawn: grownBy({ minX: box.x, minY: box.y, maxX: box.x + box.width, maxY: box.y + box.height }, outline / 2) };
+  }
+
+  /**
+   * What the keys that reach this element's background (`levels`,
+   * #backgroundKeyLevels) write on the `area` it draws, as { name: value }:
+   * the author's attributes and the class every layer carries, none of the
+   * values the library computes for the area.
+   */
+  #authoredBackground(area, levels) {
+    const attributesOf = this.#sharedOptions.layerAttributeEntries ?? BlissElement.#ownLayerEntries;
+    return Object.fromEntries(attributesOf(ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS[area]], {}, levels));
   }
 
   /**
@@ -528,7 +551,7 @@ export class BlissElement {
    */
   #visitBackgrounds(visit, x = 0, y = 0, levels = []) {
     const keys = this.#backgroundKeyLevels(levels);
-    const drawing = this.#backgroundDrawing(x, y);
+    const drawing = this.#backgroundDrawing(x, y, keys);
     if (drawing) visit(this, drawing, keys);
     for (const child of this.#children) {
       child.#visitBackgrounds(visit, this.#relativeToParentX + x, this.#relativeToParentY + y, keys);
@@ -568,7 +591,7 @@ export class BlissElement {
    */
   #backgroundLayer(x = 0, y = 0, levels = []) {
     const keys = this.#backgroundKeyLevels(levels);
-    const drawing = this.#backgroundDrawing(x, y);
+    const drawing = this.#backgroundDrawing(x, y, keys);
     const layers = [
       ...(drawing ? [{ ...this.#backgroundMarkup(drawing, keys), drawn: drawing.drawn }] : []),
       ...this.#children.map(child => child.#backgroundLayer(this.#relativeToParentX + x, this.#relativeToParentY + y, keys)),
@@ -656,7 +679,7 @@ export class BlissElement {
    */
   get drawnArea() {
     const boxes = [];
-    const lines = this.#drawnBox(0, 0);
+    const lines = this.#drawnBox(0, 0, this.#contentFrame);
     if (lines) boxes.push(lines);
     this.#visitBackgrounds((element, drawing) => boxes.push(drawing.drawn));
     return boxes.length > 0 ? unionOf(boxes) : undefined;
@@ -1922,20 +1945,50 @@ export class BlissElement {
   /**
    * What this element draws, as { minX, minY, maxX, maxY }, from the origin of
    * the frame it sits in as #calculateBounds takes it: the same boxes, each
-   * leaf's widened by half its own line width, so the box holds the lines and
-   * not only their geometry. Exact for round caps and joins, every line the
-   * library draws; short of a dot's own width, which a filter region covers
-   * through the viewBox. Undefined where the element has no layout children,
-   * as it draws nothing.
+   * leaf's widened by half the width its lines are drawn at inside the group
+   * `frame` describes (#lineWidth), so the box holds the lines and not only
+   * their geometry. Exact for round caps and joins, every line the library
+   * draws; short of a dot's own width, which a filter region covers through
+   * the viewBox. Undefined where the element has no layout children, as it
+   * draws nothing.
    */
-  #drawnBox(offsetX, offsetY) {
+  #drawnBox(offsetX, offsetY, frame = {}) {
     if (this.#leafHeight !== undefined && this.#leafWidth !== undefined) {
-      return grownBy(this.#calculateBounds(offsetX, offsetY), (this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) / 2);
+      return grownBy(this.#calculateBounds(offsetX, offsetY), this.#lineWidth(frame) / 2);
     }
     const absX = offsetX + this.#relativeToParentX;
     const absY = offsetY + this.#relativeToParentY;
-    const boxes = this.#layoutChildren.map(child => child.#drawnBox(absX, absY)).filter(Boolean);
+    const boxes = this.#layoutChildren.map(child => child.#drawnBox(absX, absY, frame)).filter(Boolean);
     return boxes.length > 0 ? unionOf(boxes) : undefined;
+  }
+
+  /**
+   * The width this element's lines are drawn at inside a group written with
+   * `frame.width`: the nearest width an element states itself, from this one
+   * up to `frame.top` (the element the group is drawn for: the group's width
+   * holds its own, or a key written on the group replaces it), or the root,
+   * whose option the content group writes; widened by
+   * `frame.extra`, as an ink area widens every width stated inside it. Else
+   * the group's, and where no group is given, the width the options give
+   * this element. An element's own width is written on its own group, so it
+   * beats whatever the group around it writes, an author's key included.
+   */
+  #lineWidth({ top, width, extra = 0 }) {
+    for (let element = this; element && element !== top && element.#level > 0; element = element.#parentElement) {
+      const own = element.#blissObj.options?.strokeWidth;
+      if (own !== undefined) return own + extra;
+    }
+    return width ?? this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH;
+  }
+
+  /**
+   * The group the lines sit in as #lineWidth reads it: the content group,
+   * with the width it is written with, an author's key included. A tree
+   * rendered outside a picture has none, and its lines are sized by the
+   * options.
+   */
+  get #contentFrame() {
+    return { width: this.#sharedOptions.contentStrokeWidth?.() };
   }
 
   /**
@@ -1961,7 +2014,7 @@ export class BlissElement {
    */
   #ownFilters(x, y, box) {
     return (entries, linked) => translateFilters(entries, () => ({
-      drawn: this.#drawnBox(x, y),
+      drawn: this.#drawnBox(x, y, this.#contentFrame),
       geometry: this.#calculateBounds(x, y),
       hit: linked ? this.#linkBox(x, y, box) : undefined,
       outset: this.#filterOutset,
