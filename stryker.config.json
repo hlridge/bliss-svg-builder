@@ -21,6 +21,7 @@
   "incrementalFile": ".stryker-tmp/incremental.json",
   "tempDirName": ".stryker-tmp",
   "timeoutMS": 10000,
+  "dryRunTimeoutMinutes": 30,
   "logLevel": "info",
   "disableTypeChecks": "{src,tests}/**/*.{js,ts}",
   "ignorePatterns": [

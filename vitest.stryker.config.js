@@ -41,6 +41,11 @@ export default defineConfig({
       // '@property' tag is also undeclared in this config, so including the
       // files would fail Vitest 4.1's tag-declaration check in the dry run.
       'tests/**/*.property.{test,spec}.js',
+      // Matches the parser's source text against its written shape. Stryker
+      // runs the suite on a rewritten copy holding every mutant at once, so
+      // that text no longer matches and the dry run fails; the copy is the
+      // same for every mutant, so the scan could not kill one anyway.
+      'tests/BlissSVGBuilder.option-admission-drift.test.js',
     ],
   },
   resolve: {
