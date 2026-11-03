@@ -27,6 +27,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   holds.
  * - A link: its `<filter>` before the transparent rect, the region covering
  *   the rect.
+ * - A drop-shadow drawn from SVG 1.1 primitives at every level and on a copy,
+ *   with no `<feDropShadow>` anywhere in the picture.
  * - A value left untranslated, a `url()` and `none` written exactly as today,
  *   and reported nowhere.
  *
@@ -71,7 +73,10 @@ const B81 = '<path d="M3,6l1,-2M4,4l1,2"/>';
 const B291_AT_10 = '<path d="M10,8h8M10,16h8M10,8v8M18,8v8"/>';
 const B313_B291 = '<path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6M10,8h8M10,16h8M10,8v8M18,8v8"/>';
 const BLUR_1 = '<feGaussianBlur stdDeviation="1"/>';
-const SHADOW_RED = '<feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="red"/>';
+// drop-shadow(1px 1px 0 red), first in its value
+const SHADOW_RED = '<feOffset result="shadow-input-0"/><feOffset dx="1" dy="1" result="shadow-offset-0"/>'
+  + '<feFlood flood-color="red"/><feComposite in2="shadow-offset-0" operator="in"/>'
+  + '<feMerge><feMergeNode/><feMergeNode in="shadow-input-0"/></feMerge>';
 const GRAYSCALE_1 = '<feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0"/>';
 // Regions derived from the viewBox (B313: -0.75 -0.75 9.5 21.5; B313/B291:
 // -0.75 -0.75 19.5 21.5), each drawn box lying inside it, grown by the reach,
@@ -250,6 +255,22 @@ describe('BlissSVGBuilder native filters', () => {
 
       expect(contentOf(svg)).toBe(`<a href="#a" style="cursor: pointer;"><g filter="url(#${idIn(svg, 1)})">${filterDef(idIn(svg, 1), [-4, -4, 16, 28], BLUR_1)}`
         + `<rect x="-1" y="-1" width="10" height="22" fill="transparent" stroke="none"/>${B313}</g></a>`);
+    });
+  });
+
+  describe('when a drop-shadow is drawn', () => {
+    it.each([
+      ['a word', '[filter=drop-shadow(1px 1px red)]|B313/B291'],
+      ['a character', 'B313/[filter=drop-shadow(1px 1px 2px red)]B291'],
+      ['a part', 'B313;[style=filter:drop-shadow(1px 1px red)]>B81'],
+      ['an element background\'s copy', '[filter=drop-shadow(1px 1px red);background=yellow]B313'],
+    ])('draws it on %s with no feDropShadow in the picture', (_case, input) => {
+      // regression: a renderer without <feDropShadow> (node-canvas's Linux
+      // build, librsvg 2.52.8) drew nothing of a shadowed element
+      const svg = build(input).svgCode;
+
+      expect(svg).toContain('<feFlood flood-color="red"/>');
+      expect(svg).not.toContain('feDropShadow');
     });
   });
 

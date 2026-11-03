@@ -220,7 +220,10 @@ describe('BlissSVGBuilder github issue examples', () => {
   describe("when GH #34's case is taken from the handbook (the issue has no code)", () => {
     it('draws a CSS drop-shadow as a native SVG filter that the style points to', () => {
       const svg = render('[style=filter:drop-shadow(2px 2px 2px rgba(0,0,0,0.3))]||B313').svgCode;
-      expect(svg).toContain('<feDropShadow');
+      expect(svg).toContain('<feFlood flood-color="rgba(0,0,0,0.3)"/>');
+      // drawn without <feDropShadow>, which a renderer lacking it (librsvg
+      // 2.52.8) answers by drawing nothing of the symbol
+      expect(svg).not.toContain('feDropShadow');
       expect(svg).toMatch(/style="filter:url\(#bliss-filter-[^)"]+\)"/);
     });
   });

@@ -14,14 +14,6 @@
  *   recipe   for each element in SVG_ELEMENT_BASIS, union `elems[el].attrs`
  *            with every `attrsGroups[g]` named by `elems[el].attrsGroups`;
  *            then drop namespaced names, then add the link attributes below.
- *   gap      `feDropShadow` has no `elems` entry: SVGO names it among the
- *            filter primitives, but its collections describe SVG 1.1, which
- *            predates it. It takes the attributes Filter Effects 1 gives it
- *            (https://www.w3.org/TR/filter-effects-1/#feDropShadowElement),
- *            each group read from `attrsGroups` like any other element's: the
- *            `core`, `presentation` and `filterPrimitive` groups, plus `class`,
- *            `style`, `in`, `stdDeviation`, `dx` and `dy`. All of them already
- *            arrive through `feGaussianBlur` and `<text>`, so it adds no name.
  *   minus    namespaced names (`xlink:*`, `xml:*`). Neither entry point can
  *            deliver one, by two different mechanisms: an option bracket splits
  *            the key on the colon before any lookup could see it, and an
@@ -35,10 +27,10 @@
  *            routed names arrive through the 1.1 union: `target` from `<a>`,
  *            and `type` from `<style>` and nowhere else, which is why dropping
  *            `<style>` from the basis is not the isolated change it looks like.
- *   census   129 names: 18 camelCase, 50 hyphenated, 61 single-word, resolving
- *            to 129 distinct normalized keys.
+ *   census   135 names: 18 camelCase, 50 hyphenated, 67 single-word, resolving
+ *            to 135 distinct normalized keys.
  *
- * Sixteen of the 129 are inert in both directions and are kept anyway: the
+ * Sixteen of the 135 are inert in both directions and are kept anyway: the
  * `on*` event handlers are refused by the safety gate under every spelling, so
  * no canonicalization can make one live. They stay because the list is faithful
  * to its source, and because excluding them would be the kind of unstated
@@ -52,10 +44,10 @@
  * Scoped deliberately to the elements the library emits, and no wider. Every
  * name here is one the library may rewrite on the author's behalf, so a longer
  * list is a larger surface on which to rename something an author meant
- * literally. Generic SVG words such as `in`, `result` and `values` are here
- * because the library emits the filter primitives that own them; `mode`
- * (`<feBlend>`) and `operator` (`<feComposite>`) belong to elements it does
- * not emit, and stay out.
+ * literally. Generic SVG words such as `in`, `result`, `values` and `operator`
+ * are here because the library emits the filter primitives that own them;
+ * `mode` (`<feBlend>`) and `kernelMatrix` (`<feConvolveMatrix>`) belong to
+ * elements it does not emit, and stay out.
  */
 
 /**
@@ -67,8 +59,8 @@
 export const SVG_ELEMENT_BASIS = new Set([
   'a', 'desc', 'g', 'path', 'rect', 'style', 'svg', 'text', 'title',
   // the native filter a CSS `filter` inside the picture is drawn as
-  'feColorMatrix', 'feComponentTransfer', 'feDropShadow', 'feFuncA', 'feFuncB', 'feFuncG',
-  'feFuncR', 'feGaussianBlur', 'filter',
+  'feColorMatrix', 'feComponentTransfer', 'feComposite', 'feFlood', 'feFuncA', 'feFuncB',
+  'feFuncG', 'feFuncR', 'feGaussianBlur', 'feMerge', 'feMergeNode', 'feOffset', 'filter',
 ]);
 
 /** The owner's spelling of every attribute name in scope. */
@@ -81,11 +73,13 @@ export const SVG_ATTRIBUTE_NAMES = new Set([
   'filterRes', 'filterUnits', 'flood-color', 'flood-opacity', 'font-family', 'font-size',
   'font-size-adjust', 'font-stretch', 'font-style', 'font-variant', 'font-weight',
   'glyph-orientation-horizontal', 'glyph-orientation-vertical', 'height', 'href', 'hreflang',
-  'id', 'image-rendering', 'in', 'intercept', 'lengthAdjust', 'letter-spacing', 'lighting-color',
+  'id', 'image-rendering', 'in', 'in2', 'intercept', 'k1', 'k2', 'k3', 'k4', 'lengthAdjust',
+  'letter-spacing', 'lighting-color',
   'marker-end', 'marker-mid', 'marker-start', 'mask', 'media', 'offset', 'onabort', 'onactivate',
   'onclick', 'onerror', 'onfocusin', 'onfocusout', 'onload', 'onmousedown', 'onmousemove',
   'onmouseout', 'onmouseover', 'onmouseup', 'onresize', 'onscroll', 'onunload', 'onzoom',
-  'opacity', 'overflow', 'paint-order', 'pathLength', 'pointer-events', 'preserveAspectRatio',
+  'opacity', 'operator', 'overflow', 'paint-order', 'pathLength', 'pointer-events',
+  'preserveAspectRatio',
   'primitiveUnits', 'referrerpolicy', 'rel', 'requiredExtensions', 'requiredFeatures', 'result',
   'rotate', 'rx', 'ry', 'shape-rendering', 'slope', 'stdDeviation', 'stop-color', 'stop-opacity',
   'stroke', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-linecap', 'stroke-linejoin',

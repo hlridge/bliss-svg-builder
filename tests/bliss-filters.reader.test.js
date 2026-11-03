@@ -39,8 +39,11 @@ import { readFilterValue } from '../src/lib/bliss-filters.js';
  */
 
 const blur = (deviation) => `<feGaussianBlur stdDeviation="${deviation}"/>`;
-const shadow = (dx, dy, deviation, color) =>
-  `<feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${deviation}" flood-color="${color}"/>`;
+// A drop-shadow first in its value, as the chain the reader writes for it;
+// `blurred` is its feGaussianBlur, '' where it has none.
+const shadow = (dx, dy, color, blurred = '') => `<feOffset result="shadow-input-0"/>${blurred}`
+  + `<feOffset dx="${dx}" dy="${dy}" result="shadow-offset-0"/><feFlood flood-color="${color}"/>`
+  + '<feComposite in2="shadow-offset-0" operator="in"/><feMerge><feMergeNode/><feMergeNode in="shadow-input-0"/></feMerge>';
 const opacity = (amount) => `<feComponentTransfer><feFuncA type="table" tableValues="0 ${amount}"/></feComponentTransfer>`;
 const hueRotate = (degrees) => `<feColorMatrix type="hueRotate" values="${degrees}"/>`;
 // saturate(10), Filter Effects 1's saturate matrix at amount 10
@@ -62,9 +65,9 @@ describe('bliss-filters reader', () => {
       [' blur( 1px ) ', [blur(1)]],
       ['blur(1px)/**/grayscale(1)', [blur(1), GRAYSCALE_1]],
       ['blur(1px)\ngrayscale(1)', [blur(1), GRAYSCALE_1]],
-      ['drop-shadow(red 1px 1px)', [shadow(1, 1, 0, 'red')]],
-      ['drop-shadow(1px 1px red)', [shadow(1, 1, 0, 'red')]],
-      ['drop-shadow(.5px .5px red)', [shadow(0.5, 0.5, 0, 'red')]],
+      ['drop-shadow(red 1px 1px)', [shadow(1, 1, 'red')]],
+      ['drop-shadow(1px 1px red)', [shadow(1, 1, 'red')]],
+      ['drop-shadow(.5px .5px red)', [shadow(0.5, 0.5, 'red')]],
       ['blur()', [blur(0)]],
       ['grayscale()', [GRAYSCALE_1]],
       ['opacity(.5)', [opacity(0.5)]],
@@ -153,13 +156,13 @@ describe('bliss-filters reader', () => {
     ])('writes %s as flood-color="%s", the one form resvg draws translucent', (color, flood) => {
       // pins the alpha's /100: a percentage alpha left as written draws an
       // opaque black shadow in resvg
-      expect(readFilterValue(`drop-shadow(1px 1px ${color})`).primitives).toEqual([shadow(1, 1, 0, flood)]);
-      expect(readFilterValue(`drop-shadow(${color} 1px 1px)`).primitives).toEqual([shadow(1, 1, 0, flood)]);
+      expect(readFilterValue(`drop-shadow(1px 1px ${color})`).primitives).toEqual([shadow(1, 1, flood)]);
+      expect(readFilterValue(`drop-shadow(${color} 1px 1px)`).primitives).toEqual([shadow(1, 1, flood)]);
     });
 
     it('clamps the alpha to 0..1, as CSS does', () => {
-      expect(readFilterValue('drop-shadow(1px 1px rgb(0 0 0 / 150%))').primitives).toEqual([shadow(1, 1, 0, 'rgba(0,0,0,1)')]);
-      expect(readFilterValue('drop-shadow(1px 1px rgb(0 0 0 / -50%))').primitives).toEqual([shadow(1, 1, 0, 'rgba(0,0,0,0)')]);
+      expect(readFilterValue('drop-shadow(1px 1px rgb(0 0 0 / 150%))').primitives).toEqual([shadow(1, 1, 'rgba(0,0,0,1)')]);
+      expect(readFilterValue('drop-shadow(1px 1px rgb(0 0 0 / -50%))').primitives).toEqual([shadow(1, 1, 'rgba(0,0,0,0)')]);
     });
 
     it.each([
@@ -171,12 +174,12 @@ describe('bliss-filters reader', () => {
       // pins the parenthesis a math function needs: tan is a colour as a word
       'tan',
     ])('copies %s as written', (color) => {
-      expect(readFilterValue(`drop-shadow(1px 1px ${color})`).primitives).toEqual([shadow(1, 1, 0, color)]);
+      expect(readFilterValue(`drop-shadow(1px 1px ${color})`).primitives).toEqual([shadow(1, 1, color)]);
     });
 
-    it('writes an omitted colour as currentColor, where the primitive alone would draw black', () => {
-      expect(readFilterValue('drop-shadow(1px 1px)').primitives).toEqual([shadow(1, 1, 0, 'currentColor')]);
-      expect(readFilterValue('drop-shadow(1px 1px 2px)').primitives).toEqual([shadow(1, 1, 2, 'currentColor')]);
+    it('writes an omitted colour as currentColor, where the flood alone would draw black', () => {
+      expect(readFilterValue('drop-shadow(1px 1px)').primitives).toEqual([shadow(1, 1, 'currentColor')]);
+      expect(readFilterValue('drop-shadow(1px 1px 2px)').primitives).toEqual([shadow(1, 1, 'currentColor', blur(2))]);
     });
   });
 });

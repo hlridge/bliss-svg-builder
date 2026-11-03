@@ -11,8 +11,8 @@
  * - Answering "nobody owns this" for an author's own name, which is what keeps
  *   a made-up name emitting exactly as written.
  * - Answering nothing for a standard's name on an element the library does not
- *   emit (`mode`, `operator`), which is what keeps the vocabulary scoped to the
- *   basis rather than to all of SVG.
+ *   emit (`mode`, `kernelMatrix`), which is what keeps the vocabulary scoped to
+ *   the basis rather than to all of SVG.
  * - The declared element basis matching the elements the library actually
  *   emits, by equality, so a feature that emits a new element cannot silently
  *   leave the vocabulary short.
@@ -93,6 +93,10 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
       ['std-deviation', 'stdDeviation'],
       ['filterunits', 'filterUnits'],
       ['table-values', 'tableValues'],
+      // and the composite a drop-shadow is drawn with
+      ['OPERATOR', 'operator'],
+      ['IN2', 'in2'],
+      ['K4', 'k4'],
     ])('resolves %s to the owner spelling %s', (written, owner) => {
       expect(svgAttributeSpelling(written)).toBe(owner);
     });
@@ -107,7 +111,7 @@ describe('BlissSVGBuilder SVG attribute vocabulary', () => {
     // basis grows is regenerating over all of them: these two would then join.
     it('answers undefined for a standard name on an element the library does not emit', () => {
       expect(svgAttributeSpelling('mode')).toBeUndefined();
-      expect(svgAttributeSpelling('operator')).toBeUndefined();
+      expect(svgAttributeSpelling('kernelMatrix')).toBeUndefined();
     });
 
     it('answers undefined for a curated option the library owns instead', () => {

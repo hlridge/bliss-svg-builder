@@ -11,6 +11,11 @@ import { filterMarkup, filterReach, filterRegion, pictureHash, readFilterValue, 
  * - Each of the ten functions at an ordinary and an out-of-range argument,
  *   against Filter Effects 1's matrices and transfer functions written out
  *   here; the clamps CSS applies (grayscale, sepia, invert, opacity at 1).
+ * - A drop-shadow as Filter Effects 1's own equivalent in SVG 1.1 primitives,
+ *   never `<feDropShadow>`: its input named, a blur (left out at 0), an
+ *   offset, a flood kept inside the offset, a merge under the input; the
+ *   names carry the shadow's place in the value, so two shadows never share
+ *   one.
  * - Chaining: primitives in written order, each reach added.
  * - The reach: a shadow's larger offset plus three times its blur, three
  *   times a blur, nothing for a colour function; an element's, the largest
@@ -41,7 +46,13 @@ const transfer = (funcs) => `<feComponentTransfer>${funcs}</feComponentTransfer>
 const rgbFuncs = (attributes) => ['R', 'G', 'B'].map(channel => `<feFunc${channel} ${attributes}/>`).join('');
 const matrix = (values) => `<feColorMatrix type="matrix" values="${values}"/>`;
 const BLUR_1 = '<feGaussianBlur stdDeviation="1"/>';
-const SHADOW_RED = '<feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="red"/>';
+// A drop-shadow at `place` in its value, as the chain the module writes for
+// it; `blur` is its feGaussianBlur, '' where it has none.
+const shadowAt = (place, { dx, dy, color, blur = '' }) => `<feOffset result="shadow-input-${place}"/>${blur}`
+  + `<feOffset dx="${dx}" dy="${dy}" result="shadow-offset-${place}"/><feFlood flood-color="${color}"/>`
+  + `<feComposite in2="shadow-offset-${place}" operator="in"/>`
+  + `<feMerge><feMergeNode/><feMergeNode in="shadow-input-${place}"/></feMerge>`;
+const SHADOW_RED = shadowAt(0, { dx: 1, dy: 1, color: 'red' });
 const GRAYSCALE_1 = matrix('0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0');
 const SEPIA_1 = matrix('0.393 0.769 0.189 0 0 0.349 0.686 0.168 0 0 0.272 0.534 0.131 0 0 0 0 0 1 0');
 // B313's viewBox, and its drawn box: geometry 0..8 x 8..16 widened by half its 0.5 line
@@ -56,8 +67,8 @@ describe('bliss-filters primitives', () => {
   describe('when each function is mapped to its primitive', () => {
     it.each([
       ['blur(2px)', '<feGaussianBlur stdDeviation="2"/>'],
-      ['drop-shadow(1px 2px 3px red)', '<feDropShadow dx="1" dy="2" stdDeviation="3" flood-color="red"/>'],
-      ['drop-shadow(-1px -2px blue)', '<feDropShadow dx="-1" dy="-2" stdDeviation="0" flood-color="blue"/>'],
+      ['drop-shadow(1px 2px 3px red)', shadowAt(0, { dx: 1, dy: 2, color: 'red', blur: '<feGaussianBlur stdDeviation="3"/>' })],
+      ['drop-shadow(-1px -2px blue)', shadowAt(0, { dx: -1, dy: -2, color: 'blue' })],
       ['brightness(1.5)', transfer(rgbFuncs('type="linear" slope="1.5"'))],
       ['brightness(250%)', transfer(rgbFuncs('type="linear" slope="2.5"'))],
       ['contrast(2)', transfer(rgbFuncs('type="linear" slope="2" intercept="-0.5"'))],
@@ -84,10 +95,48 @@ describe('bliss-filters primitives', () => {
     });
   });
 
+  describe('when a drop-shadow is drawn', () => {
+    // regression: one <feDropShadow> drew nothing of the element at all in a
+    // renderer without that primitive (node-canvas's Linux build, librsvg 2.52.8)
+    it('writes Filter Effects 1\'s equivalent in SVG 1.1 primitives, the shadow merged under its input', () => {
+      expect(primitivesOf('drop-shadow(1px 2px 3px red)')).toEqual([
+        '<feOffset result="shadow-input-0"/>'
+        + '<feGaussianBlur stdDeviation="3"/>'
+        + '<feOffset dx="1" dy="2" result="shadow-offset-0"/>'
+        + '<feFlood flood-color="red"/>'
+        + '<feComposite in2="shadow-offset-0" operator="in"/>'
+        + '<feMerge><feMergeNode/><feMergeNode in="shadow-input-0"/></feMerge>',
+      ]);
+    });
+
+    it.each([
+      'drop-shadow(1px 1px red)',
+      'drop-shadow(1px 1px 0 red)',
+      'drop-shadow(1px 1px 0px red)',
+      // rounds to 0, so judged as written to the markup, not as read
+      'drop-shadow(1px 1px 0.00001px red)',
+    ])('leaves the blur out of %s, an unblurred shadow', (value) => {
+      // pins the blur left out at 0: SVG 1.1's first edition draws a zero
+      // blur as transparent black, which would lose the shadow
+      expect(primitivesOf(value)).toEqual([SHADOW_RED]);
+    });
+
+    it('keeps the smallest blur written', () => {
+      expect(primitivesOf('drop-shadow(1px 1px 0.0001px red)'))
+        .toEqual([shadowAt(0, { dx: 1, dy: 1, color: 'red', blur: '<feGaussianBlur stdDeviation="0.0001"/>' })]);
+    });
+
+    it('names each shadow by its place in the value, so two never share a name', () => {
+      expect(primitivesOf('drop-shadow(1px 1px red) grayscale(1) drop-shadow(2px 2px blue)')).toEqual([
+        SHADOW_RED, GRAYSCALE_1, shadowAt(2, { dx: 2, dy: 2, color: 'blue' }),
+      ]);
+    });
+  });
+
   describe('when functions are chained', () => {
     it('writes one primitive per function, in written order', () => {
       expect(primitivesOf('drop-shadow(1px 1px 0 red) blur(1px)')).toEqual([SHADOW_RED, BLUR_1]);
-      expect(primitivesOf('blur(1px) drop-shadow(1px 1px 0 red)')).toEqual([BLUR_1, SHADOW_RED]);
+      expect(primitivesOf('blur(1px) drop-shadow(1px 1px 0 red)')).toEqual([BLUR_1, shadowAt(1, { dx: 1, dy: 1, color: 'red' })]);
     });
   });
 

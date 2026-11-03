@@ -266,24 +266,40 @@ const NUMERIC = /^(?:[+-]?\.?\d|(?:calc|min|max|clamp|round|mod|rem|sin|cos|tan|
 
 // CSS's `drop-shadow( <color>? && <length>{2,3} )`: the color before or after
 // the lengths, the third length a blur that is not negative. An omitted color
-// is CSS's currentColor, where the primitive alone would draw black.
-const dropShadow = (tokens) => {
+// is CSS's currentColor, where the flood alone would draw black.
+//
+// Drawn as Filter Effects 1's own equivalent in SVG 1.1 primitives, not as
+// <feDropShadow>: a renderer without that primitive draws nothing at all of
+// the element it filters (librsvg 2.52.8, which node-canvas's Linux build
+// bundles). The shadow's input is named, blurred, offset, flooded with the
+// color inside the offset's alpha, and merged under the input. The names carry
+// the function's `place` in the value, so two shadows in one filter keep their
+// inputs apart. A blur of 0 is left out, as SVG 1.1's first edition draws a
+// zero blur as transparent black, which would lose the shadow.
+const dropShadow = (tokens, place) => {
   const colorAt = [0, tokens.length - 1].find(at => at in tokens && !NUMERIC.test(tokens[at]));
   const lengths = tokens.filter((_, at) => at !== colorAt).map(token => measure(token, LENGTH_UNITS));
   if (lengths.length < 2 || lengths.length > 3 || lengths.includes(null) || lengths[2] < 0) return null;
   const flood = colorAt === undefined ? 'currentColor' : floodColor(tokens[colorAt]);
   if (flood === null) return null;
   const [dx, dy, deviation = 0] = lengths.map(roundForMarkup);
+  const input = `shadow-input-${place}`;
+  const offset = `shadow-offset-${place}`;
   return {
-    primitive: `<feDropShadow dx="${dx}" dy="${dy}" stdDeviation="${deviation}" flood-color="${flood}"/>`,
+    primitive: `<feOffset result="${input}"/>`
+      + (deviation === 0 ? '' : `<feGaussianBlur stdDeviation="${deviation}"/>`)
+      + `<feOffset dx="${dx}" dy="${dy}" result="${offset}"/>`
+      + `<feFlood flood-color="${flood}"/><feComposite in2="${offset}" operator="in"/>`
+      + `<feMerge><feMergeNode/><feMergeNode in="${input}"/></feMerge>`,
     reach: Math.max(Math.abs(dx), Math.abs(dy)) + 3 * deviation,
   };
 };
 
-// What each of the ten functions draws, from its arguments: { primitive,
-// reach }, or null where CSS would not read them or they cannot be converted.
-// The primitives are Filter Effects 1's (section 13), with stdDeviation the
-// CSS blur radius itself.
+// What each of the ten functions draws, from its arguments and its place in
+// the value (which only drop-shadow reads): { primitive, reach }, the markup
+// of one or more primitives, or null where CSS would not read the arguments
+// or they cannot be converted. The primitives are Filter Effects 1's (section
+// 13), with stdDeviation the CSS blur radius itself.
 const FUNCTIONS = new Map([
   ['blur', blur],
   ['drop-shadow', dropShadow],
@@ -331,9 +347,9 @@ const functionCalls = (value) => {
 /**
  * Reads one CSS `filter` value (escaped text). `{ kind: 'translated',
  * primitives, reach }` where it is a list of the ten functions CSS would read,
- * in absolute lengths: `primitives` the markup of each in written order,
- * `reach` how far the effect can draw past what it filters, in grid units.
- * `{ kind: 'kept' }` for any other value, which is carried as written.
+ * in absolute lengths: `primitives` the markup of each function in written
+ * order, `reach` how far the effect can draw past what it filters, in grid
+ * units. `{ kind: 'kept' }` for any other value, which is carried as written.
  */
 export const readFilterValue = (text) => {
   const calls = functionCalls(trimSpace(readable(String(text))));
@@ -341,7 +357,7 @@ export const readFilterValue = (text) => {
   const primitives = [];
   let reach = 0;
   for (const { name, args } of calls) {
-    const effect = FUNCTIONS.get(name)?.(argumentsOf(args)) ?? null;
+    const effect = FUNCTIONS.get(name)?.(argumentsOf(args), primitives.length) ?? null;
     if (effect === null) return KEPT;
     primitives.push(effect.primitive);
     reach += effect.reach;

@@ -37,6 +37,10 @@ const rewrite = (style) => {
   return { out, reads };
 };
 const BLUR_1 = '<feGaussianBlur stdDeviation="1"/>';
+// drop-shadow(1px 1px 0 red), first in its value
+const SHADOW_RED = '<feOffset result="shadow-input-0"/><feOffset dx="1" dy="1" result="shadow-offset-0"/>'
+  + '<feFlood flood-color="red"/><feComposite in2="shadow-offset-0" operator="in"/>'
+  + '<feMerge><feMergeNode/><feMergeNode in="shadow-input-0"/></feMerge>';
 
 describe('bliss-filters style', () => {
   describe('when a style is split into declarations', () => {
@@ -108,7 +112,7 @@ describe('bliss-filters style', () => {
 
       expect(reads).toEqual([
         { kind: 'translated', primitives: [BLUR_1], reach: 3 },
-        { kind: 'translated', primitives: ['<feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="red"/>'], reach: 1 },
+        { kind: 'translated', primitives: [SHADOW_RED], reach: 1 },
       ]);
     });
   });

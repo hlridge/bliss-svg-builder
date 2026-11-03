@@ -44,6 +44,10 @@ const hashOf = (svg) => svg.match(/bliss-filter-([0-9a-f]{8})-\d/)?.[1];
 const idIn = (svg, n) => `bliss-filter-${hashOf(svg)}-${n}`;
 const filterDef = (id, [x, y, width, height], primitives) => `<filter id="${id}" filterUnits="userSpaceOnUse"`
   + ` x="${x}" y="${y}" width="${width}" height="${height}" color-interpolation-filters="sRGB">${primitives}</filter>`;
+// drop-shadow(1px 1px <color>), first in its value, as the translation writes it
+const shadowOf = (color) => '<feOffset result="shadow-input-0"/><feOffset dx="1" dy="1" result="shadow-offset-0"/>'
+  + `<feFlood flood-color="${color}"/><feComposite in2="shadow-offset-0" operator="in"/>`
+  + '<feMerge><feMergeNode/><feMergeNode in="shadow-input-0"/></feMerge>';
 const rootTag = (svg) => svg.match(/<svg[^>]*>/)[0];
 const contentOf = (svg) => {
   const start = svg.indexOf('\n', svg.indexOf('<g class="bliss-content"')) + 1;
@@ -111,7 +115,7 @@ describe('BlissSVGBuilder native filter layers', () => {
 
       expect(svg).toContain([
         `  ${DEFAULT_CONTENT_TAG.replace(/>$/, ` filter="url(#${id})">`)}`,
-        `    ${filterDef(id, region, '<feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="red"/>')}`,
+        `    ${filterDef(id, region, shadowOf('red'))}`,
         `    ${shape}`,
         `    ${ink}`,
         '  </g>',
@@ -221,7 +225,7 @@ describe('BlissSVGBuilder native filter layers', () => {
       const svg = build('[grid;grid--filter=drop-shadow(1px 1px "red")]||B313').svgCode;
 
       expect(svg).toContain(`    ${filterDef(idIn(svg, 1), [-1.75, -1.75, 11.5, 23.5],
-        '<feDropShadow dx="1" dy="1" stdDeviation="0" flood-color="&quot;red&quot;"/>')}\n`);
+        shadowOf('&quot;red&quot;'))}\n`);
       expect(svg).not.toContain('"red"');
     });
 
