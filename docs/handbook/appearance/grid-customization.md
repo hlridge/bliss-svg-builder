@@ -138,6 +138,8 @@ Each of these class names is also a **target**, which lets you put any SVG attri
 
 <Demo code="[grid;grid-line--sky--stroke-dasharray=0.5]||B313" title="Dashes on the sky line alone" />
 
+Grid lines have butt ends, so each dash is exactly as long as you write it. Add `grid-line--stroke-linecap=square` for square ends, which make every dash longer by the line's width.
+
 The targets overlap exactly as the classes do. `grid-line--` reaches every line, `grid-line--major--` reaches the three that carry `bliss-grid-line--major` (the major family, plus the sky and earth lines, which are major lines too), and where two of them reach the same line the more specific class wins. Set a color through both channels at once, as in `[grid;grid-color=red;grid-line--stroke=blue]||`, and the raw key is the one that takes effect, with the option it displaced named in a [`MULTIPLE_ATTRIBUTE_VALUES`](/reference/warning-codes#multiple-attribute-values) warning.
 
 Attributes written on `grid--` land on the group, where `opacity` fades the grid as a unit. The names the grid writes on each line, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin` and `d`, cannot take effect there, and writing one is reported with [`MISPLACED_CONTAINER_ATTRIBUTE`](/reference/warning-codes#misplaced-container-attribute), pointing at `grid-line--` instead. See [pass-through attributes](/handbook/syntax-options/svg-pass-through#targeting-one-part-of-the-picture) for the whole mechanism.

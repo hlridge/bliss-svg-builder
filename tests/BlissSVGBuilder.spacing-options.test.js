@@ -195,8 +195,8 @@ describe('BlissSVGBuilder spacing options', () => {
     it('extends grid to min-width when grid is enabled', () => {
       const { svg } = getViewBox('[grid;min-width=20]||H');
 
-      expect(svg).toContain('M0,8h20');
-      expect(svg).toContain('M0,16h20');
+      expect(svg).toContain('M-0.083,8h20.166');
+      expect(svg).toContain('M-0.083,16h20.166');
     });
 
     it('clamps negative min-width to 0', () => {
@@ -307,8 +307,8 @@ describe('BlissSVGBuilder spacing options', () => {
       expect(x).toBeCloseTo(-0.75 - (extraSpace / 2));
 
       const gridOffsetX = x + 0.75;
-      expect(svg).toContain(`M${gridOffsetX},8h30`);
-      expect(svg).toContain(`M${gridOffsetX},16h30`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},8h30.166`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},16h30.166`);
     });
   });
 
@@ -317,38 +317,38 @@ describe('BlissSVGBuilder spacing options', () => {
       const { x, svg } = getViewBox('[grid;min-width=20;center]||H');
 
       const gridOffsetX = x + 0.75;
-      expect(svg).toContain(`M${gridOffsetX},8h20`);
-      expect(svg).toContain(`M${gridOffsetX},16h20`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},8h20.166`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},16h20.166`);
     });
 
     it('shifts grid with viewBox for narrow content (B428, width=0)', () => {
       const { x, svg } = getViewBox('[grid;min-width=8;center]||B428');
 
       const gridOffsetX = x + 0.75;
-      expect(svg).toContain(`M${gridOffsetX},8h8`);
-      expect(svg).toContain(`M${gridOffsetX},16h8`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},8h8.166`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},16h8.166`);
     });
 
     it('keeps grid at 0 without center (no viewBox shift)', () => {
       const { x, svg } = getViewBox('[grid;min-width=15]||H');
 
       expect(x).toBeCloseTo(-0.75);
-      expect(svg).toContain('M0,8h15');
-      expect(svg).toContain('M0,16h15');
+      expect(svg).toContain('M-0.083,8h15.166');
+      expect(svg).toContain('M-0.083,16h15.166');
     });
 
     it('shifts grid when center with margin', () => {
       const { x, svg } = getViewBox('[grid;min-width=12;margin=3;center]||H');
 
       const gridOffsetX = x + 3;
-      expect(svg).toContain(`M${gridOffsetX},8h12`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},8h12.166`);
     });
 
     it('shifts grid for very large min-width', () => {
       const { x, svg } = getViewBox('[grid;min-width=50]||H');
 
       const gridOffsetX = x + 0.75;
-      expect(svg).toContain(`M${gridOffsetX},8h50`);
+      expect(svg).toContain(`M${gridOffsetX - 0.083},8h50.166`);
     });
   });
 

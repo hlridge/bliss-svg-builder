@@ -11,7 +11,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   its length; everything outside the grid lines byte-identical, with a
  *   paper and with zones.
  * - A negative value; 0 and the absent key byte-identical to the unmoved grid,
- *   whose coordinates are written unrounded.
+ *   which writes a coordinate only the shift would move unrounded (an end the
+ *   lengthening moves is rounded, see `BlissSVGBuilder.grid-line-coverage.test.js`).
  * - Moved coordinates rounded to 4 decimals (`1/6` writes `8.1667`).
  * - Refused values (not a number, bare, empty, non-finite, a fraction as
  *   text), each with its code and source, the grid left unmoved.
@@ -69,8 +70,9 @@ describe('BlissSVGBuilder grid shift', () => {
     it('moves every grid line right and down by the value', () => {
       const paths = gridPathsOf(new BlissSVGBuilder('[grid;grid-shift=0.25]||B313').svgCode);
 
-      expect(paths[2]).toBe('M0.25,0.25h8M0.25,4.25h8M0.25,12.25h8M0.25,20.25h8M0.25,0.25V20.25M4.25,0.25V20.25M8.25,0.25V20.25');
-      expect(paths[3]).toBe('M0.25,8.25h8');
+      expect(paths[2]).toBe('M0.167,0.25h8.166M0.167,4.25h8.166M0.167,12.25h8.166M0.167,20.25h8.166'
+        + 'M0.25,0.167V20.333M4.25,0.167V20.333M8.25,0.167V20.333');
+      expect(paths[3]).toBe('M0.167,8.25h8.166');
       expect(paths).toEqual(gridPathsOf(UNMOVED).map((d) => movedBy(d, 0.25)));
     });
 
@@ -91,7 +93,7 @@ describe('BlissSVGBuilder grid shift', () => {
     it('moves every grid line left and up by the value', () => {
       const paths = gridPathsOf(new BlissSVGBuilder('[grid;grid-shift=-0.25]||B313').svgCode);
 
-      expect(paths[3]).toBe('M-0.25,7.75h8');
+      expect(paths[3]).toBe('M-0.333,7.75h8.166');
       expect(paths).toEqual(gridPathsOf(UNMOVED).map((d) => movedBy(d, -0.25)));
     });
   });
@@ -105,13 +107,14 @@ describe('BlissSVGBuilder grid shift', () => {
       expect(new BlissSVGBuilder(input).svgCode).toBe(new BlissSVGBuilder(control).svgCode);
     });
 
-    it('writes an unmoved coordinate unrounded', () => {
-      // pins "untouched at 0": a grid that always rounded would write 0.3333
-      // here, and the crop row above cannot show it, because its control is
-      // drawn by the same code and rounded the same way
-      const paths = gridPathsOf(new BlissSVGBuilder('[grid;crop=0.33333;grid-shift=0]||B313').svgCode);
+    it('writes a coordinate only the shift would move unrounded', () => {
+      // pins "untouched at 0": a grid that always rounded would write M8 here,
+      // and the crop row above cannot show it, because its control is drawn by
+      // the same code and rounded the same way. A vertical line's x is the one
+      // coordinate only the shift moves; its ends are lengthened, and rounded.
+      const paths = gridPathsOf(new BlissSVGBuilder('[grid;center;min-width=8.00002;grid-shift=0]||B313').svgCode);
 
-      expect(paths[0]).toMatch(/^M0\.33333,1h7\.33334M/);
+      expect(paths[2]).toContain('M7.99999,-0.083V20.083');
     });
   });
 
@@ -119,8 +122,8 @@ describe('BlissSVGBuilder grid shift', () => {
     it('rounds every moved coordinate to 4 decimals', () => {
       const paths = gridPathsOf(new BlissSVGBuilder('B313', { grid: true, gridShift: 1 / 6 }).svgCode);
 
-      expect(paths[3]).toBe('M0.1667,8.1667h8');
-      expect(paths[4]).toBe('M0.1667,16.1667h8');
+      expect(paths[3]).toBe('M0.0837,8.1667h8.166');
+      expect(paths[4]).toBe('M0.0837,16.1667h8.166');
       expect(paths.join('')).not.toMatch(/\d\.\d{5}/);
     });
   });
@@ -169,7 +172,7 @@ describe('BlissSVGBuilder grid shift', () => {
         ...new BlissSVGBuilder('B313').toJSON(), options: { grid: true, gridShift: 0.25 },
       }).svgCode;
 
-      expect(gridPathsOf(fromDsl)[3]).toBe('M0.25,8.25h8');
+      expect(gridPathsOf(fromDsl)[3]).toBe('M0.167,8.25h8.166');
       expect([fromCamel, fromKebab, fromObject]).toEqual([fromDsl, fromDsl, fromDsl]);
     });
 
@@ -226,7 +229,7 @@ describe('BlissSVGBuilder grid shift', () => {
       const svg = new BlissSVGBuilder('[grid;grid-shift=0.25;grid--transform=rotate(1)]||B313').svgCode;
 
       expect(svg).toContain('<g class="bliss-grid" shape-rendering="crispEdges" transform="rotate(1)">');
-      expect(gridPathsOf(svg)[3]).toBe('M0.25,8.25h8');
+      expect(gridPathsOf(svg)[3]).toBe('M0.167,8.25h8.166');
     });
 
     it('moves a grid filter region with the lines', () => {

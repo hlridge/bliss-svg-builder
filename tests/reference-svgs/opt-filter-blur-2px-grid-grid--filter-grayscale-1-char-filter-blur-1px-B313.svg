@@ -5,16 +5,16 @@
       .bliss-grid-line { shape-rendering: geometricPrecision; }
     }
   </style>
-  <g class="bliss-grid" shape-rendering="crispEdges" filter="url(#bliss-filter-0896ba71-2)">
-    <filter id="bliss-filter-0896ba71-2" filterUnits="userSpaceOnUse" x="-0.75" y="-0.75" width="9.5" height="21.5" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0"/></filter>
-    <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="0.166" stroke="#ebebeb" stroke-linecap="square" stroke-linejoin="miter" d="M0,1h8M0,3h8M0,5h8M0,7h8M0,9h8M0,11h8M0,13h8M0,15h8M0,17h8M0,19h8M1,0V20M3,0V20M5,0V20M7,0V20"/>
-    <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="0.166" stroke="#ebebeb" stroke-linecap="square" stroke-linejoin="miter" d="M0,2h8M0,6h8M0,10h8M0,14h8M0,18h8M2,0V20M6,0V20"/>
-    <path class="bliss-grid-line bliss-grid-line--major" stroke-width="0.166" stroke="#c7c7c7" stroke-linecap="square" stroke-linejoin="miter" d="M0,0h8M0,4h8M0,12h8M0,20h8M0,0V20M4,0V20M8,0V20"/>
-    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="0.166" stroke="#858585" stroke-linecap="square" stroke-linejoin="miter" d="M0,8h8"/>
-    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="0.166" stroke="#858585" stroke-linecap="square" stroke-linejoin="miter" d="M0,16h8"/>
+  <g class="bliss-grid" shape-rendering="crispEdges" filter="url(#bliss-filter-18c372c7-2)">
+    <filter id="bliss-filter-18c372c7-2" filterUnits="userSpaceOnUse" x="-0.75" y="-0.75" width="9.5" height="21.5" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0.2126 0.7152 0.0722 0 0 0 0 0 1 0"/></filter>
+    <path class="bliss-grid-line bliss-grid-line--minor" stroke-width="0.166" stroke="#ebebeb" stroke-linecap="butt" stroke-linejoin="miter" d="M-0.083,1h8.166M-0.083,3h8.166M-0.083,5h8.166M-0.083,7h8.166M-0.083,9h8.166M-0.083,11h8.166M-0.083,13h8.166M-0.083,15h8.166M-0.083,17h8.166M-0.083,19h8.166M1,-0.083V20.083M3,-0.083V20.083M5,-0.083V20.083M7,-0.083V20.083"/>
+    <path class="bliss-grid-line bliss-grid-line--medium" stroke-width="0.166" stroke="#ebebeb" stroke-linecap="butt" stroke-linejoin="miter" d="M-0.083,2h8.166M-0.083,6h8.166M-0.083,10h8.166M-0.083,14h8.166M-0.083,18h8.166M2,-0.083V20.083M6,-0.083V20.083"/>
+    <path class="bliss-grid-line bliss-grid-line--major" stroke-width="0.166" stroke="#c7c7c7" stroke-linecap="butt" stroke-linejoin="miter" d="M-0.083,0h8.166M-0.083,4h8.166M-0.083,12h8.166M-0.083,20h8.166M0,-0.083V20.083M4,-0.083V20.083M8,-0.083V20.083"/>
+    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="0.166" stroke="#858585" stroke-linecap="butt" stroke-linejoin="miter" d="M-0.083,8h8.166"/>
+    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth" stroke-width="0.166" stroke="#858585" stroke-linecap="butt" stroke-linejoin="miter" d="M-0.083,16h8.166"/>
   </g>
-  <g class="bliss-content" fill="none" stroke="#000000" stroke-linejoin="round" stroke-linecap="round" stroke-width="0.5" filter="url(#bliss-filter-0896ba71-3)">
-    <filter id="bliss-filter-0896ba71-3" filterUnits="userSpaceOnUse" x="-8.75" y="-8.75" width="25.5" height="37.5" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="2"/></filter>
-    <g filter="url(#bliss-filter-0896ba71-1)"><filter id="bliss-filter-0896ba71-1" filterUnits="userSpaceOnUse" x="-3.75" y="-3.75" width="15.5" height="27.5" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="1"/></filter><path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/></g>
+  <g class="bliss-content" fill="none" stroke="#000000" stroke-linejoin="round" stroke-linecap="round" stroke-width="0.5" filter="url(#bliss-filter-18c372c7-3)">
+    <filter id="bliss-filter-18c372c7-3" filterUnits="userSpaceOnUse" x="-8.75" y="-8.75" width="25.5" height="37.5" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="2"/></filter>
+    <g filter="url(#bliss-filter-18c372c7-1)"><filter id="bliss-filter-18c372c7-1" filterUnits="userSpaceOnUse" x="-3.75" y="-3.75" width="15.5" height="27.5" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="1"/></filter><path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/></g>
   </g>
 </svg>

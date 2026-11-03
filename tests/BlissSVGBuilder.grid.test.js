@@ -93,9 +93,9 @@ describe('BlissSVGBuilder grid', () => {
       const svg = builder.svgCode;
 
       expect(svg).toContain('bliss-grid-line--sky');
-      expect(svg).toMatch(/bliss-grid-line--sky[^>]*d="M0,8h/);
+      expect(svg).toMatch(/bliss-grid-line--sky[^>]*d="M-0\.083,8h/);
       expect(svg).toContain('bliss-grid-line--earth');
-      expect(svg).toMatch(/bliss-grid-line--earth[^>]*d="M0,16h/);
+      expect(svg).toMatch(/bliss-grid-line--earth[^>]*d="M-0\.083,16h/);
 
       const skyPathMatch = svg.match(/<path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky"[^>]*>/);
       const earthPathMatch = svg.match(/<path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--earth"[^>]*>/);

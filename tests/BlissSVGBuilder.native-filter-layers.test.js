@@ -174,7 +174,7 @@ describe('BlissSVGBuilder native filter layers', () => {
       expect(svg.match(/<filter /g)).toHaveLength(1);
       expect(svg).toContain(`    ${filterDef(idIn(svg, 1), B313_BLUR, BLUR_1)}\n`
         + `    <path class="bliss-grid-line bliss-grid-line--major bliss-grid-line--sky" stroke-width="0.166" stroke="#858585"`
-        + ` stroke-linecap="square" stroke-linejoin="miter" d="M0,8h8" filter="url(#${idIn(svg, 1)})"/>`);
+        + ` stroke-linecap="butt" stroke-linejoin="miter" d="M-0.083,8h8.166" filter="url(#${idIn(svg, 1)})"/>`);
     });
 
     it.each([

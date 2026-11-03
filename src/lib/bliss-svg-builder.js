@@ -7,7 +7,7 @@
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
 import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_BODY, MAX_INPUT_LENGTH, classifyXCode, layoutDefinitionOf, processXCodes, slotCodeOf, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
-import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, removeElementOption, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, bareElementKeyRefusal, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN } from "./bliss-constants.js";
+import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, removeElementOption, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, bareElementKeyRefusal, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN, writtenNumber } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -6721,10 +6721,24 @@ class BlissSVGBuilder {
     const gridShift = this.#processedOptions.gridShift ?? 0;
     const shifted = (position) => (gridShift === 0 ? position : round(position + gridShift));
 
-    const hLine = (y) => `M${shifted(gridStartX)},${shifted(y)}h${gridLineWidth}`;
-    const hLines = (ys) => ys.filter(y => y >= gridMinY && y <= gridMaxY).map(hLine).join('');
+    // A segment run `half` further at both ends, away from itself (a
+    // zero-length one forward along its axis, as a square end is drawn). Each
+    // lengthened coordinate takes the shift before it is rounded, once; at 0
+    // the segment is written exactly as it runs.
+    const away = (from, to, half) => (to < from ? -half : half);
+    const hLine = (y, half) => {
+      if (half === 0) return `M${shifted(gridStartX)},${shifted(y)}h${gridLineWidth}`;
+      const reach = away(0, gridLineWidth, half);
+      return `M${round(gridStartX + gridShift - reach)},${shifted(y)}h${round(gridLineWidth + 2 * reach)}`;
+    };
+    const vLine = (x, half) => {
+      if (half === 0) return `M${shifted(x)},${shifted(gridMinY)}V${shifted(gridMaxY)}`;
+      const reach = away(gridMinY, gridMaxY, half);
+      return `M${shifted(x)},${round(gridMinY + gridShift - reach)}V${round(gridMaxY + gridShift + reach)}`;
+    };
+    const hLines = (ys, half) => ys.filter(y => y >= gridMinY && y <= gridMaxY).map(y => hLine(y, half)).join('');
 
-    let getVerticalLines = (type) => {
+    let getVerticalLines = (type, half) => {
       let pathData = "";
       let xs = [];
 
@@ -6743,7 +6757,7 @@ class BlissSVGBuilder {
           break;
       }
       for (const x of xs.filter(x => x >= cropLeft && x <= width - cropRight)) {
-        pathData += `M${shifted(gridOffsetX + x)},${shifted(gridMinY)}V${shifted(gridMaxY)}`;
+        pathData += vLine(gridOffsetX + x, half);
       }
       return pathData;
     }
@@ -6759,38 +6773,58 @@ class BlissSVGBuilder {
       const gridEarthStrokeWidth = this.#processedOptions.gridEarthStrokeWidth ?? 0.166;
       const gridEarthColor = this.#processedOptions.gridEarthColor ?? "#858585";
 
-      const minorD = hLines([1,3,5,7,9,11,13,15,17,19]) + getVerticalLines("minor");
-      const mediumD = hLines([2,6,10,14,18]) + getVerticalLines("medium");
-      const majorD = hLines([0,4,12,20]) + getVerticalLines("major");
-      const skyD = 8 >= gridMinY && 8 <= gridMaxY ? hLine(8) : '';
-      const earthD = 16 >= gridMinY && 16 <= gridMaxY ? hLine(16) : '';
+      // Each family's path data, its segments run `half` further at both ends.
+      const minorD = (half) => hLines([1,3,5,7,9,11,13,15,17,19], half) + getVerticalLines("minor", half);
+      const mediumD = (half) => hLines([2,6,10,14,18], half) + getVerticalLines("medium", half);
+      const majorD = (half) => hLines([0,4,12,20], half) + getVerticalLines("major", half);
+      const skyD = (half) => hLines([8], half);
+      const earthD = (half) => hLines([16], half);
 
+      // A line is drawn with butt ends on segments run half its width further
+      // at both ends: the area a square end covers, which Chrome draws
+      // differently from this identical shape (a shade light at the default
+      // size, and into a second pixel row where the grid falls between pixels).
+      // The two agree only on the builder's own path and cap, at a width read
+      // in user units, so a line whose cap, path or vector-effect the author
+      // wrote, or whose width is no number, is written as before: its plain
+      // extents, under square ends or the author's own cap, follow whatever
+      // width the renderer resolves. The width is the one written on the
+      // line, the author's where a key set it.
+      //
       // The computed key order below is load-bearing: a reordered attribute is a
       // diff in every grid assertion in the suite. Every line runs within one
       // extent, from gridStartX across gridLineWidth and from gridMinY to
       // gridMaxY, moved by the shift, so its box is that extent widened by
       // half its own width.
-      const gridLine = (classes, strokeWidth, stroke, d) => ({
-        classes,
-        computed: { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': 'square', 'stroke-linejoin': 'miter', d },
-        box: {
-          minX: gridStartX + gridShift - strokeWidth / 2,
-          minY: gridMinY + gridShift - strokeWidth / 2,
-          maxX: gridStartX + gridShift + gridLineWidth + strokeWidth / 2,
-          maxY: gridMaxY + gridShift + strokeWidth / 2,
-        },
-      });
+      const gridLine = (classes, strokeWidth, stroke, pathData) => {
+        const authored = this.#authoredFor(classes);
+        const width = writtenNumber(authored['stroke-width'] ?? strokeWidth);
+        const lengthened = Number.isFinite(width) && width >= 0
+          && !['stroke-linecap', 'd', 'vector-effect'].some(name => Object.hasOwn(authored, name));
+        const d = pathData(lengthened ? width / 2 : 0);
+        return d ? {
+          classes,
+          authored,
+          computed: { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': lengthened ? 'butt' : 'square', 'stroke-linejoin': 'miter', d },
+          box: {
+            minX: gridStartX + gridShift - strokeWidth / 2,
+            minY: gridMinY + gridShift - strokeWidth / 2,
+            maxX: gridStartX + gridShift + gridLineWidth + strokeWidth / 2,
+            maxY: gridMaxY + gridShift + strokeWidth / 2,
+          },
+        } : null;
+      };
 
       const lines = [
-        minorD  ? gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD)  : null,
-        mediumD ? gridLine(ELEMENT_CLASSES.gridMedium, gridMediumStrokeWidth, gridMediumColor, mediumD) : null,
-        majorD  ? gridLine(ELEMENT_CLASSES.gridMajor,  gridMajorStrokeWidth,  gridMajorColor,  majorD)  : null,
-        skyD    ? gridLine(ELEMENT_CLASSES.gridSky,    gridSkyStrokeWidth,    gridSkyColor,    skyD)    : null,
-        earthD  ? gridLine(ELEMENT_CLASSES.gridEarth,  gridEarthStrokeWidth,  gridEarthColor,  earthD)  : null,
+        gridLine(ELEMENT_CLASSES.gridMinor,  gridMinorStrokeWidth,  gridMinorColor,  minorD),
+        gridLine(ELEMENT_CLASSES.gridMedium, gridMediumStrokeWidth, gridMediumColor, mediumD),
+        gridLine(ELEMENT_CLASSES.gridMajor,  gridMajorStrokeWidth,  gridMajorColor,  majorD),
+        gridLine(ELEMENT_CLASSES.gridSky,    gridSkyStrokeWidth,    gridSkyColor,    skyD),
+        gridLine(ELEMENT_CLASSES.gridEarth,  gridEarthStrokeWidth,  gridEarthColor,  earthD),
       ].filter(Boolean);
 
       // The group is written before its lines, so its filter is numbered first.
-      const shapes = lines.map(({ classes, computed, box }) => ({ attrs: layerAttributes(classes, computed, this.#authoredFor(classes)), box }));
+      const shapes = lines.map(({ classes, authored, computed, box }) => ({ attrs: layerAttributes(classes, computed, authored), box }));
       const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.grid, { 'shape-rendering': 'crispEdges' },
         this.#authoredFor(ELEMENT_CLASSES.grid)), () => ({ drawn: unionOf(shapes.map(({ box }) => box)), outset: outsetOf(shapes) }));
       const gridLines = shapes.flatMap(({ attrs, box }) => {
