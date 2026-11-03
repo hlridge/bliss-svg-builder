@@ -258,7 +258,7 @@ The backgrounds of words, characters and parts sit inside the content group, bef
 
 The background is a group in every case, holding one rectangle that covers the picture, or one rectangle for each zone you set, so `background--` means the same thing whichever you asked for.
 
-Because the painting defaults sit on the content group, a styling attribute you set globally sits beside them and replaces the one it names for everything in the artwork that does not set its own. Most of the artwork sets none, so a global `stroke` reaches every character. The grid and the paper sit outside that group, so global styling never reaches them, which is what their own options and the targets above are for. One more thing is worth knowing: a dot is sized from the `stroke-width` option, so the two spellings part company on dots. `[stroke-width=2]||` grows each dot to suit the heavier line, while `[content--stroke-width=2]||` only strokes the dot it already had more heavily, so it comes out smaller.
+Because the painting defaults sit on the content group, a styling attribute you set globally sits beside them and replaces the one it names for everything in the artwork that does not set its own. Most of the artwork sets none, so a global `stroke` reaches every character. The grid and the paper sit outside that group, so global styling never reaches them, which is what their own options and the targets above are for. One more thing is worth knowing: a dot is sized from the `stroke-width` option, so the two spellings part company on dots. `[stroke-width=2]||` grows each dot to suit the heavier line, while `[content--stroke-width=2]||` leaves each dot the size it was, so next to the heavier lines it comes out smaller.
 
 ### Class names
 
