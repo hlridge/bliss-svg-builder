@@ -20,6 +20,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   character's copy in its word's ink area.
  * - The content group over an element background's filter; the grid group
  *   over its filtered lines.
+ * - A raw `stroke-width` key on a grid line: the line's region and the
+ *   group's sized by the width the key writes, as the width option would size
+ *   them (the shared and the most specific key, a thinner and a zero width, a
+ *   line given its own cap or `vector-effect`, the options object, a line past
+ *   the picture's edge); a width the number grammar cannot read keeps the
+ *   option's region.
  * - A link's area: a word's padded rect, `link-area=ink`, a part's rect, a
  *   one-shape part's padded rect; a thin linked element's invisible shape
  *   judged by its lines alone.
@@ -32,7 +38,10 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The arithmetic on its own, see `bliss-filters.primitives.test.js`.
  * - How long a renderer takes over a region, measured outside the suite.
  * - What a part moved by an author's `transform` draws past the cut: no box
- *   the library computes can see it.
+ *   the library computes can see it. Nor can it see a grid line's own path
+ *   (`grid-line--d`), or a width set by a `style` key or the page's CSS.
+ * - How a grid line's width lengthens its segments, see
+ *   `BlissSVGBuilder.grid-line-ends.test.js`.
  *
  * @issue: #34
  */
@@ -121,6 +130,54 @@ describe('BlissSVGBuilder native filter regions', () => {
       // five lines each reaching 1: the group spreads 1 past them, not 5
       expect(regionsOf(build('[grid;grid--filter=grayscale(1);grid-line--filter=drop-shadow(1px 1px 0 red)]||B313').svgCode))
         .toEqual(Array(6).fill([-1.75, -1.75, 11.5, 23.5]));
+    });
+  });
+
+  describe('when a raw key writes a grid line\'s width', () => {
+    it('covers the line at the width the key writes, inside a margin', () => {
+      // the sky line draws from x -2.5 to 10.5; sized by the option's 0.166,
+      // the region was cut at -1.383 and 9.383, inside the picture
+      expect(regionsOf(build('[grid;margin=5;grid-line--sky--stroke-width=5;grid-line--sky--filter=blur(0.1px)]||B313').svgCode))
+        .toEqual([[-3.8, -5.3, 15.6, 30.6]]);
+    });
+
+    it('covers a line reaching past the picture\'s edge, where a host lets it show', () => {
+      // the major lines at x=0 and y=0 draw from -2.5, past the viewBox's -0.75
+      expect(regionsOf(build('[grid;grid-line--major--stroke-width=5;grid-line--major--filter=blur(0.1px)]||B313').svgCode))
+        .toEqual(Array(3).fill([-2.8, -2.8, 13.6, 25.6]));
+    });
+
+    it('covers it at the width the options object writes', () => {
+      const svg = new BlissSVGBuilder('[margin=5]||B313', { grid: true, 'grid-line--sky--stroke-width': 5, 'grid-line--sky--filter': 'blur(0.1px)' }).svgCode;
+
+      expect(regionsOf(svg)).toEqual([[-3.8, -5.3, 15.6, 30.6]]);
+    });
+
+    it.each([
+      ['on the line\'s own filter', 'grid-line--sky--stroke-width=5', 'grid-sky-stroke-width=5', 'grid-line--sky--filter=blur(0.1px)'],
+      ['on the group\'s filter', 'grid-line--sky--stroke-width=5', 'grid-sky-stroke-width=5', 'grid--filter=blur(0.1px)'],
+      ['on every line, by the key they share', 'grid-line--stroke-width=5', 'grid-stroke-width=5', 'grid-line--filter=blur(0.1px)'],
+      ['by the most specific key', 'grid-line--stroke-width=1;grid-line--sky--stroke-width=5', 'grid-stroke-width=1;grid-sky-stroke-width=5',
+        'grid--filter=blur(0.1px);grid-line--filter=blur(0.1px)'],
+      ['at a width thinner than the default', 'grid-line--sky--stroke-width=0.05', 'grid-sky-stroke-width=0.05', 'grid-line--sky--filter=blur(0.1px)'],
+      ['at a zero width', 'grid-line--sky--stroke-width=0', 'grid-sky-stroke-width=0', 'grid-line--sky--filter=blur(0.1px)'],
+      ['on a line given round ends', 'grid-line--sky--stroke-width=5;grid-line--sky--stroke-linecap=round',
+        'grid-sky-stroke-width=5;grid-line--sky--stroke-linecap=round', 'grid-line--sky--filter=blur(0.1px)'],
+      // note: a non-scaling width is drawn in screen pixels; read as picture
+      // units it covers the line wherever a unit is drawn at least a pixel wide
+      ['on a line given a vector-effect', 'grid-line--sky--stroke-width=5;grid-line--sky--vector-effect=non-scaling-stroke',
+        'grid-sky-stroke-width=5;grid-line--sky--vector-effect=non-scaling-stroke', 'grid-line--sky--filter=blur(0.1px)'],
+    ])('draws the region its width option draws, %s', (_case, key, option, filter) => {
+      expect(regionsOf(build(`[grid;margin=5;${key};${filter}]||B313`).svgCode))
+        .toEqual(regionsOf(build(`[grid;margin=5;${option};${filter}]||B313`).svgCode));
+    });
+
+    // note: the renderer resolves a width the number grammar cannot read
+    // (`5px` as 5 units, a word or a negative one as the inherited width); the
+    // region keeps the option's width, as the line keeps its plain extents
+    it.each(['5px', 'abc', '-1', '1e400'])('keeps the option\'s region where the key\'s width %s is no number', (width) => {
+      expect(regionsOf(build(`[grid;margin=5;grid-line--sky--stroke-width=${width};grid-line--sky--filter=blur(0.1px)]||B313`).svgCode))
+        .toEqual(regionsOf(build('[grid;margin=5;grid-line--sky--filter=blur(0.1px)]||B313').svgCode));
     });
   });
 

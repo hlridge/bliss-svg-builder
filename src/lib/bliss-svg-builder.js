@@ -6794,23 +6794,29 @@ class BlissSVGBuilder {
       // The computed key order below is load-bearing: a reordered attribute is a
       // diff in every grid assertion in the suite. Every line runs within one
       // extent, from gridStartX across gridLineWidth and from gridMinY to
-      // gridMaxY, moved by the shift, so its box is that extent widened by
-      // half its own width.
+      // gridMaxY, moved by the shift, so its box, which its filter's region
+      // covers, is that extent widened by half the width written on it: as far
+      // as a square or round end reaches, under the builder's cap or the
+      // author's. A non-scaling width (`vector-effect`) is in screen pixels, so
+      // read as user units it covers more wherever a unit is drawn at least a
+      // pixel wide. A width that is no number is resolved by the renderer
+      // alone, and the box keeps the option's.
       const gridLine = (classes, strokeWidth, stroke, pathData) => {
         const authored = this.#authoredFor(classes);
-        const width = writtenNumber(authored['stroke-width'] ?? strokeWidth);
-        const lengthened = Number.isFinite(width) && width >= 0
-          && !['stroke-linecap', 'd', 'vector-effect'].some(name => Object.hasOwn(authored, name));
+        const written = writtenNumber(authored['stroke-width'] ?? strokeWidth);
+        const readable = Number.isFinite(written) && written >= 0;
+        const lengthened = readable && !['stroke-linecap', 'd', 'vector-effect'].some(name => Object.hasOwn(authored, name));
+        const width = readable ? written : strokeWidth;
         const d = pathData(lengthened ? width / 2 : 0);
         return d ? {
           classes,
           authored,
           computed: { 'stroke-width': strokeWidth, stroke, 'stroke-linecap': lengthened ? 'butt' : 'square', 'stroke-linejoin': 'miter', d },
           box: {
-            minX: gridStartX + gridShift - strokeWidth / 2,
-            minY: gridMinY + gridShift - strokeWidth / 2,
-            maxX: gridStartX + gridShift + gridLineWidth + strokeWidth / 2,
-            maxY: gridMaxY + gridShift + strokeWidth / 2,
+            minX: gridStartX + gridShift - width / 2,
+            minY: gridMinY + gridShift - width / 2,
+            maxX: gridStartX + gridShift + gridLineWidth + width / 2,
+            maxY: gridMaxY + gridShift + width / 2,
           },
         } : null;
       };
