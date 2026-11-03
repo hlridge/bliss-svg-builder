@@ -74,7 +74,21 @@ jobs:
       # the result is Node-version-independent; running it on one leg is enough.
       - name: Visual regression (e2e)
         if: matrix.node-version == 24
-        run: pnpm run test:e2e
+        run: |
+          node -e "const c = require('canvas'); console.log('cairo', c.cairoVersion, 'rsvg', c.rsvgVersion)"
+          pnpm run test:e2e
+
+      # Keep both renderings and their diff when e2e fails, so a difference
+      # that shows only on this runner can be looked at.
+      - name: Upload visual diffs
+        if: failure() && matrix.node-version == 24
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: |
+            temp/visual-diffs/
+            temp/visual-report.html
+          retention-days: 7
 
       # A dev-dependency advisory must never block a publish (that was the
       # reason `pnpm audit` was removed from `prepublishOnly`); audit only the
