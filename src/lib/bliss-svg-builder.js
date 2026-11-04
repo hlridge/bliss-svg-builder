@@ -2055,6 +2055,10 @@ class BlissSVGBuilder {
       // it draws.
       contentStrokeWidth: () => writtenWidth(this.#contentAttributes['stroke-width'])
         ?? this.#processedOptions.strokeWidth ?? DEFAULT_STROKE_WIDTH,
+      // What an author's keys write on the content group, as { name: value }:
+      // the join, cap and miter limit every line inherits, read at render
+      // time, as above, for how far past those boxes a corner or an end draws.
+      contentAttributes: () => ({ ...this.#contentAttributes }),
     };
     if (blissObj._parseWarnings) {
       this.#warnings.push(...blissObj._parseWarnings);

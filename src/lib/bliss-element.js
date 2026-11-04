@@ -5,7 +5,7 @@
  */
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph } from "./bliss-element-definitions.js";
-import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, INK_AREA_MARGIN, DEFAULT_STROKE_WIDTH, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES, writtenWidth } from "./bliss-constants.js";
+import { INTERNAL_OPTIONS, PUBLICATION_MAP, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, HIT_MARGIN, PART_HIT_MARGIN, INK_AREA_MARGIN, DEFAULT_STROKE_WIDTH, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, isDocumentDefiningAttribute, isSafeAttributeName, generateKey, MAX_RECURSION_DEPTH, WARNING_CODES, writtenWidth, cssNumber } from "./bliss-constants.js";
 import { createTextFallbackGlyph } from "./bliss-shape-creators.js";
 import { basePartCount, classifyIndicatorKind } from "./indicator-utils.js";
 import { resolveHeadIndex, headScanCode } from "./bliss-head-glyph-exclusions.js";
@@ -50,6 +50,29 @@ const EFFECT_ATTRIBUTES = new Set([
   'transform', 'transform-origin', 'transform-box',
   'opacity', 'filter', 'clip-path', 'mask', 'display', 'visibility',
 ]);
+
+// The joins and caps that draw no further from a line than half its width,
+// as a renderer reads their words, in any case; and the miter limit a
+// renderer draws where no `stroke-miterlimit` reads as one.
+const HALF_WIDTH_JOINS = new Set(['round', 'bevel']);
+const HALF_WIDTH_CAPS = new Set(['round', 'butt']);
+const INITIAL_MITER_LIMIT = 4;
+
+// A written `stroke-miterlimit` read as a renderer reads a number (cssNumber)
+// at or above 1, the only limits a renderer reads, else undefined.
+const writtenMiterLimit = (value) => {
+  const limit = cssNumber(value);
+  return Number.isFinite(limit) && limit >= 1 ? limit : undefined;
+};
+
+// Whether a written join or cap is drawn as one of `words`; a line no key
+// reaches is drawn with the library's round ones. The word is trimmed only
+// of the whitespace CSS skips: a renderer refuses one padded with any other
+// space (a no-break space) and draws the inherited join or cap. CSS ignores
+// case only in ASCII letters; JavaScript's lowercasing turns no other letter
+// into one of these words' letters, so the two agree on these words.
+const drawnAs = (value, words) => value === undefined
+  || words.has(String(value).replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, '').toLowerCase());
 
 export class BlissElement {
   //#region Private Properties
@@ -390,8 +413,9 @@ export class BlissElement {
    */
   #linkHit(x, y, box) {
     if (this.#getInheritedOption('linkArea') === 'ink') {
+      // drawn inside this element's own group, so inside its join and cap
       const paint = 'transparent';
-      const ink = this.#inkArea(x, y, paint, this.#areaPadding(BlissElement.#LINK_AREAS));
+      const ink = this.#inkArea(x, y, paint, this.#areaPadding(BlissElement.#LINK_AREAS), undefined, this.#lineGroups(this.#contentFrame));
       return ink ? `<g fill="none" stroke="${paint}" stroke-width="${ink.width}">${ink.lines}</g>` : '';
     }
     const area = box();
@@ -417,18 +441,20 @@ export class BlissElement {
    * halo mode getSvgContent takes, in `paint`, each line widened by twice the
    * area's `padding` and each letter filled in `paint` and outlined by as much.
    * Returns the lines; the width a group strokes them at (the element's
-   * computed width, widened alike); and that group as #lineWidth reads it,
-   * its width `written` where an author's key writes one that reads as a
-   * width (writtenWidth), else the computed one. Null where it draws no line,
+   * computed width, widened alike); and that group as #lineWidth and
+   * #lineGroups read it, its width `written` where an author's key writes one
+   * that reads as a width (writtenWidth), else the computed one, the lines a
+   * copy inside `groups`, the attributes of the groups around them, nearest
+   * first (#lineGroups). Null where it draws no line,
    * as ZSA does. Built from the widths the library computes: of the element's
    * own attributes only its effects reach its ink area, on the copy the layer
    * puts around it (#backgroundLayer), and its descendants' effects reach
    * their lines inside it (#haloWrap).
    */
-  #inkArea(x, y, paint, padding, written) {
+  #inkArea(x, y, paint, padding, written, groups) {
     const outline = 2 * padding;
     const width = (this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) + outline;
-    const frame = { top: this, width: written ?? width, extra: outline };
+    const frame = { top: this, width: written ?? width, extra: outline, copy: true, groups };
     const lines = this.getSvgContent(x, y, { paint, outline, element: this, frame });
     if (lines === '') return null;
     return {
@@ -459,7 +485,7 @@ export class BlissElement {
       ? [['stroke-width', roundForMarkup(options.strokeWidth + halo.outline)]]
       : [];
     const { entries, defs } = translateFilters([...width, ...this.#effectEntries],
-      () => ({ drawn: this.#drawnBox(x, y, halo.frame), outset: this.#filterOutset }), this.#sharedOptions.filters);
+      () => ({ drawn: this.#drawnBox(x, y, halo.frame), outset: this.#filterOutset(halo.frame) }), this.#sharedOptions.filters);
     if (entries.length === 0) return content;
     const lines = content.startsWith('<') ? content : `<path d="${content}"/>`;
     return `<g ${formatEntries(entries)}>${defs.join('')}${lines}</g>`;
@@ -515,9 +541,10 @@ export class BlissElement {
     if (this.#level <= 2 && !this.#paintArea) return null;
     if (this.#getInheritedOption('backgroundArea') === 'ink') {
       const padding = this.#areaPadding(BlissElement.#PAINT_AREAS);
-      const written = writtenWidth(this.#authoredBackground('ink', levels)['stroke-width']);
-      const ink = this.#inkArea(x, y, this.#background, padding, written);
-      return ink && { area: 'ink', lines: ink.lines, width: ink.width, drawn: this.#drawnBox(x, y, ink.frame) };
+      // drawn in the content group, outside the element's own group
+      const authored = this.#authoredBackground('ink', levels);
+      const ink = this.#inkArea(x, y, this.#background, padding, writtenWidth(authored['stroke-width']), [authored, ...this.#contentFrame.groups]);
+      return ink && { area: 'ink', lines: ink.lines, width: ink.width, frame: ink.frame, drawn: this.#drawnBox(x, y, ink.frame) };
     }
     const box = this.#level <= 2
       ? BlissElement.#bandHitBox(this.#relativeToParentX + x, this.#relativeToParentY + y, this.#paintArea)
@@ -629,7 +656,7 @@ export class BlissElement {
   #backgroundMarkup(drawing, levels) {
     const classes = ELEMENT_CLASSES[BACKGROUND_AREA_ELEMENTS[drawing.area]];
     const attributesOf = this.#sharedOptions.layerAttributeEntries ?? BlissElement.#ownLayerEntries;
-    const outset = drawing.area === 'ink' ? this.#filterOutset : 0;
+    const outset = drawing.area === 'ink' ? this.#filterOutset(drawing.frame) : 0;
     const translated = (computed) => {
       const attributes = attributesOf(classes, computed, levels);
       const { entries, defs } = translateFilters(attributes, () => ({ drawn: drawing.drawn, outset }), this.#sharedOptions.filters);
@@ -692,7 +719,7 @@ export class BlissElement {
    * region of a filter on the content group, which holds both.
    */
   get filterOutset() {
-    return Math.max(this.#filterOutset, this.#backgroundLayer().spread);
+    return Math.max(this.#filterOutset(this.#contentFrame), this.#backgroundLayer().spread);
   }
 
   static #separateAnchorAndGroupOptions(processed, authored) {
@@ -1949,11 +1976,12 @@ export class BlissElement {
    * `frame` describes (#lineWidth), so the box holds the lines and not only
    * their geometry. Exact for round caps and joins, every line the library
    * draws; short of a dot's own width, which a filter region covers through
-   * the viewBox. Undefined where the element has no layout children, as it
-   * draws nothing.
+   * the viewBox, and of a corner or an end a key draws sharper, which the
+   * filters carry as an outset (#lineOverhang). Undefined where the element
+   * has no layout children, as it draws nothing.
    */
   #drawnBox(offsetX, offsetY, frame = {}) {
-    if (this.#leafHeight !== undefined && this.#leafWidth !== undefined) {
+    if (this.#isLeaf) {
       return grownBy(this.#calculateBounds(offsetX, offsetY), this.#lineWidth(frame) / 2);
     }
     const absX = offsetX + this.#relativeToParentX;
@@ -1981,26 +2009,78 @@ export class BlissElement {
     return width ?? this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH;
   }
 
-  /**
-   * The group the lines sit in as #lineWidth reads it: the content group,
-   * with the width it is written with, an author's key included. A tree
-   * rendered outside a picture has none, and its lines are sized by the
-   * options.
-   */
-  get #contentFrame() {
-    return { width: this.#sharedOptions.contentStrokeWidth?.() };
+  /** Whether this element draws lines of its own, as a shape does, rather than holding elements that do. */
+  get #isLeaf() {
+    return this.#leafHeight !== undefined && this.#leafWidth !== undefined;
   }
 
   /**
-   * How far past its drawn box (#drawnBox) what this element holds draws: a
-   * filter on a child carries the child's ink its reach past the child, past
-   * what the filters inside the child already carry it, so the reaches along
-   * a chain add up; 0 where no filter below this element translates.
+   * How far past its drawn box (#drawnBox) this element's lines may draw
+   * inside the group `frame` describes, where a key lets a corner or an end
+   * reach further than the half width the box holds: a join drawn as neither
+   * round nor bevel may be a miter, its tip up to the miter limit's half
+   * widths from the corner, and a cap drawn as neither round nor butt is
+   * square, its corners √2 half widths from the end. The nearest join and cap
+   * written around the lines decide (#lineGroups), as a renderer inherits
+   * them; a word it cannot read falls back to the initial miter or to one
+   * written further out, so it counts as neither safe word. The limit is the
+   * nearest that reads as one (writtenMiterLimit), as a renderer ignores any
+   * other, else the initial 4. Carried as an outset, as an effect's reach is,
+   * so the box keeps what is surely drawn, the thin-element shape judges
+   * that, and a huge limit grows a region past the picture no further than
+   * an absurd effect does. 0 for an element whose lines are its children's.
    */
-  get #filterOutset() {
-    return Math.max(0, ...this.#layoutChildren.map(child => filterReach(
+  #lineOverhang(frame) {
+    if (!this.#isLeaf) return 0;
+    const groups = this.#lineGroups(frame);
+    const nearest = (name) => groups.find(group => Object.hasOwn(group, name))?.[name];
+    const limit = groups.map(group => writtenMiterLimit(group['stroke-miterlimit'])).find(read => read !== undefined) ?? INITIAL_MITER_LIMIT;
+    const join = drawnAs(nearest('stroke-linejoin'), HALF_WIDTH_JOINS) ? 1 : limit;
+    const cap = drawnAs(nearest('stroke-linecap'), HALF_WIDTH_CAPS) ? 1 : Math.SQRT2;
+    return (Math.max(join, cap) - 1) * this.#lineWidth(frame) / 2;
+  }
+
+  /**
+   * The attributes of the groups this element's lines are drawn in, as
+   * { name: value }, nearest first: each element's own group, from this one
+   * up to its word, as the lines inherit them, except in a copy of the
+   * lines (`frame.copy`, an ink area's), whose elements write none of
+   * theirs; then the groups the frame holds the lines in (`frame.groups`),
+   * the content group's last.
+   */
+  #lineGroups({ copy = false, groups = [] }) {
+    const own = [];
+    for (let element = this; !copy && element && element.#level > 0; element = element.#parentElement) {
+      own.push(Object.fromEntries(BlissElement.#separateAnchorAndGroupOptions(element.#blissObj.options, element.#blissObj.authoredOptions).groupEntries));
+    }
+    return [...own, ...groups];
+  }
+
+  /**
+   * The group the lines sit in as #lineWidth and #lineGroups read it: the
+   * content group, with the width it is written with and the attributes an
+   * author's keys write on it. A tree rendered outside a picture has none,
+   * and its lines are sized by the options and drawn round.
+   */
+  get #contentFrame() {
+    return {
+      width: this.#sharedOptions.contentStrokeWidth?.(),
+      groups: [this.#sharedOptions.contentAttributes?.() ?? {}],
+    };
+  }
+
+  /**
+   * How far past its drawn box (#drawnBox) what this element holds draws,
+   * inside the group `frame` describes: a filter on a child carries the
+   * child's ink its reach past the child, past what the filters inside the
+   * child already carry it, so the reaches along a chain add up, and a line
+   * reaches past the box as far as its corners and ends do (#lineOverhang);
+   * 0 where neither reaches further.
+   */
+  #filterOutset(frame) {
+    return Math.max(this.#lineOverhang(frame), ...this.#layoutChildren.map(child => filterReach(
       BlissElement.#separateAnchorAndGroupOptions(child.#blissObj.options, child.#blissObj.authoredOptions).groupEntries,
-    ) + child.#filterOutset));
+    ) + child.#filterOutset(frame)));
   }
 
   /**
@@ -2017,7 +2097,7 @@ export class BlissElement {
       drawn: this.#drawnBox(x, y, this.#contentFrame),
       geometry: this.#calculateBounds(x, y),
       hit: linked ? this.#linkBox(x, y, box) : undefined,
-      outset: this.#filterOutset,
+      outset: this.#filterOutset(this.#contentFrame),
     }), this.#sharedOptions.filters);
   }
 

@@ -394,7 +394,8 @@ export const filterMarkup = (id, primitives, { x, y, width, height }) => `<filte
 const OVERFLOW_LIMIT = 8;
 
 // How far past its drawn box an element may draw where the library cannot
-// see it: a dot's full width, a miter join.
+// see it: a dot's full width, a miter join the page's CSS or a `style` key
+// sets.
 const REGION_MARGIN = 1;
 
 // The smallest box ({ minX, minY, maxX, maxY }) holding both, either of which
