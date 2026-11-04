@@ -169,6 +169,21 @@ const layerAttributes = (structuralClasses, computed, authored = {}) => {
   };
 };
 
+// The join and cap the content group writes where no key writes its own. The
+// lines inherit them, so a join or cap written on the root never reaches them.
+const CONTENT_LINE_DEFAULTS = Object.freeze({ 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
+
+// CSS's initial `stroke-width`: what a line draws at where nothing it inherits
+// writes a width a renderer reads.
+const INITIAL_STROKE_WIDTH = 1;
+
+// The width a group's lines draw at where a key on the group writes one a
+// renderer cannot read: the width the group inherits, from the nearest of
+// `layers` (what keys write on the groups around it, nearest first) whose
+// width reads as one (writtenWidth), else the initial one.
+const inheritedWidth = (...layers) =>
+  layers.map(attributes => writtenWidth(attributes['stroke-width'])).find(width => width !== undefined) ?? INITIAL_STROKE_WIDTH;
+
 // Resolves which glyph carries a word-level (`;;`) overlay. A stored
 // designation wins; the fallback resolves among content-bearing glyphs only,
 // because serialization omits a bare empty-parts glyph, so a reparse of
@@ -2047,18 +2062,27 @@ class BlissSVGBuilder {
       // layer attributes. The tree translates their filters itself.
       layerAttributeEntries: (classes, computed, levels) =>
         Object.entries(layerAttributes(classes, computed, this.#authoredFor(classes, levels))),
-      // The width the content group is written with, which every line and
-      // element background that states no width of its own is drawn at: an
-      // author's key where it reads as a width (writtenWidth), else the
-      // option's. Read at render time, after the walk below has filled the
-      // content group's attributes, for the boxes the tree sizes around what
-      // it draws.
-      contentStrokeWidth: () => writtenWidth(this.#contentAttributes['stroke-width'])
-        ?? this.#processedOptions.strokeWidth ?? DEFAULT_STROKE_WIDTH,
-      // What an author's keys write on the content group, as { name: value }:
-      // the join, cap and miter limit every line inherits, read at render
-      // time, as above, for how far past those boxes a corner or an end draws.
-      contentAttributes: () => ({ ...this.#contentAttributes }),
+      // The width the content group is drawn at, which every line and element
+      // background that states no width of its own is drawn at: an author's
+      // key where it reads as a width (writtenWidth); where a renderer cannot
+      // read it, the width the group inherits from the root (inheritedWidth),
+      // or the option's where that is wider, so a width only the renderer
+      // reads (`5px`) sizes no box smaller than the option does; with no key,
+      // the option's. Read at render time, after the walk below has filled the
+      // layer attributes, for the boxes the tree sizes around what it draws.
+      contentStrokeWidth: () => {
+        const option = this.#processedOptions.strokeWidth ?? DEFAULT_STROKE_WIDTH;
+        const written = this.#contentAttributes['stroke-width'];
+        return written === undefined ? option : writtenWidth(written) ?? Math.max(option, inheritedWidth(this.#rootAttributes));
+      },
+      // The groups the content's lines inherit a join, a cap and a miter
+      // limit from, each as { name: value }, nearest first: what an author's
+      // keys write on the content group; the round join and cap it writes
+      // where no key does; and what keys write on the root, which reaches the
+      // lines only where the content group writes nothing (the miter limit) or
+      // a value a renderer cannot read. Read at render time, as above, for how
+      // far past those boxes a corner or an end draws.
+      contentGroups: () => [{ ...this.#contentAttributes }, CONTENT_LINE_DEFAULTS, { ...this.#rootAttributes }],
     };
     if (blissObj._parseWarnings) {
       this.#warnings.push(...blissObj._parseWarnings);
@@ -6811,13 +6835,16 @@ class BlissSVGBuilder {
       // as a square or round end reaches, under the builder's cap or the
       // author's. A non-scaling width (`vector-effect`) is in screen pixels, so
       // read as user units it covers more wherever a unit is drawn at least a
-      // pixel wide. A width that is no number is resolved by the renderer
-      // alone, and the box keeps the option's.
+      // pixel wide. A width a renderer cannot read draws the one the line
+      // inherits, the grid group's or the root's (inheritedWidth), and the box
+      // takes the option's where that is wider, so a width only the renderer
+      // reads (`5px`) sizes no box smaller than the option does.
+      const gridAuthored = this.#authoredFor(ELEMENT_CLASSES.grid);
       const gridLine = (classes, strokeWidth, stroke, pathData) => {
         const authored = this.#authoredFor(classes);
         const written = writtenWidth(authored['stroke-width'] ?? strokeWidth);
         const lengthened = written !== undefined && !['stroke-linecap', 'd', 'vector-effect'].some(name => Object.hasOwn(authored, name));
-        const width = written ?? strokeWidth;
+        const width = written ?? Math.max(strokeWidth, inheritedWidth(gridAuthored, this.#rootAttributes));
         const d = pathData(lengthened ? width / 2 : 0);
         return d ? {
           classes,
@@ -6842,8 +6869,8 @@ class BlissSVGBuilder {
 
       // The group is written before its lines, so its filter is numbered first.
       const shapes = lines.map(({ classes, authored, computed, box }) => ({ attrs: layerAttributes(classes, computed, authored), box }));
-      const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.grid, { 'shape-rendering': 'crispEdges' },
-        this.#authoredFor(ELEMENT_CLASSES.grid)), () => ({ drawn: unionOf(shapes.map(({ box }) => box)), outset: outsetOf(shapes) }));
+      const group = layerMarkup(layerAttributes(ELEMENT_CLASSES.grid, { 'shape-rendering': 'crispEdges' }, gridAuthored),
+        () => ({ drawn: unionOf(shapes.map(({ box }) => box)), outset: outsetOf(shapes) }));
       const gridLines = shapes.flatMap(({ attrs, box }) => {
         const line = layerMarkup(attrs, () => ({ drawn: box }));
         return [...line.filterLines, `    <path ${line.attributes}/>`];
@@ -6893,8 +6920,7 @@ class BlissSVGBuilder {
     const paintDefaults = {
       fill: 'none',
       stroke: color,
-      'stroke-linejoin': 'round',
-      'stroke-linecap': 'round',
+      ...CONTENT_LINE_DEFAULTS,
       'stroke-width': strokeWidth,
     };
     const contentAttrs = layerAttributes(ELEMENT_CLASSES.content, paintDefaults, this.#contentAttributes);

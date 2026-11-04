@@ -24,16 +24,21 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   is drawn at; a link under `link-area=ink` covered both where its lines
  *   draw and where its transparent lines, sized from the options, answer.
  * - A width the number grammar cannot read, or CSS refuses as a number (a
- *   trailing point, a no-break space), keeps the region the options give.
+ *   trailing point, a no-break space): an ink area and a box keep the region
+ *   the options give, the content group's lines draw the region of the
+ *   initial width they inherit, over a thinner option.
  *
  * Does NOT cover:
  * - A grid line's raw width, and regions sized by the options alone, see
  *   `BlissSVGBuilder.native-filter-regions.test.js`.
+ * - What an unread width inherits from the groups around it, the root's
+ *   width and miter limit among them, see
+ *   `BlissSVGBuilder.native-filter-inherited-strokes.test.js`.
  * - What a raw content width does to what the library draws itself: an ink
  *   area, a link's transparent lines and a dot keep the widths the options
  *   compute (pinned here only as far as the ink area's region follows them).
  * - A width set by a `style` key or the page's CSS, and a stroke on the paper
- *   or a zone, which reaches only past the picture's edge.
+ *   or a zone, whose filter region spans the whole picture.
  *
  * @issue: #34
  */
@@ -184,9 +189,12 @@ describe('BlissSVGBuilder native filter raw widths', () => {
       expect(build('[margin=5;stroke-width=2;content--stroke-width=0.1]||[filter=drop-shadow(1px 1px 0 red)]HL8').svgCode).toContain(THIN_SHAPE);
     });
 
-    it('keeps the option\'s region where the key\'s width is no number', () => {
+    // note: the renderer reads `5px` as 5 units, which the library does not
+    // read; it counts as a width the renderer cannot read, drawn at the one
+    // the content group inherits, the initial 1, over the option's 0.5
+    it('draws the region of the initial width where the key\'s width is no number', () => {
       expect(regionsOf(build('[margin=5;content--stroke-width=5px]||B313//[filter=blur(0.1px)]B313//B313').svgCode))
-        .toEqual(regionsOf(build('[margin=5]||B313//[filter=blur(0.1px)]B313//B313').svgCode));
+        .toEqual(regionsOf(build('[margin=5;content--stroke-width=1]||B313//[filter=blur(0.1px)]B313//B313').svgCode));
     });
 
     it('keeps an ink area\'s region at the width the options draw the area', () => {

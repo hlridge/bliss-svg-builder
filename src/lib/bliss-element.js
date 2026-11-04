@@ -442,10 +442,12 @@ export class BlissElement {
    * area's `padding` and each letter filled in `paint` and outlined by as much.
    * Returns the lines; the width a group strokes them at (the element's
    * computed width, widened alike); and that group as #lineWidth and
-   * #lineGroups read it, its width `written` where an author's key writes one
-   * that reads as a width (writtenWidth), else the computed one, the lines a
-   * copy inside `groups`, the attributes of the groups around them, nearest
-   * first (#lineGroups). Null where it draws no line,
+   * #lineGroups read it, the lines a copy inside `groups`, the attributes of
+   * the groups around them, nearest first (#lineGroups). Its width is the
+   * computed one unless an author's key writes one, `written`: that one where
+   * it reads as a width (writtenWidth), else the width the group inherits,
+   * the content group's (the area is drawn in it), where that is the wider.
+   * Null where it draws no line,
    * as ZSA does. Built from the widths the library computes: of the element's
    * own attributes only its effects reach its ink area, on the copy the layer
    * puts around it (#backgroundLayer), and its descendants' effects reach
@@ -454,7 +456,9 @@ export class BlissElement {
   #inkArea(x, y, paint, padding, written, groups) {
     const outline = 2 * padding;
     const width = (this.#getInheritedOption('strokeWidth') ?? DEFAULT_STROKE_WIDTH) + outline;
-    const frame = { top: this, width: written ?? width, extra: outline, copy: true, groups };
+    // a tree outside a picture has no content group, and the computed width stands
+    const drawn = written === undefined ? width : writtenWidth(written) ?? Math.max(width, this.#contentFrame.width ?? width);
+    const frame = { top: this, width: drawn, extra: outline, copy: true, groups };
     const lines = this.getSvgContent(x, y, { paint, outline, element: this, frame });
     if (lines === '') return null;
     return {
@@ -543,7 +547,7 @@ export class BlissElement {
       const padding = this.#areaPadding(BlissElement.#PAINT_AREAS);
       // drawn in the content group, outside the element's own group
       const authored = this.#authoredBackground('ink', levels);
-      const ink = this.#inkArea(x, y, this.#background, padding, writtenWidth(authored['stroke-width']), [authored, ...this.#contentFrame.groups]);
+      const ink = this.#inkArea(x, y, this.#background, padding, authored['stroke-width'], [authored, ...this.#contentFrame.groups]);
       return ink && { area: 'ink', lines: ink.lines, width: ink.width, frame: ink.frame, drawn: this.#drawnBox(x, y, ink.frame) };
     }
     const box = this.#level <= 2
@@ -2046,7 +2050,7 @@ export class BlissElement {
    * up to its word, as the lines inherit them, except in a copy of the
    * lines (`frame.copy`, an ink area's), whose elements write none of
    * theirs; then the groups the frame holds the lines in (`frame.groups`),
-   * the content group's last.
+   * the content group's and the root's last.
    */
   #lineGroups({ copy = false, groups = [] }) {
     const own = [];
@@ -2058,14 +2062,15 @@ export class BlissElement {
 
   /**
    * The group the lines sit in as #lineWidth and #lineGroups read it: the
-   * content group, with the width it is written with and the attributes an
-   * author's keys write on it. A tree rendered outside a picture has none,
-   * and its lines are sized by the options and drawn round.
+   * content group, with the width it is drawn at and the groups its lines
+   * inherit a join, a cap and a miter limit from, itself and the root. A tree
+   * rendered outside a picture has none, and its lines are sized by the
+   * options and drawn round.
    */
   get #contentFrame() {
     return {
       width: this.#sharedOptions.contentStrokeWidth?.(),
-      groups: [this.#sharedOptions.contentAttributes?.() ?? {}],
+      groups: this.#sharedOptions.contentGroups?.() ?? [],
     };
   }
 
