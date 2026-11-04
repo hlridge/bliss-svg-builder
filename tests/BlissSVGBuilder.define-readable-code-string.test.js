@@ -37,9 +37,12 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - Every key that character bracket refuses, for each definition kind and
  *   on both surfaces, see
  *   `BlissSVGBuilder.code-string-own-bracket-refusals.test.js`.
- * - A part the reader cannot take for a code at all (`B291;!`, a stray space),
- *   or one a `;` slot cannot hold (`B291;Xabc`): accepted and reported where
- *   the code is used; an open backlog row, whose tripwire the letter-run row is.
+ * - A part the reader cannot take for a code at all (`B291;!`), or one a `;`
+ *   slot cannot hold (`B291;Xabc`): accepted and reported where the code is
+ *   used; an open backlog row, whose tripwire the letter-run row is.
+ * - Whitespace in a code string, dropped as an input string drops it (so
+ *   `C8: 1` reads as `C8:1`), see
+ *   `BlissSVGBuilder.define-code-string-whitespace.test.js`.
  * - `define()` given both getPath and a codeString keeping only the function:
  *   unchanged, see `BlissSVGBuilder.define-hardening.test.js`.
  */
@@ -68,7 +71,6 @@ describe('BlissSVGBuilder define readable code string', () => {
       ['shape', 'C8:.'],
       ['shape', 'C8:-.'],
       ['shape', 'C8:1.2.3'],
-      ['shape', 'C8: 1'],
       ['shape', '[color=red]>C8:.'],
       ['glyph', 'B291;C8:.'],
       ['glyph', '[color=red]B291:.'],

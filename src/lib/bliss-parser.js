@@ -119,6 +119,20 @@ export function writesWordIndicatorList(codeString) {
   return codeString.replace(BRACKET_TOKEN_PATTERN, 'TOKEN').replace(/\s/g, '').includes(';;');
 }
 
+// A code string without the whitespace an input string drops: all of it
+// outside the option brackets and text blocks, found by the tokenizer's own
+// pattern, so a definition's code string reads as the same text written as
+// input does.
+export function withoutInputWhitespace(codeString) {
+  let read = '';
+  let at = 0;
+  for (const token of codeString.matchAll(BRACKET_TOKEN_PATTERN)) {
+    read += codeString.slice(at, token.index).replace(/\s/g, '') + token[0];
+    at = token.index + token[0].length;
+  }
+  return read + codeString.slice(at).replace(/\s/g, '');
+}
+
 // A written X token runs from a glyph boundary to the next structural
 // character: another glyph boundary (`/`), a part boundary (`;`), a head
 // marker (`^`) or a coordinate suffix (`:`). Taking the token WHOLE is what

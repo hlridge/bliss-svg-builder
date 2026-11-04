@@ -6,7 +6,7 @@
 
 import { blissElementDefinitions, builtInCodes, isSpaceGlyph, protectedCodes } from "./bliss-element-definitions.js";
 import { BlissElement } from "./bliss-element.js";
-import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_BODY, MAX_INPUT_LENGTH, classifyXCode, layoutDefinitionOf, processXCodes, slotCodeOf, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries } from "./bliss-parser.js";
+import { BlissParser, COORD_SUFFIX_PATTERN, X_RUN_BODY, MAX_INPUT_LENGTH, classifyXCode, layoutDefinitionOf, processXCodes, slotCodeOf, extractPositionFromOptions, normalizePositionFields, pullsInWordSpace, resolveKerning, kerningOptionEntries, withoutInputWhitespace } from "./bliss-parser.js";
 import { BOOLEAN_OPTION_KEYS, INTERNAL_OPTIONS, KERNING_OPTION_KEYS, PUBLICATION_MAP, KNOWN_OPTION_KEYS, GLOBAL_ONLY_OPTION_KEYS, TRANSIENT_REFUSED_OPTION_KEYS, transientRefusalMessage, isDocumentDefiningAttribute, isLibraryOwnedRootAttribute, isImageAttribute, ANCHOR_ATTRIBUTE_NAMES, BAND_HEIGHT, DEFAULT_STROKE_WIDTH, admitOptions, canonicalOptionKey, optionNameIsAlreadyRefused, layerKeyNameRefusal, reservedAttributeMessage, unsafeAttributeNameMessage, programmaticOptionKey, deleteOptionByName, removeElementOption, GEOMETRY_OPTION_KEYS, SIZE_OPTION_KEYS, COMPUTED_GEOMETRY_INPUTS, ELEMENT_CLASSES, BACKGROUND_AREA_ELEMENTS, CURATED_ATTRIBUTE_SOURCES, CONTAINER_SHADOWED_ATTRIBUTES, targetOfClass, judgeNumericOptionValue, judgeTextOptionValue, judgeKeywordOptionValue, bareElementKeyRefusal, KEYWORD_OPTION_VALUES, textOfValue, escapeHtml, isSafeAttributeName, camelToKebab, isNamedOptionKey, INTERNAL_ONLY_SPELLINGS, isLayerAttributeKey, isElementLayerKey, parseLayerAttributeKey, generateKey, LIB_VERSION, WARNING_CODES, serializeOptionValue, peelCharacterBrackets, WRITTEN_COORDINATE_PATTERN, writtenWidth } from "./bliss-constants.js";
 import { ElementHandle, assertCodeArg, assertKeyArgs, assertOptsArg } from "./element-handle.js";
 import { filterToIndicators, getBareCode, lookupEffectiveDefinition, mergeWordIndicatorsOntoHead, resolveEffectiveDefinition, resolveWordIndicatorOverlay, SINGLE_CODE_TOKEN, wordIndicatorNode } from "./indicator-utils.js";
@@ -6150,8 +6150,14 @@ class BlissSVGBuilder {
       return result;
     }
 
-    for (const [code, definition] of Object.entries(definitions)) {
+    for (const [code, given] of Object.entries(definitions)) {
       try {
+        // A code string is read as an input string is: the whitespace outside
+        // its brackets is dropped before it is judged and stored. Kept, it
+        // reached every code lookup, so each use failed as an unknown code.
+        const definition = typeof given?.codeString === 'string'
+          ? { ...given, codeString: withoutInputWhitespace(given.codeString) }
+          : given;
         const type = definition?.type;
 
         if (type && type !== 'glyph' && type !== 'shape' && type !== 'externalGlyph') {
@@ -6308,6 +6314,10 @@ class BlissSVGBuilder {
     }
     if (!changes || typeof changes !== 'object') {
       throw new Error(`patchDefinition("${code}"): changes must be an object.`);
+    }
+    // Read as define() reads one (see there).
+    if (typeof changes.codeString === 'string') {
+      changes = { ...changes, codeString: withoutInputWhitespace(changes.codeString) };
     }
 
     const def = blissElementDefinitions[code];

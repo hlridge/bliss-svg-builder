@@ -554,11 +554,15 @@ describe('BlissSVGBuilder.define', () => {
   });
 
   describe('when incidental whitespace accompanies real content', () => {
-    it('accepts and stores verbatim a codeString with surrounding whitespace', () => {
+    it('accepts a codeString with surrounding whitespace and stores it without, as an input string reads it', () => {
+      // re-pinned 2026-11-04 (owner: fix now): this row was the tripwire for
+      // backlog row "`define()` accepts a code string holding a part the
+      // reader cannot take for a code at all"; the whitespace is now dropped
+      // (see BlissSVGBuilder.define-code-string-whitespace.test.js)
       const code = trackCode('QZPAD1');
       const result = BlissSVGBuilder.define({ [code]: { codeString: ' B100' } });
       expect(result.defined).toContain(code);
-      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe(' B100');
+      expect(BlissSVGBuilder.getDefinition(code).codeString).toBe('B100');
     });
 
     it('defines a getPath shape even when its optional codeString is whitespace-only', () => {
