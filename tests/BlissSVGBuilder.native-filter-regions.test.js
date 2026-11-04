@@ -24,7 +24,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   group's sized by the width the key writes, as the width option would size
  *   them (the shared and the most specific key, a thinner and a zero width, a
  *   line given its own cap or `vector-effect`, the options object, a line past
- *   the picture's edge); a width the number grammar cannot read keeps the
+ *   the picture's edge); a width the number grammar cannot read, or CSS
+ *   refuses as a number (a trailing point, a no-break space), keeps the
  *   option's region.
  * - A link's area: a word's padded rect, `link-area=ink`, a part's rect, a
  *   one-shape part's padded rect; a thin linked element's invisible shape
@@ -172,10 +173,26 @@ describe('BlissSVGBuilder native filter regions', () => {
         .toEqual(regionsOf(build(`[grid;margin=5;${option};${filter}]||B313`).svgCode));
     });
 
+    // pins the width read as CSS reads a number, in each form CSS reads
+    it.each([
+      ['with a sign', '+5'],
+      ['as a bare fraction with an exponent', '.5e1'],
+      ['with a capital, signed exponent', '0.5E+1'],
+      ['padded with every whitespace CSS skips', '"\t\n\f\r 5\t\n\f\r "'],
+    ])('draws the region a width of 5 draws, written %s', (_case, width) => {
+      expect(regionsOf(build(`[grid;margin=5;grid-line--sky--stroke-width=${width};grid-line--sky--filter=blur(0.1px)]||B313`).svgCode))
+        .toEqual(regionsOf(build('[grid;margin=5;grid-line--sky--stroke-width=5;grid-line--sky--filter=blur(0.1px)]||B313').svgCode));
+    });
+
     // note: the renderer resolves a width the number grammar cannot read
     // (`5px` as 5 units, a word or a negative one as the inherited width); the
     // region keeps the option's width, as the line keeps its plain extents
-    it.each(['5px', 'abc', '-1', '1e400'])('keeps the option\'s region where the key\'s width %s is no number', (width) => {
+    it.each([
+      '5px', 'abc', '-1', '1e400',
+      // pins the width read as CSS reads a number: a renderer refuses a
+      // trailing point and a no-break space, which the DSL's own grammar reads
+      '5.', '"5 "',
+    ])('keeps the option\'s region where the key\'s width %s is no number', (width) => {
       expect(regionsOf(build(`[grid;margin=5;grid-line--sky--stroke-width=${width};grid-line--sky--filter=blur(0.1px)]||B313`).svgCode))
         .toEqual(regionsOf(build('[grid;margin=5;grid-line--sky--filter=blur(0.1px)]||B313').svgCode));
     });

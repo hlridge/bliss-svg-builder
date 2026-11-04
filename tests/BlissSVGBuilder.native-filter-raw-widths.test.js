@@ -23,7 +23,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   than the option; a filtered line's invisible shape judged by the width it
  *   is drawn at; a link under `link-area=ink` covered both where its lines
  *   draw and where its transparent lines, sized from the options, answer.
- * - A width the number grammar cannot read keeps the region the options give.
+ * - A width the number grammar cannot read, or CSS refuses as a number (a
+ *   trailing point, a no-break space), keeps the region the options give.
  *
  * Does NOT cover:
  * - A grid line's raw width, and regions sized by the options alone, see
@@ -103,6 +104,14 @@ describe('BlissSVGBuilder native filter raw widths', () => {
 
     it('keeps the options\' region where the key\'s width is no number', () => {
       expect(regionsOf(build('[margin=5;element-background--ink--stroke-width=5px;element-background--ink--filter=blur(0.1px)]||[background=yellow;background-area=ink]B313').svgCode))
+        .toEqual(regionsOf(build('[margin=5;element-background--ink--filter=blur(0.1px)]||[background=yellow;background-area=ink]B313').svgCode));
+    });
+
+    // pins the width read as CSS reads a number: a renderer refuses a trailing
+    // point and a no-break space, which the DSL's own grammar reads, and draws
+    // the area at the width it inherits
+    it.each(['5.', '"5 "'])('keeps the options\' region where CSS reads the key\'s width %s as no number', (width) => {
+      expect(regionsOf(build(`[margin=5;element-background--ink--stroke-width=${width};element-background--ink--filter=blur(0.1px)]||[background=yellow;background-area=ink]B313`).svgCode))
         .toEqual(regionsOf(build('[margin=5;element-background--ink--filter=blur(0.1px)]||[background=yellow;background-area=ink]B313').svgCode));
     });
   });

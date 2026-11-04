@@ -1257,16 +1257,33 @@ export const writtenNumber = (value) => {
   return typeof value === 'string' ? numberFromText(value) : NaN;
 };
 
+// CSS's number syntax, padded with nothing but the whitespace CSS skips.
+const CSS_NUMBER_TEXT = /^[\t\n\f\r ]*[+-]?(?:\d+|\d*\.\d+)(?:[eE][+-]?\d+)?[\t\n\f\r ]*$/;
+
 /**
- * A written `stroke-width` read as a width in user units (writtenNumber), or
+ * A value written for a renderer, read as a number the way the renderer reads
+ * it, or NaN when it reads none: a number or a bigint as itself, text only in
+ * CSS's number syntax. A renderer refuses text the number grammar above reads,
+ * a trailing point (`4.`), `Infinity`, or padding with any other space (a
+ * no-break space), and draws the inherited value instead, so a box sized by
+ * that grammar's reading could cut what is drawn. Positions and kerning, which
+ * no renderer reads, keep writtenNumber.
+ */
+export const cssNumber = (value) => {
+  if (typeof value === 'number' || typeof value === 'bigint') return Number(value);
+  return typeof value === 'string' && CSS_NUMBER_TEXT.test(value) ? Number(value) : NaN;
+};
+
+/**
+ * A written `stroke-width` read as a width in user units (cssNumber), or
  * undefined where it reads as no number at or above 0. A renderer resolves
- * such a value alone (`5px` as pixels, a word or a negative one as the
- * inherited width), so a box the library sizes around the line keeps the
- * width the library computed. Shared by every box a written width sizes, so
- * the readings cannot drift.
+ * such a value alone (`5px` as pixels, a word, a negative one or one CSS
+ * cannot read as a number as the inherited width), so a box the library sizes
+ * around the line keeps the width the library computed. Shared by every box a
+ * written width sizes, so the readings cannot drift.
  */
 export const writtenWidth = (value) => {
-  const width = writtenNumber(value);
+  const width = cssNumber(value);
   return Number.isFinite(width) && width >= 0 ? width : undefined;
 };
 

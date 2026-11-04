@@ -15,8 +15,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   lines by its own half; a zero width lengthening by nothing and still drawn.
  * - A raw `stroke-width` key on a line: the line is lengthened by the width
  *   that key writes, the most specific key winning, the same from the options
- *   object; a width the number grammar cannot read leaves the line square-ended
- *   on its plain extents, as it was written before.
+ *   object; a width the number grammar cannot read, or CSS refuses as a
+ *   number (a trailing point), leaves the line square-ended on its plain
+ *   extents, as it was written before.
  * - A raw `stroke-linecap`, `d` or `vector-effect` on a line, which takes over
  *   what the lengthening rests on, leaves that line written as before.
  * - A raw dash pattern keeps the line butt-ended and lengthened, so each dash
@@ -135,9 +136,9 @@ describe('BlissSVGBuilder grid line ends', () => {
     });
 
     // note: a width read elsewhere (CSS units, a negative one, a word, a hex
-    // number JavaScript reads) is resolved by the renderer; the square end
-    // follows whatever it resolves
-    it.each(['1px', 'abc', '-1', 'Infinity', '0x10'])('writes a line whose width %s is no number as before, square-ended on its plain extents', (width) => {
+    // number JavaScript reads, a trailing point CSS refuses) is resolved by
+    // the renderer; the square end follows whatever it resolves
+    it.each(['1px', 'abc', '-1', 'Infinity', '0x10', '1.'])('writes a line whose width %s is no number as before, square-ended on its plain extents', (width) => {
       const input = `[grid;grid-line--sky--stroke-width=${width}]||B313`;
 
       expect(gridLine(input, 'sky')).toBe(
