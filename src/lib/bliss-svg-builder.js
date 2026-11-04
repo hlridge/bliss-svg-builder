@@ -240,6 +240,17 @@ const putOwn = (target, key, value) =>
 // key; a Date, a Map and the like are not.
 const isRecord = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
+// A definition with its code string read as an input string reads it, and
+// read as given otherwise: the copy keeps the caller's prototype and every own
+// property, so a class instance keeps the getPath it inherits, a code string
+// its class computes is replaced rather than assigned over its getter, and a
+// frozen object takes the new one.
+const withInputCodeString = (definition) =>
+  Object.create(Object.getPrototypeOf(definition), {
+    ...Object.getOwnPropertyDescriptors(definition),
+    codeString: { value: withoutInputWhitespace(definition.codeString), writable: true, enumerable: true, configurable: true },
+  });
+
 /**
  * The copy the constructor makes of a composition object, so nothing it does
  * reaches the caller's object. `structuredClone` made it until it met a value
@@ -6155,9 +6166,7 @@ class BlissSVGBuilder {
         // A code string is read as an input string is: the whitespace outside
         // its brackets is dropped before it is judged and stored. Kept, it
         // reached every code lookup, so each use failed as an unknown code.
-        const definition = typeof given?.codeString === 'string'
-          ? { ...given, codeString: withoutInputWhitespace(given.codeString) }
-          : given;
+        const definition = typeof given?.codeString === 'string' ? withInputCodeString(given) : given;
         const type = definition?.type;
 
         if (type && type !== 'glyph' && type !== 'shape' && type !== 'externalGlyph') {
@@ -6317,7 +6326,7 @@ class BlissSVGBuilder {
     }
     // Read as define() reads one (see there).
     if (typeof changes.codeString === 'string') {
-      changes = { ...changes, codeString: withoutInputWhitespace(changes.codeString) };
+      changes = withInputCodeString(changes);
     }
 
     const def = blissElementDefinitions[code];

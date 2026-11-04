@@ -17,6 +17,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - A code string that reads as a `;;` once its whitespace is dropped
  *   (`B313; ;B86`), refused as `B313;;B86` is.
  * - patchDefinition() reading a new code string the same way.
+ * - The definition or patch otherwise read as given: a class instance keeps
+ *   the getPath it inherits (define and patch), a code string its class
+ *   computes is read, and a frozen definition is read.
  *
  * Does NOT cover:
  * - A whitespace-only code string (refused) and a getPath shape given one
@@ -110,6 +113,46 @@ describe('BlissSVGBuilder define code string whitespace', () => {
       const builder = new BlissSVGBuilder('B313/WS_PATCH');
       expect(builder.warnings).toEqual([]);
       expect(builder.toString()).toBe('B313/B291');
+    });
+  });
+
+  describe('when the definition is a class instance or a frozen object', () => {
+    // A shape keeps its getPath over a code string, so the code string beside
+    // the inherited method is never drawn.
+    class Stroke {
+      type = 'shape';
+      width = 8;
+      height = 8;
+      constructor(codeString) { this.codeString = codeString; }
+      getPath() { return 'M0,0L8,8'; }
+    }
+
+    it.each(['C8', ' C8 ', ''])('draws the getPath its class carries beside the code string %j', (codeString) => {
+      // regression: the copy made to read the code string kept only own properties, losing the inherited getPath
+      const result = defineTracked({ WS_CLASS: new Stroke(codeString) });
+      expect(result.errors).toEqual([]);
+      expect(new BlissSVGBuilder('WS_CLASS').svgCode).toContain('d="M0,0L8,8"');
+    });
+
+    it('reads a code string its class computes', () => {
+      // pins the copy defining its code string: assigned, it met the inherited getter and threw
+      class Word { get codeString() { return ' B313 / B291 '; } }
+      defineTracked({ WS_COMPUTED: new Word() });
+      expect(BlissSVGBuilder.getDefinition('WS_COMPUTED').codeString).toBe('B313/B291');
+    });
+
+    it('reads the code string of a frozen definition', () => {
+      defineTracked({ WS_FROZEN: Object.freeze({ codeString: ' B313 ' }) });
+      expect(BlissSVGBuilder.getDefinition('WS_FROZEN').codeString).toBe('B313');
+    });
+
+    it('refuses a shape patch whose class carries a getPath beside the code string', () => {
+      // regression: the patch was read through the same own-properties copy, so the getPath went unseen
+      class Redraw { codeString = ' HL8 '; getPath() { return 'M0,0L8,8'; } }
+      defineTracked({ WS_PATCH_SHAPE: { type: 'shape', codeString: 'C8' } });
+      expect(() => BlissSVGBuilder.patchDefinition('WS_PATCH_SHAPE', new Redraw()))
+        .toThrow('a shape is drawn either by its getPath function or by its codeString');
+      expect(BlissSVGBuilder.getDefinition('WS_PATCH_SHAPE').codeString).toBe('C8');
     });
   });
 });
