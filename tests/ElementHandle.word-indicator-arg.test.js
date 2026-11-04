@@ -13,6 +13,13 @@
  * - a single `;` with no character before it stays an empty part, as a
  *   string reads it, and a character of two parts stays accepted
  * - a `;;` inside an option bracket or a text block is not a separator
+ * - whitespace between the two semicolons (`B313; ;B81`, `; ;B81`), which a
+ *   string drops before it reads them: the same `;;`, refused on every
+ *   surface
+ * - an option bracket or a text block between two semicolons
+ *   (`B313;[color=red];B86`) writes no `;;`: the part methods count three
+ *   parts, and the character methods add the (failed) character a string
+ *   reads
  * - inputs refused or kept before keep their outcome: `;;;B81` produces no
  *   glyphs in the part methods, a `;;` is named before a head marker, and a
  *   whole word keeps the WORD_AS_PART route
@@ -51,6 +58,10 @@ const PART_CODES = [';;B81', ';;', ';;B81;B86', '/;;B81', ';;[color=red]>B81'];
 const GLYPH_CODES = [';;B81', ';;', ';;B81;B86', '/;;B81', ';;B81/B291'];
 const EACH_PART_SURFACE_AND_CODE = PART_SURFACES.flatMap((s) => PART_CODES.map((code) => [s.label, code, s]));
 const EACH_GLYPH_SURFACE_AND_CODE = GLYPH_SURFACES.flatMap((s) => GLYPH_CODES.map((code) => [s.label, code, s]));
+
+const SPACED_CODES = ['B313; ;B81', 'B313;\n;B81', 'B313;\t \n;B81', '; ;B81'];
+const EACH_PART_SURFACE_AND_SPACED_CODE = PART_SURFACES.flatMap((s) => SPACED_CODES.map((code) => [s.label, code, s]));
+const EACH_GLYPH_SURFACE_AND_SPACED_CODE = GLYPH_SURFACES.flatMap((s) => SPACED_CODES.map((code) => [s.label, code, s]));
 
 const WORD_INDICATOR_MESSAGE = (code) => `Code "${code}" carries a word-level indicator list (";;"). `
   + 'Use applyIndicators() on the word, or addGroup() for word content';
@@ -152,6 +163,51 @@ describe('ElementHandle word indicator arg', () => {
       b.group(0).addGlyph('B313{a;;b}');
       expect(b.toString()).toBe('B291/B313');
       expect(b.warnings.map((w) => [w.code, w.source])).toEqual([['UNSUPPORTED_TEXT_BLOCKS', 'B313{a;;b}']]);
+    });
+  });
+
+  describe('when whitespace stands between the two semicolons', () => {
+    // regression: 1.0.0 threw for these, reading the parse; the text check
+    // that replaced it kept the space, so the indicators were dropped in silence
+    it.each(EACH_PART_SURFACE_AND_SPACED_CODE)('%s throws for %j and leaves the builder untouched', (label, code, { invoke }) => {
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, code)).toThrow(WORD_INDICATOR_MESSAGE(code));
+      expect(stateOf(b)).toBe(before);
+      expect(b.warnings).toEqual([]);
+    });
+
+    it.each(EACH_GLYPH_SURFACE_AND_SPACED_CODE)('%s throws for %j and leaves the builder untouched', (label, code, { invoke }) => {
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => invoke(b, code)).toThrow(WORD_INDICATOR_MESSAGE(code));
+      expect(stateOf(b)).toBe(before);
+      expect(b.warnings).toEqual([]);
+    });
+  });
+
+  describe('when an option bracket or a text block stands between two semicolons', () => {
+    // pins the stand-in a bracket or a block leaves in the text check: with
+    // none, the two `;` around it meet and read as a `;;` the code never
+    // writes; found by the 2026-11 Stryker run
+    it.each([
+      ['B313;[color=red];B86', ['UNKNOWN_CODE']],
+      ['B313;{hi};B86', ['UNSUPPORTED_TEXT_BLOCKS', 'UNKNOWN_CODE']],
+    ])('adds the character a string reads for %s, with %j', (code, codes) => {
+      const b = new BlissSVGBuilder('B291');
+      b.group(0).addGlyph(code);
+      const read = new BlissSVGBuilder(`B291/${code}`);
+      expect(stateOf(b)).toBe(stateOf(read));
+      expect(b.warnings.map((w) => w.code)).toEqual(codes);
+      expect(read.warnings.map((w) => w.code)).toEqual(codes);
+    });
+
+    it.each(['B313;[color=red];B86', 'B313;{hi};B86'])('counts the three parts of %s in the part methods', (code) => {
+      const b = new BlissSVGBuilder('B291');
+      const before = stateOf(b);
+      expect(() => b.group(0).glyph(0).addPart(code))
+        .toThrow(`Expected a single part, but code "${code}" produced 3 parts`);
+      expect(stateOf(b)).toBe(before);
     });
   });
 

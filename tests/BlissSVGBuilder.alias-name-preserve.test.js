@@ -35,9 +35,11 @@
  * - The default saves of such an alias, which spell its codes out as parts
  *   of the character: the same ink, grouped otherwise on reload.
  * - A part held below another with nothing below it, which is not read from
- *   its definition, and the saves of a part of no name or of a name nothing
- *   defines holding parts; backlog rows "A glyph authored with only
- *   `codeName`" and "A composition-object part holding parts under no name".
+ *   its definition (one naming an alias is the `it.todo` row below, after
+ *   1.1.0), and the saves of a part of no name or of a name nothing defines
+ *   holding parts; backlog rows "A hand-built object's held part naming an
+ *   alias draws an error", "A glyph authored with only `codeName`" and "A
+ *   composition-object part holding parts under no name".
  * - What an alias in a slot draws, see
  *   `BlissSVGBuilder.alias-in-part-slot.test.js`; its other saves, see
  *   `BlissSVGBuilder.alias-in-part-slot-routes.test.js`.
@@ -274,6 +276,12 @@ describe('BlissSVGBuilder alias name preserve', () => {
     ])('takes the parts below %s as they stand', (_label, object, drawn) => {
       expect(new BlissSVGBuilder(object).svgCode).toBe(new BlissSVGBuilder(drawn).svgCode);
     });
+  });
+
+  describe('when a composition object holds a part naming an alias below another part, with nothing below it', () => {
+    // scenario: { codeName: 'B313', parts: [{ codeName: 'NP_A2' }] } reports
+    // UNKNOWN_CODE NP_A2 today, where NP_A2 in a slot of the character draws
+    it.todo('draws the alias as it draws in a slot of the character (deferred to after 1.1.0: backlog row "A hand-built object\'s held part naming an alias draws an error")');
   });
 
   describe('when an alias of a typed definition of several codes is saved under preserve', () => {
