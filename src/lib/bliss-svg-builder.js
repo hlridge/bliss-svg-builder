@@ -251,6 +251,15 @@ const withInputCodeString = (definition) =>
     codeString: { value: withoutInputWhitespace(definition.codeString), writable: true, enumerable: true, configurable: true },
   });
 
+// The first failed part among `parts` and the parts they hold, at any depth.
+const heldFailure = (parts = []) => {
+  for (const part of parts) {
+    const failure = part.errorCode ? part : heldFailure(part.parts);
+    if (failure) return failure;
+  }
+  return undefined;
+};
+
 /**
  * The copy the constructor makes of a composition object, so nothing it does
  * reaches the caller's object. `structuredClone` made it until it met a value
@@ -4184,6 +4193,12 @@ class BlissSVGBuilder {
           if (options.deep && part.parts) {
             stripParts(part.parts);
           } else {
+            // Written without the parts it holds, a part carries their
+            // failure: an alias of a word, kept by its name in a preserve
+            // save, holds the word, which fails, and the default save writes
+            // that failure where it spells the alias out.
+            const failure = part.errorCode ? undefined : heldFailure(part.parts);
+            if (failure) Object.assign(part, { error: failure.error, errorCode: failure.errorCode });
             delete part.parts;
           }
         }

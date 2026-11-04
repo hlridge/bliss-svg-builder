@@ -17,7 +17,9 @@
  *   code it draws with the merged options, `preserve` keeps the name; each
  *   string and each JSON reloading byte-identical.
  * - A rename of a word alias, failing in a slot as the word does, keeping the
- *   word's options in its `preserve` JSON, from the string and an object.
+ *   word's options and the failure the default JSON writes (`error`,
+ *   `errorCode`) in its `preserve` JSON, from the string and an object; the
+ *   failure also for a word with no options and for a rename of the rename.
  * - An alias inserted before a part, whose `preserve` save kept the part
  *   after it.
  * - An alias of a typed shape written alone reloading from its `preserve`
@@ -39,6 +41,7 @@ const TARGETS = {
   SR_POS: { codeString: 'B291:1,0', defaultOptions: { color: 'red' } },
   SR_MULTI: { codeString: 'B291;C8' },
   SR_W: { codeString: 'B313/B291', defaultOptions: { color: 'red' } },
+  SR_PW: { codeString: 'B313/B291' },
 };
 
 const ALIASES = {
@@ -49,11 +52,14 @@ const ALIASES = {
   SR_RSA: { codeString: 'REFSQUARE', defaultOptions: { 'stroke-dasharray': '1 1' } },
   SR_ALPOS: { codeString: 'SR_POS', defaultOptions: { color: 'blue' } },
   SR_AW: { codeString: 'SR_W' },
+  SR_APW: { codeString: 'SR_PW' },
 };
 
-// An alias of several codes, one of them an alias, defined once that alias exists.
+// Aliases naming an alias, defined once it exists: one of several codes, and a
+// rename of a word's rename.
 const HOLDERS = {
   SR_MC: { codeString: 'B313;SR_A2' },
+  SR_AAW: { codeString: 'SR_AW' },
 };
 
 beforeAll(() => {
@@ -174,6 +180,24 @@ describe('BlissSVGBuilder alias in a part slot routes', () => {
         expect(part.codeName).toBe('SR_AW');
         expect(part.options).toEqual({ color: 'red' });
       }
+    });
+
+    it.each([
+      ['the string B291;SR_AW', 'B291;SR_AW'],
+      ['an object naming SR_AW', objectWithPart({ codeName: 'SR_AW' })],
+      ['the string B291;SR_APW, a word with no options', 'B291;SR_APW'],
+      ['the string B291;SR_AAW, a rename of the rename', 'B291;SR_AAW'],
+    ])('keeps the failure of the word a renamed alias names in the preserve JSON of %s', (_label, input) => {
+      // regression: the JSON writes a part without the parts it holds, and the failed word was one of them
+      const builder = new BlissSVGBuilder(input);
+      const failureOf = (saved) => {
+        const { error, errorCode } = saved.groups[0].glyphs[0].parts[1];
+        return { error, errorCode };
+      };
+      const kept = builder.toJSON({ preserve: true });
+      expect(failureOf(kept)).toEqual(failureOf(builder.toJSON()));
+      expect(failureOf(kept).errorCode).toBe('WORD_AS_PART');
+      expect(new BlissSVGBuilder(kept).warnings).toEqual(builder.warnings);
     });
 
     it('keeps the part after an alias inserted before it under preserve', () => {
