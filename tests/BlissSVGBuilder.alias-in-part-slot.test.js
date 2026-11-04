@@ -21,7 +21,9 @@
  *   alias that places or restyles them, or a link to one; a rename of a word
  *   fails as the word does. A positioned typed glyph of several codes stays a
  *   part, so does a part bracket on a typed glyph or shape of several codes,
- *   and any of these may be the one part of a character.
+ *   and any of these may be the one part of a character. Written as that one
+ *   part, a chain is read to its first link that places the codes, on x, y or
+ *   both, and the part holds them under the name written.
  * - A misplaced indicator or space written through a name, reported by the
  *   name and the position written where it is used, or by the code drawn
  *   once an edit took off a position the name places.
@@ -73,6 +75,7 @@ const ALIASES = {
   SL_ALMULTI: { codeString: 'SL_MULTI' },
   SL_PM: { codeString: 'SL_MULTI:1,0' },
   SL_PMY: { codeString: 'SL_MULTI:,1' },
+  SL_PMX: { codeString: 'SL_MULTI:1' },
   SL_PXM: { codeString: '[color=red]>SL_MULTI' },
   SL_PTG: { codeString: 'SL_TG:1,0' },
   SL_PXTG: { codeString: '[color=green]>SL_TG' },
@@ -189,6 +192,16 @@ describe('BlissSVGBuilder alias in a part slot', () => {
       const inner = new BlissSVGBuilder('B313;SL_A2').glyph(0).part(1).part(0);
       expect(inner.codeName).toBe(new BlissSVGBuilder('B313;B291').glyph(0).part(1).part(0).codeName);
     });
+
+    it('holds the codes a link places under the name written, with no part for that link', () => {
+      // pins where the slot stops reading SL_ALPM: at SL_PM, its first link
+      // that places the codes; survivors of the 2026-11 stryker run that
+      // stopped at a link placing nothing gave SL_PM a part of its own
+      const part = new BlissSVGBuilder(';SL_ALPM').glyph(0).part(0);
+      expect(part.codeName).toBe('SL_ALPM');
+      expect(part.part(0).codeName).toBe('SL_MULTI');
+      expect(part.part(0).part(0).codeName).toBe('B291');
+    });
   });
 
   describe('when the alias names an alias of something other than one code', () => {
@@ -234,9 +247,11 @@ describe('BlissSVGBuilder alias in a part slot', () => {
       expect(svgOf(';SL_PM')).toBe(svgOf('SL_PM'));
     });
 
-    it.each(['SL_PMY', 'SL_PPM', 'SL_ALPM'])('draws ;%s, which places several codes, as it draws alone', (alias) => {
+    it.each(['SL_PMY', 'SL_PMX', 'SL_PPM', 'SL_ALPM'])('draws ;%s, which places several codes, as it draws alone', (alias) => {
       // pins where the slot stops reading such a chain: at its first link
-      // that places the codes, on one axis or both, however many follow
+      // that places the codes, on one axis or both, however many follow;
+      // SL_PMX pins x alone: survivors of the 2026-11 stryker run read its
+      // link as placing nothing and drew the codes at x 0
       expect(warningsOf(`;${alias}`)).toEqual([]);
       expect(svgOf(`;${alias}`)).toBe(svgOf(alias));
     });

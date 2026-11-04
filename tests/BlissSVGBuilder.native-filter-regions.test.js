@@ -16,10 +16,12 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - The copies of an element's effects: around a box with its own filter
  *   (written on the element and as a global key), around a child's copy,
  *   the widest of what a copy holds past a plain box before it, around an
- *   ink area whose lines hold a filtered part; an ink area's own filter; a
+ *   ink area whose lines hold a filtered part (a character's own, and a
+ *   word's around its character's); an ink area's own filter; a
  *   character's copy in its word's ink area.
- * - The content group over an element background's filter; the grid group
- *   over its filtered lines.
+ * - The content group over an element background's filter, and over a part's
+ *   box away from the origin (in a second word, in a word moved down); the
+ *   grid group over its filtered lines.
  * - A raw `stroke-width` key on a grid line: the line's region and the
  *   group's sized by the width the key writes, as the width option would size
  *   them (the shared and the most specific key, a thinner and a zero width, a
@@ -87,6 +89,13 @@ describe('BlissSVGBuilder native filter regions', () => {
       expect(regionsOf(build(input).svgCode)).toEqual([[-6, -6, 21, 32], [-6, -6, 21, 32], [-0.75, -0.75, 10, 21.5]]);
     });
 
+    it('widens a word\'s copy around a character\'s ink area by the filters its lines hold', () => {
+      // pins the copy's spread grown by the filters inside it: a survivor of
+      // the 2026-11 stryker run shrank it by them, to x 4.25 and width -0.5
+      expect(regionsOf(build('[filter=grayscale(1)]|[background=yellow;background-area=ink]B313;[filter=drop-shadow(5px 5px 0 red)]>B86').svgCode))
+        .toEqual([[-5.75, -5.75, 19.5, 31.5], [-3.65, -5.75, 15.3, 31.5], [-5.75, -5.75, 19.5, 31.5], [-3.25, -5.75, 14.5, 31.5]]);
+    });
+
     it('widens a word\'s copy by a character\'s copy inside it', () => {
       expect(regionsOf(build('[filter=grayscale(1)]|[background=yellow;filter=drop-shadow(5px 5px 0 red)]B313/B291').svgCode))
         .toEqual([[-6, -6, 21, 32], [-6, -6, 21, 32], [-5.75, -5.75, 29.5, 31.5], [-5.75, -5.75, 20, 31.5]]);
@@ -123,6 +132,17 @@ describe('BlissSVGBuilder native filter regions', () => {
       // the content group's <filter> is written first and numbered last
       expect(regionsOf(build('[filter=grayscale(1);element-background--filter=drop-shadow(5px 5px 0 red)]||B313/[background=yellow]B291').svgCode))
         .toEqual([[-5.75, -6, 29.75, 32], [3, -6, 21, 32]]);
+    });
+  });
+
+  describe('when the whole symbol is filtered over an element background away from the origin', () => {
+    it.each([
+      // pins the walk read at the word's position, along the line and down it:
+      // survivors of the 2026-11 stryker run subtracted it
+      ['in the second word', '[content--filter=blur(1px)]||B291//[background=yellow]>B313;B86', [-3.75, -3.75, 31.5, 27.5]],
+      ['in a word moved down 12', '[content--filter=blur(1px)]||[y=12]|B313;[background=yellow]>B86', [-3.75, -3.75, 15.5, 35]],
+    ])('covers a part\'s box %s', (_case, input, region) => {
+      expect(regionsOf(build(input).svgCode)).toEqual([region]);
     });
   });
 

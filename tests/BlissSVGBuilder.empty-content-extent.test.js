@@ -14,7 +14,8 @@
  *   longer inflates the group's bounds
  * - snapshot bounds.maxX ends at the last content glyph
  * - [center] with min-width positions a trailing-empty document exactly
- *   like its serialized twin (baseWidth exclusion)
+ *   like its serialized twin (baseWidth exclusion), the DSL form and an
+ *   object input ending in a group of no glyphs
  * - a leading empty group no longer defeats the first-character
  *   indicator-overhang offset (live width matches the reparse)
  *
@@ -87,6 +88,16 @@ describe('BlissSVGBuilder empty-content extent', () => {
       const viewBox = (s) => new BlissSVGBuilder(s).svgCode.match(/viewBox="([^"]+)"/)[1];
       expect(viewBox('[center;min-width=12]||B291//|'))
         .toBe(viewBox('[center;min-width=12]||B291//'));
+    });
+
+    it('centers an object input ending in a group of no glyphs like the same input without it', () => {
+      // pins the empty group left out of the centred width: a survivor of the
+      // 2026-11 stryker run counted it (viewBox x -5.75); the DSL row above no
+      // longer can, its trailing space ending where the empty group starts
+      const viewBox = (groups) => new BlissSVGBuilder({ options: { center: true, minWidth: 20 }, groups })
+        .svgCode.match(/viewBox="([^"]+)"/)[1];
+      expect(viewBox([word('B291'), empty()])).toBe('-6.75 -0.75 21.5 21.5');
+      expect(viewBox([word('B291')])).toBe('-6.75 -0.75 21.5 21.5');
     });
   });
 

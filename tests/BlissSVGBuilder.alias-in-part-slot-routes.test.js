@@ -16,6 +16,8 @@
  * - Both saves of a slot holding an alias: the default spells it out in the
  *   code it draws with the merged options, `preserve` keeps the name; each
  *   string and each JSON reloading byte-identical.
+ * - A rename of a word alias, failing in a slot as the word does, keeping the
+ *   word's options in its `preserve` JSON, from the string and an object.
  * - An alias inserted before a part, whose `preserve` save kept the part
  *   after it.
  * - An alias of a typed shape written alone reloading from its `preserve`
@@ -36,6 +38,7 @@ const TARGETS = {
   SR_A1: { codeString: 'B291', defaultOptions: { color: 'red' } },
   SR_POS: { codeString: 'B291:1,0', defaultOptions: { color: 'red' } },
   SR_MULTI: { codeString: 'B291;C8' },
+  SR_W: { codeString: 'B313/B291', defaultOptions: { color: 'red' } },
 };
 
 const ALIASES = {
@@ -45,6 +48,7 @@ const ALIASES = {
   SR_A2: { codeString: 'SR_A1', defaultOptions: { color: 'blue' } },
   SR_RSA: { codeString: 'REFSQUARE', defaultOptions: { 'stroke-dasharray': '1 1' } },
   SR_ALPOS: { codeString: 'SR_POS', defaultOptions: { color: 'blue' } },
+  SR_AW: { codeString: 'SR_W' },
 };
 
 // An alias of several codes, one of them an alias, defined once that alias exists.
@@ -161,6 +165,16 @@ describe('BlissSVGBuilder alias in a part slot routes', () => {
           expect(new BlissSVGBuilder(saved).svgCode).toBe(builder.svgCode);
         }
       });
+
+    it('keeps the options of the word a renamed alias names in the preserve JSON of the slot it fails in', () => {
+      // pins the word's definition read where the chain stops at it: survivors
+      // of the 2026-11 stryker run saved the part with no options
+      for (const input of ['B291;SR_AW', objectWithPart({ codeName: 'SR_AW' })]) {
+        const part = new BlissSVGBuilder(input).toJSON({ preserve: true }).groups[0].glyphs[0].parts[1];
+        expect(part.codeName).toBe('SR_AW');
+        expect(part.options).toEqual({ color: 'red' });
+      }
+    });
 
     it('keeps the part after an alias inserted before it under preserve', () => {
       // regression: the save wrote an inner link's name as the base

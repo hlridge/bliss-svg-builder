@@ -41,6 +41,10 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   member of an X-sequence stands alone instead of merging into the
  *   whole-run fallback. A `;`-part slot routes the one-glyph answer
  *   (`B291;Xλ`) and still refuses a word (`B291;Xab`).
+ * - The internal routing key naming letters that all have outlines
+ *   (`XTXT_hello`, `XTXT_a`) read as those letters: the same picture,
+ *   warnings and save as the plain letters, alone, in a part slot and
+ *   before a `;` part.
  * - XTXT_ singleton isolation: rendering a text-fallback input does not
  *   leak `XTXT_` keys into the global definitions registry, and two
  *   builders with different XTXT_ inputs render independently.
@@ -497,6 +501,15 @@ describe('BlissSVGBuilder text fallback', () => {
       expect(key.warnings.map(w => w.code)).toEqual(written.warnings.map(w => w.code));
       expect(key.warnings.map(w => w.code)).toContain('WORD_AS_PART');
       expect(key.svgCode).toBe(written.svgCode);
+    });
+
+    it.each([
+      ['XTXT_a;B86', 'Xa;B86'],
+      ['XTXT_ab;B86', 'Xab;B86'],
+    ])('saves %s as %s saves, the letters the key names', (key, written) => {
+      // pins the key read as its letters where a part follows it: a survivor
+      // of the 2026-11 stryker run kept the key as written there
+      expect(new BlissSVGBuilder(key).toJSON()).toEqual(new BlissSVGBuilder(written).toJSON());
     });
 
     it('refuses to be a part composition, the same way the written letters are', () => {

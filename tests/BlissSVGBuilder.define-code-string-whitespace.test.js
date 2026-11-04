@@ -9,10 +9,10 @@ import { BlissSVGBuilder } from '../src/index.js';
  *
  * Covers:
  * - Whitespace before, after and inside a code string (around `;` and `/`,
- *   before a coordinate, between a bracket and its `>`, a newline and a tab),
- *   on a bare alias, a typed glyph and a typed shape: stored without it, and
- *   every use (alone, as a character, as a part) drawing, saving and
- *   reporting as the same definition written without it.
+ *   before a coordinate, before a bracket and between it and its `>`, a
+ *   newline and a tab), on a bare alias, a typed glyph and a typed shape:
+ *   stored without it, and every use (alone, as a character, as a part)
+ *   drawing, saving and reporting as the same definition written without it.
  * - Whitespace inside a quoted bracket value, kept.
  * - A code string that reads as a `;;` once its whitespace is dropped
  *   (`B313; ;B86`), refused as `B313;;B86` is.
@@ -58,6 +58,7 @@ describe('BlissSVGBuilder define code string whitespace', () => {
       ['bare', 'B313;\n\tC8', 'B313;C8'],
       ['bare', 'B313 / B291', 'B313/B291'],
       ['bare', '[color=red] >B313', '[color=red]>B313'],
+      ['bare', 'B313 / [color=red]>B291', 'B313/[color=red]>B291'],
       ['bare', 'B313 :1,0', 'B313:1,0'],
       ['glyph', ' B313;C8', 'B313;C8'],
       ['shape', ' HL8; VL8 ', 'HL8;VL8'],
@@ -77,6 +78,7 @@ describe('BlissSVGBuilder define code string whitespace', () => {
       ['bare', 'B313;\n\tC8', 'B313;C8'],
       ['bare', 'B313 / B291', 'B313/B291'],
       ['bare', '[color=red] >B313', '[color=red]>B313'],
+      ['bare', 'B313 / [color=red]>B291', 'B313/[color=red]>B291'],
       ['bare', 'B313 :1,0', 'B313:1,0'],
       ['glyph', ' B313;C8', 'B313;C8'],
       ['shape', ' HL8; VL8 ', 'HL8;VL8'],

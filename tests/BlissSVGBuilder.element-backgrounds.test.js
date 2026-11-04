@@ -8,14 +8,16 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *
  * Covers:
  * - A character's box: its base span plus 1 unit on each side, indicators
- *   ignored, and y -1 to 21 in its own frame however short its ink. Toward a
+ *   ignored (a base placed left of its origin included), and y -1 to 21 in
+ *   its own frame however short its ink, moved with its word. Toward a
  *   painted neighbour (the next character in reading order, painted itself or
  *   by its word, across a word space too) closer than 2 units, half the gap;
  *   toward any other, the full unit, a neighbour that is only linked, holds
  *   only a painted part, sits on the picture's own background or has an empty
  *   background included.
  * - A word's box: its characters' boxes joined, one rect for the whole word.
- * - A part's box: its ink box plus half a unit, wherever its character sits.
+ * - A part's box: its ink box plus half a unit, wherever its character or
+ *   word sits.
  * - The box's numbers rounded to 4 decimals, as the picture rounds its own.
  * - `background-area=box`, and a refused area value, painting the same box.
  * - What paints: an options-only token, a character whose code is unknown and
@@ -130,9 +132,22 @@ describe('BlissSVGBuilder element backgrounds', () => {
       expect(boxes(build('[background=yellow]B1;B81').svgCode)).toEqual([box(0, -1, 2, 22, 'yellow')]);
     });
 
+    it('keeps the base span of a base placed left of its origin, beside an indicator', () => {
+      // pins the span read from the character's origin: a survivor of the
+      // 2026-11 stryker run subtracted it, giving x="1" width="6" (beside an
+      // indicator the base keeps the position written)
+      expect(boxes(build('[background=yellow]B313:-2,0;B86').svgCode)).toEqual([box(-3, -1, 10, 22, 'yellow')]);
+    });
+
     it('moves the band with a character moved vertically', () => {
       expect(contentOf(build('[y=2;background=yellow]B313').svgCode))
         .toBe(`${box(-1, 1, 10, 22, 'yellow')}<path d="M0,12a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/>`);
+    });
+
+    it('moves the band with the word its character sits in, moved vertically', () => {
+      // pins the band read at the word's position: a survivor of the 2026-11
+      // stryker run subtracted it, giving y="-5"
+      expect(boxes(build('[y=4]|[background=yellow]B313').svgCode)).toEqual([box(-1, 3, 10, 22, 'yellow')]);
     });
 
     it('rounds the box to 4 decimals, as the picture rounds its own numbers', () => {
@@ -159,6 +174,9 @@ describe('BlissSVGBuilder element backgrounds', () => {
     it.each([
       ['in the first character', 'B313;[background=yellow]>B81', box(2.5, 3.5, 3, 3, 'yellow')],
       ['in a character moved down 2, second in its word', 'B291/[y=2]B313;[background=yellow]>B81', box(12.5, 5.5, 3, 3, 'yellow')],
+      // pins the walk read at the word's position: a survivor of the 2026-11
+      // stryker run subtracted it, giving y="-0.5"
+      ['in a word moved down 4', '[y=4]|B313;[background=yellow]>B81', box(2.5, 7.5, 3, 3, 'yellow')],
     ])('paints a box over its ink plus half a unit, %s', (_case, input, expected) => {
       expect(boxes(build(input).svgCode)).toEqual([expected]);
     });

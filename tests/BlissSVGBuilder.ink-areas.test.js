@@ -18,8 +18,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  * - Inheritance: the option written on a word or after `||` reaching every
  *   background below it; a character's own `box` beating its word's `ink`; the
  *   picture's own background staying the whole picture.
- * - Widths: a character's `stroke-width`, the symbol's, and one inside a
- *   painted word each widened by 0.8; a width written in `style` not
+ * - Widths: a character's `stroke-width`, the symbol's, one inside a painted
+ *   word, a part's own inside a widened character, and a shape part's own,
+ *   each widened by 0.8; a width written in `style` not
  *   followed; a dot's and a comma's own widths widened with their paths kept;
  *   a letter and a text character filled in the paint and outlined; a summed
  *   width rounded to four decimals.
@@ -69,6 +70,9 @@ const B291_AT_10 = '<path d="M10,8h8M10,16h8M10,8v8M18,8v8"/>';
 const B313_B291 = '<path d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6M10,8h8M10,16h8M10,8v8M18,8v8"/>';
 // The action indicator's ink in `B313;B81`: x 3 to 5, y 4 to 6.
 const B81_ON_B313 = '<path d="M3,6l1,-2M4,4l1,2"/>';
+// B86's ink in `B313;B86`, and the C8 shape's in `B313;C8`.
+const B86_ON_B313 = '<path d="M3,4l1,2M4,6l1,-2"/>';
+const C8_ON_B313 = '<path d="M0,4a4,4 0 1,1 8,0a4,4 0 1,1 -8,0"/>';
 const DOT = '<path d="M-0.20825,12a0.20825,0.20825 0 1,1 0.4165,0a0.20825,0.20825 0 1,1 -0.4165,0"/>';
 const WIDE_DOT = '<path d="M-0.25,12a0.25,0.25 0 1,1 0.5,0a0.25,0.25 0 1,1 -0.5,0"/>';
 const COMMA_DOT = '<path d="M-0.20825,16a0.20825,0.20825 0 1,1 0.4165,0a0.20825,0.20825 0 1,1 -0.4165,0"/>';
@@ -159,6 +163,24 @@ describe('BlissSVGBuilder ink areas', () => {
       // pins the nested width: the word's area alone would draw the thicker
       // character at the word's width, inside its own line
       expect(contentOf(build(input).svgCode)).toBe(expected);
+    });
+
+    it('widens a part\'s own width inside a widened character, the character\'s lines kept as markup', () => {
+      // pins the character's lines read as markup where they hold a group: a
+      // survivor of the 2026-11 stryker run wrapped them in a path's d
+      const svg = build('[background-area=ink;background=yellow]|[stroke-width=2]B313;[stroke-width=3]>B86/B291').svgCode;
+
+      expect(contentOf(svg)).toBe(`${inkArea('yellow', 1.3, `<g stroke-width="2.8">${B313}<g stroke-width="3.8">${B86_ON_B313}</g></g>${B291_AT_10}`)}`
+        + `<g stroke-width="2">${B313}<g stroke-width="3">${B86_ON_B313}</g></g>${B291_AT_10}`);
+    });
+
+    it('widens the own width of a shape written as a part by 0.8', () => {
+      // pins the area's width on a part with no parts of its own: a survivor
+      // of the 2026-11 stryker run copied its width unwidened
+      const svg = build('[background-area=ink;background=yellow]|B313;[stroke-width=3]>C8').svgCode;
+
+      expect(contentOf(svg)).toBe(`${inkArea('yellow', 1.3, `${B313}<g stroke-width="3.8">${C8_ON_B313}</g>`)}`
+        + `${B313}<g stroke-width="3">${C8_ON_B313}</g>`);
     });
 
     it('ignores a width written in a style attribute', () => {

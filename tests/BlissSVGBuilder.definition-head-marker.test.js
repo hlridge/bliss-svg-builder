@@ -15,8 +15,9 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   the marker and read back from every save to the same drawing.
  * - In a word with `;;` indicators: drawn as the same definition without the
  *   marker; the marker designates the head where the definition heads the
- *   word and stays dormant behind another character, as a bare alias of the
- *   same code string does.
+ *   word and stays dormant behind another character (one of two parts with a
+ *   part bracket on its second too), as a bare alias of the same code string
+ *   does.
  * - A marker before the code string's first indicator: warned once, as the
  *   same code string written in place; as a part, dormant like any marker.
  * - As a part, nested in another glyph, and a bare alias of a marked code in
@@ -152,6 +153,15 @@ describe('BlissSVGBuilder definition head marker', () => {
       // stops at a character before it, here B313 (the head-marker contract)
       expect(new BlissSVGBuilder('B313/HM_B291;;B81').toString()).toBe('B313/B291;;B81');
       expect(svgOf('B313/HM_B291;;B81')).toBe(svgOf('B313/ALIAS_HM;;B81'));
+    });
+
+    it('keeps the indicator on a character of two parts before the marked definition, a part bracket on its second', () => {
+      // pins the parts of a character counted past a part bracket inside it: a
+      // survivor of the 2026-11 stryker run read B937;[color=red]>B86 as the
+      // passed-over B937 alone and headed the word with HM_B291
+      const input = 'B937;[color=red]>B86/HM_B291;;B81';
+      expect(new BlissSVGBuilder(input).toString()).toBe('B937;[color=red]>B86/B291;;B81');
+      expect(svgOf(input)).toBe(svgOf('B937;[color=red]>B86/UN_B291;;B81'));
     });
 
     it('heads the word with a marked definition of a code the head scan passes over', () => {

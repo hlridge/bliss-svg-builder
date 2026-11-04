@@ -38,7 +38,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   warning names the token exactly as written.
  * - What a run DENOTES: an all-outlined run is a word (many glyphs)
  *   and refuses a ;-part; a run holding a letter with no outline is
- *   ONE text-fallback glyph and accepts one.
+ *   ONE text-fallback glyph and accepts one (routed to that glyph, so
+ *   its save marks it external as the run alone does).
  * - Trailing decorations (head marker, coordinate, ;-part, ;;-overlay)
  *   on the last member of a written single-letter sequence, which
  *   ride the merged glyph instead of stranding it.
@@ -365,6 +366,13 @@ describe('BlissParser X-codes', () => {
     it('renders it identically to the written twin of the same run', () => {
       expect(new BlissSVGBuilder('Xaλ;C8').svgCode)
         .toBe(new BlissSVGBuilder('Xa/Xλ;C8').svgCode);
+    });
+
+    it('saves the glyph marked external, as the run alone is', () => {
+      // pins the run routed to its one text glyph before the part: a survivor
+      // of the 2026-11 stryker run left it unrouted and unmarked in the save
+      expect(new BlissSVGBuilder('Xaλ').toJSON().groups[0].glyphs[0].isExternalGlyph).toBe(true);
+      expect(new BlissSVGBuilder('Xaλ;C8').toJSON().groups[0].glyphs[0].isExternalGlyph).toBe(true);
     });
   });
 

@@ -20,7 +20,8 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   replaced whole by a nearer key, never accumulated; `style` on a box and on
  *   an ink area.
  * - The key never on its element's own group, link or lines, and no effect:
- *   no copy of it wraps the background.
+ *   no copy of it wraps the background; two keys naming filters drawn as two
+ *   filters side by side before it.
  * - `svgContent`.
  *
  * Does NOT cover:
@@ -154,6 +155,15 @@ describe('BlissSVGBuilder element background key reach', () => {
       const svg = build('[element-background--opacity=0.5;background=yellow]B313').svgCode;
 
       expect(contentOf(svg)).toBe(`${box(-1, -1, 10, 22, 'yellow', ' opacity="0.5"')}${B313}`);
+    });
+
+    it('writes the filters two keys name one after the other, before the background', () => {
+      // pins the background's filters written side by side: a survivor of the
+      // 2026-11 stryker run wrote other text between them
+      const svg = build('[element-background--filter=blur(1px);element-background--style=filter:blur(2px);background=yellow]B313').svgCode;
+      const [defs] = contentOf(svg).split('<rect');
+
+      expect(defs).toMatch(/^(<filter [^>]*>.*?<\/filter>){2}$/);
     });
   });
 

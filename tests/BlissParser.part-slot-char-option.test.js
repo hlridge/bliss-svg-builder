@@ -39,7 +39,9 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   a doubled separator (`>>CODE`) is still refused, in the first slot or a
  *   later one. More than one bracket
  *   at ONE scope warns `MULTIPLE_OPTION_BRACKETS`, applies the first and
- *   renders, at every scope and for every code class including word aliases.
+ *   renders, at every scope and for every code class including word aliases;
+ *   a later part's bracket is no second bracket of the first part, so a word
+ *   behind it still fails as a part (WORD_AS_PART).
  *   The legal different-scope adjacency (`[char][part]>CODE`,
  *   `[global]||[word]|CODE`) stays warning-free, which is what the `>` stop
  *   condition in the peel is for. All of it pinned on the definition path
@@ -450,6 +452,20 @@ describe('BlissParser part-slot character options', () => {
         expect(codes('[color=red]>[fill=green]>_DUPWORD'))
           .toEqual(['MULTIPLE_OPTION_BRACKETS', 'MISPLACED_PART_OPTION']);
         expect(partDoubled.svgCode).toBe(partSingle.svgCode);
+      } finally {
+        BlissSVGBuilder.removeDefinition('_DUPWORD');
+      }
+    });
+
+    it("leaves a later part's bracket with its part, so a word there still fails as a part", () => {
+      // pins the extra-bracket peel anchored at the code: a survivor of the
+      // 2026-11 stryker run peeled the later part's bracket as a second one and
+      // drew the whole character as the word behind it
+      BlissSVGBuilder.define({ _DUPWORD: { codeString: 'B291/B431' } });
+      try {
+        const b = build('[color=red]>S8;[color=blue]>_DUPWORD');
+        expect(b.warnings.map((w) => [w.code, w.source])).toEqual([['WORD_AS_PART', '_DUPWORD']]);
+        expect(b.toString()).toBe('[color=red]>S8;[color=blue]>_DUPWORD');
       } finally {
         BlissSVGBuilder.removeDefinition('_DUPWORD');
       }

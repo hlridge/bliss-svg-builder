@@ -23,7 +23,8 @@ import { blissElementDefinitions } from '../src/lib/bliss-element-definitions.js
  *   carries a non-zero local x offset: subtracts the first group's
  *   offset from the last group's far edge (not adds).
  * - baseWidth delegation by element level (element/group/glyph/part) and
- *   exclusion of root indicator overhang from element baseWidth.
+ *   exclusion of root indicator overhang from element baseWidth; a word's
+ *   baseWidth stopping short of an indicator placed past its last base.
  * - Defensive throws when a level-scoped width helper is called on the
  *   wrong level (rightExtendedGlyphWidth, baseGlyphWidth, baseGroupWidth).
  * - Root-level width on a single bare character (Enclosure full width,
@@ -209,6 +210,14 @@ describe('BlissElement baseWidth and width helpers', () => {
       expect(group.baseWidth).toBe(group.baseGroupWidth);
       expect(glyph.baseWidth).toBe(glyph.baseGlyphWidth);
       expect(part.baseWidth).toBe(part.width);
+    });
+
+    it('gives a word the base width of its characters, short of an indicator placed past the last', () => {
+      // pins a word's baseWidth read from its characters' bases: a survivor of
+      // the 2026-11 stryker run gave it the word's whole width
+      const group = new BlissSVGBuilder('B291/B313;B86:12,0').groups[0];
+      expect(group.baseWidth).toBe(18);
+      expect(group.width).toBe(24);
     });
   });
 

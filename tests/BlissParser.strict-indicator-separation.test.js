@@ -17,10 +17,11 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - `;` appends a part to a glyph in written order, with no warning;
  *   byte-identical to `addPart`.
  * - `;` on a bare alias / multi-character word / multi-word (`//`) alias warns
- *   MISPLACED_CHARACTER_INDICATOR, drops the part, and still renders the base
- *   as defined (the word's head keeps any baked indicator).
- * - Trailing `;` is inert (no strip, no warning, baked indicator kept); leading
- *   `;` is tolerated.
+ *   MISPLACED_CHARACTER_INDICATOR, drops the part (one behind its own
+ *   character bracket too), and still renders the base as defined (the word's
+ *   head keeps any baked indicator).
+ * - Trailing `;` is inert (no strip, no warning, baked indicator kept), on a
+ *   bare alias, a word and a glyph definition; leading `;` is tolerated.
  * - `!` after a single `;` has no special parse: it dumb-appends an invalid
  *   code on a glyph (UNKNOWN_CODE) but is dropped-before-validation when the
  *   base is misplaced (MISPLACED only, no UNKNOWN_CODE).
@@ -101,6 +102,16 @@ describe('BlissParser strict indicator separation', () => {
       expect(codes('NOUN_S;B81')).toContain('MISPLACED_CHARACTER_INDICATOR');
       expect(b.toString()).toBe('B291;B97');
     });
+
+    it('drops a misplaced part behind a character bracket as it drops a bare one', () => {
+      // pins the bracket peel anchored at the code: a survivor of the 2026-11
+      // stryker run peeled the part's bracket from mid-string and composed the
+      // part onto the alias
+      const b = new BlissSVGBuilder('NOUN;[color=red]B313');
+      expect(b.warnings.map((w) => [w.code, w.source])).toEqual([['MISPLACED_CHARACTER_INDICATOR', 'NOUN']]);
+      expect(b.toString()).toBe('B291;B81');
+      expect(b.svgCode).toBe(svg('B291;B81'));
+    });
   });
 
   describe('when ; is applied to a multi-character word', () => {
@@ -139,6 +150,16 @@ describe('BlissParser strict indicator separation', () => {
       const b = new BlissSVGBuilder('NOUN;');
       expect(b.toString()).toBe('B291;B81');
       expect(b.warnings).toEqual([]);
+    });
+
+    it('keeps a trailing ; inert on a glyph definition, drawing it as alone', () => {
+      // pins the trailing ; cut from the token a glyph definition is held by:
+      // a survivor of the 2026-11 stryker run wrote other text in its place,
+      // failing the character as an unknown code
+      const b = new BlissSVGBuilder('GPLAIN;');
+      expect(b.warnings).toEqual([]);
+      expect(b.svgCode).toBe(svg('GPLAIN'));
+      expect(b.toString({ preserve: true })).toBe('GPLAIN');
     });
 
     it('does not flag a trailing ; on a word as misplaced', () => {

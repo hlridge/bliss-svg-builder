@@ -20,6 +20,8 @@ import { BlissSVGBuilder } from '../src/index.js';
  * - The report names the axis and quotes the value it was handed.
  * - A refused field beside a written option is not also reported as an
  *   overridden position, since it was never going to be used.
+ * - A valid field beside a valid option of the same axis: the option wins and
+ *   one report names every field it displaced (`x=1;y=2` on a word).
  *
  * Does NOT cover:
  * - The OPTIONS-BAG spelling of a position (`{options:{x:'3'}}`), which has had
@@ -237,6 +239,17 @@ describe('BlissSVGBuilder object-input position gate', () => {
       });
       expect(builder.toString()).toBe('B291;ZSA:5');
       expect(codesOf(builder)).toEqual(['MULTIPLE_POSITION_VALUES']);
+    });
+
+    it('names both overridden axes of a word in one report, as an option bracket joins them', () => {
+      // pins the axes joined as a bracket joins its keys: a survivor of the
+      // 2026-11 stryker run reported them as `x=1y=2`
+      const builder = new BlissSVGBuilder({
+        groups: [{ x: 1, y: 2, options: { x: 3, y: 4 }, glyphs: [{ parts: [{ codeName: 'B291' }] }] }],
+      });
+      expect(builder.toString()).toBe('[x=3;y=4]|B291');
+      expect(builder.warnings.map(({ code, source }) => ({ code, source })))
+        .toEqual([{ code: 'MULTIPLE_POSITION_VALUES', source: 'x=1;y=2' }]);
     });
 
     it('does not report a refused field as an overridden position', () => {

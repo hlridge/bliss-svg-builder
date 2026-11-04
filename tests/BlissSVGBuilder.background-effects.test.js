@@ -14,13 +14,15 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
  *   around an ink area, the painted element's own never repeated inside its
  *   ink area; paint, `class`, `id` and the other pass-through attributes
  *   (`mix-blend-mode`, `isolation`, `pointer-events`, `cursor`,
- *   `vector-effect`) never copied.
+ *   `vector-effect`) never copied, nor a `data-` attribute whose value reads
+ *   as a style.
  * - Reading a `style`: split at each `;` outside parentheses, quotes and
  *   comments, a property read in any case, spacing and comments, each effect
  *   declaration copied as written and in order, and no copy for a `style`
  *   with none.
  * - A filter's copy drawn as its own native filter, its region from what the
- *   copy holds (#34).
+ *   copy holds (#34); a filter option beside a filter in `style` drawn as two
+ *   filters side by side, in a word's copy and in its ink area's.
  * - The layer as the tree pared down to its effects: copies nested outermost
  *   first, one copy shared by every background under one element, none for
  *   an element with nothing painted beneath it, the whole layer still first.
@@ -144,6 +146,10 @@ describe('BlissSVGBuilder background effects', () => {
         + '<path vector-effect="non-scaling-stroke" d="M0,10a2,2 0 1,1 4,0a2,2 0 1,1 4,0q0,3 -4,6q-4,-3 -4,-6"/></g>'],
       ['a character\'s paint and class, into its word\'s ink area', '[background-area=ink;background=yellow]|[color=red;class=noun]B313/B291',
         `${inkArea('yellow', 1.3, B313_B291)}<g stroke="red" class="noun">${B313}</g>${B291_AT_10}`],
+      // pins a style read only from `style`: a survivor of the 2026-11 stryker
+      // run read this value as one and blurred the box
+      ['a data attribute whose value reads as a style', '[data-note=filter:blur(1px);background=yellow]B313',
+        `${YELLOW_B313}<g data-note="filter:blur(1px)">${B313}</g>`],
     ])('copies none of %s', (_case, input, expected) => {
       expect(contentOf(build(input).svgCode)).toBe(expected);
     });
@@ -182,6 +188,26 @@ describe('BlissSVGBuilder background effects', () => {
     ])('writes no copy for a style with %s', (_case, style, emitted) => {
       expect(contentOf(build(`[style="${style}";background=yellow]B313`).svgCode))
         .toBe(`${YELLOW_B313}<g style="${emitted}">${B313}</g>`);
+    });
+  });
+
+  describe('when an element writes one filter as an option and another in its style', () => {
+    it('writes the two filters of its word\'s copy one after the other, before the box', () => {
+      // pins the copy's filters written side by side: a survivor of the
+      // 2026-11 stryker run wrote other text between them
+      const svg = build('[filter=blur(1px);style=filter:blur(2px);background=yellow]|B313/B291').svgCode;
+      const [copy] = contentOf(svg).split('<rect');
+
+      expect(copy).toMatch(/^<g [^>]*>(<filter [^>]*>.*?<\/filter>){2}$/);
+    });
+
+    it('writes the two filters of its copy in its word\'s ink area one after the other, before its lines', () => {
+      // pins the ink area copy's filters written side by side: a survivor of
+      // the 2026-11 stryker run wrote other text between them
+      const svg = build('[background-area=ink;background=yellow]|[filter=blur(1px);style=filter:blur(2px)]B313/B291').svgCode;
+      const [copy] = contentOf(svg).split('<path');
+
+      expect(copy).toMatch(/^<g class="bliss-element-background bliss-element-background--ink"[^>]*><g [^>]*>(<filter [^>]*>.*?<\/filter>){2}$/);
     });
   });
 
