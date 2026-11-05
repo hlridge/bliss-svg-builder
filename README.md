@@ -77,7 +77,7 @@ For complete documentation including DSL syntax, mutation API, element inspectio
 
 ## Stability
 
-**Stable.** As of 1.0.0 the public API and DSL are settled. Within the 1.x line the aim is that valid input keeps rendering the same and the documented API stays compatible; behavior changes ride a new major version and are noted in the [changelog](./CHANGELOG.md).
+**Stable.** As of 1.0.0 the public API and DSL are settled. Within the 1.x line the aim is that valid input keeps rendering the same and the documented API stays compatible. A minor release may still change existing behavior, mostly to correct output that was wrong or had no effect; the [changelog](./CHANGELOG.md) lists each such change first, with what to do if you relied on the old behavior.
 
 ## License
 
