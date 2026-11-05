@@ -289,7 +289,7 @@ A whole global option bracket written after the start of the input, as a bracket
 [grid]||B313//[color=red]||B431   →  renders as [grid]||B313//B431
 ```
 
-The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid` and all `grid-*` colors and stroke widths, `background-top`, `background-mid`, `background-bottom`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
+The canvas-wide keys: `margin`/`margin-*`, `crop`/`crop-*`, `grid`, `grid-shift` and all `grid-*` colors and stroke widths, `background-top`, `background-mid`, `background-bottom`, `center`, `min-width`, `char-space`, `word-space`, `external-glyph-space`, `svg-title`, `svg-desc`, `svg-height`, `error-placeholder`.
 
 The report is the same however the key reaches that scope: a bracket, a bracket inside a custom code's `codeString`, a composition object, `setOptions()` or the options of an adding or replacing method, and `setTransientOptions()`. Only the last sentence of the message changes, to say where the key goes in the notation you were using:
 

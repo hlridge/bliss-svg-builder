@@ -276,7 +276,7 @@ builder.removeOptions('grid');
 builder.toString(); // 'B313'
 ```
 
-`setOptions` takes what the constructor's [options argument](/handbook/syntax-options/programmatic-options) takes, `{ defaults, overrides }` included, and stores what that argument would. Repeated calls merge. `x` and `y` move the whole composition, and kerning, which belongs to a character, is refused with a warning. Full detail: [`setOptions(opts)` and `removeOptions(...keys)`](/reference/api-documentation#setoptions-opts-and-removeoptions-keys).
+`setOptions` takes what the constructor's [options argument](/handbook/syntax-options/programmatic-options) takes, `{ defaults, overrides }` included, and stores what that argument would. Repeated calls merge. `x` and `y` move the whole composition, and kerning (`relativeKerning`, `absoluteKerning`), which belongs to a character, is refused with a warning. Full detail: [`setOptions(opts)` and `removeOptions(...keys)`](/reference/api-documentation#setoptions-opts-and-removeoptions-keys).
 
 ### Transient Options
 

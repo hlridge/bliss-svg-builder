@@ -610,7 +610,7 @@ builder.removeOptions('grid');
 builder.toString(); // 'B313'
 ```
 
-`setOptions` takes what the constructor's options argument takes, flat options or `{ defaults, overrides }`, and stores what passing the same keys to the constructor would. Repeated calls merge, and the last value of a key wins. `x` and `y` move the whole composition. Kerning belongs to a character, so it is dropped with [`MISPLACED_KERNING_OPTION`](/reference/warning-codes#misplaced-kerning-option).
+`setOptions` takes what the constructor's options argument takes, flat options or `{ defaults, overrides }`, and stores what passing the same keys to the constructor would. Repeated calls merge, and the last value of a key wins. `x` and `y` move the whole composition. Kerning (`relativeKerning`, `absoluteKerning`) belongs to a character, so it is dropped with [`MISPLACED_KERNING_OPTION`](/reference/warning-codes#misplaced-kerning-option).
 
 `removeOptions` reads a name as an element's [`.removeOptions()`](#removeoptions-keys) does, and naming `x` or `y` removes the composition's position, however it was set. Once the last global option goes, the string has no `[...]||` prefix.
 
