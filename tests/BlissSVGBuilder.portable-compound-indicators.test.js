@@ -24,8 +24,9 @@
  * - The same compound alone on that base: its parts written where they were
  *   drawn, the string's reload with identical ink but a wider character (a
  *   residue).
- * - The JSON of both, which keeps the plain part flagged: every part placed,
- *   reloading as drawn without a warning.
+ * - The JSON of both, also given a position on either axis, which keeps the
+ *   plain part flagged: every part placed, reloading as drawn without a
+ *   warning.
  * - `preserve`, which keeps every name.
  * - Controls: a lone compound, a compound as a character's base, an
  *   unpositioned compound of indicators on a character.
@@ -186,6 +187,14 @@ describe('BlissSVGBuilder portable compound indicators', () => {
       // regression: B270 reloaded as plain ink, widening the character
       ['B4;PC_MIXED', [{ codeName: 'B4' },
         { codeName: 'B270', x: -1, isIndicator: true, width: 2 }, { codeName: 'B86', x: -1, isIndicator: true, width: 2 }]],
+      // regression: given a position, B270 reloaded as plain ink, after B81
+      // its parts elsewhere and alone its character wider
+      ['B4;B81;PC_MIXED:1', [{ codeName: 'B4' }, { codeName: 'B81', x: -2.5, isIndicator: true, width: 2 },
+        { codeName: 'B270', x: 1, isIndicator: true, width: 2 }, { codeName: 'B86', x: 1, isIndicator: true, width: 2 }]],
+      ['B4;B81;PC_MIXED:,1', [{ codeName: 'B4' }, { codeName: 'B81', x: -2.5, isIndicator: true, width: 2 },
+        { codeName: 'B270', x: 0.5, y: 1, isIndicator: true, width: 2 }, { codeName: 'B86', x: 0.5, y: 1, isIndicator: true, width: 2 }]],
+      ['B4;PC_MIXED:-2', [{ codeName: 'B4' },
+        { codeName: 'B270', x: -2, isIndicator: true, width: 2 }, { codeName: 'B86', x: -2, isIndicator: true, width: 2 }]],
     ])('places every part of the JSON of %s, which reloads as drawn without a warning', (input, parts) => {
       const builder = new BlissSVGBuilder(input);
       const json = builder.toJSON();

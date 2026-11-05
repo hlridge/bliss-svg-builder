@@ -26,12 +26,14 @@
  * - The string saves, which already break custom codes down, see
  *   `BlissSVGBuilder.custom-glyphs.test.js`; this JSON spells a custom code
  *   out with the same step.
- * - A compound indicator written in a slot WITH a position, whose broken-down
- *   form reloads with its parts elsewhere, in the string as in this JSON
+ * - A compound indicator holding a plain part on a base narrower than it,
+ *   with or without a position: its string reloads as another picture
  *   (backlog: "Mixed-base compound indicator doesn't round-trip through
- *   primitive decomposition").
- * - A word-level (`;;`) code named by a custom definition, kept by its name
- *   in both default saves (backlog).
+ *   primitive decomposition"), its JSON as drawn, see
+ *   `BlissSVGBuilder.portable-compound-indicators.test.js`.
+ * - A word-level (`;;`) code named by a custom definition, spelled out in
+ *   both default saves, see `BlissSVGBuilder.portable-word-indicators.test.js`
+ *   and `BlissSVGBuilder.portable-word-plain-parts.test.js`.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { BlissSVGBuilder } from '../src/index.js';
