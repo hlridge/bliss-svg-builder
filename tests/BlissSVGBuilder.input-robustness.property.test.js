@@ -15,11 +15,15 @@ import { boundedInputArb, SEED, FUZZ_RUNS, MAX_OUTPUT_CHARS } from './utils/prop
  * A fixed seed + fixed run count make this a deterministic release gate; a
  * failure prints the seed and a shrunk counterexample for replay.
  *
- * Covers (Codex-formulated property 4 of the run-to-stable Phase 3 spec):
+ * Covers:
  * - No throw across construction, rendering, toString(), and toJSON() (within
  *   the documented 10,000-char input cap; see Does NOT cover).
  * - No non-finite geometry (NaN/Infinity) in the rendered SVG for inputs whose
  *   numeric values fit in a double-precision float (the fuzz's numeric range).
+ * - A number too large for a double (>=309 integer digits, either sign) written
+ *   where the DSL reads a number (a coordinate, `RK`/`AK`, a numeric option)
+ *   draws finite SVG and is reported. The 40-char fuzz cannot reach the ~1.8e308
+ *   threshold, so a separate generator writes these numbers into each such slot.
  * - No hang (enforced by the vitest test timeout).
  *
  * Does NOT cover:
@@ -27,13 +31,6 @@ import { boundedInputArb, SEED, FUZZ_RUNS, MAX_OUTPUT_CHARS } from './utils/prop
  *   design); see `BlissSVGBuilder.serialization-roundtrip.property.test.js`.
  * - The specific warning code emitted for a given malformation; that is pinned
  *   by the example-based parser/warning suites.
- * - Numeric values large enough to OVERFLOW a double (>=309 integer digits in a
- *   coordinate, `min-width`, `margin`, `RK`/`AK`, ...) render silently non-finite
- *   SVG (`width="Infinity"`/`"NaN"`, zero warnings). This is a registered,
- *   currently-deferred library gap (`.claude/backlog/option-content-validation.md`,
- *   "malformed NUMERIC option values"). The 40-char fuzz bound cannot reach the
- *   ~1.8e308 threshold, so the NaN/Infinity check above cannot exercise it at gate
- *   scope; the `it.todo` below is the tripwire for when that gap is fixed.
  * - Runaway output: `MAX_OUTPUT_CHARS` is a generous backstop that the bounded
  *   input (linear expansion, <=10k input cap) cannot reach at gate scope; it
  *   guards against a future superlinear regression, not a currently-reachable one.
@@ -42,6 +39,23 @@ import { boundedInputArb, SEED, FUZZ_RUNS, MAX_OUTPUT_CHARS } from './utils/prop
  */
 
 const config = { seed: SEED, numRuns: FUZZ_RUNS };
+
+// Each slot the DSL reads as a number, with `#` where the number goes.
+// `svg-height` sits on a wide picture: the width is derived from the height by
+// the picture's ratio, and only a ratio above ~1.8 carries a huge height past
+// the double's range.
+const NUMERIC_SLOTS = [
+  'B313:#,0', 'B313:0,#', 'B313/RK:#/B291', 'B313/AK:#/B291', '[x=#]B313', '[y=#]B313',
+  '[margin=#]||B313', '[min-width=#]||B313', '[crop=#]||B313', '[crop-right=#]||B313',
+  '[svg-height=#]||B313/B313/B313/B313/B313', '[stroke-width=#]||B313',
+  '[char-space=#]||B313/B291', '[word-space=#]||B313//B291', '[relative-kerning=#]B291',
+  '[grid;grid-shift=#]||B313',
+];
+
+// A number past what a double holds (~1.8e308), either sign, in one of the slots.
+const overflowInputArb = fc
+  .tuple(fc.constantFrom(...NUMERIC_SLOTS), fc.constantFrom('', '-'), fc.integer({ min: 309, max: 400 }))
+  .map(([slot, sign, digits]) => slot.replace('#', `${sign}${'9'.repeat(digits)}`));
 
 describe('BlissSVGBuilder input robustness (property-based)', { tags: ['@property'] }, () => {
   describe('when constructing from an arbitrary bounded string', () => {
@@ -67,22 +81,25 @@ describe('BlissSVGBuilder input robustness (property-based)', { tags: ['@propert
           // so any match is geometry the renderer emitted, not passed-through
           // input. Note this catches ARITHMETIC non-finiteness only; a numeric
           // value that OVERFLOWS a double needs >=309 digits, which the 40-char
-          // bound cannot assemble (see the header + the it.todo below).
+          // bound cannot assemble (the next describe covers that).
           expect(svg).not.toMatch(/NaN|Infinity/);
           expect(svg.length).toBeLessThan(MAX_OUTPUT_CHARS);
         }),
         config,
       );
     });
+  });
 
-    // Tripwire for the registered numeric-value-validation gap
-    // (.claude/backlog/option-content-validation.md, "malformed NUMERIC option
-    // values"). A >=309-digit numeric coordinate / min-width / margin / RK
-    // overflows a double to Infinity/NaN and lands in the SVG silently; the
-    // 40-char fuzz cannot reach the ~1.8e308 threshold, so the NaN/Infinity
-    // assertion above is dead at gate scope. When that gap is fixed (overflow
-    // warns or clamps instead of emitting non-finite SVG), implement this with a
-    // huge-numeric arbitrary so the finite-geometry check gains real teeth.
-    it.todo('warns or clamps numeric values that overflow a double (option-content-validation.md)');
+  describe('when a number too large for a double fills a numeric slot', () => {
+    it('renders finite SVG and reports the value', () => {
+      fc.assert(
+        fc.property(overflowInputArb, (s) => {
+          const b = new BlissSVGBuilder(s);
+          expect(b.svgCode).not.toMatch(/NaN|Infinity/);
+          expect(b.warnings.length).toBeGreaterThan(0);
+        }),
+        config,
+      );
+    });
   });
 });
