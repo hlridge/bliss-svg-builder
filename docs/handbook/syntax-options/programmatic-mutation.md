@@ -430,7 +430,7 @@ builder.removeElement(1);
 builder.replaceElement(1, 'QSP');
 ```
 
-`SP` is the standard space code. It auto-resolves to `TSP` (standard word spacing) or `QSP` (reduced spacing before punctuation). You can also use `TSP` or `QSP` explicitly for precise control.
+`SP` is the standard space code. In a string it becomes `TSP` (standard word spacing), or `QSP` (reduced spacing) before a punctuation mark. These raw methods read the code on its own, with nothing after it, so `SP` always becomes `TSP` here: pass `QSP` yourself for the space before a punctuation mark.
 
 ### Inspecting Space Groups
 

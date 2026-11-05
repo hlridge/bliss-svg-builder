@@ -661,7 +661,7 @@ builder.insertElement(1, 'SP');
 // inserts space at raw index 1
 ```
 
-`SP` auto-resolves to `TSP` (standard spacing) or `QSP` (reduced spacing before punctuation). Use `TSP` or `QSP` explicitly to bypass resolution.
+The code is read on its own, with nothing after it, so `SP` always becomes `TSP` (standard spacing) here. In a string, `SP` before a punctuation mark becomes `QSP` (reduced spacing); with these methods, pass `QSP` yourself.
 
 An omitted or empty `code` inserts an [empty group](#empty-slots-are-deliberate).
 
@@ -1308,7 +1308,7 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | `isIndicator` | `boolean` | no | Marks this glyph as an indicator |
 | `anchorOffsetX` | `number` | no | Horizontal anchor adjustment; unset on a glyph that draws one code, that code's |
 | `anchorOffsetY` | `number` | no | Vertical anchor adjustment; unset on a glyph that draws one code, that code's |
-| `width` | `number` | no | Width override |
+| `width` | `number` | no | Metadata only: it does not change how the glyph draws or spaces (`toJSON()` writes it on the plain-shape parts of a custom indicator) |
 | `shrinksPrecedingWordSpace` | `boolean` | no | Auto-shrink word space before this glyph (like punctuation) |
 
 **type: 'shape': primitive (getPath) or composite (codeString):**
@@ -1319,8 +1319,8 @@ The `type` field controls what kind of definition is created: `'glyph'`, `'shape
 | `width` | `number` | if primitive | Shape width in grid units |
 | `height` | `number` | if primitive | Shape height in grid units |
 | `codeString` | `string` | if composite | Composition of existing shapes |
-| `x` | `number` | no | Default x offset |
-| `y` | `number` | no | Default y offset |
+| `x` | `number` | no | Primitive only: the left edge of the path's box, if the path starts away from the point `getPath` is given (default 0). Automatic crops, a part's own background and link area, and a filter's region use this box; the path itself is not moved |
+| `y` | `number` | no | Primitive only: the top edge of the path's box, as `x` |
 | `extraPathOptions` | `object` | no | Extra options passed to `getPath` |
 | `defaultOptions` | `object` | no | The shape's own options (see [own options](#a-definition-s-own-options)) |
 
@@ -1335,7 +1335,7 @@ For adding characters from external font systems. Requires providing your own SV
 | `getPath` | `function(x, y, options)` | yes | Returns SVG path `d` string |
 | `width` | `number` | yes | Glyph width |
 | `char` | `string` | yes | Rendered Unicode character (e.g. `'a'` for the external glyph registered as `'Xa'`) |
-| `y` | `number` | no | Y offset |
+| `y` | `number` | no | The top of the glyph's ink, if `getPath` draws below the point it is given (with `height`, the ink's extent). Automatic crops and a part's own background and link area use it; the path itself is not moved |
 | `height` | `number` | no | Glyph height |
 | `kerningRules` | `object` | no | Kerning pair adjustments |
 

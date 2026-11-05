@@ -1299,8 +1299,9 @@ export declare class BlissSVGBuilder {
   splitAt(groupIndex: number): BlissSVGBuilder;
 
   /**
-   * Appends a raw group with no automatic space management. SP auto-resolves
-   * to TSP/QSP. An omitted, empty, or whitespace-only `code` appends an empty group.
+   * Appends a raw group with no automatic space management. The code is read
+   * on its own, so `SP` becomes `TSP`; pass `QSP` for the space before a
+   * punctuation mark. An omitted, empty, or whitespace-only `code` appends an empty group.
    * @throws {TypeError} If `code` is provided and is not a string.
    * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
@@ -1310,7 +1311,8 @@ export declare class BlissSVGBuilder {
 
   /**
    * Inserts a raw group at the given index with no automatic space management.
-   * SP auto-resolves. An omitted, empty, or whitespace-only `code` inserts an empty group.
+   * The code is read on its own, so `SP` becomes `TSP` (see `addElement`). An
+   * omitted, empty, or whitespace-only `code` inserts an empty group.
    * @throws {TypeError} If `code` is provided and is not a string.
    * @throws {TypeError} If `opts` is provided and is not an object.
    * @throws {Error} If `code` does not parse to exactly one group, or
