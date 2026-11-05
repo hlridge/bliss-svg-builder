@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0 (2026-11-05)
 
 Everything below is the change since `1.0.0`. The first section lists what an app built on 1.0.0 may notice after upgrading, each entry with what to do if you relied on the old behavior.
 

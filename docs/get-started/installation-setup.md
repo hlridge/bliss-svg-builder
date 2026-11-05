@@ -132,7 +132,7 @@ The ESM bundle can also be self-hosted, but the bare specifier `'bliss-svg-build
 :::
 
 ::: details Choosing a version
-Installing without a version (`npm install bliss-svg-builder`) gets the latest stable release and records a caret range (`^1.0.0`), so future installs stay on 1.x and pick up patches and minor updates without breaking changes. The CDN examples pin to `@1` for the same reason: a browser `<script>` has no lockfile, so an unpinned URL would jump to the next major the day it ships. To pin exactly, use a full version like `@1.0.0`.
+Installing without a version (`npm install bliss-svg-builder`) gets the latest stable release and records a caret range (`^1.1.0`), so future installs stay on 1.x and pick up patches and minor updates without breaking changes. The CDN examples pin to `@1` for the same reason: a browser `<script>` has no lockfile, so an unpinned URL would jump to the next major the day it ships. To pin exactly, use a full version like `@1.1.0`.
 :::
 
 ::: details Using jsDelivr instead of unpkg
