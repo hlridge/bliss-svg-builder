@@ -200,7 +200,11 @@ export interface BlissOptions {
   [key: string]: string | number | boolean | undefined;
 }
 
-/** Cascading option layers: defaults (lowest priority) and overrides (highest priority). */
+/**
+ * Cascading option layers: defaults (lowest priority) and overrides (highest
+ * priority), at the level the options are applied. A bracket deeper in the
+ * string still wins where it is.
+ */
 export interface OptionLayers {
   defaults?: BlissOptions;
   overrides?: BlissOptions;

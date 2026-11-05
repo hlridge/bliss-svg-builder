@@ -21,7 +21,7 @@ new BlissSVGBuilder(input, { defaults, overrides })
 |-----------|------|-------------|
 | `input` | `string` | DSL input string |
 | `defaults` | `object` | Options applied when the string doesn't set them (optional) |
-| `overrides` | `object` | Options that always win, even over the string (optional) |
+| `overrides` | `object` | Options that win over the string's global options (optional) |
 
 Both `defaults` and `overrides` are optional. Omitting the second parameter preserves full backward compatibility.
 
@@ -36,7 +36,9 @@ defaults → DSL string → overrides
 ```
 
 - **Defaults** provide fallback values. The DSL string wins if it sets the same option.
-- **Overrides** enforce values. They always win, even if the DSL string sets the same option.
+- **Overrides** enforce values. They win even if the string's global bracket (`[...]||`) sets the same option.
+
+These are global options, so they meet the string's global options. A bracket deeper in the string, on a word, a character or a part, still wins where it is, as the more specific level always does (see [Where an override stops](#where-an-override-stops)).
 
 ### Defaults Example
 
@@ -73,7 +75,20 @@ const builder = new BlissSVGBuilder('[color=blue]||B313', {
 // Result: red stroke (override wins)
 ```
 
-<Demo code="[color=red]||B313" title="Override always wins" />
+<Demo code="[color=red]||B313" title="Override wins over the global bracket" />
+
+### Where an override stops
+
+An override is a global option, so a bracket written on a character keeps its own value:
+
+```js
+const builder = new BlissSVGBuilder('[color=blue]B313', {
+  overrides: { color: 'red' }
+});
+// Result: blue stroke (the bracket belongs to the character)
+```
+
+<Demo code="[color=red]||[color=blue]B313" title="A character's own bracket wins" />
 
 ### All Three Layers
 

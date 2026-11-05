@@ -685,6 +685,6 @@ builder.addGroup('[color=red]B431', {
 });
 ```
 
-Precedence: `defaults` → DSL string → `overrides`.
+Precedence: `defaults` → DSL string → `overrides`, at the level the method adds: a word for `addGroup`, a character for `addGlyph`, a part for `addPart`. A bracket deeper in the code string still wins where it is: `addGroup('[color=blue]B431', { overrides: { color: 'red' } })` draws blue, since that bracket belongs to the character, while `addGroup('[color=blue]|B431', ...)` draws red.
 
 Flat options `{ color: 'red' }` are equivalent to `{ overrides: { color: 'red' } }`. The structured format is only needed when you want to set defaults that the DSL string can override.
