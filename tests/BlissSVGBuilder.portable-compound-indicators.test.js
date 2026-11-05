@@ -10,17 +10,22 @@
  *   offset as a character's base, a single indicator with a baked offset on
  *   either axis, and one nesting a displaced compound: the exact default
  *   string, the same string flattened and without options, and the default
- *   JSON rebuilt to it; each reloading as drawn and naming only built-in
- *   codes.
+ *   JSON rebuilt to it (for one holding a plain part, the JSON's exact parts,
+ *   the plain part flagged as an indicator); each reloading as drawn and
+ *   naming only built-in codes.
  * - The flattened saves of a compound written as a word-level `;;` code.
  * - A compound after another indicator, and one before another indicator;
  *   the one holding a plain part reloading without a warning.
  * - A compound given through `glyph(0).applyIndicators()` and `addPart()`.
  * - A compound holding a plain part whose parts cannot settle where they were
- *   drawn, after another indicator on a base narrower than it: saved as
- *   before, no position written (its reload still differs, a residue).
+ *   drawn, after another indicator on a base narrower than it: the string
+ *   saved as before, no position written (its reload still differs, a
+ *   residue).
  * - The same compound alone on that base: its parts written where they were
- *   drawn, the reload's ink identical but its character wider (a residue).
+ *   drawn, the string's reload with identical ink but a wider character (a
+ *   residue).
+ * - The JSON of both, which keeps the plain part flagged: every part placed,
+ *   reloading as drawn without a warning.
  * - `preserve`, which keeps every name.
  * - Controls: a lone compound, a compound as a character's base, an
  *   unpositioned compound of indicators on a character.
@@ -87,13 +92,20 @@ const PLACED = [
   // pins the written zeros reaching the save: left out, B86 would be centred;
   // the y the layout already gives is not written
   ['B291;PC_STACK:0,0', 'B291;B86:0;B97:3'],
-  ['B291;PC_MIXED', 'B291;B270:3;B86'],
   ['PC_OFFSET;B81', 'B86;B97:5,0;B81:8'],
   ['B291;PC_INDPOS', 'B291;B81:4,0'],
   ['B291;PC_INDPOSY', 'B291;B81:3,2'],
   ['B291;PC_OUTER', 'B291;B86:0.5,0;B97:2.5,0;B81:5.5'],
   ['B291;B81;PC_BAKED', 'B291;B81;B97;B99:6,0'],
-  ['B291;PC_MIXED;B81', 'B291;B270:1.5;B86;B81'],
+];
+
+// A compound holding a plain part: the string, then the default JSON's parts.
+const PLACED_HOLDING_PLAIN = [
+  ['B291;PC_MIXED', 'B291;B270:3;B86', [{ codeName: 'B291' },
+    { codeName: 'B270', x: 3, isIndicator: true, width: 2 }, { codeName: 'B86', x: 3, isIndicator: true, width: 2 }]],
+  ['B291;PC_MIXED;B81', 'B291;B270:1.5;B86;B81', [{ codeName: 'B291' },
+    { codeName: 'B270', x: 1.5, isIndicator: true, width: 2 }, { codeName: 'B86', x: 1.5, isIndicator: true, width: 2 },
+    { codeName: 'B81', x: 4.5, isIndicator: true, width: 2 }]],
 ];
 
 const AS_DRAWN = [
@@ -121,6 +133,24 @@ describe('BlissSVGBuilder portable compound indicators', () => {
       expect(notBuiltIn([...codesOfString(string), ...codesOfJson(json)])).toEqual([]);
     });
 
+    it.each(PLACED_HOLDING_PLAIN)('saves %s as %s, and the JSON with every part flagged and placed, each reloading as drawn', (input, saved, parts) => {
+      // re-pinned: the JSON keeps B270 flagged as the compound it came from,
+      // so B270 and B86 lay out as a row on reload and B86 is written where it
+      // was drawn; the string, which has no spelling for the flag, is
+      // unchanged (backlog: "A flagged indicator whose code string writes a
+      // coordinate loses isIndicator and width in the default toJSON()")
+      const builder = new BlissSVGBuilder(input);
+      const string = builder.toString();
+      const json = builder.toJSON();
+      expect(string).toBe(saved);
+      expect(builder.toString({ flattenIndicators: true })).toBe(saved);
+      expect(builder.toString({ omitOptions: true })).toBe(saved);
+      expect(json.groups[0].glyphs[0].parts).toEqual(parts);
+      expect(new BlissSVGBuilder(string).svgCode).toBe(builder.svgCode);
+      expect(new BlissSVGBuilder(json).svgCode).toBe(builder.svgCode);
+      expect(notBuiltIn([...codesOfString(string), ...codesOfJson(json)])).toEqual([]);
+    });
+
     it('saves B291;B81;PC_MIXED as B291;B81:1.5;B270:4.5;B86:4.5, which reloads as drawn without a warning', () => {
       // regression: the save wrote B291;B81;B270;B86, a plain part after an
       // indicator, which warns MISPLACED_INDICATOR_PART on reload
@@ -135,17 +165,34 @@ describe('BlissSVGBuilder portable compound indicators', () => {
   });
 
   describe('when the spelled-out parts cannot settle where they were drawn', () => {
-    it('saves B4;B81;PC_MIXED as before, writing no position on any part', () => {
+    it('saves the string of B4;B81;PC_MIXED as before, writing no position on any part', () => {
       // pins writing only a placement that settles: B270 reaches left of B4's
       // start, and a plain part after an indicator re-origins the character,
       // so every round moves every part. The reload still differs (backlog:
       // "Mixed-base compound indicator doesn't round-trip through primitive
       // decomposition")
       const builder = new BlissSVGBuilder('B4;B81;PC_MIXED');
-      const parts = builder.toJSON().groups[0].glyphs[0].parts;
       expect(builder.toString()).toBe('B4;B81;B270;B86');
-      expect(parts.filter((part) => part.x !== undefined || part.y !== undefined)).toEqual([]);
       expect(new BlissSVGBuilder(builder.toString()).svgCode).not.toBe(builder.svgCode);
+    });
+  });
+
+  describe('when the JSON keeps a compound\'s plain part flagged on a narrower base', () => {
+    it.each([
+      // re-pinned: written unplaced, B270 reloaded as a plain part after an
+      // indicator, elsewhere and warning MISPLACED_INDICATOR_PART
+      ['B4;B81;PC_MIXED', [{ codeName: 'B4' }, { codeName: 'B81', x: -2.5, isIndicator: true, width: 2 },
+        { codeName: 'B270', x: 0.5, isIndicator: true, width: 2 }, { codeName: 'B86', x: 0.5, isIndicator: true, width: 2 }]],
+      // regression: B270 reloaded as plain ink, widening the character
+      ['B4;PC_MIXED', [{ codeName: 'B4' },
+        { codeName: 'B270', x: -1, isIndicator: true, width: 2 }, { codeName: 'B86', x: -1, isIndicator: true, width: 2 }]],
+    ])('places every part of the JSON of %s, which reloads as drawn without a warning', (input, parts) => {
+      const builder = new BlissSVGBuilder(input);
+      const json = builder.toJSON();
+      const reloaded = new BlissSVGBuilder(json);
+      expect(json.groups[0].glyphs[0].parts).toEqual(parts);
+      expect(reloaded.warnings).toEqual([]);
+      expect(reloaded.svgCode).toBe(builder.svgCode);
     });
   });
 
@@ -196,7 +243,7 @@ describe('BlissSVGBuilder portable compound indicators', () => {
   describe('when saved with preserve', () => {
     it('keeps every compound named, as written', () => {
       // control: passes before C25
-      const inputs = [...PLACED, ...AS_DRAWN].map(([input]) => input).concat('B291;B81;PC_MIXED');
+      const inputs = [...PLACED, ...PLACED_HOLDING_PLAIN, ...AS_DRAWN].map(([input]) => input).concat('B291;B81;PC_MIXED');
       const preserved = Object.fromEntries(inputs.map((input) => [input, new BlissSVGBuilder(input).toString({ preserve: true })]));
       expect(preserved).toEqual(Object.fromEntries(inputs.map((input) => [input, input])));
     });

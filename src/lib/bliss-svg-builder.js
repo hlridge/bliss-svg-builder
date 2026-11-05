@@ -4253,11 +4253,13 @@ class BlissSVGBuilder {
               // The public JSON spells a custom code out as the string does,
               // so another instance can read it without the definition: a
               // part named by one is published as the parts it draws, each
-              // where it was drawn. `preserve` keeps the names, and `deep`
-              // output feeds the string, which spells them out itself.
+              // where it was drawn, and each drawn for a custom indicator
+              // marked as one, which the string cannot write. `preserve`
+              // keeps the names, and `deep` output feeds the string, which
+              // spells them out itself.
               if (!options.preserve && !options.deep) {
                 const overlay = glyphIndex === overlayHead ? group.wordIndicators : null;
-                const written = BlissSVGBuilder.#writtenParts(glyph.parts, () => false, readings, overlay, true);
+                const written = BlissSVGBuilder.#writtenParts(glyph.parts, () => false, readings, overlay, true, () => false, true);
                 glyph.parts = written.parts;
                 if (written.codes) group.wordIndicators = { ...overlay, codes: written.codes };
               }
@@ -4781,17 +4783,46 @@ class BlissSVGBuilder {
   // one is (#spelledOutWordCodes). `losesIndicator(part)` names a part the
   // save's reload reads as plain ink though the builder drew it as an
   // indicator; a character holding one is placed even where nothing in it is
-  // spelled out. Returns `{ parts, codes }`, `codes` the overlay's codes as
-  // the save writes them where they are not the stored ones, else null.
-  static #writtenParts(parts, keepsName, readings, overlay = null, spellsOutCodes = false, losesIndicator = () => false) {
+  // spelled out. Where `keepsIndicators` (the JSON, which can write the flag),
+  // each part spelled out of a custom indicator is marked as one
+  // (#flaggedAsIndicators) before it is placed, so the placement lays it out
+  // as the save's reload will. Returns `{ parts, codes }`, `codes` the
+  // overlay's codes as the save writes them where they are not the stored
+  // ones, else null.
+  static #writtenParts(parts, keepsName, readings, overlay = null, spellsOutCodes = false, losesIndicator = () => false, keepsIndicators = false) {
     const spellsOutWordCodes = spellsOutCodes && !!overlay && BlissSVGBuilder.#namesCustomWordCode(overlay.codes ?? []);
     const holdsLostIndicator = parts.some((part) => losesIndicator(part));
     const sources = spellsOutWordCodes || holdsLostIndicator || BlissSVGBuilder.#mayDrawElsewhere(parts, overlay) ? [] : null;
-    const spelled = BlissSVGBuilder.#spelledOutParts(parts, keepsName, readings, sources);
+    const spelledOut = BlissSVGBuilder.#spelledOutParts(parts, keepsName, readings, sources);
+    const spelled = keepsIndicators && sources ? BlissSVGBuilder.#flaggedAsIndicators(parts, spelledOut, sources) : spelledOut;
     if (!spellsOutWordCodes && !holdsLostIndicator && !sources?.some((path) => path.length > 1)) {
       return { parts: spelled, codes: null };
     }
     return BlissSVGBuilder.#placedAsDrawn(parts, spelled, sources, overlay, readings, losesIndicator, spellsOutWordCodes);
+  }
+
+  // `spelled`, the parts #spelledOutParts writes for the stored `parts`, with
+  // each part spelled out of a custom indicator marked as one: a part takes
+  // the flag, and the `width` where one is stored, of the nearest flagged node
+  // on its way down in `sources`, which ends at the node it is written from,
+  // so a part that is an indicator itself keeps its own. A reload lays a
+  // flagged part out as an indicator, and its handles and `clearIndicators()`
+  // treat it as one, as the builder treated the code it came from. A `null`
+  // step leads into a shape defined after the build, which stored nothing
+  // below it, so the way down ends there; a shape holds no indicator. Sources
+  // are recorded wherever a custom indicator is among `parts`
+  // (#mayDrawElsewhere).
+  static #flaggedAsIndicators(parts, spelled, sources) {
+    return spelled.map((part, index) => {
+      let node = { parts };
+      let indicator = null;
+      for (const step of sources[index]) {
+        if (step === null) break;
+        node = node.parts[step];
+        if (node.isIndicator === true) indicator = node;
+      }
+      return indicator ? { ...part, isIndicator: true, ...(indicator.width !== undefined && { width: indicator.width }) } : part;
+    });
   }
 
   // Whether the parts a save writes for a character could draw anywhere but
@@ -4973,7 +5004,7 @@ class BlissSVGBuilder {
     let parts = written.map(({ part }) => part);
     let codes = startCodes;
     for (let round = 0; round < 5; round++) {
-      const read = BlissSVGBuilder.#writtenPartsReadBack(parts);
+      const read = BlissSVGBuilder.#writtenPartsReadBack(parts, losesIndicator);
       if (!read) return null;
       const reloadHead = BlissSVGBuilder.#headMergedWith(read, overlay, codes);
       const reload = BlissSVGBuilder.#characterLayout(reloadHead.parts);
@@ -5080,15 +5111,21 @@ class BlissSVGBuilder {
   }
 
   // Written parts read back as a reload reads them: their codes and positions,
-  // as the string writes them, through the parser. Options are left out, since
-  // inside a character only positions move ink. Null where the text does not
-  // read back as one character of as many parts.
-  static #writtenPartsReadBack(parts) {
+  // as the string writes them, through the parser, and the indicator flag on
+  // each written part the save keeps it on (all but the ones `losesIndicator`
+  // names). The parser reads a flag from a code alone, so a plain shape the
+  // JSON writes flagged would read back as plain ink, where the JSON's reload
+  // lays it out as an indicator. Options are left out, since inside a
+  // character only positions move ink. Null where the text does not read back
+  // as one character of as many parts.
+  static #writtenPartsReadBack(parts, losesIndicator) {
     const text = parts.map((part) => (part.codeName.startsWith('XTXT_') ? 'X' + part.codeName.slice(5) : part.codeName)
       + BlissSVGBuilder.#positionSuffix(part.x, part.y)).join(';');
     const { groups } = BlissParser.parse(text);
     const glyphs = groups?.length === 1 ? groups[0].glyphs : undefined;
-    return glyphs?.length === 1 && glyphs[0].parts?.length === parts.length ? glyphs[0].parts : null;
+    if (glyphs?.length !== 1 || glyphs[0].parts?.length !== parts.length) return null;
+    return glyphs[0].parts.map((read, index) => (parts[index].isIndicator === true && !losesIndicator(parts[index])
+      ? { ...read, isIndicator: true } : read));
   }
 
   // The layout's own test (BlissElement's part classification): it places a
@@ -5115,10 +5152,11 @@ class BlissSVGBuilder {
   // it draws written as a `;;` code with that part's options (less what its
   // own code brings) and its position. A plain part among them is taken off
   // the list, which holds indicators only, to be written on the word's head
-  // as a plain part (in the JSON too: there an indicator flag would let the
-  // codes left in the list replace it). A code with no built-in spelling
-  // keeps its name: no built-in code draws what its own function draws, and a
-  // definition removed since the build has nothing left to spell.
+  // as a plain part, its indicator flag and width dropped (in the JSON too:
+  // there an indicator flag would let the codes left in the list replace
+  // it). A code with no built-in spelling keeps its name: no built-in code
+  // draws what its own function draws, and a definition removed since the
+  // build has nothing left to spell.
   //
   // Returns `{ codes, origins, toHead }`, `origins[k]` naming where written
   // code k comes from: `stored`, the stored code's index, and `path`, the way
@@ -5145,6 +5183,7 @@ class BlissSVGBuilder {
         } else {
           const plain = { ...part };
           delete plain.isIndicator;
+          delete plain.width;
           toHead.push({ part: plain, stored, path });
         }
       });
