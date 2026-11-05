@@ -15,11 +15,16 @@ import { BlissSVGBuilder } from '../src/index.js';
  *   drawing, saving and reporting as the same definition written without it.
  * - Whitespace inside a quoted bracket value, kept.
  * - A code string that reads as a `;;` once its whitespace is dropped
- *   (`B313; ;B86`), refused as `B313;;B86` is.
- * - patchDefinition() reading a new code string the same way.
+ *   (`B313; ;B86`), refused as `B313;;B86` is, and a getPath shape's (typed
+ *   or detected) that reads as a run word, refused as the word is.
+ * - patchDefinition() reading a new code string the same way, each of its
+ *   guards included (an indicator baked into a glyph, a position in the
+ *   character's own bracket, an unreadable coordinate).
  * - The definition or patch otherwise read as given: a class instance keeps
  *   the getPath it inherits (define and patch), a code string its class
- *   computes is read, and a frozen definition is read.
+ *   computes is read, a frozen definition is read, and an accessor reading
+ *   what its class keeps for the object (a private field, a WeakMap entry)
+ *   runs on the caller's object (define and patch).
  *
  * Does NOT cover:
  * - A whitespace-only code string (refused) and a getPath shape given one
@@ -89,6 +94,15 @@ describe('BlissSVGBuilder define code string whitespace', () => {
       BlissSVGBuilder.define({ WS_CODE: definitionOf(type, read) }, { overwrite: true });
       expect(padded).toEqual(usesOf('WS_CODE'));
     });
+
+    it.each([
+      ['typed', { type: 'shape' }],
+      ['detected', {}],
+    ])('refuses a %s getPath shape whose code string " Xa Xb " reads as the word XaXb', (_, typing) => {
+      // pins the code string handed to the shape reader as read on both routes to it; the detected one went unpinned
+      const result = defineTracked({ WS_RUN: { ...typing, getPath: () => 'M0,0L8,8', width: 8, height: 8, codeString: ' Xa Xb ' } });
+      expect(result.errors).toEqual([expect.stringContaining('a shape definition cannot be a multi-character word ("XaXb"')]);
+    });
   });
 
   describe('when whitespace stands inside a quoted bracket value', () => {
@@ -116,6 +130,18 @@ describe('BlissSVGBuilder define code string whitespace', () => {
       expect(builder.warnings).toEqual([]);
       expect(builder.toString()).toBe('B313/B291');
     });
+
+    it.each([
+      [' B313; B86 ', 'B313;B86', 'a glyph definition cannot bake in an indicator'],
+      [' [x=1]C8 ', '[x=1]C8', 'cannot include the position option "x"'],
+      [' C8:x ', 'C8:x', 'the codeString "C8:x" cannot be read (MALFORMED_COORDINATES)'],
+    ])('refuses the glyph patch %j as it refuses %j', (written, read, message) => {
+      defineTracked({ WS_PATCH_GUARD: { type: 'glyph', codeString: 'C8' } });
+      expect(() => BlissSVGBuilder.patchDefinition('WS_PATCH_GUARD', { codeString: read })).toThrow(message);
+      // pins each patch guard judging the code string as read; one reading it as written let the padded form through
+      expect(() => BlissSVGBuilder.patchDefinition('WS_PATCH_GUARD', { codeString: written })).toThrow(message);
+      expect(BlissSVGBuilder.getDefinition('WS_PATCH_GUARD').codeString).toBe('C8');
+    });
   });
 
   describe('when the definition is a class instance or a frozen object', () => {
@@ -137,7 +163,7 @@ describe('BlissSVGBuilder define code string whitespace', () => {
     });
 
     it('reads a code string its class computes', () => {
-      // pins the copy defining its code string: assigned, it met the inherited getter and threw
+      // pins the code string read through the getter its class defines (a copy that assigned over it threw)
       class Word { get codeString() { return ' B313 / B291 '; } }
       defineTracked({ WS_COMPUTED: new Word() });
       expect(BlissSVGBuilder.getDefinition('WS_COMPUTED').codeString).toBe('B313/B291');
@@ -155,6 +181,50 @@ describe('BlissSVGBuilder define code string whitespace', () => {
       expect(() => BlissSVGBuilder.patchDefinition('WS_PATCH_SHAPE', new Redraw()))
         .toThrow('a shape is drawn either by its getPath function or by its codeString');
       expect(BlissSVGBuilder.getDefinition('WS_PATCH_SHAPE').codeString).toBe('C8');
+    });
+  });
+
+  describe('when an accessor of the definition reads what its class keeps for that object', () => {
+    class PrivateOptions {
+      #options = { color: 'red' };
+      constructor(fields) { Object.assign(this, fields); }
+      get defaultOptions() { return this.#options; }
+    }
+    const kept = new WeakMap();
+    class KeptOptions {
+      constructor(fields) { Object.assign(this, fields); kept.set(this, { color: 'red' }); }
+      get defaultOptions() { return kept.get(this); }
+    }
+    class OwnAccessorOptions {
+      #options = { color: 'red' };
+      constructor(fields) {
+        Object.assign(this, fields);
+        Object.defineProperty(this, 'defaultOptions', { get() { return this.#options; }, enumerable: true });
+      }
+    }
+
+    it.each([
+      ['bare', 'a private field', PrivateOptions],
+      ['glyph', 'a private field', PrivateOptions],
+      ['shape', 'a private field', PrivateOptions],
+      ['bare', 'a WeakMap keyed by it', KeptOptions],
+      ['bare', 'a private field its own accessor reads', OwnAccessorOptions],
+    ])('defines a %s definition whose defaultOptions it keeps in %s', (type, _, Definition) => {
+      // regression: the code string was read through a copy, so the accessor ran on an object its class never made
+      const result = defineTracked({ WS_KEPT: new Definition(definitionOf(type, ' C8 ')) });
+      expect(result.errors).toEqual([]);
+      expect(BlissSVGBuilder.getDefinition('WS_KEPT')).toMatchObject({ codeString: 'C8', defaultOptions: { color: 'red' } });
+    });
+
+    it.each([
+      ['bare', 'a private field its own accessor reads', OwnAccessorOptions],
+      ['glyph', 'a private field', PrivateOptions],
+      ['glyph', 'a WeakMap keyed by it', KeptOptions],
+    ])('patches a %s definition with the defaultOptions a patch keeps in %s', (type, _, Patch) => {
+      // regression: the patch was read through the same copy
+      defineTracked({ WS_KEPT_PATCH: definitionOf(type, 'B291') });
+      BlissSVGBuilder.patchDefinition('WS_KEPT_PATCH', new Patch({ codeString: ' C8 ' }));
+      expect(BlissSVGBuilder.getDefinition('WS_KEPT_PATCH')).toMatchObject({ codeString: 'C8', defaultOptions: { color: 'red' } });
     });
   });
 });

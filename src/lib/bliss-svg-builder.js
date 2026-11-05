@@ -240,17 +240,6 @@ const putOwn = (target, key, value) =>
 // key; a Date, a Map and the like are not.
 const isRecord = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
-// A definition with its code string read as an input string reads it, and
-// read as given otherwise: the copy keeps the caller's prototype and every own
-// property, so a class instance keeps the getPath it inherits, a code string
-// its class computes is replaced rather than assigned over its getter, and a
-// frozen object takes the new one.
-const withInputCodeString = (definition) =>
-  Object.create(Object.getPrototypeOf(definition), {
-    ...Object.getOwnPropertyDescriptors(definition),
-    codeString: { value: withoutInputWhitespace(definition.codeString), writable: true, enumerable: true, configurable: true },
-  });
-
 // The first failed part among `parts` and the parts they hold, at any depth.
 const heldFailure = (parts = []) => {
   for (const part of parts) {
@@ -5607,11 +5596,11 @@ class BlissSVGBuilder {
 
   // ── Private define helpers ──────────────────────────────────────
 
-  static #defineShape(code, definition, options = {}, warnings) {
+  static #defineShape(code, definition, codeString, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
     const hasGetPath = typeof definition?.getPath === 'function';
-    const hasCodeString = typeof definition?.codeString === 'string' && definition.codeString.trim().length > 0;
+    const hasCodeString = typeof codeString === 'string' && codeString.trim().length > 0;
 
     if (!hasGetPath && !hasCodeString) {
       throw new Error(`define("${code}"): shape requires either "getPath" (function) or "codeString" (non-empty, non-whitespace string).`);
@@ -5628,27 +5617,27 @@ class BlissSVGBuilder {
 
     // Shapes can only reference other shapes
     if (hasCodeString) {
-      const refError = BlissSVGBuilder.#validateReferences(code, definition.codeString, ['shape']);
+      const refError = BlissSVGBuilder.#validateReferences(code, codeString, ['shape']);
       if (refError) throw new Error(`define(${refError})`);
-      if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
+      if (BlissSVGBuilder.#hasCircularReference(code, codeString)) {
         throw new Error(`define("${code}"): circular reference detected`);
       }
       // A shape is a single character; `/` and `//` are word separators, so a
       // `/`-bearing codeString is a word, not a shape. Define a word as a bare
       // alias (omit type:"shape"). (Strict Indicator Separation.)
-      if (definition.codeString.includes('/')) {
+      if (codeString.includes('/')) {
         throw new Error(`define("${code}"): a shape definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"shape").`);
       }
 
       // `;;` is a word-level indicator (a word property); a shape is a single
       // character, so it cannot carry one. (Strict Indicator Separation.)
-      if (definition.codeString.includes(';;')) {
+      if (codeString.includes(';;')) {
         throw new Error(`define("${code}"): a shape definition cannot contain a word-level indicator (";;"); a shape is a single character.`);
       }
 
-      const shapeRunWord = BlissSVGBuilder.#expandedRunWord(definition.codeString);
+      const shapeRunWord = BlissSVGBuilder.#expandedRunWord(codeString);
       if (shapeRunWord) {
-        throw new Error(`define("${code}"): a shape definition cannot be a multi-character word ("${definition.codeString}" is shorthand for "${shapeRunWord}"). Define a word as a bare alias (omit type:"shape").`);
+        throw new Error(`define("${code}"): a shape definition cannot be a multi-character word ("${codeString}" is shorthand for "${shapeRunWord}"). Define a word as a bare alias (omit type:"shape").`);
       }
     }
 
@@ -5664,7 +5653,7 @@ class BlissSVGBuilder {
       if (definition.y !== undefined) entry.y = definition.y;
       if (definition.extraPathOptions) entry.extraPathOptions = definition.extraPathOptions;
     } else {
-      entry.codeString = definition.codeString;
+      entry.codeString = codeString;
     }
 
     if (definition.defaultOptions && typeof definition.defaultOptions === 'object') {
@@ -5805,36 +5794,36 @@ class BlissSVGBuilder {
       callName, code, Object.fromEntries(written), 'the character bracket leading its codeString');
   }
 
-  static #defineGlyph(code, definition, options = {}, warnings) {
+  static #defineGlyph(code, definition, codeString, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
-    if (typeof definition?.codeString !== 'string' || definition.codeString.trim().length === 0) {
+    if (typeof codeString !== 'string' || codeString.trim().length === 0) {
       throw new Error(`define("${code}"): "codeString" must be a non-empty, non-whitespace string.`);
     }
 
     // A glyph is a single character; `/` and `//` are word separators, so a
     // `/`-bearing codeString is a word, not a glyph. Define a word as a bare
     // alias (omit type:"glyph"). (Strict Indicator Separation.)
-    if (definition.codeString.includes('/')) {
+    if (codeString.includes('/')) {
       throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word (its codeString contains "/"). Define a word as a bare alias (omit type:"glyph").`);
     }
 
     // `;;` is a word-level indicator (a word property); a glyph is a single
     // character, so it cannot carry one. (Strict Indicator Separation.)
-    if (definition.codeString.includes(';;')) {
+    if (codeString.includes(';;')) {
       throw new Error(`define("${code}"): a glyph definition cannot contain a word-level indicator (";;"); a glyph is a single character. Apply a word indicator at the use site (WORD;;INDICATOR).`);
     }
 
-    const glyphRunWord = BlissSVGBuilder.#expandedRunWord(definition.codeString);
+    const glyphRunWord = BlissSVGBuilder.#expandedRunWord(codeString);
     if (glyphRunWord) {
-      throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word ("${definition.codeString}" is shorthand for "${glyphRunWord}"). Define a word as a bare alias (omit type:"glyph").`);
+      throw new Error(`define("${code}"): a glyph definition cannot be a multi-character word ("${codeString}" is shorthand for "${glyphRunWord}"). Define a word as a bare alias (omit type:"glyph").`);
     }
 
     // Glyphs can reference other glyphs, shapes and letters (external glyphs),
     // but not bare aliases
-    const refError = BlissSVGBuilder.#validateReferences(code, definition.codeString, ['glyph', 'shape', 'externalGlyph']);
+    const refError = BlissSVGBuilder.#validateReferences(code, codeString, ['glyph', 'shape', 'externalGlyph']);
     if (refError) throw new Error(`define(${refError})`);
-    if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
+    if (BlissSVGBuilder.#hasCircularReference(code, codeString)) {
       throw new Error(`define("${code}"): circular reference detected`);
     }
 
@@ -5842,7 +5831,7 @@ class BlissSVGBuilder {
     // base+indicator combo. Reject a glyph def (not flagged isIndicator) that
     // bakes in an indicator part; define such combos as bare aliases instead.
     if (definition.isIndicator !== true) {
-      const refs = BlissSVGBuilder.#extractReferencedCodes(definition.codeString);
+      const refs = BlissSVGBuilder.#extractReferencedCodes(codeString);
       if (refs.some(ref => blissElementDefinitions[ref]?.isIndicator === true)) {
         throw new Error(`define("${code}"): a glyph definition cannot bake in an indicator. Define a base+indicator combination as a bare alias (omit type:"glyph"), attach the indicator at the use site (BASE;INDICATOR), or flag a compound indicator with isIndicator:true.`);
       }
@@ -5851,7 +5840,7 @@ class BlissSVGBuilder {
     BlissSVGBuilder.#assertReplaceable(code, options);
 
     const entry = {
-      codeString: definition.codeString,
+      codeString,
       glyphCode: code,
       isBlissGlyph: true
     };
@@ -6075,10 +6064,10 @@ class BlissSVGBuilder {
     return undefined;
   }
 
-  static #defineBare(code, definition, options = {}, warnings) {
+  static #defineBare(code, definition, codeString, options = {}, warnings) {
     BlissSVGBuilder.#validateCode(code);
 
-    if (typeof definition?.codeString !== 'string' || definition.codeString.trim().length === 0) {
+    if (typeof codeString !== 'string' || codeString.trim().length === 0) {
       throw new Error(`define("${code}"): "codeString" must be a non-empty, non-whitespace string.`);
     }
 
@@ -6088,7 +6077,7 @@ class BlissSVGBuilder {
     // a further use-site `;;` on such a definition would nest word-indicators, yet
     // a word carries only one. Reject ANY `;;`, whether or not the code after it
     // is itself an indicator. (Strict Indicator Separation.)
-    if (definition.codeString.includes(';;')) {
+    if (codeString.includes(';;')) {
       throw new Error(`define("${code}"): a definition cannot contain a word-level indicator (";;"); apply a word indicator at the use site (WORD;;INDICATOR).`);
     }
 
@@ -6097,7 +6086,7 @@ class BlissSVGBuilder {
     // no cycle guard: a cycle (CA -> CB -> CA, or a direct self-reference) was
     // stored and then crashed at render with "Maximum recursion depth". Rejecting
     // one side here leaves the chain terminating at an unregistered code instead.
-    if (BlissSVGBuilder.#hasCircularReference(code, definition.codeString)) {
+    if (BlissSVGBuilder.#hasCircularReference(code, codeString)) {
       throw new Error(`define("${code}"): circular reference detected`);
     }
 
@@ -6106,8 +6095,8 @@ class BlissSVGBuilder {
     // composed unflagged alias as a ;-part (checked on the written codeString,
     // which is also what gets stored), so define() is consistent with the
     // use-site failure.
-    if (BlissSVGBuilder.#hasCompositePartViolation(definition.codeString)) {
-      throw new Error(`define("${code}"): a ; part cannot be a composition ("${definition.codeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
+    if (BlissSVGBuilder.#hasCompositePartViolation(codeString)) {
+      throw new Error(`define("${code}"): a ; part cannot be a composition ("${codeString}"). A ; part must be a primitive or a flagged glyph; attach indicators at the use site (BASE;INDICATOR) or compose words with /.`);
     }
 
     BlissSVGBuilder.#assertReplaceable(code, options);
@@ -6116,7 +6105,7 @@ class BlissSVGBuilder {
     // codeString stay verbatim, so definition content is late-bound like a
     // native code (a redefine of a referenced code flows through to every
     // composition using it). Only /SP/ space segments normalize.
-    const stored = BlissSVGBuilder.#normalizeSpaceSegments(definition.codeString);
+    const stored = BlissSVGBuilder.#normalizeSpaceSegments(codeString);
 
     // Word definitions (containing /) must not have internal position
     // modifiers, not even through a referenced alias: the guard judges the
@@ -6176,12 +6165,16 @@ class BlissSVGBuilder {
       return result;
     }
 
-    for (const [code, given] of Object.entries(definitions)) {
+    for (const [code, definition] of Object.entries(definitions)) {
       try {
         // A code string is read as an input string is: the whitespace outside
         // its brackets is dropped before it is judged and stored. Kept, it
         // reached every code lookup, so each use failed as an unknown code.
-        const definition = typeof given?.codeString === 'string' ? withInputCodeString(given) : given;
+        // Read once, here, and handed on beside the definition, which is read
+        // as given: a copy ran the caller's accessors on an object their class
+        // never made, so one reading a private field threw.
+        const written = definition?.codeString;
+        const codeString = typeof written === 'string' ? withoutInputWhitespace(written) : written;
         const type = definition?.type;
 
         if (type && type !== 'glyph' && type !== 'shape' && type !== 'externalGlyph') {
@@ -6203,17 +6196,17 @@ class BlissSVGBuilder {
         }
 
         if (type === 'glyph') {
-          BlissSVGBuilder.#defineGlyph(code, definition, options, result.warnings);
+          BlissSVGBuilder.#defineGlyph(code, definition, codeString, options, result.warnings);
         } else if (type === 'shape') {
-          BlissSVGBuilder.#defineShape(code, definition, options, result.warnings);
+          BlissSVGBuilder.#defineShape(code, definition, codeString, options, result.warnings);
         } else if (type === 'externalGlyph') {
           BlissSVGBuilder.#defineExternalGlyph(code, definition, options, result.warnings);
         } else if (typeof definition?.getPath === 'function' && typeof definition?.char === 'string') {
           BlissSVGBuilder.#defineExternalGlyph(code, definition, options, result.warnings);
         } else if (typeof definition?.getPath === 'function') {
-          BlissSVGBuilder.#defineShape(code, definition, options, result.warnings);
-        } else if (typeof definition?.codeString === 'string') {
-          BlissSVGBuilder.#defineBare(code, definition, options, result.warnings);
+          BlissSVGBuilder.#defineShape(code, definition, codeString, options, result.warnings);
+        } else if (typeof codeString === 'string') {
+          BlissSVGBuilder.#defineBare(code, definition, codeString, options, result.warnings);
         } else {
           result.errors.push(`"${code}": unable to detect definition type. Provide codeString, type+getPath+width+height (shape), or type+getPath+char (externalGlyph).`);
           continue;
@@ -6339,10 +6332,11 @@ class BlissSVGBuilder {
     if (!changes || typeof changes !== 'object') {
       throw new Error(`patchDefinition("${code}"): changes must be an object.`);
     }
-    // Read as define() reads one (see there).
-    if (typeof changes.codeString === 'string') {
-      changes = withInputCodeString(changes);
-    }
+    // Read as define() reads one (see there): once, here, with `changes`
+    // itself read as given. Every later use of the patch's code string reads
+    // this one, and so does the definition it is stored on.
+    let newCodeString = typeof changes.codeString === 'string'
+      ? withoutInputWhitespace(changes.codeString) : changes.codeString;
 
     const def = blissElementDefinitions[code];
 
@@ -6379,7 +6373,6 @@ class BlissSVGBuilder {
 
     // If codeString is being patched, validate references and circular refs
     if ('codeString' in changes) {
-      const newCodeString = changes.codeString;
       if (typeof newCodeString !== 'string' || newCodeString.trim().length === 0) {
         throw new Error(`patchDefinition("${code}"): "codeString" must be a non-empty, non-whitespace string.`);
       }
@@ -6432,7 +6425,7 @@ class BlissSVGBuilder {
     // indicator that keeps its anatomy. The POST-patch state is judged, so
     // codeString + isIndicator:true in one patch stays legal.
     if (type === 'glyph' && ('codeString' in changes || 'isIndicator' in changes)) {
-      const nextCodeString = 'codeString' in changes ? changes.codeString : def.codeString;
+      const nextCodeString = 'codeString' in changes ? newCodeString : def.codeString;
       const nextIsIndicator = 'isIndicator' in changes ? changes.isIndicator === true : def.isIndicator === true;
       if (!nextIsIndicator && typeof nextCodeString === 'string') {
         const refs = BlissSVGBuilder.#extractReferencedCodes(nextCodeString);
@@ -6448,11 +6441,11 @@ class BlissSVGBuilder {
     // judges the resolved view, mirroring #defineBare (patch cannot
     // construct a state define() forbids).
     if ('codeString' in changes && type === 'bare') {
-      const stored = BlissSVGBuilder.#normalizeSpaceSegments(changes.codeString);
+      newCodeString = BlissSVGBuilder.#normalizeSpaceSegments(newCodeString);
       BlissSVGBuilder.#assertNoWordInternalCoordinates(
-        'patchDefinition', code, BlissSVGBuilder.#resolveBareAliases(stored)
+        'patchDefinition', code, BlissSVGBuilder.#resolveBareAliases(newCodeString)
       );
-      changes = { ...changes, codeString: stored };
+      changes = { ...changes, codeString: newCodeString };
     }
 
     // Deferred validation at the completing patch: a patch that
@@ -6482,8 +6475,8 @@ class BlissSVGBuilder {
     }
 
     if ('codeString' in changes) {
-      BlissSVGBuilder.#assertOwnBracketDescribesTheCharacter('patchDefinition', code, changes.codeString);
-      BlissSVGBuilder.#assertCodeStringReadable('patchDefinition', code, type, { ...def, ...changes });
+      BlissSVGBuilder.#assertOwnBracketDescribesTheCharacter('patchDefinition', code, newCodeString);
+      BlissSVGBuilder.#assertCodeStringReadable('patchDefinition', code, type, { ...def, ...changes, codeString: newCodeString });
     }
 
     // Apply changes
@@ -6500,6 +6493,8 @@ class BlissSVGBuilder {
         } else {
           delete def.kerningRules;
         }
+      } else if (key === 'codeString') {
+        def.codeString = newCodeString;
       } else {
         def[key] = value;
       }
