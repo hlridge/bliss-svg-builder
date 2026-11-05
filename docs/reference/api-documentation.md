@@ -158,7 +158,7 @@ new BlissSVGBuilder('LOVE').toJSON({ preserve: true });   // codeName: 'LOVE'
 
 Word-level indicator behavior:
 - A word-level indicator (`;;`) is carried as a reversible `wordIndicators: { codes, stripSemantic }` field on its group, not baked onto a glyph's parts. The round-trip keeps it.
-- A `;;` code named by a custom definition is written in `codes` as the built-in indicator codes it draws (`['B99']` for `{ codeString: 'B99' }`); one that spells out into a plain shape, which a `;;` list cannot hold, becomes a part of the head glyph that keeps `isIndicator`. `preserve` keeps the name.
+- A `;;` code named by a custom definition is written in `codes` as the built-in indicator codes it draws (`['B99']` for `{ codeString: 'B99' }`); one that spells out into a plain shape, which a `;;` list cannot hold, becomes a part of the head glyph, marked `isIndicator` when no code is left in the list. `preserve` keeps the name.
 - Pass `{ flattenIndicators: true }` to bake the overlay onto the head glyph's parts and omit the `wordIndicators` field (the decomposed primitive form). `flattenIndicators` is independent of `preserve` and composes with it.
 
 ```js
