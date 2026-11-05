@@ -5,8 +5,7 @@ import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 /**
  * Pins the head-marker (`^`) contract cross-product matrix: marker
  * placement x fragment position x exclusion interplay x word shape x
- * decorations, per the test-matrix requirement in
- * `.claude/backlog/head-marker-contract.md`.
+ * decorations: the combinations the contract requires a test for.
  *
  * Covers:
  * - Markers riding single-character alias chains and aliases to composed

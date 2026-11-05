@@ -3,8 +3,7 @@
  * `tests/utils/visual-comparison.js`) actually distinguishes equivalent renders
  * from divergent ones. This is the pipeline's only self-test: the e2e suite
  * trusts `compareImages` to FAIL on a real regression, but nothing else proves
- * it can rather than silently passing. (Workstream A of the SVG-regeneration
- * effort, `.claude/plans/svg-regeneration-and-pipeline-validation.md`.)
+ * it can rather than silently passing.
  *
  * Covers:
  * - Byte-identical renders report a match at 100% similarity (no false negative).
@@ -17,13 +16,13 @@
  * Does NOT cover:
  * - The sub-threshold sensitivity floor: a per-channel delta <= 10 and overall
  *   similarity >= 99.999% are tolerated by design, so a regression smaller than
- *   that floor is intentionally not caught. See the plan's "Comparison tolerance"
- *   note (UPDATE 2026-06-23).
+ *   that floor is intentionally not caught, so the set of failing e2e cases is a
+ *   lower bound on what changed, not the full set.
  * - The e2e harness's missing-reference behaviour (a `fs.readFileSync` throw in
  *   `BlissSVGBuilder.visual-regression.e2e.test.js`, not in `compareImages`).
  * - Exhaustive comparator edge cases (whitespace, attribute order, namespaces,
- *   embedded images) and the dead `toMatchImage` matcher: deferred to
- *   `.claude/backlog/visual-regression-pipeline-thorough-validation.md`.
+ *   embedded images) and the dead `toMatchImage` matcher: deferred, tested
+ *   nowhere yet.
  */
 import { describe, it, expect } from 'vitest';
 import { renderSVGToPNG, compareImages } from './utils/visual-comparison.js';

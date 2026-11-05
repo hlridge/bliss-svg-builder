@@ -143,11 +143,11 @@ describe('ElementHandle clear indicators', () => {
     });
 
     it('re-emits a part-level option on the restored base so the round-trip is lossless', () => {
-      // RR3-3: clearing reduces the glyph to a single identityful base part that
-      // still carries a part-level option (plus the relocation offset). serializeGlyph
+      // Clearing reduces the glyph to a single identityful base part that still
+      // carries a part-level option (plus the relocation offset). serializeGlyph
       // routes the single-part built-in through serializeParts so the option AND the
-      // offset re-emit, instead of collapsing to the bare code. Subsumes the N13 offset
-      // path (one code path). see .claude/backlog/part-options-dropped-on-restored-base.md
+      // offset re-emit, instead of collapsing to the bare code; the offset-only case
+      // above takes the same path.
       const b = new BlissSVGBuilder('[color=red]>B291:2,3;B86/B303');
       b.group(0).glyph(0).clearIndicators();
       expect(b.toString()).toBe('[color=red]>B291:2,3/B303');

@@ -3,9 +3,8 @@ import { BlissParser } from '../src/lib/bliss-parser.js';
 import { BlissSVGBuilder } from '../src/lib/bliss-svg-builder.js';
 
 /**
- * Pins the head-marker (`^`) contract decided 2026-06-11: `^` belongs to
- * characters. The ten acceptance fixtures from
- * `.claude/backlog/head-marker-contract.md` land here verbatim, plus the
+ * Pins the head-marker (`^`) contract: `^` belongs to characters. The
+ * contract's ten acceptance fixtures land here verbatim, plus the
  * warning-exactness rules (MISPLACED_HEAD_MARKER for markers on
  * multi-character aliases; MULTIPLE_HEAD_MARKERS only for two written
  * markers in the same word-string).
