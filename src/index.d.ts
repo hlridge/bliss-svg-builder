@@ -1426,14 +1426,16 @@ export declare class BlissSVGBuilder {
   /**
    * Returns a normalized parsed structure (plain object). Custom codes are
    * decomposed to built-in codes by default, wherever they are used, each
-   * part carrying the options its definition gives (a shape drawn by its own
-   * `getPath` function, or an external glyph, keeps its name, as in
-   * `toString()`); `{ preserve: true }` keeps custom names under the same rule
-   * as `toString()`. As there, a part or a `wordIndicators` code carries the
-   * position it was drawn at, and a glyph `isHeadGlyph: true`, where needed to
-   * keep an indicator where it was drawn, and a `;;` code named by a custom
-   * definition is written as built-in codes, a plain shape among them as a
-   * part of the head that keeps `isIndicator`.
+   * part carrying the options its definition gives, and each part a custom
+   * indicator decomposes into keeping `isIndicator` and `width` (a shape
+   * drawn by its own `getPath` function, or an external glyph, keeps its
+   * name, as in `toString()`); `{ preserve: true }` keeps custom names under
+   * the same rule as `toString()`. As there, a part or a `wordIndicators` code
+   * carries the position it was drawn at, and a glyph `isHeadGlyph: true`,
+   * where needed to keep an indicator where it was drawn, and a `;;` code
+   * named by a custom definition is written as built-in codes, a plain shape
+   * among them as a part of the head, marked `isIndicator` when no code is
+   * left in the list.
    *
    * `flattenIndicators` bakes word-level (`;;`) indicators onto the head and
    * omits the `wordIndicators` field (see `toString`).
