@@ -1,0 +1,100 @@
+name: Publish to npm
+
+# Publishes a tagged version to npm through trusted publishing: npm checks that
+# the request comes from this workflow in this repository, so no npm token is
+# stored anywhere.
+#
+# Runs only when started by hand, on a version tag: Actions > Publish to npm >
+# Run workflow > "Use workflow from" > Tags > vX.Y.Z (or
+# `gh workflow run publish.yml --ref vX.Y.Z`). A push, a tag or a GitHub
+# Release never starts it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # lets npm verify the run; it grants nothing else
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check that the run is on a version tag
+        run: |
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Run this workflow on a version tag (Use workflow from > Tags), not on $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # node-canvas (used by the render-comparison tests) links against the
+      # system Cairo/Pango libraries at runtime.
+      - name: Install canvas system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      # No dependency cache in a release build: everything installs fresh from
+      # the lockfile.
+      - name: Setup Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Check that package.json matches the tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::package.json says $VERSION but the tag is $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      # Every project: lib, dist, property and visual regression.
+      - name: Tests
+        run: pnpm run test:all
+
+      - name: Pack
+        run: |
+          pnpm pack
+          FILE="bliss-svg-builder-$VERSION.tgz"
+          tar -tzf "$FILE"
+          echo "sha1 $(sha1sum "$FILE" | cut -d' ' -f1)"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: Check the npm version
+        run: |
+          npm --version
+          node -e "const [a, b, c] = process.argv[1].split('.').map(Number); process.exit(a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1))) ? 0 : 1)" "$(npm --version)"
+
+      # A prerelease (1.2.0-rc.1) goes to the `next` tag, a release to `latest`.
+      - name: Publish
+        run: |
+          if [[ "$VERSION" == *-* ]]; then
+            npm publish "$FILE" --tag next
+          else
+            npm publish "$FILE"
+          fi
